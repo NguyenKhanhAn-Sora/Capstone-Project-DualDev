@@ -194,7 +194,9 @@ export class LivestreamService {
     return stream;
   }
 
-  private async getStreamAnyStatusOrThrow(streamId: string): Promise<Livestream> {
+  private async getStreamAnyStatusOrThrow(
+    streamId: string,
+  ): Promise<Livestream> {
     if (!Types.ObjectId.isValid(streamId)) {
       throw new NotFoundException('Livestream not found');
     }
@@ -238,9 +240,13 @@ export class LivestreamService {
 
   async create(userId: string, dto: CreateLivestreamDto) {
     const title = dto.title.trim();
-    const titleWordCount = title ? title.split(/\s+/).filter(Boolean).length : 0;
+    const titleWordCount = title
+      ? title.split(/\s+/).filter(Boolean).length
+      : 0;
     if (titleWordCount > 300) {
-      throw new BadRequestException('Livestream title supports up to 300 words');
+      throw new BadRequestException(
+        'Livestream title supports up to 300 words',
+      );
     }
 
     const activeByHost = await this.livestreamModel
@@ -338,10 +344,11 @@ export class LivestreamService {
   async joinToken(
     streamId: string,
     user: { userId: string },
-    opts: { asHost?: boolean; participantName?: string },
+    opts: { asHost?: boolean; participantName?: string; isPreview?: boolean },
   ) {
     const stream = await this.getLiveStreamOrThrow(streamId);
     const asHost = Boolean(opts.asHost);
+    const isPreview = Boolean(opts.isPreview);
     const isHost = stream.hostUserId.toString() === user.userId;
 
     if (asHost && !isHost) {
@@ -352,12 +359,16 @@ export class LivestreamService {
       stream.roomName,
     );
 
-    if (!asHost && participants >= MAX_VIEWERS_PER_ROOM + 1) {
-      throw new BadRequestException('This livestream has reached the 30-viewer limit');
+    if (!asHost && !isPreview && participants >= MAX_VIEWERS_PER_ROOM + 1) {
+      throw new BadRequestException(
+        'This livestream has reached the 30-viewer limit',
+      );
     }
 
     const role = asHost ? 'host' : 'viewer';
-    const identity = `${user.userId}-${role}-${Date.now().toString(36)}`;
+    const identity = isPreview
+      ? `preview-${user.userId}-${Date.now().toString(36)}`
+      : `${user.userId}-${role}-${Date.now().toString(36)}`;
     const participantName =
       opts.participantName?.trim() || (asHost ? stream.hostName : 'Viewer');
 
@@ -416,7 +427,9 @@ export class LivestreamService {
   async getIvsIngest(streamId: string, userId: string) {
     const stream = await this.getLiveStreamOrThrow(streamId);
     if (stream.hostUserId.toString() !== userId) {
-      throw new ForbiddenException('Only the host can access IVS ingest credentials');
+      throw new ForbiddenException(
+        'Only the host can access IVS ingest credentials',
+      );
     }
 
     if ((stream.provider ?? 'livekit') !== 'ivs') {
@@ -448,7 +461,9 @@ export class LivestreamService {
       }
       const titleWordCount = title.split(/\s+/).filter(Boolean).length;
       if (titleWordCount > 300) {
-        throw new BadRequestException('Livestream title supports up to 300 words');
+        throw new BadRequestException(
+          'Livestream title supports up to 300 words',
+        );
       }
       stream.title = title;
       stream.mentionUsernames = this.normalizeMentions(undefined, title);
@@ -472,7 +487,9 @@ export class LivestreamService {
 
     await stream.save();
 
-    const participants = await this.livekitService.getParticipantCount(stream.roomName);
+    const participants = await this.livekitService.getParticipantCount(
+      stream.roomName,
+    );
     const hostProfile = await this.profileModel
       .findOne({ userId: stream.hostUserId })
       .select('username avatarUrl')

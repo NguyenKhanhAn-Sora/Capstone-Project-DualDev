@@ -1089,7 +1089,10 @@ export class AdminService implements OnModuleInit {
       const [profileMatches, userMatches] = await Promise.all([
         this.profileModel
           .find({
-            $or: [{ username: { $regex: regex } }, { displayName: { $regex: regex } }],
+            $or: [
+              { username: { $regex: regex } },
+              { displayName: { $regex: regex } },
+            ],
           })
           .select('userId')
           .lean(),
@@ -1115,7 +1118,10 @@ export class AdminService implements OnModuleInit {
 
       if (reporterIds.length) {
         matchers.push({
-          $or: [{ reporterId: { $in: reporterIds } }, { userId: { $in: reporterIds } }],
+          $or: [
+            { reporterId: { $in: reporterIds } },
+            { userId: { $in: reporterIds } },
+          ],
         });
       }
 
@@ -1138,7 +1144,9 @@ export class AdminService implements OnModuleInit {
     const reporterIds = Array.from(
       new Set(
         docs
-          .map((doc) => doc.reporterId?.toString?.() ?? doc.userId?.toString?.())
+          .map(
+            (doc) => doc.reporterId?.toString?.() ?? doc.userId?.toString?.(),
+          )
           .filter(Boolean),
       ),
     )
@@ -1163,7 +1171,10 @@ export class AdminService implements OnModuleInit {
             .find({ userId: { $in: allUserIds } })
             .select('userId displayName username')
             .lean(),
-          this.userModel.find({ _id: { $in: allUserIds } }).select('_id email').lean(),
+          this.userModel
+            .find({ _id: { $in: allUserIds } })
+            .select('_id email')
+            .lean(),
         ])
       : [[], []];
 
@@ -1262,7 +1273,11 @@ export class AdminService implements OnModuleInit {
     }
 
     const updated = await this.reportProblemModel
-      .findOneAndUpdate({ _id: reportId }, { $set: updatePayload }, { new: true })
+      .findOneAndUpdate(
+        { _id: reportId },
+        { $set: updatePayload },
+        { new: true },
+      )
       .select('_id status adminNote handledBy handledAt updatedAt')
       .lean();
 
@@ -2814,7 +2829,8 @@ export class AdminService implements OnModuleInit {
     const dbOperational = this.connection.readyState === 1;
     const apiStatus = dbOperational ? 'Operational' : 'Down';
     const apiUptimeSeconds = Math.floor(process.uptime());
-    const onlineStatsSnapshot = this.notificationsGateway.getOnlineStatsSnapshot();
+    const onlineStatsSnapshot =
+      this.notificationsGateway.getOnlineStatsSnapshot();
 
     return {
       totalUsers,
@@ -5987,7 +6003,10 @@ export class AdminService implements OnModuleInit {
         .countDocuments({ reporterId: objectId, createdAt: { $gte: since7d } })
         .exec(),
       this.reportUserModel
-        .countDocuments({ targetUserId: objectId, reporterId: { $ne: objectId } })
+        .countDocuments({
+          targetUserId: objectId,
+          reporterId: { $ne: objectId },
+        })
         .exec(),
       this.reportUserModel.distinct('reporterId', {
         targetUserId: objectId,
@@ -6047,7 +6066,11 @@ export class AdminService implements OnModuleInit {
       commentReportsReceivedTotal;
 
     const uniqueReporterSet = new Set<string>();
-    [...userReportersReceived, ...postReportersReceived, ...commentReportersReceived]
+    [
+      ...userReportersReceived,
+      ...postReportersReceived,
+      ...commentReportersReceived,
+    ]
       .map((id: any) => id?.toString?.() ?? '')
       .filter((id: string) => Boolean(id))
       .forEach((id: string) => uniqueReporterSet.add(id));
@@ -7710,7 +7733,10 @@ export class AdminService implements OnModuleInit {
       const isObjectId = Types.ObjectId.isValid(q);
       if (isObjectId) {
         return {
-          $or: [{ _id: new Types.ObjectId(q) }, { name: { $regex: q, $options: 'i' } }],
+          $or: [
+            { _id: new Types.ObjectId(q) },
+            { name: { $regex: q, $options: 'i' } },
+          ],
         };
       }
       return { name: { $regex: q, $options: 'i' } };
@@ -7719,7 +7745,8 @@ export class AdminService implements OnModuleInit {
     const sortSpec = (() => {
       if (sort === 'created_asc') return { createdAt: 1 };
       if (sort === 'created_desc') return { createdAt: -1 };
-      if (sort === 'activated_asc') return { 'communitySettings.activatedAt': 1, createdAt: 1 };
+      if (sort === 'activated_asc')
+        return { 'communitySettings.activatedAt': 1, createdAt: 1 };
       return { 'communitySettings.activatedAt': -1, createdAt: -1 };
     })();
     const servers = await this.serverModel
@@ -8024,8 +8051,10 @@ export class AdminService implements OnModuleInit {
 
     const sortSpec = (() => {
       if (sort === 'action_asc') return { createdAt: 1 };
-      if (sort === 'activated_asc') return { 'serverSnapshot.communityActivatedAt': 1, createdAt: 1 };
-      if (sort === 'activated_desc') return { 'serverSnapshot.communityActivatedAt': -1, createdAt: -1 };
+      if (sort === 'activated_asc')
+        return { 'serverSnapshot.communityActivatedAt': 1, createdAt: 1 };
+      if (sort === 'activated_desc')
+        return { 'serverSnapshot.communityActivatedAt': -1, createdAt: -1 };
       return { createdAt: -1 };
     })();
 
@@ -8046,7 +8075,9 @@ export class AdminService implements OnModuleInit {
       serverIds.length === 0
         ? []
         : await this.serverModel
-            .find({ _id: { $in: serverIds.map((id) => new Types.ObjectId(id)) } })
+            .find({
+              _id: { $in: serverIds.map((id) => new Types.ObjectId(id)) },
+            })
             .select('_id deletedAt deletedByUserId name ownerId members')
             .populate('deletedByUserId', 'email')
             .lean()
@@ -8065,11 +8096,15 @@ export class AdminService implements OnModuleInit {
       missingOwnerIds.length === 0
         ? []
         : await this.userModel
-            .find({ _id: { $in: missingOwnerIds.map((id) => new Types.ObjectId(id)) } })
+            .find({
+              _id: { $in: missingOwnerIds.map((id) => new Types.ObjectId(id)) },
+            })
             .select('_id email')
             .lean()
             .exec();
-    const ownerById = new Map(missingOwners.map((u: any) => [String(u._id), u]));
+    const ownerById = new Map(
+      missingOwners.map((u: any) => [String(u._id), u]),
+    );
 
     const enriched = items.map((it: any) => {
       const s = serverById.get(String(it.serverId));
@@ -8077,8 +8112,8 @@ export class AdminService implements OnModuleInit {
       const deletedAt = s?.deletedAt ?? null;
       const deletedBy = s?.deletedByUserId
         ? {
-            id: String((s.deletedByUserId as any)?._id ?? s.deletedByUserId),
-            email: (s.deletedByUserId as any)?.email ?? null,
+            id: String(s.deletedByUserId?._id ?? s.deletedByUserId),
+            email: s.deletedByUserId?.email ?? null,
           }
         : null;
 
@@ -8089,13 +8124,15 @@ export class AdminService implements OnModuleInit {
         !exists && Types.ObjectId.isValid(snapshotOwnerId)
           ? {
               id: snapshotOwnerId,
-              email: (ownerById.get(snapshotOwnerId) as any)?.email ?? null,
+              email: ownerById.get(snapshotOwnerId)?.email ?? null,
             }
           : null;
       return {
         ...it,
         serverDeleted: Boolean(deletedAt) || !exists,
-        deletedAt: deletedAt ? new Date(deletedAt).toISOString?.() ?? deletedAt : null,
+        deletedAt: deletedAt
+          ? (new Date(deletedAt).toISOString?.() ?? deletedAt)
+          : null,
         deletedBy: deletedBy ?? hardDeletedBy,
         canRestoreServer: Boolean(deletedAt), // only soft-deleted can be restored
       };
@@ -8341,7 +8378,6 @@ export class AdminService implements OnModuleInit {
       { $pull: { members: { userId: uid } } },
     );
 
-
     const userServerResult = await this.userServerModel.deleteMany({
       userId: uid,
       serverId: sid,
@@ -8473,7 +8509,7 @@ export class AdminService implements OnModuleInit {
       throw new NotFoundException('Channel not found in this server');
 
     const messages = await this.messageModel
-      .find({ channelId: new Types.ObjectId(channelId), isDeleted: false })
+      .find({ channelId: new Types.ObjectId(channelId) })
       .populate('senderId', 'email')
       .populate({
         path: 'replyTo',

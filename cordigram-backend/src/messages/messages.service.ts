@@ -7,6 +7,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { Buffer } from 'node:buffer';
 import { Model, Types } from 'mongoose';
 import { Message } from './message.schema';
 import { Channel } from '../channels/channel.schema';
@@ -294,7 +295,9 @@ export class MessagesService {
       serverLean ||
       ((await this.serverModel
         .findById(serverId)
-        .select('ownerId members safetySettings isAgeRestricted isPublic accessMode')
+        .select(
+          'ownerId members safetySettings isAgeRestricted isPublic accessMode',
+        )
         .lean()
         .exec()) as Record<string, unknown> | null);
     if (!server) return { allowed: false, reason: 'verification' };
@@ -337,8 +340,7 @@ export class MessagesService {
       ? new Date(memberRow.joinedAt)
       : null;
 
-    const legacyMemberNoUserServerRow =
-      !usDoc && rawMemberJoinedAt != null;
+    const legacyMemberNoUserServerRow = !usDoc && rawMemberJoinedAt != null;
     const ageAckForGate =
       isBypass ||
       Boolean((usDoc as any)?.ageRestrictedAcknowledged) ||
@@ -682,7 +684,7 @@ export class MessagesService {
       const sourceServerId =
         sourceServerIdRaw && Types.ObjectId.isValid(sourceServerIdRaw)
           ? sourceServerIdRaw
-          : channel.serverId?.toString?.() ?? String(channel.serverId);
+          : (channel.serverId?.toString?.() ?? String(channel.serverId));
 
       const isCrossServerSticker =
         String(sourceServerId) !==
@@ -991,7 +993,11 @@ export class MessagesService {
   > {
     const userObjectId = new Types.ObjectId(userId);
     const messages = await this.messageModel
-      .find({ mentions: userObjectId, isDeleted: false })
+      .find({
+        mentions: userObjectId,
+        isDeleted: false,
+        deletedFor: { $nin: [userObjectId] },
+      })
       .populate('channelId', 'name type serverId')
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -1020,8 +1026,10 @@ export class MessagesService {
       servers.map((s: any) => [String(s._id), s.name]),
     );
 
-    const allSenderIds = [
-      ...new Set(messages.map((m: any) => m.senderId.toString())),
+    const allSenderIds: string[] = [
+      ...new Set(
+        messages.map((m: any) => String(m.senderId?._id ?? m.senderId)),
+      ),
     ];
     const mutedSenders = await this.mentionMuteService.listMutedSendersForOwner(
       userId,
@@ -1142,7 +1150,6 @@ export class MessagesService {
   }> {
     const match: any = {
       channelId: new Types.ObjectId(channelId),
-      isDeleted: false,
     };
 
     // Access Control: nếu có viewerId thì chỉ cho xem khi viewer thuộc server.
@@ -1176,7 +1183,9 @@ export class MessagesService {
 
       const serverForGate = await this.serverModel
         .findById(channel.serverId)
-        .select('ownerId members safetySettings isAgeRestricted isPublic accessMode')
+        .select(
+          'ownerId members safetySettings isAgeRestricted isPublic accessMode',
+        )
         .lean()
         .exec();
       const gate = await this.resolveChannelChatGate(
@@ -1205,6 +1214,9 @@ export class MessagesService {
           { mentions: viewerOid },
         ];
       }
+
+      const viewerOid = new Types.ObjectId(viewerId);
+      match.deletedFor = { $nin: [viewerOid] };
     }
     const messages = await this.messageModel
       .find(match)
@@ -1329,6 +1341,10 @@ export class MessagesService {
       throw new NotFoundException(`Message with id ${messageId} not found`);
     }
 
+    if (message.isDeleted) {
+      throw new ForbiddenException('Cannot edit a deleted message');
+    }
+
     // Check if user is sender
     if (message.senderId.toString() !== userId) {
       throw new ForbiddenException('You can only edit your own messages');
@@ -1341,27 +1357,133 @@ export class MessagesService {
     return message.save();
   }
 
-  async deleteMessage(messageId: string, userId: string): Promise<void> {
-    const message = await this.messageModel.findById(messageId);
+  /**
+   * Xóa tin kênh máy chủ — giống DM:
+   * - `for-me`: ẩn với user hiện tại (`deletedFor`), người khác vẫn thấy.
+   * - `for-everyone`: chỉ người gửi; thu hồi nội dung, giữ bubble (`isDeleted` + xóa payload).
+   */
+  async deleteChannelMessage(
+    channelId: string,
+    messageId: string,
+    userId: string,
+    deleteType: 'for-everyone' | 'for-me',
+  ): Promise<{
+    deleteType: 'for-everyone' | 'for-me';
+    deletedAt: Date | null;
+    messageId: string;
+    channelId: string;
+    isDeletedForEveryone: boolean;
+  }> {
+    const canView = await this.userCanJoinChannelRoom(channelId, userId);
+    if (!canView) {
+      throw new ForbiddenException(
+        'Bạn không được phép thao tác trên kênh này',
+      );
+    }
 
+    if (!Types.ObjectId.isValid(messageId)) {
+      throw new BadRequestException(`Invalid message id: ${messageId}`);
+    }
+
+    const message = await this.messageModel.findById(messageId).exec();
     if (!message) {
       throw new NotFoundException(`Message with id ${messageId} not found`);
     }
 
-    // Check if user is sender
-    if (message.senderId.toString() !== userId) {
-      throw new ForbiddenException('You can only delete your own messages');
+    if (message.channelId.toString() !== channelId) {
+      throw new BadRequestException('Message does not belong to this channel');
     }
 
-    message.isDeleted = true;
-    await message.save();
+    const userObjectId = new Types.ObjectId(userId);
+    const senderIdStr = message.senderId.toString();
 
-    // Update channel message count
-    const channel = await this.channelModel.findById(message.channelId);
-    if (channel && channel.messageCount > 0) {
-      channel.messageCount -= 1;
-      await channel.save();
+    if (deleteType === 'for-everyone') {
+      if (senderIdStr !== userId) {
+        throw new ForbiddenException(
+          'Only the sender can delete message for everyone',
+        );
+      }
+
+      if (message.isDeleted) {
+        return {
+          deleteType: 'for-everyone',
+          deletedAt: message.deletedAt ?? new Date(),
+          messageId: message._id.toString(),
+          channelId,
+          isDeletedForEveryone: true,
+        };
+      }
+
+      const deletedAt = new Date();
+      const contentPlaceholder = '\u200b';
+      const filter = { _id: message._id };
+      const fullRecall = {
+        isDeleted: true,
+        deletedAt,
+        content: contentPlaceholder,
+        attachments: [] as string[],
+        giphyId: null as string | null,
+        customStickerUrl: null as string | null,
+        serverStickerId: null as Types.ObjectId | null,
+        voiceUrl: null as string | null,
+        voiceDuration: null as number | null,
+        reactions: [] as Array<{ userId: Types.ObjectId; emoji: string }>,
+      };
+      try {
+        const r = await this.messageModel.collection.updateOne(filter, {
+          $set: fullRecall,
+        });
+        if (!r.acknowledged || r.matchedCount === 0) {
+          throw new NotFoundException(`Message with id ${messageId} not found`);
+        }
+      } catch (_first) {
+        const r2 = await this.messageModel.collection.updateOne(filter, {
+          $set: {
+            isDeleted: true,
+            deletedAt,
+            content: contentPlaceholder,
+          },
+        });
+        if (!r2.acknowledged || r2.matchedCount === 0) {
+          throw new NotFoundException(`Message with id ${messageId} not found`);
+        }
+      }
+
+      return {
+        deleteType: 'for-everyone',
+        deletedAt,
+        messageId: message._id.toString(),
+        channelId,
+        isDeletedForEveryone: true,
+      };
     }
+
+    await this.messageModel.collection.updateOne(
+      { _id: message._id },
+      { $addToSet: { deletedFor: userObjectId } },
+    );
+
+    return {
+      deleteType: 'for-me',
+      deletedAt: null,
+      messageId: message._id.toString(),
+      channelId,
+      isDeletedForEveryone: false,
+    };
+  }
+
+  /** @deprecated Prefer deleteChannelMessage + deleteType; kept for DELETE clients. */
+  async deleteMessage(messageId: string, userId: string): Promise<void> {
+    const message = await this.messageModel.findById(messageId).lean().exec();
+    if (!message) {
+      throw new NotFoundException(`Message with id ${messageId} not found`);
+    }
+    await this.deleteChannelMessage(
+      message.channelId.toString(),
+      messageId,
+      userId,
+      'for-everyone',
+    );
   }
 
   async addReaction(
@@ -1373,6 +1495,10 @@ export class MessagesService {
 
     if (!message) {
       throw new NotFoundException(`Message with id ${messageId} not found`);
+    }
+
+    if (message.isDeleted) {
+      throw new ForbiddenException('Cannot react on a deleted message');
     }
 
     const userObjectId = new Types.ObjectId(userId);
@@ -1413,6 +1539,7 @@ export class MessagesService {
       .find({
         channelId: channelObjectId,
         isDeleted: false,
+        deletedFor: { $nin: [userObjectId] },
         mentions: userObjectId,
         createdAt: { $lte: now },
       })
@@ -1452,6 +1579,7 @@ export class MessagesService {
     return this.messageModel.countDocuments({
       channelId: channelObjectId,
       isDeleted: false,
+      deletedFor: { $nin: [userObjectId] },
       createdAt: { $gt: lastReadAt },
       senderId: { $ne: userObjectId },
     });
@@ -1459,6 +1587,25 @@ export class MessagesService {
 
   private escapeRegexFragment(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private buildLooseContentSearch(text: string): Record<string, unknown> {
+    const terms = text
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0);
+    if (terms.length <= 1) {
+      const escaped = this.escapeRegexFragment(text.trim());
+      return { content: { $regex: escaped, $options: 'i' } };
+    }
+    return {
+      $and: terms.map((term) => ({
+        content: {
+          $regex: this.escapeRegexFragment(term),
+          $options: 'i',
+        },
+      })),
+    };
   }
 
   private async resolveChannelForSearch(
@@ -1588,7 +1735,8 @@ export class MessagesService {
         .lean()
         .exec();
       const channelIds = channels.map((c) => c._id);
-      if (channelIds.length === 0) return { results: [], totalCount: 0, parsed };
+      if (channelIds.length === 0)
+        return { results: [], totalCount: 0, parsed };
       match.channelId = { $in: channelIds };
     }
 
@@ -1619,8 +1767,7 @@ export class MessagesService {
     }
 
     const hasImageFilter = parsed.filters.has === 'image';
-    const hasFileFilter =
-      Boolean(hasFile) || parsed.filters.has === 'file';
+    const hasFileFilter = Boolean(hasFile) || parsed.filters.has === 'file';
 
     if (hasImageFilter) {
       match.$and = match.$and || [];
@@ -1673,22 +1820,18 @@ export class MessagesService {
         });
         contentExtra = { $text: { $search: text } };
       } catch {
-        const escaped = this.escapeRegexFragment(text);
-        contentExtra = { content: { $regex: escaped, $options: 'i' } };
+        contentExtra = this.buildLooseContentSearch(text);
       }
     }
 
     let { totalCount, messages } = await runQuery(contentExtra);
 
-    if (
-      fuzzy &&
-      totalCount === 0 &&
-      text &&
-      !('$text' in contentExtra)
-    ) {
+    if (fuzzy && totalCount === 0 && text && !('$text' in contentExtra)) {
       const words = text.split(/\s+/).filter((w) => w.length > 0);
       if (words.length > 1) {
-        const pattern = words.map((w) => this.escapeRegexFragment(w)).join('.*');
+        const pattern = words
+          .map((w) => this.escapeRegexFragment(w))
+          .join('.*');
         contentExtra = { content: { $regex: pattern, $options: 'i' } };
         const retry = await runQuery(contentExtra);
         totalCount = retry.totalCount;
@@ -1696,9 +1839,8 @@ export class MessagesService {
       }
     }
 
-    if (fuzzy && totalCount === 0 && text && '$text' in contentExtra) {
-      const escaped = this.escapeRegexFragment(text);
-      contentExtra = { content: { $regex: escaped, $options: 'i' } };
+    if (totalCount === 0 && text && '$text' in contentExtra) {
+      contentExtra = this.buildLooseContentSearch(text);
       const retry = await runQuery(contentExtra);
       totalCount = retry.totalCount;
       messages = retry.messages;

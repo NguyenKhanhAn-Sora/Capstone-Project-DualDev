@@ -49,7 +49,7 @@ export class RolesService {
   async getRolesByServer(serverId: string): Promise<Role[]> {
     return this.roleModel
       .find({ serverId: new Types.ObjectId(serverId) })
-      .sort({ position: -1 }) 
+      .sort({ position: -1 })
       .exec();
   }
 
@@ -99,10 +99,8 @@ export class RolesService {
     userId: string,
     createRoleDto: CreateRoleDto,
   ): Promise<Role> {
-    
     await this.checkOwnerPermission(serverId, userId);
 
-    
     const highestRole = await this.roleModel
       .findOne({ serverId: new Types.ObjectId(serverId) })
       .sort({ position: -1 })
@@ -151,7 +149,6 @@ export class RolesService {
 
     const role = await this.getRoleById(serverId, roleId);
 
-    
     if (
       role.isDefault &&
       updateRoleDto.name &&
@@ -160,7 +157,6 @@ export class RolesService {
       throw new BadRequestException('Cannot rename the @everyone role');
     }
 
-    
     if (updateRoleDto.name !== undefined && !role.isDefault) {
       role.name = updateRoleDto.name;
     }
@@ -207,7 +203,6 @@ export class RolesService {
 
     const role = await this.getRoleById(serverId, roleId);
 
-    
     if (role.isDefault) {
       throw new BadRequestException('Cannot delete the @everyone role');
     }
@@ -227,13 +222,12 @@ export class RolesService {
 
     const { roleIds } = reorderDto;
 
-    
     const bulkOps = roleIds.map((roleId, index) => ({
       updateOne: {
         filter: {
           _id: new Types.ObjectId(roleId),
           serverId: new Types.ObjectId(serverId),
-          isDefault: false, 
+          isDefault: false,
         },
         update: { $set: { position: roleIds.length - index } },
       },
@@ -269,7 +263,6 @@ export class RolesService {
     const role = await this.getRoleById(serverId, roleId);
     const memberObjectId = new Types.ObjectId(memberId);
 
-    
     const server = await this.serverModel
       .findOne({
         _id: new Types.ObjectId(serverId),
@@ -281,7 +274,6 @@ export class RolesService {
       throw new BadRequestException('Member is not part of this server');
     }
 
-    
     if (role.memberIds.some((id) => id.equals(memberObjectId))) {
       throw new BadRequestException('Member already has this role');
     }
@@ -289,7 +281,6 @@ export class RolesService {
     role.memberIds.push(memberObjectId);
     const saved = await role.save();
 
-    
     await this.auditLogService.logRoleChange({
       serverId,
       targetUserId: memberId,
@@ -315,7 +306,6 @@ export class RolesService {
 
     const role = await this.getRoleById(serverId, roleId);
 
-    
     if (role.isDefault) {
       throw new BadRequestException(
         'Cannot remove members from @everyone role',
@@ -326,7 +316,6 @@ export class RolesService {
     role.memberIds = role.memberIds.filter((id) => !id.equals(memberObjectId));
     const saved = await role.save();
 
-    
     await this.auditLogService.logRoleChange({
       serverId,
       targetUserId: memberId,
@@ -370,14 +359,12 @@ export class RolesService {
   ): Promise<RolePermissions> {
     const roles = await this.getMemberRoles(serverId, memberId);
 
-    
     const result: RolePermissions = {
-      
       manageServer: false,
       manageChannels: false,
       manageEvents: false,
       manageExpressions: false,
-      
+
       createInvite: false,
       changeNickname: false,
       manageNicknames: false,
@@ -404,7 +391,6 @@ export class RolesService {
       setVoiceChannelStatus: false,
     };
 
-    
     for (const role of roles) {
       for (const key of Object.keys(result) as (keyof RolePermissions)[]) {
         if (role.permissions[key]) {
@@ -425,10 +411,6 @@ export class RolesService {
       .exec();
   }
 
-  
-  
-  
-
   /**
    * Lấy role cao nhất (position lớn nhất) của một member
    * Role cao nhất quyết định màu hiển thị và quyền hạn mạnh nhất
@@ -439,7 +421,7 @@ export class RolesService {
   ): Promise<Role | null> {
     const roles = await this.getMemberRoles(serverId, memberId);
     if (roles.length === 0) return null;
-    
+
     return roles[0];
   }
 
@@ -467,7 +449,6 @@ export class RolesService {
     memberId: string,
     permission: keyof RolePermissions,
   ): Promise<boolean> {
-    
     const server = await this.serverModel.findById(serverId).exec();
     if (server && server.ownerId.toString() === memberId) {
       return true;
@@ -497,20 +478,15 @@ export class RolesService {
     const server = await this.serverModel.findById(serverId).exec();
     if (!server) return false;
 
-    
     if (actorId === targetId) return false;
 
-    
     if (server.ownerId.toString() === targetId) return false;
 
-    
     if (server.ownerId.toString() === actorId) return true;
 
-    
     const actorPosition = await this.getHighestPosition(serverId, actorId);
     const targetPosition = await this.getHighestPosition(serverId, targetId);
 
-    
     return actorPosition > targetPosition;
   }
 
@@ -539,7 +515,7 @@ export class RolesService {
     const roles = await this.getMemberRoles(serverId, memberId);
 
     const roleInfos = roles
-      .filter((r) => !r.isDefault) 
+      .filter((r) => !r.isDefault)
       .map((r) => ({
         _id: r._id.toString(),
         name: r.name,
@@ -547,7 +523,6 @@ export class RolesService {
         position: r.position,
       }));
 
-    
     const highestNonDefaultRole = roles.find((r) => !r.isDefault);
     const highestRole = highestNonDefaultRole
       ? {
@@ -558,10 +533,7 @@ export class RolesService {
         }
       : null;
 
-    
-    
     const displayColor = highestRole?.color || '#99AAB5';
-
 
     return {
       roles: roleInfos,
@@ -584,7 +556,6 @@ export class RolesService {
     targetId: string,
     requiredPermission: keyof RolePermissions,
   ): Promise<void> {
-    
     const hasPermissionResult = await this.hasPermission(
       serverId,
       actorId,
@@ -597,7 +568,6 @@ export class RolesService {
       );
     }
 
-    
     const canAffect = await this.canAffectUser(serverId, actorId, targetId);
     if (!canAffect) {
       throw new ForbiddenException(

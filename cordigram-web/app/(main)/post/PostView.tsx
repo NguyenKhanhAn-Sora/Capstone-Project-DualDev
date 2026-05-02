@@ -11,10 +11,12 @@ import { formatRelativeTime } from "@/lib/relative-time";
 import { useLanguage } from "@/component/language-provider";
 import {
   createComment,
+  createPost,
   fetchComments,
   fetchCurrentProfile,
   fetchPostDetail,
   fetchReelDetail,
+  repostPost,
   followUser,
   reportComment,
   reportPost,
@@ -53,6 +55,10 @@ import {
 } from "@/lib/blocked-users";
 import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
 import CommentLikesOverlay from "@/ui/comment-likes-overlay/comment-likes-overlay";
+import RepostOverlay, {
+  type RepostTarget,
+  type QuoteInput,
+} from "@/ui/repost-overlay/repost-overlay";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
 import {
@@ -1426,6 +1432,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [interactionMuteOverlayMessage, setInteractionMuteOverlayMessage] =
     useState<string | null>(null);
+  const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
+  const [repostCount, setRepostCount] = useState<number | null>(null);
   const [openCommentMenuId, setOpenCommentMenuId] = useState<string | null>(
     null,
   );
@@ -1652,6 +1660,70 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     setToastMessage(message);
     toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
   }, []);
+
+  const incrementRepostStat = useCallback(() => {
+    setRepostCount((prev) => {
+      const base = prev ?? (post?.stats?.reposts ?? post?.stats?.shares ?? 0);
+      return base + 1;
+    });
+  }, [post?.stats?.reposts, post?.stats?.shares]);
+
+  const handleQuickRepost = useCallback(
+    async (target: RepostTarget) => {
+      if (!token) { showToast("Please sign in to repost"); return; }
+      try {
+        const originalId = (post?.repostOf as string | undefined) || target.postId;
+        await createPost({ token, payload: { repostOf: originalId } });
+        incrementRepostStat();
+        try { await repostPost({ token, postId: target.postId }); } catch {}
+        showToast("Reposted");
+      } catch (err) {
+        const mutedMsg = getInteractionMutedMessage(err);
+        if (mutedMsg) {
+          setInteractionMuteOverlayMessage(mutedMsg || INTERACTION_MUTED_FALLBACK_MESSAGE);
+          return;
+        }
+        throw err;
+      }
+    },
+    [token, post?.repostOf, createPost, repostPost, incrementRepostStat, showToast],
+  );
+
+  const handleShareQuote = useCallback(
+    async (target: RepostTarget, input: QuoteInput) => {
+      if (!token) { showToast("Please sign in to repost"); return; }
+      try {
+        const originalId = (post?.repostOf as string | undefined) || target.postId;
+        const note = input.content.trim();
+        const mentions = extractMentionsFromCaption(note);
+        await createPost({
+          token,
+          payload: {
+            repostOf: originalId,
+            content: note || undefined,
+            hashtags: input.hashtags.length ? input.hashtags : undefined,
+            location: input.location.trim() || undefined,
+            allowComments: input.allowComments,
+            allowDownload: Boolean(target.originalAllowDownload),
+            hideLikeCount: input.hideLikeCount,
+            visibility: input.visibility,
+            mentions: mentions.length ? mentions : undefined,
+          },
+        });
+        incrementRepostStat();
+        try { await repostPost({ token, postId: target.postId }); } catch {}
+        showToast("Reposted with quote");
+      } catch (err) {
+        const mutedMsg = getInteractionMutedMessage(err);
+        if (mutedMsg) {
+          setInteractionMuteOverlayMessage(mutedMsg || INTERACTION_MUTED_FALLBACK_MESSAGE);
+          return;
+        }
+        throw err;
+      }
+    },
+    [token, post?.repostOf, createPost, repostPost, incrementRepostStat, showToast],
+  );
 
   const openAdsDetailPage = useCallback(async () => {
     setShowMoreMenu(false);
@@ -5678,7 +5750,24 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         {post.stats?.views ?? post.stats?.impressions ?? 0}
                       </span>
                     </span>
-                    <span className={styles.statItem}>
+                    <button
+                      type="button"
+                      className={`${styles.statItem} ${styles.statButton}`}
+                      aria-label="Repost"
+                      onClick={() => {
+                        if (!post) return;
+                        const canRepost = (post as any).canRepost !== false;
+                        if (!canRepost) return;
+                        setRepostTarget({
+                          postId: post.id,
+                          label: `@${post.authorUsername} · ${post.kind ?? "post"}`,
+                          kind: (post.kind as "post" | "reel") ?? "post",
+                          originalAllowDownload: Boolean(
+                            (post as any).allowDownload ?? (post as any).allowDownloads,
+                          ),
+                        });
+                      }}
+                    >
                       <svg
                         aria-hidden="true"
                         width="18"
@@ -5695,8 +5784,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
                         ></path>
                       </svg>
-                      <span>{post.stats?.reposts ?? post.stats?.shares ?? 0}</span>
-                    </span>
+                      <span>{repostCount ?? (post.stats?.reposts ?? post.stats?.shares ?? 0)}</span>
+                    </button>
                   </div>
 
                   <div className={styles.commentsSection}>
@@ -6794,6 +6883,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           onClose={closeCommentLikesOverlay}
         />
       ) : null}
+
+      <RepostOverlay
+        target={repostTarget}
+        onRequestClose={() => setRepostTarget(null)}
+        onQuickRepost={handleQuickRepost}
+        onShareQuote={handleShareQuote}
+      />
     </div>
   );
 }

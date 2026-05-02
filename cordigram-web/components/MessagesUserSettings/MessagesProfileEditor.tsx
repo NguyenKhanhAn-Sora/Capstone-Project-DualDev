@@ -117,6 +117,8 @@ export default function MessagesProfileEditor({
     ...DEMO_DISPLAY_NAME_STYLE,
   });
   const [styleModalOpen, setStyleModalOpen] = useState(false);
+  const [styleModalBaseline, setStyleModalBaseline] =
+    useState<DisplayNameStyleValue>(DEFAULT_DISPLAY_NAME_STYLE);
 
   const [serverId, setServerId] = useState("");
   const [serverNickname, setServerNickname] = useState("");
@@ -304,6 +306,11 @@ export default function MessagesProfileEditor({
     tab === "server" && serverId ? serverDisplayNameStyle : displayNameStyle;
   const effectiveNameStyle = boostUnlocked ? appliedDisplayNameStyle : demoDisplayNameStyle;
 
+  const openDisplayNameStyleModal = useCallback(() => {
+    setStyleModalBaseline(boostUnlocked ? appliedDisplayNameStyle : demoDisplayNameStyle);
+    setStyleModalOpen(true);
+  }, [boostUnlocked, appliedDisplayNameStyle, demoDisplayNameStyle]);
+
   const bannerStyle = useMemo(() => {
     if (effectiveBannerImageUrl) {
       return {
@@ -424,6 +431,7 @@ export default function MessagesProfileEditor({
   const applyDisplayNameStyle = async (next: DisplayNameStyleValue) => {
     if (!boostUnlocked) {
       setDemoDisplayNameStyle(next);
+      emitDisplayNameStyleUpdated(next);
       return;
     }
 
@@ -436,14 +444,16 @@ export default function MessagesProfileEditor({
           displayNamePrimaryHex: next.primaryHex,
           displayNameAccentHex: next.accentHex,
         });
-        onToast?.("Đã áp dụng kiểu tên hiển thị.");
+        onToast?.(t("chat.profileEditor.displayNameStyleApplied"));
       } catch (e) {
         onToast?.(e instanceof Error ? e.message : t("chat.profileEditor.errorSaveProfile"));
       }
       return;
     }
 
+    const revertedFrom = displayNameStyle;
     setDisplayNameStyle(next);
+    emitDisplayNameStyleUpdated(next);
     try {
       await updateMyMessagingProfile({
         token,
@@ -454,11 +464,14 @@ export default function MessagesProfileEditor({
           displayNameAccentHex: next.accentHex,
         },
       });
-      emitDisplayNameStyleUpdated(next);
-      onToast?.("Đã áp dụng kiểu tên hiển thị.");
+      onToast?.(t("chat.profileEditor.displayNameStyleApplied"));
       await loadProfile();
     } catch (e) {
-      onToast?.(e instanceof Error ? e.message : t("chat.profileEditor.errorSaveProfile"));
+      setDisplayNameStyle(revertedFrom);
+      emitDisplayNameStyleUpdated(revertedFrom);
+      onToast?.(
+        e instanceof Error ? e.message : t("chat.profileEditor.displayNameStyleError"),
+      );
     }
   };
 
@@ -589,31 +602,35 @@ export default function MessagesProfileEditor({
               <div className={styles.boostPromoRow}>
                 <div>
                   <div className={styles.boostPromoTitle}>
-                    {boostUnlocked ? "Dùng Boost ngay" : "Dùng thử Boost"}
+                    {boostUnlocked
+                      ? t("chat.profileEditor.boostPromoTitleActive")
+                      : t("chat.profileEditor.boostPromoTitleDemo")}
                     {!boostUnlocked ? (
                       <span className={styles.lockedTag}>
                         <span className={styles.lockedTagDot} aria-hidden />
-                        Locked
+                        {t("chat.profileEditor.boostPromoTagLocked")}
                       </span>
                     ) : (
                       <span className={styles.lockedTag}>
                         <span className={styles.lockedTagDot} aria-hidden />
-                        Unlock
+                        {t("chat.profileEditor.boostPromoTagUnlock")}
                       </span>
                     )}
                   </div>
                   <div className={styles.boostPromoDesc}>
                     {boostUnlocked
-                      ? "Mở Kiểu Tên Hiển Thị để chọn font, hiệu ứng và màu rồi dùng ngay trên hồ sơ của bạn."
-                      : "Bạn có thể thử tùy chỉnh kiểu tên hiển thị trong preview. Các thay đổi sẽ không được lưu nếu chưa mở khóa."}
+                      ? t("chat.profileEditor.boostPromoDescActive")
+                      : t("chat.profileEditor.boostPromoDescDemo")}
                   </div>
                 </div>
                 <button
                   type="button"
                   className={styles.btnGhost}
-                  onClick={() => setStyleModalOpen(true)}
+                  onClick={openDisplayNameStyleModal}
                 >
-                  {boostUnlocked ? "Dùng ngay" : "Mở demo"}
+                  {boostUnlocked
+                    ? t("chat.profileEditor.boostPromoCtaActive")
+                    : t("chat.profileEditor.boostPromoCtaDemo")}
                 </button>
               </div>
             </div>
@@ -764,13 +781,17 @@ export default function MessagesProfileEditor({
 
             <hr className={styles.divider} />
 
-            <label className={styles.sectionTitle}>Kiểu Tên Hiển Thị</label>
+            <label className={styles.sectionTitle}>
+              {t("chat.profileEditor.displayNameStyleHeading")}
+            </label>
             <button
               type="button"
               className={styles.btnPrimary}
-              onClick={() => setStyleModalOpen(true)}
+              onClick={openDisplayNameStyleModal}
             >
-              {boostUnlocked ? "Chỉnh kiểu tên" : "Dùng thử (Boost)"}
+              {boostUnlocked
+                ? t("chat.profileEditor.displayNameStyleOpen")
+                : t("chat.profileEditor.displayNameStyleTry")}
             </button>
 
             <hr className={styles.divider} />
@@ -925,8 +946,10 @@ export default function MessagesProfileEditor({
         open={styleModalOpen}
         locked={!boostUnlocked}
         value={boostUnlocked ? appliedDisplayNameStyle : demoDisplayNameStyle}
+        revertValue={styleModalBaseline}
         onToast={onToast}
         onClose={() => setStyleModalOpen(false)}
+        onDraftPreview={(next) => emitDisplayNameStyleUpdated(next)}
         onChange={(next) => {
           void applyDisplayNameStyle(next);
         }}

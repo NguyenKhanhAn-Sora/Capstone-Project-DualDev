@@ -531,3 +531,362 @@
 .endCallButtonAudio:active {
   transform: scale(0.95);
 }
+
+/* =========================================================================
+   Unified Call View — full-bleed stage with controls overlaid at the bottom
+   (not a separate footer band that shrinks the video). Scoped with 'unified*'.
+   ========================================================================= */
+
+.unifiedCallContainer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  color: #fff;
+}
+
+.unifiedStage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.unifiedVideoStage {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.unifiedRemoteVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Self-view full-bleed when the peer has no video (mirror like a front camera). */
+.unifiedLocalMainVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+/* Screen share: preserve aspect ratio (cover would crop text/UI). */
+.unifiedMainScreenShare {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.unifiedPip {
+  position: absolute;
+  top: auto;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  width: 180px;
+  height: 250px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+  background: #111;
+}
+
+.unifiedPipVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.unifiedPipAvatarOnly {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.unifiedPipAvatarLetter {
+  font-size: 48px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+/* Remote participant with camera off — avatar region + cam-off hint (1:1 calls). */
+.unifiedPipRemoteCameraOff {
+  display: flex;
+  flex-direction: column;
+  background: #0f172a;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.unifiedPipRemoteCameraOffTop {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+}
+
+.unifiedPipRemoteCameraOffBottom {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  background: rgba(15, 23, 42, 0.98);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.unifiedPipRemoteCameraOffBottom svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.unifiedPipRemoteCameraOffName {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Local self PiP when camera is off (remote on main) — avatar + name + mic/cam hints. */
+.unifiedPipLocalSelf {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+}
+
+.unifiedPipLocalSelfMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px 10px 0;
+}
+
+.unifiedPipLocalAvatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.unifiedPipLocalName {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.unifiedPipLocalSelfStatus {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px 8px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.unifiedPipStatusIcon {
+  display: flex;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.unifiedPipStatusIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.unifiedAvatarMain {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.unifiedAvatarLabel {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.unifiedAvatarGrid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 24px;
+  padding: 48px;
+  /* Leave room for overlaid control bar so avatars are not hidden behind it */
+  padding-bottom: calc(48px + 110px + env(safe-area-inset-bottom, 0px));
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  justify-items: center;
+}
+
+.unifiedAvatarTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.unifiedAvatar {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0 10px 30px rgba(99, 102, 241, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.unifiedAvatar.speaking {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.5), 0 10px 30px rgba(99, 102, 241, 0.45);
+}
+
+.unifiedControlsBar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  row-gap: 12px;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  /* Legible tap targets without an opaque strip that crops the video */
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.35) 45%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.unifiedControlsBar > * {
+  pointer-events: auto;
+}
+
+.unifiedCtrlBtn {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.unifiedCtrlBtn:hover {
+  background: rgba(255, 255, 255, 0.32);
+  transform: translateY(-1px);
+}
+
+.unifiedCtrlBtn:active {
+  transform: scale(0.94);
+}
+
+.unifiedCtrlBtnOff {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.unifiedCtrlBtnDanger {
+  background: #ed4245;
+  color: #fff;
+}
+
+.unifiedCtrlBtnDanger:hover {
+  background: #ff5458;
+}
+
+/* Local screen-share PiP: static preview only (no live <VideoTrack>). */
+.localScreenSharePip {
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-sizing: border-box;
+}
+
+.localScreenSharePreviewInner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.localScreenShareIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.95;
+}
+
+.localScreenShareLabel {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 100%;
+}

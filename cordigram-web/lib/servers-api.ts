@@ -167,6 +167,10 @@ export interface Message {
     displayName?: string;
     username?: string;
     avatarUrl?: string;
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
   };
   content: string;
   attachments: string[];
@@ -177,6 +181,8 @@ export interface Message {
   isEdited?: boolean;
   editedAt?: string;
   isDeleted?: boolean;
+  deletedAt?: string | null;
+  deletedFor?: string[];
   createdAt: string;
   updatedAt: string;
   replyTo?: string | {
@@ -2226,6 +2232,32 @@ export async function deleteMessage(
   if (!response.ok) {
     throw new Error("Không xóa được tin nhắn");
   }
+}
+
+/** Giống DM: `for-me` ẩn ở phía bạn; `for-everyone` chỉ người gửi (thu hồi). */
+export async function deleteChannelMessage(
+  channelId: string,
+  messageId: string,
+  deleteType: "for-everyone" | "for-me",
+): Promise<unknown> {
+  const ch = encodeURIComponent(channelId);
+  const id = encodeURIComponent(messageId);
+  const path =
+    deleteType === "for-everyone"
+      ? `${API_BASE_URL}/channels/${ch}/messages/${id}/delete-for-everyone`
+      : `${API_BASE_URL}/channels/${ch}/messages/${id}/delete-for-me`;
+  const response = await fetch(path, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(
+      (data as { message?: string }).message || "Không xóa được tin nhắn",
+    );
+  }
+  return response.json().catch(() => ({}));
 }
 
 export async function addMessageReaction(

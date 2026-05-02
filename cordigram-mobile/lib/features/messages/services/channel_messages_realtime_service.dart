@@ -5,6 +5,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../../core/config/app_config.dart';
 import '../../../core/services/auth_storage.dart';
 import '../models/channel_message.dart';
+import '../models/message_reaction.dart';
 
 class ChannelMessagesRealtimeService {
   ChannelMessagesRealtimeService._();
@@ -16,10 +17,12 @@ class ChannelMessagesRealtimeService {
       StreamController<ChannelMessage>.broadcast();
   static final StreamController<Map<String, dynamic>> _reactionController =
       StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _deletedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   static Stream<ChannelMessage> get messages => _messagesController.stream;
-  static Stream<Map<String, dynamic>> get reactions =>
-      _reactionController.stream;
+  static Stream<Map<String, dynamic>> get reactions => _reactionController.stream;
+  static Stream<Map<String, dynamic>> get deleted => _deletedController.stream;
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -50,7 +53,20 @@ class ChannelMessagesRealtimeService {
 
     socket.on('reaction-updated', (payload) {
       if (payload is! Map) return;
-      _reactionController.add(Map<String, dynamic>.from(payload));
+      final mapped = Map<String, dynamic>.from(payload);
+      final reactionsRaw = mapped['reactions'];
+      if (reactionsRaw is List) {
+        mapped['reactions'] = reactionsRaw
+            .whereType<Map>()
+            .map((e) => MessageReaction.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      _reactionController.add(mapped);
+    });
+
+    socket.on('message-deleted', (payload) {
+      if (payload is! Map) return;
+      _deletedController.add(Map<String, dynamic>.from(payload));
     });
 
     socket.connect();
@@ -70,6 +86,7 @@ class ChannelMessagesRealtimeService {
     if (socket != null) {
       socket.off('new-message');
       socket.off('reaction-updated');
+      socket.off('message-deleted');
       socket.disconnect();
       socket.dispose();
     }

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { LivestreamService } from './livestream.service';
@@ -33,6 +41,7 @@ export class LivestreamController {
     return this.livestreamService.joinToken(streamId, user, {
       asHost: dto.asHost,
       participantName: dto.participantName,
+      isPreview: dto.isPreview,
     });
   }
 
@@ -55,7 +64,11 @@ export class LivestreamController {
     @Body() dto: UpdateLivestreamDto,
     @CurrentUser() user: { userId: string },
   ) {
-    return this.livestreamService.updateLiveSettings(streamId, user.userId, dto);
+    return this.livestreamService.updateLiveSettings(
+      streamId,
+      user.userId,
+      dto,
+    );
   }
 
   @Post(':id/end')

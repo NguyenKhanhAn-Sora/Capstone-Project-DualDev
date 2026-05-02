@@ -12,6 +12,7 @@ import '../../core/config/app_config.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../home/home_screen.dart';
+import '../messages/call/dm_call_manager.dart';
 
 // ---------------------------------------------------------------------------
 // SignupScreen – 4-step flow mirroring cordigram-web:
@@ -373,6 +374,7 @@ class _SignupScreenState extends State<SignupScreen> {
         accessToken: token,
         refreshToken: result.refreshToken,
       );
+      await DmCallManager.instance.onAuthChanged();
     }
     if (!mounted) return;
     Navigator.of(
@@ -1452,6 +1454,7 @@ class _GoogleSignupButtonState extends State<_GoogleSignupButton> {
           accessToken: accessToken,
           refreshToken: refreshToken,
         );
+        await DmCallManager.instance.onAuthChanged();
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),

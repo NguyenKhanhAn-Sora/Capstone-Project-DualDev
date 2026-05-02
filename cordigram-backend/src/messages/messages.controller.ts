@@ -161,6 +161,66 @@ export class MessagesController {
     return { success: true };
   }
 
+  @Post(':id/delete-for-me')
+  async deleteChannelMessageForMe(
+    @Param('channelId') channelId: string,
+    @Param('id') messageId: string,
+    @Request() req: any,
+  ) {
+    const result = await this.messagesService.deleteChannelMessage(
+      channelId,
+      messageId,
+      req.user.userId,
+      'for-me',
+    );
+    try {
+      this.channelMessagesGateway.emitMessageDeleted(channelId, {
+        channelId,
+        messageId: result.messageId,
+        deleteType: 'for-me',
+      });
+    } catch (_) {
+      // non-critical
+    }
+    return {
+      deleted: true,
+      deleteType: result.deleteType,
+      messageId: result.messageId,
+      channelId: result.channelId,
+    };
+  }
+
+  @Post(':id/delete-for-everyone')
+  async deleteChannelMessageForEveryone(
+    @Param('channelId') channelId: string,
+    @Param('id') messageId: string,
+    @Request() req: any,
+  ) {
+    const result = await this.messagesService.deleteChannelMessage(
+      channelId,
+      messageId,
+      req.user.userId,
+      'for-everyone',
+    );
+    try {
+      this.channelMessagesGateway.emitMessageDeleted(channelId, {
+        channelId,
+        messageId: result.messageId,
+        deleteType: 'for-everyone',
+        deletedAt: result.deletedAt?.toISOString?.(),
+      });
+    } catch (_) {
+      // non-critical
+    }
+    return {
+      deleted: true,
+      deleteType: result.deleteType,
+      deletedAt: result.deletedAt,
+      messageId: result.messageId,
+      channelId: result.channelId,
+    };
+  }
+
   @Get(':id')
   async getMessage(@Param('id') messageId: string) {
     return this.messagesService.getMessageById(messageId);
@@ -180,8 +240,27 @@ export class MessagesController {
   }
 
   @Delete(':id')
-  async deleteMessage(@Param('id') messageId: string, @Request() req: any) {
-    await this.messagesService.deleteMessage(messageId, req.user.userId);
+  async deleteMessage(
+    @Param('channelId') channelId: string,
+    @Param('id') messageId: string,
+    @Request() req: any,
+  ) {
+    const result = await this.messagesService.deleteChannelMessage(
+      channelId,
+      messageId,
+      req.user.userId,
+      'for-everyone',
+    );
+    try {
+      this.channelMessagesGateway.emitMessageDeleted(channelId, {
+        channelId,
+        messageId: result.messageId,
+        deleteType: 'for-everyone',
+        deletedAt: result.deletedAt?.toISOString?.(),
+      });
+    } catch (_) {
+      // non-critical
+    }
     return { message: 'Message deleted successfully' };
   }
 

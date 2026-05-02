@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '../config/config.module';
@@ -21,7 +21,7 @@ import { OnlineStats, OnlineStatsSchema } from './online-stats.schema';
 @Module({
   imports: [
     ConfigModule,
-    AuthModule,
+    forwardRef(() => AuthModule),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -39,6 +39,6 @@ import { OnlineStats, OnlineStatsSchema } from './online-stats.schema';
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsGateway, FcmPushService],
-  exports: [NotificationsService, NotificationsGateway],
+  exports: [NotificationsService, NotificationsGateway, FcmPushService],
 })
 export class NotificationsModule {}

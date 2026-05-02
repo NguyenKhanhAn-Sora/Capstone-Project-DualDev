@@ -104,14 +104,21 @@ export class LivekitService {
 
   async getParticipantCount(roomName: string): Promise<number> {
     try {
-      const participants = await this.getRoomService().listParticipants(roomName);
-      return participants.length;
+      const participants =
+        await this.getRoomService().listParticipants(roomName);
+      return participants.filter(
+        (p) =>
+          !p.identity?.startsWith('preview-') &&
+          !p.name?.startsWith('preview-'),
+      ).length;
     } catch {
       return 0;
     }
   }
 
-  async listRoomsByPrefix(prefix: string): Promise<Array<{ name: string; numParticipants: number }>> {
+  async listRoomsByPrefix(
+    prefix: string,
+  ): Promise<Array<{ name: string; numParticipants: number }>> {
     const rooms = await this.getRoomService().listRooms();
     return rooms
       .filter((room) => (room.name ?? '').startsWith(prefix))

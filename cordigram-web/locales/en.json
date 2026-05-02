@@ -42,6 +42,47 @@
       "plusUploadFile": "Upload file",
       "plusCreatePoll": "Create poll"
     },
+    "createPoll": {
+      "title": "Create poll",
+      "closeAria": "Close",
+      "questionLabel": "Question",
+      "questionPlaceholder": "What do you want to ask?",
+      "optionsLabel": "Answer options",
+      "optionPlaceholder": "Enter an option",
+      "addOption": "Add option",
+      "durationLabel": "Duration",
+      "duration1h": "1 hour",
+      "duration4h": "4 hours",
+      "duration8h": "8 hours",
+      "duration24h": "24 hours",
+      "duration3d": "3 days",
+      "duration7d": "7 days",
+      "allowMultiple": "Allow multiple choices",
+      "cancel": "Cancel",
+      "submit": "Post"
+    },
+    "displayNameStyleModal": {
+      "title": "Display name style",
+      "subtitleLocked": "Locked — you can preview, but it will not save until you unlock Boost.",
+      "closeAria": "Close",
+      "sectionFont": "Font",
+      "sectionEffect": "Effect",
+      "sectionColor": "Color",
+      "colorPrimary": "Primary",
+      "colorAccent": "Accent",
+      "fontDefault": "Default",
+      "fontRounded": "Rounded",
+      "fontMono": "Monospace",
+      "effectSolid": "Solid",
+      "effectGradient": "Gradient",
+      "effectNeon": "Neon",
+      "previewTitle": "Preview",
+      "previewSub": "@cordigram · they/them",
+      "cancel": "Cancel",
+      "applyTry": "Try it",
+      "apply": "Apply",
+      "toastNeedBoost": "Boost is required to save display name styles."
+    },
     "mention": {
       "sectionQuick": "Quick mentions",
       "sectionMembers": "Members",
@@ -221,6 +262,19 @@
         "title": "Remove for you",
         "desc": "This message will be removed from your device, but it will still be visible to other members in the chat."
       }
+    },
+    "actions": {
+      "deleteForMe": "Delete for me",
+      "deleteForEveryone": "Delete for everyone"
+    },
+    "messageRecalled": {
+      "self": "You deleted a message",
+      "other": "{name} deleted a message"
+    },
+    "toast": {
+      "deletedForMe": "Message deleted for you",
+      "recalled": "Message deleted for everyone",
+      "deleteFailed": "Failed to delete message"
     },
     "reportMessage": {
       "title": "Report message",
@@ -942,6 +996,19 @@
       "errorOpenRecent": "Could not open recent image (CORS or network).",
       "errorGetUrl": "Could not get URL",
       "comingSoon": "Feature coming soon.",
+      "boostPromoTitleActive": "Use Boost now",
+      "boostPromoTitleDemo": "Try Boost",
+      "boostPromoTagUnlock": "Unlock",
+      "boostPromoTagLocked": "Locked",
+      "boostPromoDescActive": "Open Display Name Style to pick font, effects, and colors — they show on your profile right away.",
+      "boostPromoDescDemo": "You can try display name styles in the preview. Changes are not saved until you unlock.",
+      "boostPromoCtaActive": "Use now",
+      "boostPromoCtaDemo": "Open demo",
+      "displayNameStyleHeading": "Display name style",
+      "displayNameStyleOpen": "Edit name style",
+      "displayNameStyleTry": "Try (Boost)",
+      "displayNameStyleApplied": "Display name style applied.",
+      "displayNameStyleError": "Could not save display name style.",
       "cosmetics": {
         "errorLoadShop": "Could not load shop.",
         "itemFallbackDescription": "Profile cosmetic item",
@@ -1033,6 +1100,7 @@
       "soundOn": "Unmute",
       "soundOff": "Mute",
       "createServerTitle": "Create server",
+      "messagesHomeTitle": "Messages home",
       "socialHomeTitle": "Go to Social",
       "exploreTitle": "Explore",
       "exploreClose": "Close Explore",

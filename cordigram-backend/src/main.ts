@@ -24,7 +24,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://localhost:3001',
       'https://www.cordigram.com',
-      'https://admin.cordigram.com'
+      'https://admin.cordigram.com',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

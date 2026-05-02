@@ -68,11 +68,12 @@
   flex-shrink: 0;
 }
 
+/* Dùng panel-hover + chữ token — tránh --color-surface (có thể rất sáng khi Boost tint) làm “hình tròn trắng” trên UI tối */
 .socialHomeBtn:hover {
   transform: scale(1.05);
-  background: var(--color-surface);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  background: var(--color-panel-hover);
+  border-color: var(--color-border);
+  color: var(--color-text);
 }
 
 .exploreBtn {
@@ -2752,7 +2753,7 @@
 .closeButton {
   background: transparent;
   border: none;
-  color: var(--color-panel-text-muted);
+  color: var(--color-button-x, var(--color-panel-text));
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -2920,7 +2921,7 @@
 
 .pollCheckboxRow label {
   font-size: 14px;
-  color: var(--color-panel-text-muted);
+  color: var(--color-panel-text);
   cursor: pointer;
 }
 

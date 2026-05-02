@@ -80,9 +80,7 @@ export class IgnoredService {
   }
 
   /** For settings UI: list ignored users with profile fields. */
-  async listIgnoredUsers(
-    viewerId: string | Types.ObjectId,
-  ): Promise<
+  async listIgnoredUsers(viewerId: string | Types.ObjectId): Promise<
     Array<{
       userId: string;
       username?: string;

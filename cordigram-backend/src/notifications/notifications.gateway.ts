@@ -118,7 +118,10 @@ export class NotificationsGateway
 
     if (event === 'notification:new') {
       const typed = payload as unknown as NotificationRealtimePayload;
-      void this.fcmPushService.pushNotificationToUser(userId, typed.notification);
+      void this.fcmPushService.pushNotificationToUser(
+        userId,
+        typed.notification,
+      );
     }
   }
 

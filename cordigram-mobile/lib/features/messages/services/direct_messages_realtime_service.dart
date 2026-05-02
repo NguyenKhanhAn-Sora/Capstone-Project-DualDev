@@ -53,6 +53,8 @@ class DirectMessagesRealtimeService {
       StreamController<DmCallEvent>.broadcast();
   static final StreamController<String> _callEndedController =
       StreamController<String>.broadcast();
+  static final StreamController<Map<String, dynamic>> _messageDeletedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   static Stream<DmMessage> get newMessages => _newMessageController.stream;
   static Stream<DmUnreadCountEvent> get unreadCounts =>
@@ -62,6 +64,8 @@ class DirectMessagesRealtimeService {
       _reactionController.stream;
   static Stream<DmCallEvent> get callEvents => _callController.stream;
   static Stream<String> get callEnded => _callEndedController.stream;
+  static Stream<Map<String, dynamic>> get messageDeleted =>
+      _messageDeletedController.stream;
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -186,6 +190,10 @@ class DirectMessagesRealtimeService {
       final data = Map<String, dynamic>.from(payload);
       _callEndedController.add((data['from'] ?? '').toString());
     });
+    socket.on('message-deleted', (payload) {
+      if (payload is! Map) return;
+      _messageDeletedController.add(Map<String, dynamic>.from(payload));
+    });
 
     socket.connect();
     _socket = socket;
@@ -250,6 +258,7 @@ class DirectMessagesRealtimeService {
       socket.off('call-rejected');
       socket.off('ice-candidate');
       socket.off('call-ended');
+      socket.off('message-deleted');
       socket.disconnect();
       socket.dispose();
     }

@@ -12,6 +12,7 @@ class DmMessage {
     this.voiceUrl,
     this.voiceDurationSec,
     this.giphyId,
+    this.replyTo,
     this.attachments = const [],
     this.reactions = const [],
   });
@@ -26,6 +27,7 @@ class DmMessage {
   final String? voiceUrl;
   final int? voiceDurationSec;
   final String? giphyId;
+  final DmReplyMessage? replyTo;
   final List<String> attachments;
   final List<MessageReaction> reactions;
 
@@ -59,6 +61,9 @@ class DmMessage {
           ? (json['voiceDuration'] as num).toInt()
           : null,
       giphyId: json['giphyId']?.toString(),
+      replyTo: json['replyTo'] is Map
+          ? DmReplyMessage.fromJson(Map<String, dynamic>.from(json['replyTo']))
+          : null,
       attachments: attachmentsRaw is List
           ? attachmentsRaw.map((e) => e.toString()).toList()
           : const <String>[],
@@ -70,6 +75,49 @@ class DmMessage {
                 )
                 .toList()
           : const <MessageReaction>[],
+    );
+  }
+}
+
+class DmReplyMessage {
+  const DmReplyMessage({
+    required this.id,
+    required this.content,
+    required this.senderId,
+    this.senderName,
+    this.type,
+    this.voiceUrl,
+    this.voiceDurationSec,
+  });
+
+  final String id;
+  final String content;
+  final String senderId;
+  final String? senderName;
+  final String? type;
+  final String? voiceUrl;
+  final int? voiceDurationSec;
+
+  factory DmReplyMessage.fromJson(Map<String, dynamic> json) {
+    final sender = json['senderId'];
+    final senderId = sender is Map
+        ? (sender['_id'] ?? sender['id'] ?? sender['userId'] ?? '').toString()
+        : (sender?.toString() ?? '');
+    final senderName = sender is Map
+        ? (sender['displayName'] ?? sender['username'] ?? sender['email'])
+              ?.toString()
+              .trim()
+        : null;
+    return DmReplyMessage(
+      id: (json['_id'] ?? json['id'] ?? '').toString(),
+      content: (json['content'] ?? '').toString(),
+      senderId: senderId,
+      senderName: senderName?.isEmpty == true ? null : senderName,
+      type: json['type']?.toString(),
+      voiceUrl: json['voiceUrl']?.toString(),
+      voiceDurationSec: json['voiceDuration'] is num
+          ? (json['voiceDuration'] as num).toInt()
+          : null,
     );
   }
 }

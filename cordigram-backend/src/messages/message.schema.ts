@@ -76,6 +76,13 @@ export class Message extends Document {
   @Prop({ type: Boolean, default: false })
   isDeleted: boolean;
 
+  @Prop({ type: Date, default: null })
+  deletedAt: Date | null;
+
+  /** Người đã chọn "Xóa ở phía tôi" — tin vẫn tồn tại cho người khác (trừ khi đã thu hồi). */
+  @Prop({ type: [Types.ObjectId], ref: 'User', default: [] })
+  deletedFor: Types.ObjectId[];
+
   @Prop({ type: Types.ObjectId, ref: 'Message', default: null })
   replyTo: Types.ObjectId | null;
 

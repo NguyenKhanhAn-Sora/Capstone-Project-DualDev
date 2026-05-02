@@ -1,8 +1,18 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import 'call/dm_call_manager.dart';
+import 'server_detail_screen.dart';
+import 'server_list_controller.dart';
 import 'message_chat_screen.dart';
 import 'messages_controller.dart';
 import 'models/message_thread.dart';
+import 'models/server_models.dart';
+import 'services/direct_messages_service.dart';
+import 'services/messages_media_service.dart';
+import 'services/voice_channel_session_controller.dart';
 import 'widgets/message_folder_dropdown.dart';
 import 'widgets/message_thread_tile.dart';
 
@@ -21,80 +31,25 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   final MessagesController _messagesController = MessagesController();
+  final ServerListController _serverListController = ServerListController();
   bool _isFolderExpanded = false;
   bool _isServerMode = false;
-
-  final List<MessageThread> _serverThreads = const [
-    MessageThread(
-      id: 's1',
-      name: 'ServerName',
-      lastMessage: '',
-      lastActiveLabel: '',
-      unreadCount: 2,
-    ),
-    MessageThread(
-      id: 's2',
-      name: 'ServerName',
-      lastMessage: '',
-      lastActiveLabel: '',
-      unreadCount: 2,
-    ),
-    MessageThread(
-      id: 's3',
-      name: 'ServerName',
-      lastMessage: '',
-      lastActiveLabel: '',
-      unreadCount: 2,
-    ),
-    MessageThread(
-      id: 's4',
-      name: 'ServerName',
-      lastMessage: '',
-      lastActiveLabel: '',
-      unreadCount: 2,
-    ),
-    MessageThread(
-      id: 's5',
-      name: 'ServerName',
-      lastMessage: '',
-      lastActiveLabel: '',
-      unreadCount: 2,
-    ),
-    MessageThread(
-      id: 's6',
-      name: 'ServerName',
-      lastMessage: '',
-      lastActiveLabel: '',
-      unreadCount: 2,
-    ),
-    MessageThread(
-      id: 's7',
-      name: 'ServerName',
-      lastMessage: '',
-      lastActiveLabel: '',
-      unreadCount: 2,
-    ),
-    MessageThread(
-      id: 's8',
-      name: 'ServerName',
-      lastMessage: '',
-      lastActiveLabel: '',
-      unreadCount: 2,
-    ),
-  ];
 
   @override
   void initState() {
     super.initState();
     _messagesController.addListener(_onControllerChanged);
+    _serverListController.addListener(_onControllerChanged);
     _messagesController.init();
   }
 
   @override
   void dispose() {
     _messagesController.removeListener(_onControllerChanged);
+    _serverListController.removeListener(_onControllerChanged);
     _messagesController.disposeController();
     _messagesController.dispose();
+    _serverListController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -105,12 +60,22 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
   }
 
   List<MessageThread> get _filteredThreads {
-    final source = _isServerMode ? _serverThreads : _messagesController.threads;
+    final source = _messagesController.threads;
     final query = _searchController.text.trim().toLowerCase();
     return source.where((thread) {
       if (query.isEmpty) return true;
       return thread.name.toLowerCase().contains(query) ||
           thread.lastMessage.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  List<ServerSummary> get _filteredServers {
+    final source = _serverListController.servers;
+    final query = _searchController.text.trim().toLowerCase();
+    return source.where((server) {
+      if (query.isEmpty) return true;
+      return server.name.toLowerCase().contains(query) ||
+          (server.description ?? '').toLowerCase().contains(query);
     }).toList();
   }
 
@@ -123,6 +88,53 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
   ];
 
   String get _voiceContextKey => _isServerMode ? 'server:lobby' : 'dm:lobby';
+
+  bool get _hasServerVoice => VoiceChannelSessionController.instance.active;
+  bool get _hasDmVoiceCall => DmCallManager.instance.active != null;
+
+  bool get _globalMicMuted {
+    if (_hasServerVoice) {
+      return !VoiceChannelSessionController.instance.micEnabled;
+    }
+    if (_hasDmVoiceCall) {
+      return !DmCallManager.instance.activeMicEnabled;
+    }
+    return _messagesController.voiceStateFor(_voiceContextKey).micMuted;
+  }
+
+  bool get _globalSoundMuted {
+    if (_hasServerVoice) {
+      return !VoiceChannelSessionController.instance.soundEnabled;
+    }
+    if (_hasDmVoiceCall) {
+      return !DmCallManager.instance.activeSoundEnabled;
+    }
+    return _messagesController.voiceStateFor(_voiceContextKey).soundMuted;
+  }
+
+  Future<void> _toggleGlobalMic() async {
+    if (_hasServerVoice) {
+      await VoiceChannelSessionController.instance.toggleMic();
+      return;
+    }
+    if (_hasDmVoiceCall) {
+      await DmCallManager.instance.toggleActiveMic();
+      return;
+    }
+    _messagesController.toggleMic(_voiceContextKey);
+  }
+
+  Future<void> _toggleGlobalSound() async {
+    if (_hasServerVoice) {
+      await VoiceChannelSessionController.instance.toggleSound();
+      return;
+    }
+    if (_hasDmVoiceCall) {
+      await DmCallManager.instance.toggleActiveSound();
+      return;
+    }
+    _messagesController.toggleSound(_voiceContextKey);
+  }
 
   void _toggleFolder() {
     setState(() {
@@ -137,6 +149,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       if (shouldSwitchToServer) {
         _isServerMode = true;
         _searchController.clear();
+        if (_serverListController.servers.isEmpty && !_serverListController.loading) {
+          _serverListController.loadServers();
+        }
       } else if (shouldSwitchToDm) {
         _isServerMode = false;
         _searchController.clear();
@@ -145,8 +160,286 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     });
   }
 
+  Future<void> _openServer(ServerSummary server) async {
+    _serverListController.selectServer(server.id);
+    final displayName = (_messagesController.myDisplayName ?? '').trim();
+    final username = (_messagesController.myUsername ?? '').trim();
+    final participantName = displayName.isNotEmpty
+        ? displayName
+        : (username.isNotEmpty ? username : 'Người dùng');
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ServerDetailScreen(
+          server: server,
+          currentUserId: _messagesController.myUserId,
+          participantName: participantName,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createServerDialog() async {
+    const templates = <Map<String, String>>[
+      {'id': 'custom', 'label': 'Tuỳ chỉnh'},
+      {'id': 'gaming', 'label': 'Gaming'},
+      {'id': 'friends', 'label': 'Friends'},
+      {'id': 'study-group', 'label': 'Study group'},
+      {'id': 'school-club', 'label': 'School club'},
+      {'id': 'local-community', 'label': 'Local community'},
+      {'id': 'artists-creators', 'label': 'Artists & creators'},
+    ];
+    const purposes = <Map<String, String>>[
+      {'id': 'club-community', 'label': 'CLB / Cộng đồng'},
+      {'id': 'me-and-friends', 'label': 'Mình và bạn bè'},
+    ];
+    final nameController = TextEditingController();
+    final descController = TextEditingController();
+    final picker = ImagePicker();
+    int step = 0;
+    String selectedTemplate = 'custom';
+    String selectedPurpose = 'me-and-friends';
+    String? avatarUrl;
+    bool creating = false;
+    bool uploadingAvatar = false;
+    String languageCode = 'vi';
+    try {
+      languageCode = await DirectMessagesService.getCurrentLanguageCode();
+    } catch (_) {}
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !creating,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Widget content;
+            if (step == 0) {
+              content = Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Chọn mẫu máy chủ',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...templates.map((tpl) {
+                    return RadioListTile<String>(
+                      value: tpl['id']!,
+                      groupValue: selectedTemplate,
+                      onChanged: creating
+                          ? null
+                          : (v) {
+                              if (v == null) return;
+                              setModalState(() => selectedTemplate = v);
+                            },
+                      activeColor: const Color(0xFF2D7EFF),
+                      title: Text(
+                        tpl['label']!,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }),
+                ],
+              );
+            } else if (step == 1) {
+              content = Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Mục đích máy chủ',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...purposes.map((p) {
+                    return RadioListTile<String>(
+                      value: p['id']!,
+                      groupValue: selectedPurpose,
+                      onChanged: creating
+                          ? null
+                          : (v) {
+                              if (v == null) return;
+                              setModalState(() => selectedPurpose = v);
+                            },
+                      activeColor: const Color(0xFF2D7EFF),
+                      title: Text(
+                        p['label']!,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }),
+                ],
+              );
+            } else {
+              content = Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: (creating || uploadingAvatar)
+                        ? null
+                        : () async {
+                            final file = await picker.pickImage(
+                              source: ImageSource.gallery,
+                            );
+                            if (file == null) return;
+                            if (!context.mounted) return;
+                            setModalState(() => uploadingAvatar = true);
+                            try {
+                              final upload = await MessagesMediaService.uploadFile(
+                                filePath: file.path,
+                                contentType: MessagesMediaService.resolveUploadContentType(
+                                  filePath: file.path,
+                                  hintedContentType: file.mimeType,
+                                ),
+                              );
+                              final url = MessagesMediaService.pickDisplayUrl(upload);
+                              if (url.isNotEmpty) {
+                                setModalState(() => avatarUrl = url);
+                              }
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Upload ảnh thất bại: $e')),
+                              );
+                            } finally {
+                              if (context.mounted) {
+                                setModalState(() => uploadingAvatar = false);
+                              }
+                            }
+                          },
+                    child: CircleAvatar(
+                      radius: 34,
+                      backgroundColor: const Color(0xFF1F2D4D),
+                      backgroundImage: (avatarUrl ?? '').isNotEmpty
+                          ? NetworkImage(avatarUrl!)
+                          : null,
+                      child: uploadingAvatar
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : ((avatarUrl ?? '').isEmpty
+                                ? const Icon(
+                                    Icons.add_a_photo_rounded,
+                                    color: Colors.white,
+                                  )
+                                : null),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: nameController,
+                    autofocus: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Tên server',
+                      labelStyle: TextStyle(color: Color(0xFFAFC0E2)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: descController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Mô tả (tuỳ chọn)',
+                      labelStyle: TextStyle(color: Color(0xFFAFC0E2)),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF0E2247),
+              title: Text(
+                step == 0
+                    ? 'Tạo máy chủ'
+                    : step == 1
+                    ? 'Thiết lập mục đích'
+                    : 'Tuỳ chỉnh máy chủ',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              content: SingleChildScrollView(child: content),
+              actions: [
+                TextButton(
+                  onPressed: creating
+                      ? null
+                      : () {
+                          if (step > 0) {
+                            setModalState(() => step -= 1);
+                            return;
+                          }
+                          Navigator.of(dialogContext).pop();
+                        },
+                  child: Text(step > 0 ? 'Quay lại' : 'Huỷ'),
+                ),
+                ElevatedButton(
+                  onPressed: creating || uploadingAvatar
+                      ? null
+                      : () async {
+                          if (step < 2) {
+                            setModalState(() => step += 1);
+                            return;
+                          }
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
+                          setModalState(() => creating = true);
+                          try {
+                            final created = await _serverListController.createServer(
+                              name: name,
+                              description: descController.text.trim(),
+                              avatarUrl: avatarUrl,
+                              template: selectedTemplate,
+                              purpose: selectedPurpose,
+                              language: languageCode,
+                            );
+                            if (!context.mounted) return;
+                            Navigator.of(dialogContext).pop();
+                            if (created != null) {
+                              _openServer(created);
+                            }
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Không tạo được server: $e'),
+                              ),
+                            );
+                          } finally {
+                            if (context.mounted) {
+                              setModalState(() => creating = false);
+                            }
+                          }
+                        },
+                  child: creating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(step < 2 ? 'Tiếp tục' : 'Tạo'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    nameController.dispose();
+    descController.dispose();
+  }
+
   void _openThread(MessageThread thread) {
-    if (_isServerMode) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
@@ -155,18 +448,137 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     );
   }
 
+  MessageThread _toServerThread(ServerSummary server) {
+    return MessageThread(
+      id: server.id,
+      name: server.name,
+      lastMessage: (server.description ?? '').trim(),
+      lastActiveLabel: '',
+      unreadCount: server.unreadCount,
+      avatarUrl: (server.avatarUrl ?? '').trim().isEmpty ? null : server.avatarUrl,
+      isOnline: true,
+    );
+  }
+
+  Widget _buildServerModeBody(List<ServerSummary> servers) {
+    if (_serverListController.loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_serverListController.error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            _serverListController.error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFFAFC0E2)),
+          ),
+        ),
+      );
+    }
+    if (servers.isEmpty) {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _createServerDialog,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Tạo server mới'),
+              ),
+            ),
+          ),
+          const Expanded(
+            child: Center(
+              child: Text(
+                'Bạn chưa tham gia server nào',
+                style: TextStyle(
+                  color: Color(0xFFAFC0E2),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          child: Row(
+            children: [
+              _ServerCircleButton(
+                icon: Icons.add_rounded,
+                selected: false,
+                onTap: _createServerDialog,
+                tooltip: 'Tạo server',
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 56,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: servers.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final server = servers[index];
+                      return _ServerCircleButton(
+                        imageUrl: server.avatarUrl,
+                        label: server.name,
+                        unreadCount: server.unreadCount,
+                        selected: _serverListController.selectedServerId == server.id,
+                        onTap: () => _openServer(server),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: _lineColor),
+        Expanded(
+          child: ListView.separated(
+            itemCount: servers.length,
+            separatorBuilder: (_, __) => const Divider(height: 1, color: _lineColor),
+            itemBuilder: (context, index) {
+              final server = servers[index];
+              return MessageThreadTile(
+                thread: _toServerThread(server),
+                showActivityLabel: false,
+                languageCode: _messagesController.languageCode,
+                onTap: () => _openServer(server),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final threads = _filteredThreads;
+    final servers = _filteredServers;
 
-    return GestureDetector(
-      onTap: () {
-        if (_isFolderExpanded) {
-          setState(() => _isFolderExpanded = false);
-        }
-        FocusScope.of(context).unfocus();
-      },
-      child: Scaffold(
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        VoiceChannelSessionController.instance,
+        DmCallManager.instance,
+      ]),
+      builder: (context, _) => GestureDetector(
+        onTap: () {
+          if (_isFolderExpanded) {
+            setState(() => _isFolderExpanded = false);
+          }
+          FocusScope.of(context).unfocus();
+        },
+        child: Scaffold(
         backgroundColor: _pageColor,
         appBar: AppBar(
           backgroundColor: _pageColor,
@@ -246,52 +658,55 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                   onSelected: _onQuickMenuTap,
                 ),
               ),
-            if (!_isServerMode)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Tìm hoặc bắt đầu cuộc trò chuyện ....',
-                    hintStyle: const TextStyle(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: _isServerMode
+                      ? 'Tìm server...'
+                      : 'Tìm hoặc bắt đầu cuộc trò chuyện ....',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFFAFC0E2),
+                    fontSize: 13,
+                  ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(
                       color: Color(0xFFAFC0E2),
-                      fontSize: 13,
+                      width: 1,
                     ),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFAFC0E2),
+                      width: 1,
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(
-                        color: Color(0xFFAFC0E2),
-                        width: 1,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(
-                        color: Color(0xFFAFC0E2),
-                        width: 1,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(
-                        color: Colors.white,
-                        width: 1.2,
-                      ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(
+                      color: Colors.white,
+                      width: 1.2,
                     ),
                   ),
                 ),
               ),
+            ),
             const Divider(height: 1, thickness: 1, color: _lineColor),
             Expanded(
-              child: _messagesController.loadingThreads && !_isServerMode
+              child: _isServerMode
+                  ? _buildServerModeBody(servers)
+                  : _messagesController.loadingThreads
                   ? const Center(child: CircularProgressIndicator())
-                  : (!_isServerMode && _messagesController.threadsError != null)
+                  : (_messagesController.threadsError != null)
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -407,8 +822,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
               ),
               const Spacer(),
               IconButton(
-                onPressed: () =>
-                    _messagesController.toggleMic(_voiceContextKey),
+                onPressed: () => unawaited(_toggleGlobalMic()),
                 iconSize: 16,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
@@ -416,20 +830,16 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                   height: 26,
                 ),
                 icon: Icon(
-                  _messagesController.voiceStateFor(_voiceContextKey).micMuted
+                  _globalMicMuted
                       ? Icons.mic_off_rounded
                       : Icons.mic_none_rounded,
-                  color:
-                      _messagesController
-                          .voiceStateFor(_voiceContextKey)
-                          .micMuted
+                  color: _globalMicMuted
                       ? const Color(0xFFFF5770)
                       : const Color(0xFFB4C2DE),
                 ),
               ),
               IconButton(
-                onPressed: () =>
-                    _messagesController.toggleSound(_voiceContextKey),
+                onPressed: () => unawaited(_toggleGlobalSound()),
                 iconSize: 16,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
@@ -437,13 +847,10 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                   height: 26,
                 ),
                 icon: Icon(
-                  _messagesController.voiceStateFor(_voiceContextKey).soundMuted
+                  _globalSoundMuted
                       ? Icons.headset_off_rounded
                       : Icons.headset_rounded,
-                  color:
-                      _messagesController
-                          .voiceStateFor(_voiceContextKey)
-                          .soundMuted
+                  color: _globalSoundMuted
                       ? const Color(0xFFFF5770)
                       : const Color(0xFFB4C2DE),
                 ),
@@ -451,6 +858,108 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
             ],
           ),
         ),
+      )),
+    );
+  }
+}
+
+class _ServerCircleButton extends StatelessWidget {
+  const _ServerCircleButton({
+    this.icon,
+    this.imageUrl,
+    this.label,
+    this.tooltip,
+    this.unreadCount = 0,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData? icon;
+  final String? imageUrl;
+  final String? label;
+  final String? tooltip;
+  final int unreadCount;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = (imageUrl ?? '').isNotEmpty;
+    final letter = (label ?? '').trim().isNotEmpty
+        ? (label!.trim().substring(0, 1).toUpperCase())
+        : '?';
+    return Tooltip(
+      message: tooltip ?? label ?? '',
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(26),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: selected ? const Color(0xFF2D7EFF) : const Color(0xFF122A55),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? Colors.white : const Color(0xFF2A3F69),
+                ),
+              ),
+              child: hasImage
+                  ? ClipOval(
+                      child: Image.network(
+                        imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            letter,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: icon != null
+                          ? Icon(icon, color: Colors.white, size: 24)
+                          : Text(
+                              letter,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                    ),
+            ),
+          ),
+          if (unreadCount > 0)
+            Positioned(
+              right: -3,
+              top: -3,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF2A45),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: const Color(0xFF071531)),
+                ),
+                child: Text(
+                  unreadCount > 99 ? '99+' : '$unreadCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 8,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

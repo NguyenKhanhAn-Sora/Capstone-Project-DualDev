@@ -2,12 +2,17 @@
 
 import React, { useEffect, useRef } from "react";
 import styles from "./MessageActionsMenu.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface MessageActionsMenuProps {
+  /** Legacy "Gỡ" — chỉ hiện khi truyền `onRemove` (vd. luồng cũ). DM và kênh máy chủ dùng `onDeleteForMe` / `onDeleteForEveryone`. */
   onRemove?: () => void;
   onForward?: () => void;
   onPin?: () => void;
   onReport?: () => void;
+  /** Direct delete actions for DMs — each one fires immediately. */
+  onDeleteForMe?: () => void;
+  onDeleteForEveryone?: () => void;
   onClose: () => void;
   position?: { top?: number; bottom?: number; left?: number; right?: number };
   isOwnMessage?: boolean;
@@ -19,11 +24,14 @@ export default function MessageActionsMenu({
   onForward,
   onPin,
   onReport,
+  onDeleteForMe,
+  onDeleteForEveryone,
   onClose,
   position,
   isOwnMessage = false,
   isPinned = false,
-}: MessageActionsMenuProps) {    
+}: MessageActionsMenuProps) {
+  const { t } = useLanguage();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,6 +50,10 @@ export default function MessageActionsMenu({
     onClose();
   };
 
+  const labelDeleteForMe = t("chat.actions.deleteForMe") || "Xóa ở phía tôi";
+  const labelDeleteForEveryone =
+    t("chat.actions.deleteForEveryone") || "Xóa với mọi người";
+
   return (
     <div className={styles.overlay} style={position}>
       <div className={styles.menu} ref={menuRef}>
@@ -52,6 +64,24 @@ export default function MessageActionsMenu({
           >
             <span className={styles.icon}>🗑️</span>
             <span>Gỡ</span>
+          </button>
+        )}
+        {onDeleteForMe && (
+          <button
+            className={styles.menuItem}
+            onClick={() => handleAction(onDeleteForMe)}
+          >
+            <span className={styles.icon}>🧹</span>
+            <span>{labelDeleteForMe}</span>
+          </button>
+        )}
+        {isOwnMessage && onDeleteForEveryone && (
+          <button
+            className={`${styles.menuItem} ${styles.danger}`}
+            onClick={() => handleAction(onDeleteForEveryone)}
+          >
+            <span className={styles.icon}>🗑️</span>
+            <span>{labelDeleteForEveryone}</span>
           </button>
         )}
         {onForward && (

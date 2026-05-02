@@ -302,7 +302,11 @@ export class ProfilesController {
       };
 
       memberIds.forEach((id) => {
-        this.channelMessagesGateway.emitToUser(id, 'user-profile-style-updated', payload);
+        this.channelMessagesGateway.emitToUser(
+          id,
+          'user-profile-style-updated',
+          payload,
+        );
       });
     } catch {
       // ignore realtime failures
@@ -353,10 +357,7 @@ export class ProfilesController {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    const previewViewerId = this.resolveAdminPreviewViewerId(
-      req,
-      usernameOrId,
-    );
+    const previewViewerId = this.resolveAdminPreviewViewerId(req, usernameOrId);
 
     return this.profilesService.getProfileDetails({
       usernameOrId,
@@ -404,7 +405,9 @@ export class ProfilesController {
         ? boost.limits.maxUploadBytes
         : MAX_AVATAR_BYTES
       : MAX_AVATAR_BYTES;
-    for (const f of [originalFile, croppedFile].filter(Boolean) as MulterFile[]) {
+    for (const f of [originalFile, croppedFile].filter(
+      Boolean,
+    ) as MulterFile[]) {
       if (typeof f.size === 'number' && f.size > maxAvatarBytes) {
         throw new BadRequestException(
           `File too large (max ${maxAvatarBytes} bytes)`,

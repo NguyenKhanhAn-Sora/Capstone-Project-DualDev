@@ -58,11 +58,7 @@ export class CommentsController {
     @Param('commentId') commentId: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
-    return this.commentsService.getById(
-      user?.userId ?? '',
-      postId,
-      commentId,
-    );
+    return this.commentsService.getById(user?.userId ?? '', postId, commentId);
   }
 
   @Post()

@@ -20,7 +20,10 @@ import { Comment } from '../comment/comment.schema';
 import { CampaignExpirySchedulerService } from './campaign-expiry-scheduler.service';
 import { MailService } from '../mail/mail.service';
 import { BoostService } from '../boost/boost.service';
-import type { BoostBillingCycle, BoostTier } from '../boost/boost-entitlement.schema';
+import type {
+  BoostBillingCycle,
+  BoostTier,
+} from '../boost/boost-entitlement.schema';
 
 @Injectable()
 export class PaymentsService {
@@ -97,7 +100,12 @@ export class PaymentsService {
     tier: string;
     billingCycle: string;
   }): number {
-    const tier = params.tier === 'boost' ? 'boost' : params.tier === 'basic' ? 'basic' : '';
+    const tier =
+      params.tier === 'boost'
+        ? 'boost'
+        : params.tier === 'basic'
+          ? 'basic'
+          : '';
     const monthly = this.boostStoreMonthlyPriceByTier[tier] ?? 0;
     if (monthly <= 0) {
       throw new BadRequestException('Invalid boostTier');
@@ -108,7 +116,10 @@ export class PaymentsService {
     return Math.round(monthly * 12 * (1 - 0.16));
   }
 
-  private computeBoostStoreExpiry(params: { startsAt: Date; billingCycle: string }): Date {
+  private computeBoostStoreExpiry(params: {
+    startsAt: Date;
+    billingCycle: string;
+  }): Date {
     const start = params.startsAt;
     const cycle = params.billingCycle === 'yearly' ? 'yearly' : 'monthly';
     const days = cycle === 'yearly' ? 365 : 30;
@@ -1028,10 +1039,13 @@ export class PaymentsService {
 
     if (actionType === 'boost_subscribe' || actionType === 'boost_gift') {
       boostTier = (dto.boostTier === 'boost' ? 'boost' : 'basic') as BoostTier;
-      billingCycle =
-        (dto.billingCycle === 'yearly' ? 'yearly' : 'monthly') as BoostBillingCycle;
+      billingCycle = (
+        dto.billingCycle === 'yearly' ? 'yearly' : 'monthly'
+      ) as BoostBillingCycle;
       recipientUserId =
-        actionType === 'boost_gift' ? String(dto.recipientUserId ?? '').trim() || null : null;
+        actionType === 'boost_gift'
+          ? String(dto.recipientUserId ?? '').trim() || null
+          : null;
       if (actionType === 'boost_gift' && !recipientUserId) {
         throw new BadRequestException('Missing recipientUserId');
       }
@@ -1404,7 +1418,8 @@ export class PaymentsService {
               ? (metadata.recipientUserId ?? null)
               : buyerId;
           const tier = metadata.boostTier === 'boost' ? 'boost' : 'basic';
-          const cycle = metadata.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+          const cycle =
+            metadata.billingCycle === 'yearly' ? 'yearly' : 'monthly';
           const paidAtDate = paidAt ?? new Date();
           if (recipient) {
             await this.boostService.finalizeBoostPurchaseAfterPayment({

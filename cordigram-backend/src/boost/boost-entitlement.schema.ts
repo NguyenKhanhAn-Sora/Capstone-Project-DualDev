@@ -43,4 +43,3 @@ export const BoostEntitlementSchema =
   SchemaFactory.createForClass(BoostEntitlement);
 
 BoostEntitlementSchema.index({ userId: 1, status: 1, expiresAt: -1 });
-

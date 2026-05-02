@@ -124,7 +124,9 @@ export class MessagingProfilesController {
         ? boost.limits.maxUploadBytes
         : MAX_AVATAR_BYTES
       : MAX_AVATAR_BYTES;
-    for (const f of [originalFile, croppedFile].filter(Boolean) as MulterFile[]) {
+    for (const f of [originalFile, croppedFile].filter(
+      Boolean,
+    ) as MulterFile[]) {
       if (typeof f.size === 'number' && f.size > maxAvatarBytes) {
         throw new BadRequestException(
           `File too large (max ${maxAvatarBytes} bytes)`,

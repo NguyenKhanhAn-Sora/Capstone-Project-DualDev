@@ -141,7 +141,8 @@ export class UsersService {
         .exec();
       const arr = (server as any)?.boostedByUserIds;
       serverBoost =
-        Array.isArray(arr) && arr.some((id: any) => String(id) === params.userId);
+        Array.isArray(arr) &&
+        arr.some((id: any) => String(id) === params.userId);
     }
 
     const ent = await this.boostService.getBoostStatus(params.userId);
@@ -1742,7 +1743,7 @@ export class UsersService {
       appearanceBackground:
         typeof s?.appearanceBackground === 'string' &&
         /^#[0-9A-Fa-f]{6}$/.test(s.appearanceBackground)
-          ? (s.appearanceBackground as string)
+          ? s.appearanceBackground
           : null,
       appearancePreset:
         (s?.appearancePreset as

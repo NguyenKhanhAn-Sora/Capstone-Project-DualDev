@@ -63,6 +63,8 @@ const ACCENT_OVERRIDE_KEYS = [
   "--color-chat-read",
   "--user-appearance-bg",
   "--color-on-accent",
+  "--color-button-x",
+  "--color-border-button-x",
 ] as const;
 
 function clamp(value: number, min: number, max: number) {
@@ -268,6 +270,13 @@ export function applyAccentColor(
     );
     s.setProperty("--color-chat-read", accentUi);
     s.setProperty("--color-on-accent", onAccent);
+    if (el) {
+      const panelL = getLuminance(panelBg);
+      const buttonX = panelL > 0.55 ? "#1F2A3D" : "#FFFFFF";
+      const buttonXBorder = panelL > 0.55 ? "#828B9A" : "#434F65";
+      s.setProperty("--color-button-x", buttonX);
+      s.setProperty("--color-border-button-x", buttonXBorder);
+    }
     s.setProperty(
       "--user-appearance-bg",
       `radial-gradient(circle at 20% 10%, ${bgGlow}, transparent 32%), linear-gradient(${bgSoft}, ${bgSoft}), ${bg}`,

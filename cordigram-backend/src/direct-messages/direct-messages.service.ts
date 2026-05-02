@@ -83,12 +83,14 @@ export class DirectMessagesService {
       const ignoredObjectIds = Array.from(ignoredSet).map(
         (id) => new Types.ObjectId(id),
       );
+      // Keep rows where the current user hid the message "for me" out via
+      // `deletedFor`, but still return messages that were unsent for everyone
+      // (`isDeleted: true`) so both sides can render the grey placeholder bubble.
       const baseMatch: any = {
         $or: [
           { senderId: user1, receiverId: user2 },
           { senderId: user2, receiverId: user1 },
         ],
-        isDeleted: false,
         deletedFor: { $ne: user1 },
       };
       if (ignoredObjectIds.length > 0) {
@@ -303,19 +305,33 @@ export class DirectMessagesService {
     messageId: string,
     userId: string,
     deleteType: 'for-everyone' | 'for-me' = 'for-me',
-  ): Promise<{ deleteType: string; deletedAt: Date }> {
+  ): Promise<{
+    deleteType: 'for-everyone' | 'for-me';
+    deletedAt: Date;
+    messageId: string;
+    senderId: string;
+    receiverId: string;
+    isDeletedForEveryone: boolean;
+  }> {
+    if (!Types.ObjectId.isValid(messageId)) {
+      throw new BadRequestException(`Invalid message id: ${messageId}`);
+    }
+
     const message = await this.directMessageModel.findById(messageId);
 
     if (!message) {
       throw new NotFoundException(`Message with id ${messageId} not found`);
     }
 
+    if (!Types.ObjectId.isValid(userId) || String(userId).length !== 24) {
+      throw new BadRequestException('Invalid user id');
+    }
     const userObjectId = new Types.ObjectId(userId);
+    const senderIdStr = this.participantUserIdString(message.senderId);
+    const receiverIdStr = this.participantUserIdString(message.receiverId);
 
     // Check if user is involved in this conversation
-    const isInvolved =
-      message.senderId.toString() === userId ||
-      message.receiverId.toString() === userId;
+    const isInvolved = senderIdStr === userId || receiverIdStr === userId;
 
     if (!isInvolved) {
       throw new ForbiddenException(
@@ -324,33 +340,90 @@ export class DirectMessagesService {
     }
 
     if (deleteType === 'for-everyone') {
-      // Only sender can delete for everyone
-      if (message.senderId.toString() !== userId) {
+      // Only the sender can delete a message for everyone.
+      if (senderIdStr !== userId) {
         throw new ForbiddenException(
           'Only the sender can delete message for everyone',
         );
       }
 
-      // Hard delete - mark as deleted for everyone
-      message.isDeleted = true;
-      await message.save();
+      // Idempotent: if already deleted for everyone, return the existing state
+      // instead of throwing, so the client + sockets can safely retry.
+      if (message.isDeleted) {
+        return {
+          deleteType: 'for-everyone',
+          deletedAt: message.deletedAt ?? new Date(),
+          messageId: message._id.toString(),
+          senderId: senderIdStr,
+          receiverId: receiverIdStr,
+          isDeletedForEveryone: true,
+        };
+      }
 
-      return {
-        deleteType: 'for-everyone',
-        deletedAt: new Date(),
+      const deletedAt = new Date();
+      // Use the underlying MongoDB collection, not `Model#updateOne`, so
+      // Mongoose document validation / `required: content` never runs. That
+      // validation is what used to 500 the API when we cleared payload fields.
+      // Zero-width content keeps text-index / empty-string edge cases happy;
+      // the app renders placeholder text from `isDeleted`, not this string.
+      const contentPlaceholder = '\u200b';
+      const filter = { _id: message._id };
+      const fullRecall = {
+        isDeleted: true,
+        deletedAt,
+        content: contentPlaceholder,
+        attachments: [] as string[],
+        giphyId: null as string | null,
+        voiceUrl: null as string | null,
+        voiceDuration: null as number | null,
+        reactions: [] as Array<{ userId: Types.ObjectId; emoji: string }>,
       };
-    } else {
-      // Soft delete - only hide for this user
-      if (!message.deletedFor.some((id) => id.toString() === userId)) {
-        message.deletedFor.push(userObjectId);
-        await message.save();
+      try {
+        const r = await this.directMessageModel.collection.updateOne(filter, {
+          $set: fullRecall,
+        });
+        if (!r.acknowledged || r.matchedCount === 0) {
+          throw new Error('Mongo update missed the document');
+        }
+      } catch (_first) {
+        // Narrow update: avoids rare driver / validator issues on mixed fields.
+        const r2 = await this.directMessageModel.collection.updateOne(filter, {
+          $set: {
+            isDeleted: true,
+            deletedAt,
+            content: contentPlaceholder,
+          },
+        });
+        if (!r2.acknowledged || r2.matchedCount === 0) {
+          throw new NotFoundException(`Message with id ${messageId} not found`);
+        }
       }
 
       return {
-        deleteType: 'for-me',
-        deletedAt: new Date(),
+        deleteType: 'for-everyone',
+        deletedAt,
+        messageId: message._id.toString(),
+        senderId: senderIdStr,
+        receiverId: receiverIdStr,
+        isDeletedForEveryone: true,
       };
     }
+
+    // for-me: add current user to deletedFor (idempotent push via $addToSet).
+    // Same as above: use native collection to avoid any Mongoose validation.
+    await this.directMessageModel.collection.updateOne(
+      { _id: message._id },
+      { $addToSet: { deletedFor: userObjectId } },
+    );
+
+    return {
+      deleteType: 'for-me',
+      deletedAt: new Date(),
+      messageId: message._id.toString(),
+      senderId: senderIdStr,
+      receiverId: receiverIdStr,
+      isDeletedForEveryone: false,
+    };
   }
 
   async markAsRead(messageIds: string[], userId: string): Promise<void> {
@@ -796,8 +869,52 @@ export class DirectMessagesService {
     }
   }
 
+  /** Normalize senderId / receiverId whether stored as ObjectId, string, or populated lean doc. */
+  private participantUserIdString(ref: unknown): string {
+    if (ref == null) {
+      throw new BadRequestException('Message is missing sender or receiver');
+    }
+    if (typeof ref === 'string') {
+      return ref;
+    }
+    if (ref instanceof Types.ObjectId) {
+      return ref.toHexString();
+    }
+    const asDoc = ref as { _id?: unknown };
+    if (asDoc._id != null) {
+      return this.participantUserIdString(asDoc._id);
+    }
+    const maybeToString = (ref as { toString?: () => string }).toString?.();
+    if (
+      typeof maybeToString === 'string' &&
+      Types.ObjectId.isValid(maybeToString)
+    ) {
+      return new Types.ObjectId(maybeToString).toHexString();
+    }
+    throw new BadRequestException('Invalid sender or receiver on message');
+  }
+
   private escapeRegexFragment(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private buildLooseContentSearch(text: string): Record<string, unknown> {
+    const terms = text
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0);
+    if (terms.length <= 1) {
+      const escaped = this.escapeRegexFragment(text.trim());
+      return { content: { $regex: escaped, $options: 'i' } };
+    }
+    return {
+      $and: terms.map((term) => ({
+        content: {
+          $regex: this.escapeRegexFragment(term),
+          $options: 'i',
+        },
+      })),
+    };
   }
 
   private async resolveSenderForDm(
@@ -841,7 +958,11 @@ export class DirectMessagesService {
       fuzzy?: boolean;
       parseQuery?: boolean;
     },
-  ): Promise<{ results: any[]; totalCount: number; parsed?: ParsedMessageSearch }> {
+  ): Promise<{
+    results: any[];
+    totalCount: number;
+    parsed?: ParsedMessageSearch;
+  }> {
     const {
       q,
       otherUserId,
@@ -947,8 +1068,7 @@ export class DirectMessagesService {
         });
         contentExtra = { $text: { $search: text } };
       } catch {
-        const escaped = this.escapeRegexFragment(text);
-        contentExtra = { content: { $regex: escaped, $options: 'i' } };
+        contentExtra = this.buildLooseContentSearch(text);
       }
     }
 
@@ -957,7 +1077,9 @@ export class DirectMessagesService {
     if (fuzzy && totalCount === 0 && text && !('$text' in contentExtra)) {
       const words = text.split(/\s+/).filter((w) => w.length > 0);
       if (words.length > 1) {
-        const pattern = words.map((w) => this.escapeRegexFragment(w)).join('.*');
+        const pattern = words
+          .map((w) => this.escapeRegexFragment(w))
+          .join('.*');
         contentExtra = { content: { $regex: pattern, $options: 'i' } };
         const retry = await runQuery(contentExtra);
         totalCount = retry.totalCount;
@@ -965,9 +1087,8 @@ export class DirectMessagesService {
       }
     }
 
-    if (fuzzy && totalCount === 0 && text && '$text' in contentExtra) {
-      const escaped = this.escapeRegexFragment(text);
-      contentExtra = { content: { $regex: escaped, $options: 'i' } };
+    if (totalCount === 0 && text && '$text' in contentExtra) {
+      contentExtra = this.buildLooseContentSearch(text);
       const retry = await runQuery(contentExtra);
       totalCount = retry.totalCount;
       messages = retry.messages;

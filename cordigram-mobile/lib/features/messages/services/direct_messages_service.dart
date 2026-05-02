@@ -96,6 +96,7 @@ class DirectMessagesService {
     int? voiceDuration,
     List<String>? attachments,
     String? giphyId,
+    String? replyTo,
   }) async {
     final res = await ApiService.post(
       '/direct-messages/$receiverId',
@@ -108,6 +109,7 @@ class DirectMessagesService {
         if (attachments != null && attachments.isNotEmpty)
           'attachments': attachments,
         if (giphyId != null && giphyId.isNotEmpty) 'giphyId': giphyId,
+        if (replyTo != null && replyTo.isNotEmpty) 'replyTo': replyTo,
       },
     );
     final message = _pickMap(res, ['message', 'data']);
@@ -138,9 +140,12 @@ class DirectMessagesService {
     );
   }
 
-  static Future<void> deleteMessage(String messageId) async {
+  static Future<void> deleteMessage(
+    String messageId, {
+    String deleteType = 'for-me',
+  }) async {
     await ApiService.delete(
-      '/direct-messages/$messageId',
+      '/direct-messages/$messageId?deleteType=${Uri.encodeQueryComponent(deleteType)}',
       extraHeaders: _authHeaders,
     );
   }

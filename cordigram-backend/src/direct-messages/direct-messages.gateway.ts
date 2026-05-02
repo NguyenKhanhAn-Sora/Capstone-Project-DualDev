@@ -15,6 +15,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Profile } from '../profiles/profile.schema';
 import { User } from '../users/user.schema';
+import { FcmPushService } from '../notifications/fcm-push.service';
 
 @WebSocketGateway({
   namespace: '/direct-messages',
@@ -120,13 +121,12 @@ export class DirectMessagesGateway
     opts?: { bumpActivity?: boolean },
   ) {
     const now = Date.now();
-    const prev =
-      this.presence.get(userId) ?? {
-        status: 'offline' as const,
-        lastActiveAt: now,
-        idleTimer: undefined as NodeJS.Timeout | undefined,
-        sharePresence: true,
-      };
+    const prev = this.presence.get(userId) ?? {
+      status: 'offline' as const,
+      lastActiveAt: now,
+      idleTimer: undefined as NodeJS.Timeout | undefined,
+      sharePresence: true,
+    };
 
     const sharePresence = prev.sharePresence;
     const lastActiveAt = opts?.bumpActivity ? now : prev.lastActiveAt;
@@ -208,6 +208,36 @@ export class DirectMessagesGateway
     }
   }
 
+  emitMessageDeleted(payload: {
+    messageId: string;
+    senderId: string;
+    receiverId: string;
+    deleteType: 'for-everyone' | 'for-me';
+    deletedAt: string;
+  }) {
+    if (!this.server) {
+      return;
+    }
+    const body = {
+      messageId: payload.messageId,
+      deleteType: payload.deleteType,
+      deletedAt: payload.deletedAt,
+      senderId: payload.senderId,
+      receiverId: payload.receiverId,
+      // Back-compat alias per spec: { type: "message_unsent", messageId }
+      type: 'message_unsent',
+    };
+
+    // Send to both participants so every open client updates instantly.
+    for (const uid of [payload.senderId, payload.receiverId]) {
+      const sockets = this.connectedUsers.get(uid);
+      if (!sockets || sockets.size === 0) continue;
+      for (const sid of sockets) {
+        this.server.to(sid).emit('message-deleted', body);
+      }
+    }
+  }
+
   emitNewDirectMessageFromRest(payload: {
     senderId: string;
     receiverId: string;
@@ -234,6 +264,7 @@ export class DirectMessagesGateway
     private readonly jwtService: JwtService,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(User.name) private userModel: Model<User>,
+    private readonly fcmPushService: FcmPushService,
   ) {}
 
   async handleConnection(socket: Socket) {
@@ -269,7 +300,6 @@ export class DirectMessagesGateway
 
       // Mark as online (or keep offline for others if sharePresence=false)
       this.setPresence(userId, 'online', { bumpActivity: true });
-
     } catch (error) {
       console.error('Connection error:', error);
       socket.disconnect();
@@ -292,7 +322,6 @@ export class DirectMessagesGateway
         this.setPresence(userId, 'offline');
         this.dmPresenceSubs.delete(userId);
       }
-
     }
   }
 
@@ -358,7 +387,6 @@ export class DirectMessagesGateway
           message._id.toString(),
         );
 
-
       // Send to receiver
       const receiverSocket = this.connectedUsers.get(data.receiverId);
       if (receiverSocket && receiverSocket.size) {
@@ -411,10 +439,8 @@ export class DirectMessagesGateway
           .lean()
           .exec();
 
-
         const username =
           senderProfile?.username || senderProfile?.displayName || 'Unknown';
-
 
         for (const sid of receiverSocket) {
           this.server.to(sid).emit('user-typing', {
@@ -488,6 +514,44 @@ export class DirectMessagesGateway
     }
   }
 
+  @SubscribeMessage('delete-message')
+  async handleDeleteMessage(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody()
+    data: {
+      messageId: string;
+      deleteType?: 'for-everyone' | 'for-me';
+      receiverId?: string;
+    },
+  ) {
+    try {
+      const userId = socket.data.userId;
+      if (!userId || !data?.messageId) return;
+      const requested = data.deleteType;
+      const deleteType: 'for-everyone' | 'for-me' =
+        requested === 'for-everyone' ? 'for-everyone' : 'for-me';
+
+      // Service is idempotent, so double-invoking (REST + socket) is safe.
+      const result = await this.directMessagesService.deleteDirectMessage(
+        data.messageId,
+        userId,
+        deleteType,
+      );
+
+      if (result.deleteType === 'for-everyone') {
+        this.emitMessageDeleted({
+          messageId: result.messageId,
+          senderId: result.senderId,
+          receiverId: result.receiverId,
+          deleteType: 'for-everyone',
+          deletedAt: result.deletedAt.toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Error handling delete-message socket event:', error);
+    }
+  }
+
   @SubscribeMessage('add-reaction')
   async handleAddReaction(
     @ConnectedSocket() socket: Socket,
@@ -537,11 +601,9 @@ export class DirectMessagesGateway
       const { Types } = require('mongoose');
       const senderObjectId = new Types.ObjectId(senderId);
 
-
       const senderProfile = await this.profileModel.findOne({
         userId: senderObjectId,
       });
-
 
       const callerInfo = {
         userId: senderId,
@@ -552,7 +614,6 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
-
       if (receiverSocket && receiverSocket.size) {
         const payload = {
           from: senderId,
@@ -560,12 +621,16 @@ export class DirectMessagesGateway
           callerInfo,
         };
 
-
         for (const sid of receiverSocket) {
           this.server.to(sid).emit('call-incoming', payload);
         }
-
       } else {
+        void this.fcmPushService.pushDmCallIncoming({
+          receiverUserId: data.receiverId,
+          callerUserId: senderId,
+          type: data.type,
+          callerInfo,
+        });
       }
     } catch (error) {
       console.error('❌ [CALL] Error initiating call:', error);
@@ -632,7 +697,6 @@ export class DirectMessagesGateway
   ) {
     const userId = socket.data.userId;
     const peerSocket = this.connectedUsers.get(data.peerId);
-
 
     if (peerSocket && peerSocket.size) {
       for (const sid of peerSocket) {

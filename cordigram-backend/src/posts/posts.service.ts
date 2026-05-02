@@ -808,8 +808,8 @@ export class PostsService {
   private normalizeMentions(handles: string[], content?: string): string[] {
     const normalized = new Set(
       (handles ?? [])
-          .map((h) => h?.toString().trim().replace(/^@/, '').toLowerCase())
-          .filter(Boolean),
+        .map((h) => h?.toString().trim().replace(/^@/, '').toLowerCase())
+        .filter(Boolean),
     );
 
     const text = typeof content === 'string' ? content : '';

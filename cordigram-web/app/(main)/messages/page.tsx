@@ -73,7 +73,6 @@ import MessageReactions from "@/components/MessageReactions";
 import MessageActionsMenu from "@/components/MessageActionsMenu";
 import ReportMessageDialog from "@/components/ReportMessageDialog";
 import ReplyMessagePreview from "@/components/ReplyMessagePreview";
-import DeleteMessageDialog from "@/components/DeleteMessageDialog";
 import CreateServerModal from "@/components/CreateServerModal/CreateServerModal";
 import CreateChannelModal, {
   type ChannelTypeForCreate,
@@ -138,6 +137,34 @@ const VoiceChannelCall = dynamic<VoiceChannelCallProps>(
 );
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__";
 
+/** Giá trị mặc định trùng MessagesProfileEditor — không coi là “tùy chỉnh”, dùng màu chữ token UI. */
+const MESSAGING_DEFAULT_SOLID_PRIMARY = "#f2f3f5";
+const MESSAGING_DEFAULT_ACCENT = "#5865f2";
+
+function hasMessagingDisplayNameOverride(
+  source?: {
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
+  } | null,
+): boolean {
+  if (!source) return false;
+  const font = String(source.displayNameFontId || "default").trim();
+  if (font === "mono" || font === "rounded") return true;
+  const effect = String(source.displayNameEffectId || "solid").trim();
+  if (effect === "gradient" || effect === "neon") return true;
+  const pRaw = String(source.displayNamePrimaryHex || "").trim();
+  const aRaw = String(source.displayNameAccentHex || "").trim();
+  const pOk = /^#[0-9a-f]{6}$/i.test(pRaw);
+  const aOk = /^#[0-9a-f]{6}$/i.test(aRaw);
+  const pNorm = pOk ? pRaw.toLowerCase() : "";
+  const aNorm = aOk ? aRaw.toLowerCase() : "";
+  if (pNorm && pNorm !== MESSAGING_DEFAULT_SOLID_PRIMARY) return true;
+  if (aNorm && aNorm !== MESSAGING_DEFAULT_ACCENT.toLowerCase()) return true;
+  return false;
+}
+
 function getDisplayNameTextStyle(
   source?: {
     displayNameFontId?: string | null;
@@ -147,7 +174,7 @@ function getDisplayNameTextStyle(
   },
   messagesShellTheme: MessagesShellTheme = "dark",
 ): React.CSSProperties | undefined {
-  if (!source) return undefined;
+  if (!source || !hasMessagingDisplayNameOverride(source)) return undefined;
   const defaultPrimary = messagesShellTheme === "light" ? "#0F1629" : "#F2F3F5";
   let primary = /^#[0-9a-f]{6}$/i.test(String(source.displayNamePrimaryHex || ""))
     ? String(source.displayNamePrimaryHex)
@@ -238,7 +265,21 @@ interface UIMessage {
   senderDisplayNameEffectId?: string | null;
   senderDisplayNamePrimaryHex?: string | null;
   senderDisplayNameAccentHex?: string | null;
+  /**
+   * True when the sender has "unsent" the message ("delete for everyone").
+   * The bubble should stay in the list but render a greyed-out italic
+   * placeholder instead of the original content.
+   */
+  isDeletedForEveryone?: boolean;
+  deletedAt?: string;
 }
+
+type PendingMessageJump = {
+  messageId: string;
+  mode: "server" | "dm";
+  channelId?: string;
+  dmUserId?: string;
+};
 
 // GiphyMessage component for rendering GIF/Sticker
 const GiphyMessage = memo(
@@ -554,6 +595,27 @@ function areMessagesEqual(
     return false;
   if (prevProps.message.id !== nextProps.message.id) return false;
 
+  if (
+    prevProps.message.senderDisplayNameFontId !==
+    nextProps.message.senderDisplayNameFontId
+  )
+    return false;
+  if (
+    prevProps.message.senderDisplayNameEffectId !==
+    nextProps.message.senderDisplayNameEffectId
+  )
+    return false;
+  if (
+    prevProps.message.senderDisplayNamePrimaryHex !==
+    nextProps.message.senderDisplayNamePrimaryHex
+  )
+    return false;
+  if (
+    prevProps.message.senderDisplayNameAccentHex !==
+    nextProps.message.senderDisplayNameAccentHex
+  )
+    return false;
+
   // Re-render if read status changed (THIS IS KEY!)
   if (prevProps.message.isRead !== nextProps.message.isRead) {
     return false;
@@ -578,6 +640,14 @@ function areMessagesEqual(
   if (prevProps.message.replyToMessage !== nextProps.message.replyToMessage)
     return false;
 
+  // Re-render when the message gets unsent / re-displayed as "recalled"
+  if (
+    prevProps.message.isDeletedForEveryone !==
+    nextProps.message.isDeletedForEveryone
+  )
+    return false;
+  if (prevProps.message.deletedAt !== nextProps.message.deletedAt) return false;
+
   // Emoji map / jumbo sizing đi qua renderMessageContent — phải re-render khi callback đổi
   if (prevProps.renderMessageContent !== nextProps.renderMessageContent)
     return false;
@@ -598,6 +668,8 @@ const MessageItem = memo(
     onPin,
     onReport,
     onDelete,
+    onDeleteForMe,
+    onDeleteForEveryone,
     scrollContainerRef,
     dmPartnerDisplayName,
     senderColor,
@@ -614,6 +686,10 @@ const MessageItem = memo(
     onPin?: (messageId: string) => void;
     onReport?: (messageId: string) => void;
     onDelete?: (messageId: string) => void;
+    /** "Delete for me" — immediate action, no confirmation dialog. */
+    onDeleteForMe?: (messageId: string) => void;
+    /** "Unsend / delete for everyone" — sender only. */
+    onDeleteForEveryone?: (messageId: string) => void;
     scrollContainerRef?: React.RefObject<HTMLElement | null>;
     dmPartnerDisplayName?: string;
     senderColor?: string; // Màu hiển thị từ role cao nhất
@@ -854,14 +930,16 @@ const MessageItem = memo(
           </div>
 
           {/* Message Reactions (ẩn khi đang hiện ở thanh sticky phía trên) */}
-          {message.reactions && message.reactions.length > 0 && (
-            <MessageReactions
-              reactions={message.reactions}
-              currentUserId={currentUserId || ""}
-              onReactionClick={(emoji) => onReaction?.(message.id, emoji)}
-              onAddClick={() => setShowEmojiPicker(true)}
-            />
-          )}
+          {!message.isDeletedForEveryone &&
+            message.reactions &&
+            message.reactions.length > 0 && (
+              <MessageReactions
+                reactions={message.reactions}
+                currentUserId={currentUserId || ""}
+                onReactionClick={(emoji) => onReaction?.(message.id, emoji)}
+                onAddClick={() => setShowEmojiPicker(true)}
+              />
+            )}
 
           {/* ✅ Read receipt indicator - only show for sent messages */}
           {alignAsSent && message.type === "direct" && (
@@ -921,7 +999,7 @@ const MessageItem = memo(
         </div>
 
         {/* Quick Reaction Bar on Hover — portal với position:fixed + z-index cao để đè lên chatHeader khi cần */}
-        {isHovered && (scrollContainerRef && fixedReactionPosition ? (
+        {isHovered && !message.isDeletedForEveryone && (scrollContainerRef && fixedReactionPosition ? (
           createPortal(
             <div
               style={{
@@ -955,7 +1033,7 @@ const MessageItem = memo(
         ))}
 
         {/* Emoji Reaction Picker — portal để đè lên chatHeader */}
-        {showEmojiPicker && (scrollContainerRef && fixedReactionPosition ? (
+        {showEmojiPicker && !message.isDeletedForEveryone && (scrollContainerRef && fixedReactionPosition ? (
           createPortal(
             <div
               style={{
@@ -995,12 +1073,30 @@ const MessageItem = memo(
         ))}
 
         {/* Message Actions Menu */}
-        {showActionsMenu && (
+        {showActionsMenu && !message.isDeletedForEveryone && (
           <MessageActionsMenu
             onRemove={
-              message.isFromCurrentUser
+              // Legacy "Gỡ" action — still used by channel/server messages
+              // (their delete flow hasn't been migrated to split delete).
+              onDelete && message.isFromCurrentUser
                 ? () => {
                     onDelete?.(message.id);
+                  }
+                : undefined
+            }
+            onDeleteForMe={
+              // Direct action — no confirmation dialog, executes immediately.
+              onDeleteForMe
+                ? () => {
+                    onDeleteForMe(message.id);
+                  }
+                : undefined
+            }
+            onDeleteForEveryone={
+              // Only shown for the sender; the menu also enforces this.
+              onDeleteForEveryone && message.isFromCurrentUser
+                ? () => {
+                    onDeleteForEveryone(message.id);
                   }
                 : undefined
             }
@@ -1375,6 +1471,10 @@ export default function MessagesPage() {
   const [conversations, setConversations] = useState<Map<string, UIMessage[]>>(
     new Map(),
   );
+  const [pendingMessageJump, setPendingMessageJump] =
+    useState<PendingMessageJump | null>(null);
+  const [highlightedJumpMessageId, setHighlightedJumpMessageId] = useState<string | null>(null);
+  const jumpHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Unread count per DM conversation (userId -> count). Updated from getConversationList; cleared when user opens chat. */
   const [dmUnreadCounts, setDmUnreadCounts] = useState<Record<string, number>>({});
   const [loadingDirectMessages, setLoadingDirectMessages] = useState(false);
@@ -1464,6 +1564,20 @@ export default function MessagesPage() {
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [currentMessagingProfile, setCurrentMessagingProfile] =
     useState<MessagingProfileCardResponse | null>(null);
+  /** Kiểu tên Boost lưu ở hồ sơ messaging; ghép vào nguồn style thanh sidebar để khớp token nền sáng/tối. */
+  const selfSidebarDisplayStyleSource = useMemo(() => {
+    const base = currentUserProfile;
+    if (!base) return null;
+    const mp = currentMessagingProfile;
+    if (!mp) return base;
+    return {
+      ...base,
+      displayNameFontId: mp.displayNameFontId ?? base.displayNameFontId,
+      displayNameEffectId: mp.displayNameEffectId ?? base.displayNameEffectId,
+      displayNamePrimaryHex: mp.displayNamePrimaryHex ?? base.displayNamePrimaryHex,
+      displayNameAccentHex: mp.displayNameAccentHex ?? base.displayNameAccentHex,
+    };
+  }, [currentUserProfile, currentMessagingProfile]);
   const resolveMessageSenderStyle = useCallback(
     (message: UIMessage): React.CSSProperties | undefined => {
       const directFriend =
@@ -1481,17 +1595,31 @@ export default function MessagesPage() {
         message.isFromCurrentUser && selectedDirectMessageFriend
           ? currentMessagingProfile
           : null;
-      const source =
+      const baseProfile =
         selfDmSource ||
         (message.isFromCurrentUser ? currentUserProfile : null) ||
         directProfile ||
         directFriend ||
-        sidebarFriend || {
-          displayNameFontId: message.senderDisplayNameFontId,
-          displayNameEffectId: message.senderDisplayNameEffectId,
-          displayNamePrimaryHex: message.senderDisplayNamePrimaryHex,
-          displayNameAccentHex: message.senderDisplayNameAccentHex,
-        };
+        sidebarFriend ||
+        null;
+      const fromMessage = {
+        displayNameFontId: message.senderDisplayNameFontId,
+        displayNameEffectId: message.senderDisplayNameEffectId,
+        displayNamePrimaryHex: message.senderDisplayNamePrimaryHex,
+        displayNameAccentHex: message.senderDisplayNameAccentHex,
+      };
+      const source = baseProfile
+        ? {
+            displayNameFontId:
+              fromMessage.displayNameFontId ?? (baseProfile as any).displayNameFontId,
+            displayNameEffectId:
+              fromMessage.displayNameEffectId ?? (baseProfile as any).displayNameEffectId,
+            displayNamePrimaryHex:
+              fromMessage.displayNamePrimaryHex ?? (baseProfile as any).displayNamePrimaryHex,
+            displayNameAccentHex:
+              fromMessage.displayNameAccentHex ?? (baseProfile as any).displayNameAccentHex,
+          }
+        : fromMessage;
       return getDisplayNameTextStyle(source, messagesShellTheme);
     },
     [
@@ -1553,7 +1681,6 @@ export default function MessagesPage() {
   } | null>(null);
   const [showReportDialog, setShowReportDialog] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<UIMessage | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [channelProfileContext, setChannelProfileContext] =
     useState<ChannelProfileAnchorContext | null>(null);
@@ -1643,6 +1770,29 @@ export default function MessagesPage() {
   useEffect(() => {
     selectedChannelRef.current = selectedChannel;
   }, [selectedChannel]);
+  const escapeMessageSelectorValue = useCallback((value: string) => {
+    if (typeof window !== "undefined" && typeof window.CSS?.escape === "function") {
+      return window.CSS.escape(value);
+    }
+    return value.replace(/["\\]/g, "\\$&");
+  }, []);
+  const scrollToMessageBubble = useCallback(
+    (messageId: string) => {
+      const container = messagesContainerRef.current;
+      if (!container) return false;
+      const selector = `[data-message-id="${escapeMessageSelectorValue(messageId)}"]`;
+      const el = container.querySelector(selector) as HTMLElement | null;
+      if (!el) return false;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      setHighlightedJumpMessageId(messageId);
+      if (jumpHighlightTimerRef.current) clearTimeout(jumpHighlightTimerRef.current);
+      jumpHighlightTimerRef.current = setTimeout(() => {
+        setHighlightedJumpMessageId((prev) => (prev === messageId ? null : prev));
+      }, 2200);
+      return true;
+    },
+    [escapeMessageSelectorValue],
+  );
 
   // DM sidebar: hồ sơ messaging của người đang chat + mutual servers / member since.
   useEffect(() => {
@@ -1687,6 +1837,7 @@ export default function MessagesPage() {
     clearNewMessageChannel,
     clearChannelNotification,
     clearServerDeleted,
+    channelMessageDeleted,
   } = useChannelMessages({ token });
 
   const inboxRefetchTimerRef = useRef<number | null>(null);
@@ -1828,6 +1979,38 @@ export default function MessagesPage() {
     });
   }, [reactionUpdateChannel, selectedChannel]);
 
+  // ✅ Channel: xóa cho tôi / thu hồi (socket — đồng bộ mọi client trong room kênh)
+  useEffect(() => {
+    if (!channelMessageDeleted) return;
+    const { channelId, messageId, deleteType, deletedAt } = channelMessageDeleted;
+    if (channelId !== selectedChannelRef.current) return;
+    const asRecalled = deleteType === "for-everyone";
+    const mid = messageId != null ? String(messageId) : "";
+    if (!mid) return;
+
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => String(m.id) === mid);
+      if (idx === -1) return prev;
+      if (asRecalled) {
+        if (prev[idx].isDeletedForEveryone) return prev;
+        const next = prev.slice();
+        next[idx] = {
+          ...next[idx],
+          isDeletedForEveryone: true,
+          deletedAt: deletedAt || new Date().toISOString(),
+          text: "",
+          giphyId: undefined,
+          customStickerUrl: undefined,
+          voiceUrl: undefined,
+          voiceDuration: undefined,
+          reactions: [],
+        };
+        return next;
+      }
+      return prev.filter((m) => String(m.id) !== mid);
+    });
+  }, [channelMessageDeleted]);
+
   // ✅ New message in channel from WebSocket (thành viên khác gửi → hiện ngay không cần reload)
   useEffect(() => {
     if (!newMessageChannel?.message || !selectedChannel) return;
@@ -1873,6 +2056,7 @@ export default function MessagesPage() {
           ?.members?.find((m) => String(m.userId) === String(senderId))?.nickname ?? null
       : null;
     const trimmedNick = typeof senderNickname === "string" ? senderNickname.trim() : "";
+    const snd = typeof msg.senderId === "object" && msg.senderId ? (msg.senderId as any) : null;
     const uiMessage: UIMessage = {
       id: msg._id,
       text: msg.content,
@@ -1881,6 +2065,10 @@ export default function MessagesPage() {
       senderName: typeof msg.senderId === "object" ? (msg.senderId?.username || msg.senderId?.email) ?? "" : "",
       senderDisplayName: trimmedNick || (typeof msg.senderId === "object" ? msg.senderId?.displayName : undefined),
       senderAvatar: typeof msg.senderId === "object" ? (msg.senderId?.avatarUrl ?? msg.senderId?.avatar) : undefined,
+      senderDisplayNameFontId: snd?.displayNameFontId ?? undefined,
+      senderDisplayNameEffectId: snd?.displayNameEffectId ?? undefined,
+      senderDisplayNamePrimaryHex: snd?.displayNamePrimaryHex ?? undefined,
+      senderDisplayNameAccentHex: snd?.displayNameAccentHex ?? undefined,
       timestamp: new Date(msg.createdAt),
       isFromCurrentUser: false,
       type: "server",
@@ -1898,6 +2086,8 @@ export default function MessagesPage() {
       reactions: normalizeReactions(msg.reactions),
       replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
       replyToMessage: mapReplyToMessage(msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null),
+      isDeletedForEveryone: msg.isDeleted === true,
+      deletedAt: msg.deletedAt || undefined,
     };
     setMessages((prev) => appendServerMessage(prev, uiMessage));
     shouldAutoScrollRef.current = true;
@@ -1996,11 +2186,23 @@ export default function MessagesPage() {
       // Notify caller that call was answered (this will open tab on caller's side)
       answerCall(incomingCall.from, { roomName });
 
-      // Open call in new tab for receiver (this user)
+      // Open call in new tab for receiver (this user). We forward the current
+      // access token + peerId so the tab:
+      //   - never falls through `getStoredAccessToken()` into a stale/missing
+      //     token (fixes the 403 users hit when accepting calls, especially
+      //     calls initiated from mobile).
+      //   - knows who to signal via BroadcastChannel when the user hits
+      //     "end call", so the other side gets a proper `call-end` instead
+      //     of having to wait for LiveKit's disconnect event.
       const participantName =
         currentUserProfile.username || currentUserProfile.displayName || "Người dùng";
       const isAudioOnly = incomingCall.type === "audio";
-      const callUrl = `/call?roomName=${encodeURIComponent(roomName)}&participantName=${encodeURIComponent(participantName)}&audioOnly=${isAudioOnly}`;
+      const callUrl =
+        `/call?roomName=${encodeURIComponent(roomName)}` +
+        `&participantName=${encodeURIComponent(participantName)}` +
+        `&audioOnly=${isAudioOnly}` +
+        `&peerId=${encodeURIComponent(incomingCall.from)}` +
+        `&accessToken=${encodeURIComponent(token)}`;
 
       window.open(callUrl, "_blank", "noopener,noreferrer");
 
@@ -2034,7 +2236,10 @@ export default function MessagesPage() {
     setOutgoingCall(null);
   }, [outgoingCall, endCall]);
 
-  // ✅ Open call tab when receiver accepts (for caller)
+  // ✅ Open call tab when receiver accepts (for caller).
+  // Mirrors the accept-path URL: include access token + peerId so the tab
+  // can authenticate on its own and signal end-of-call back to this tab
+  // over BroadcastChannel when the user hangs up.
   const openCallTab = useCallback(async () => {
     if (!outgoingCall || !currentUserProfile) return;
 
@@ -2042,7 +2247,13 @@ export default function MessagesPage() {
       const participantName =
         currentUserProfile.username || currentUserProfile.displayName || "Người dùng";
       const isAudioOnly = outgoingCall.type === "audio";
-      const callUrl = `/call?roomName=${encodeURIComponent(outgoingCall.roomName!)}&participantName=${encodeURIComponent(participantName)}&audioOnly=${isAudioOnly}`;
+      const qpToken = token ? `&accessToken=${encodeURIComponent(token)}` : "";
+      const callUrl =
+        `/call?roomName=${encodeURIComponent(outgoingCall.roomName!)}` +
+        `&participantName=${encodeURIComponent(participantName)}` +
+        `&audioOnly=${isAudioOnly}` +
+        `&peerId=${encodeURIComponent(outgoingCall.to)}` +
+        qpToken;
 
       window.open(callUrl, "_blank", "noopener,noreferrer");
 
@@ -2051,7 +2262,7 @@ export default function MessagesPage() {
     } catch (error) {
       console.error("❌ [CALLER] Failed to open call window:", error);
     }
-  }, [outgoingCall, currentUserProfile]);
+  }, [outgoingCall, currentUserProfile, token]);
 
   // ✅ Handle incoming call & call events
   useEffect(() => {
@@ -2099,8 +2310,19 @@ export default function MessagesPage() {
       return;
     }
 
-    // Call answered - open tab for caller
-    if (isCallAnswerEvent(callEvent) && outgoingCall && callEvent.sdpOffer) {
+    // Call answered - open tab for caller.
+    //
+    // The `from === outgoingCall.to` guard is load-bearing: without it, a
+    // stale `answer` callEvent from a previous session (e.g. user logged
+    // out and back in, or called a different person earlier) would
+    // re-fire here the moment the user sets up a NEW outgoingCall and
+    // auto-open a call tab, skipping the accept/reject step entirely.
+    if (
+      isCallAnswerEvent(callEvent) &&
+      outgoingCall &&
+      callEvent.sdpOffer &&
+      String(callEvent.from) === String(outgoingCall.to)
+    ) {
       openCallTab();
       return;
     }
@@ -2121,6 +2343,18 @@ export default function MessagesPage() {
       return prev;
     });
 
+    // Also relay the close signal to any active call tab — LiveKit's
+    // ParticipantDisconnected fires eventually, but broadcasting "end" here
+    // tears the tab down immediately so the UX matches what the user sees
+    // on the peer side (mobile / web).
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        const channel = new BroadcastChannel("cordigram-call");
+        channel.postMessage({ type: "peer-ended", peerId: callEnded.from });
+        channel.close();
+      } catch (_) {}
+    }
+
     // Auto-close after 3 seconds if call was cancelled
     const timer = setTimeout(() => {
       setIncomingCall((prev) => {
@@ -2137,6 +2371,39 @@ export default function MessagesPage() {
 
     return () => clearTimeout(timer);
   }, [callEnded]); // ✅ Only depend on callEnded, not incomingCall
+
+  // ✅ Listen for the call tab telling us the user ended the call.
+  //
+  // Why a BroadcastChannel and not postMessage?
+  //   window.open(..., "noopener,noreferrer") deliberately severs
+  //   `window.opener`, so the tab can't reach us directly. BroadcastChannel
+  //   is the only cross-tab messaging primitive that still works with that
+  //   hardened `rel="noopener"` posture AND is already supported by all
+  //   browsers we target.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) {
+      return;
+    }
+    const channel = new BroadcastChannel("cordigram-call");
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as
+        | { type: string; peerId?: string }
+        | null;
+      if (!data || typeof data !== "object") return;
+      if (data.type === "self-ended" && data.peerId) {
+        // Our call tab just hung up. Emit the matching socket signal so the
+        // peer (web or mobile) stops their own LiveKit session + UI.
+        endCall(data.peerId);
+        setIncomingCall(null);
+        setOutgoingCall(null);
+      }
+    };
+    channel.addEventListener("message", onMessage);
+    return () => {
+      channel.removeEventListener("message", onMessage);
+      channel.close();
+    };
+  }, [endCall]);
 
   // ✅ Listen for call-rejected event
   useEffect(() => {
@@ -2492,8 +2759,15 @@ export default function MessagesPage() {
       if (!uid) return;
 
       const isMessaging = d.profileContext === "messaging";
+      const hasIdentityPatch =
+        "avatarUrl" in d || "displayName" in d || "username" in d;
+      const hasStylePatch =
+        "displayNameFontId" in d ||
+        "displayNameEffectId" in d ||
+        "displayNamePrimaryHex" in d ||
+        "displayNameAccentHex" in d;
 
-      if ("avatarUrl" in d || "displayName" in d || "username" in d) {
+      if (hasIdentityPatch || hasStylePatch) {
         setFriends((prev) =>
           prev.map((f) =>
             String(f._id) !== uid
@@ -2501,10 +2775,10 @@ export default function MessagesPage() {
               : ({
                   ...f,
                   avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? f.avatarUrl) : f.avatarUrl,
-                  displayName: d.displayName ?? f.displayName,
+                  displayName: "displayName" in d ? (d.displayName ?? f.displayName) : f.displayName,
                   ...(isMessaging
                     ? {}
-                    : { username: d.username ?? f.username }),
+                    : { username: "username" in d ? (d.username ?? f.username) : f.username }),
                   displayNameFontId:
                     "displayNameFontId" in d ? (d.displayNameFontId ?? f.displayNameFontId) : f.displayNameFontId,
                   displayNameEffectId:
@@ -2556,6 +2830,26 @@ export default function MessagesPage() {
         } as any;
       });
 
+      if (isMessaging && String(uid) === String(currentUserId)) {
+        setCurrentMessagingProfile((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            displayName: "displayName" in d ? (d.displayName ?? prev.displayName) : prev.displayName,
+            chatUsername: "username" in d ? (d.username ?? prev.chatUsername) : prev.chatUsername,
+            avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? prev.avatarUrl) : prev.avatarUrl,
+            displayNameFontId:
+              "displayNameFontId" in d ? (d.displayNameFontId ?? prev.displayNameFontId) : prev.displayNameFontId,
+            displayNameEffectId:
+              "displayNameEffectId" in d ? (d.displayNameEffectId ?? prev.displayNameEffectId) : prev.displayNameEffectId,
+            displayNamePrimaryHex:
+              "displayNamePrimaryHex" in d ? (d.displayNamePrimaryHex ?? prev.displayNamePrimaryHex) : prev.displayNamePrimaryHex,
+            displayNameAccentHex:
+              "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? prev.displayNameAccentHex) : prev.displayNameAccentHex,
+          };
+        });
+      }
+
       if (!isMessaging) {
         setCurrentUserProfile((prev: any) => {
           if (!prev || String(prev.userId ?? prev.id ?? "") !== uid) return prev;
@@ -2574,12 +2868,29 @@ export default function MessagesPage() {
               "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? prev.displayNameAccentHex) : prev.displayNameAccentHex,
           };
         });
+      } else if (String(uid) === String(currentUserId)) {
+        setCurrentUserProfile((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? prev.avatarUrl) : prev.avatarUrl,
+            displayName: "displayName" in d ? (d.displayName ?? prev.displayName) : prev.displayName,
+            displayNameFontId:
+              "displayNameFontId" in d ? (d.displayNameFontId ?? prev.displayNameFontId) : prev.displayNameFontId,
+            displayNameEffectId:
+              "displayNameEffectId" in d ? (d.displayNameEffectId ?? prev.displayNameEffectId) : prev.displayNameEffectId,
+            displayNamePrimaryHex:
+              "displayNamePrimaryHex" in d ? (d.displayNamePrimaryHex ?? prev.displayNamePrimaryHex) : prev.displayNamePrimaryHex,
+            displayNameAccentHex:
+              "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? prev.displayNameAccentHex) : prev.displayNameAccentHex,
+          };
+        });
       }
     };
 
     window.addEventListener("cordigram-user-profile-style-updated", onStyle as any);
     return () => window.removeEventListener("cordigram-user-profile-style-updated", onStyle as any);
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!dmUserIdFromUrl || !token) return;
@@ -3134,13 +3445,17 @@ export default function MessagesPage() {
       const friendId = msg.receiverId._id; // For sent messages, friend is always the receiver
 
       const uiMessage: UIMessage = {
-        id: msg._id,
+        id: String(msg._id),
         text: msg.content,
         senderId: msg.senderId._id,
         senderEmail: msg.senderId.email,
         senderDisplayName: msg.senderId.displayName || undefined,
         senderName: msg.senderId.username || msg.senderId.email,
         senderAvatar: msg.senderId.avatar,
+        senderDisplayNameFontId: (msg.senderId as any).displayNameFontId ?? undefined,
+        senderDisplayNameEffectId: (msg.senderId as any).displayNameEffectId ?? undefined,
+        senderDisplayNamePrimaryHex: (msg.senderId as any).displayNamePrimaryHex ?? undefined,
+        senderDisplayNameAccentHex: (msg.senderId as any).displayNameAccentHex ?? undefined,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: true, // Always true for sent messages
         type: "direct",
@@ -3198,7 +3513,7 @@ export default function MessagesPage() {
       if (!friendId) return;
 
       const uiMessage: UIMessage = {
-        id: msg._id,
+        id: String(msg._id),
         text: msg.content,
         senderId: friendId,
         senderEmail: typeof rawSender === "object" ? rawSender.email ?? "" : "",
@@ -3209,6 +3524,14 @@ export default function MessagesPage() {
             ? rawSender.username || rawSender.email || ""
             : "",
         senderAvatar: typeof rawSender === "object" ? rawSender.avatar : undefined,
+        senderDisplayNameFontId:
+          typeof rawSender === "object" ? (rawSender as any).displayNameFontId ?? undefined : undefined,
+        senderDisplayNameEffectId:
+          typeof rawSender === "object" ? (rawSender as any).displayNameEffectId ?? undefined : undefined,
+        senderDisplayNamePrimaryHex:
+          typeof rawSender === "object" ? (rawSender as any).displayNamePrimaryHex ?? undefined : undefined,
+        senderDisplayNameAccentHex:
+          typeof rawSender === "object" ? (rawSender as any).displayNameAccentHex ?? undefined : undefined,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: false, // Always false for incoming messages
         type: "direct",
@@ -3223,6 +3546,8 @@ export default function MessagesPage() {
         reactions: normalizeReactions(msg.reactions),
         replyTo: msg.replyTo?._id || undefined,
         replyToMessage: mapReplyToMessage(msg.replyTo),
+        isDeletedForEveryone: msg.isDeleted === true,
+        deletedAt: msg.deletedAt || undefined,
       };
 
 
@@ -3245,7 +3570,9 @@ export default function MessagesPage() {
         }
 
         // Check for duplicates
-        const isDuplicate = currentMessages.some((m) => m.id === msg._id);
+        const isDuplicate = currentMessages.some(
+          (m) => String(m.id) === String(msg._id),
+        );
         if (!isDuplicate) {
           playMessageNotificationSound();
           const updated = [...currentMessages, uiMessage];
@@ -3289,27 +3616,50 @@ export default function MessagesPage() {
   ]);
 
   // ✅ Handle message-deleted event
+  //
+  // Distinguish between the two delete modes so the UI matches the spec:
+  //  - for-everyone → keep the bubble, mark as "recalled" (italic, grey).
+  //  - for-me (or missing type, legacy) → remove the bubble locally.
   useEffect(() => {
-    if (messageDeleted) {
-      
-      // Remove message from all conversations
-      setConversations((prev) => {
-        const newMap = new Map(prev);
-        
-        // Iterate through all conversations
-        for (const [friendId, messages] of newMap.entries()) {
-          const updatedMessages = messages.filter(
-            (msg) => msg.id !== messageDeleted.messageId
-          );
-          
-          if (updatedMessages.length !== messages.length) {
-            newMap.set(friendId, updatedMessages);
+    if (!messageDeleted) return;
+
+    const { messageId, deleteType, deletedAt } = messageDeleted;
+    // Backend also sends `type: "message_unsent"` for recall; treat as for-everyone if deleteType omitted.
+    const asRecalled =
+      deleteType === "for-everyone" ||
+      (messageDeleted as { type?: string }).type === "message_unsent";
+    const mid = messageId != null ? String(messageId) : "";
+
+    setConversations((prev) => {
+      const newMap = new Map(prev);
+      for (const [friendId, messages] of newMap.entries()) {
+        const idx = messages.findIndex((m) => String(m.id) === mid);
+        if (idx === -1) continue;
+
+        if (asRecalled) {
+          if (messages[idx].isDeletedForEveryone) continue; // idempotent
+          const next = messages.slice();
+          next[idx] = {
+            ...next[idx],
+            isDeletedForEveryone: true,
+            deletedAt: deletedAt || new Date().toISOString(),
+            text: "",
+            giphyId: undefined,
+            customStickerUrl: undefined,
+            voiceUrl: undefined,
+            voiceDuration: undefined,
+            reactions: [],
+          };
+          newMap.set(friendId, next);
+        } else {
+          const next = messages.filter((m) => m.id !== messageId);
+          if (next.length !== messages.length) {
+            newMap.set(friendId, next);
           }
         }
-        
-        return newMap;
-      });
-    }
+      }
+      return newMap;
+    });
   }, [messageDeleted]);
 
   // Load messages when any text chat channel is selected (includes category "info"; textChannels state excludes info only for sidebar grouping)
@@ -3585,6 +3935,22 @@ export default function MessagesPage() {
           typeof msg.senderId === "string"
             ? undefined
             : nickByUserId.get(String((msg.senderId as any)._id)) || (msg.senderId as any).displayName || undefined,
+        senderDisplayNameFontId:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayNameFontId ?? undefined,
+        senderDisplayNameEffectId:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayNameEffectId ?? undefined,
+        senderDisplayNamePrimaryHex:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayNamePrimaryHex ?? undefined,
+        senderDisplayNameAccentHex:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayNameAccentHex ?? undefined,
         serverNickname:
           typeof msg.senderId === "string"
             ? undefined
@@ -3620,6 +3986,8 @@ export default function MessagesPage() {
         replyToMessage: mapReplyToMessage(
           msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null,
         ),
+        isDeletedForEveryone: (msg as serversApi.Message).isDeleted === true,
+        deletedAt: (msg as serversApi.Message).deletedAt || undefined,
       }));
 
       setMessages(sortServerMessagesAscending(uiMessages));
@@ -3668,7 +4036,7 @@ export default function MessagesPage() {
       });
 
       const uiMessages: UIMessage[] = backendMessages.map((msg: any) => ({
-        id: msg._id,
+        id: String(msg._id),
         text: msg.content,
         senderId: msg.senderId._id,
         senderEmail: msg.senderId.email,
@@ -3693,6 +4061,8 @@ export default function MessagesPage() {
         reactions: normalizeReactions(msg.reactions),
         replyTo: msg.replyTo?._id || undefined,
         replyToMessage: mapReplyToMessage(msg.replyTo),
+        isDeletedForEveryone: msg.isDeleted === true,
+        deletedAt: msg.deletedAt || undefined,
       }));
 
       setConversations((prev) => {
@@ -3761,6 +4131,76 @@ export default function MessagesPage() {
     }
     await loadDirectMessages(friend._id);
   };
+
+  useEffect(() => {
+    return () => {
+      if (jumpHighlightTimerRef.current) clearTimeout(jumpHighlightTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pendingMessageJump) return;
+
+    if (pendingMessageJump.mode === "server") {
+      if (!pendingMessageJump.channelId) return;
+      if (selectedChannel !== pendingMessageJump.channelId) return;
+      let cancelled = false;
+      let attempts = 0;
+      const maxAttempts = 8;
+
+      const attempt = () => {
+        if (cancelled) return;
+        if (scrollToMessageBubble(pendingMessageJump.messageId)) {
+          setPendingMessageJump(null);
+          return;
+        }
+        attempts += 1;
+        if (attempts < maxAttempts) {
+          window.setTimeout(attempt, 140);
+        }
+      };
+
+      requestAnimationFrame(() => requestAnimationFrame(attempt));
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (pendingMessageJump.mode === "dm") {
+      const activeDmId = selectedDirectMessageFriend?._id;
+      if (!activeDmId || (pendingMessageJump.dmUserId && activeDmId !== pendingMessageJump.dmUserId)) {
+        return;
+      }
+
+      let cancelled = false;
+      let attempts = 0;
+      const maxAttempts = 8;
+
+      const attempt = () => {
+        if (cancelled) return;
+        if (scrollToMessageBubble(pendingMessageJump.messageId)) {
+          setPendingMessageJump(null);
+          return;
+        }
+        attempts += 1;
+        if (attempts < maxAttempts) {
+          window.setTimeout(attempt, 140);
+        }
+      };
+
+      requestAnimationFrame(() => requestAnimationFrame(attempt));
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [
+    pendingMessageJump,
+    selectedChannel,
+    selectedDirectMessageFriend?._id,
+    messages,
+    conversations,
+    scrollToMessageBubble,
+  ]);
 
   const handleOpenChannelUserProfile = useCallback(
     (message: UIMessage, anchorRect: DOMRect) => {
@@ -3955,43 +4395,101 @@ export default function MessagesPage() {
   };
 
   // Handler for deleting messages
+  //
+  // Two distinct behaviours per spec:
+  //  - "for-me":       removes the bubble locally (and only locally). The
+  //                    backend adds the current user to `deletedFor[]` so
+  //                    when we reload the history this user still can't
+  //                    see it.
+  //  - "for-everyone": keeps the bubble in place on every client but
+  //                    replaces its content with a greyed italic placeholder.
+  //                    Backend sets `isDeleted=true` + `deletedAt` and emits
+  //                    a socket `message-deleted` event so the receiver's
+  //                    UI updates instantly without reloading.
   const handleDeleteMessage = async (
     messageId: string,
-    deleteType: "for-everyone" | "for-me"
+    deleteType: "for-everyone" | "for-me",
   ) => {
+    const midLocal = String(messageId);
+    const applyChannelLocal = () => {
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => String(m.id) === midLocal);
+        if (idx === -1) return prev;
+        if (deleteType === "for-me") {
+          return prev.filter((m) => String(m.id) !== midLocal);
+        }
+        if (prev[idx].isDeletedForEveryone) return prev;
+        const next = prev.slice();
+        next[idx] = {
+          ...next[idx],
+          isDeletedForEveryone: true,
+          deletedAt: new Date().toISOString(),
+          text: "",
+          giphyId: undefined,
+          customStickerUrl: undefined,
+          voiceUrl: undefined,
+          voiceDuration: undefined,
+          reactions: [],
+        };
+        return next;
+      });
+    };
+
     try {
-      const result = await deleteDirectMessage(messageId, deleteType, { token });
-
-      // Update local state
       if (selectedDirectMessageFriend) {
-        const friendId = selectedDirectMessageFriend._id;
-        const currentMessages = conversations.get(friendId) || [];
-        const updatedMessages = currentMessages.filter(
-          (msg) => msg.id !== messageId
-        );
-        setConversations(new Map(conversations.set(friendId, updatedMessages)));
+        await deleteDirectMessage(messageId, deleteType, { token });
 
-        // Emit socket event to notify receiver (for real-time update)
-        if (emitDeleteMessage) {
+        if (deleteType === "for-everyone" && emitDeleteMessage) {
+          const friendId = selectedDirectMessageFriend._id;
           emitDeleteMessage(messageId, deleteType, friendId);
         }
-      }
 
-      // Show success toast
-      if (deleteType === "for-everyone") {
-        setToastMessage("Đã thu hồi tin nhắn với mọi người");
+        setConversations((prev) => {
+          const newMap = new Map(prev);
+          for (const [friendId, messages] of newMap.entries()) {
+            const idx = messages.findIndex((m) => String(m.id) === midLocal);
+            if (idx === -1) continue;
+
+            if (deleteType === "for-me") {
+              const next = messages.filter((m) => String(m.id) !== midLocal);
+              newMap.set(friendId, next);
+            } else {
+              const next = messages.slice();
+              next[idx] = {
+                ...next[idx],
+                isDeletedForEveryone: true,
+                deletedAt: new Date().toISOString(),
+                text: "",
+                giphyId: undefined,
+                customStickerUrl: undefined,
+                voiceUrl: undefined,
+                voiceDuration: undefined,
+                reactions: [],
+              };
+              newMap.set(friendId, next);
+            }
+          }
+          return newMap;
+        });
       } else {
-        setToastMessage("Bạn đã xóa một tin nhắn");
+        const chId = selectedChannelRef.current;
+        if (!chId) {
+          alert(t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn");
+          return;
+        }
+        await serversApi.deleteChannelMessage(chId, messageId, deleteType);
+        applyChannelLocal();
       }
 
-      // Hide toast after 3 seconds
+      setToastMessage(
+        deleteType === "for-everyone"
+          ? t("chat.toast.recalled") || "Đã xóa tin nhắn với mọi người"
+          : t("chat.toast.deletedForMe") || "Bạn đã xóa một tin nhắn",
+      );
       setTimeout(() => setToastMessage(null), 3000);
-
-      // Close dialog
-      setShowDeleteDialog(null);
     } catch (error) {
       console.error("Failed to delete message:", error);
-      alert("Không thể gỡ tin nhắn");
+      alert(t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn");
     }
   };
 
@@ -5427,6 +5925,39 @@ export default function MessagesPage() {
         voiceDuration,
       } = message;
 
+      // "Delete for everyone" / unsend — preserve the bubble footprint so the
+      // surrounding layout (avatars, reactions, read receipts) doesn't jump,
+      // but replace the payload with a greyed-out italic placeholder.
+      //
+      // The placeholder is personalised so the deletor sees "You deleted a
+      // message" while the other side sees "{senderName} deleted a message"
+      // (matches the spec: identify who removed the message in chat).
+      if (message.isDeletedForEveryone) {
+        const senderName =
+          message.senderDisplayName ||
+          message.senderName ||
+          message.senderEmail ||
+          t("chat.welcome.unknownUser") ||
+          "Người dùng";
+        const label = message.isFromCurrentUser
+          ? t("chat.messageRecalled.self") || "Bạn đã xóa tin nhắn"
+          : (
+              t("chat.messageRecalled.other") || "{name} đã xóa tin nhắn"
+            ).replace("{name}", senderName);
+        return (
+          <span
+            style={{
+              fontStyle: "italic",
+              color: "var(--color-text-muted)",
+              opacity: 0.85,
+              userSelect: "none",
+            }}
+          >
+            {label}
+          </span>
+        );
+      }
+
       if (messageType === "system") {
         return (
           <div style={{
@@ -6492,17 +7023,17 @@ export default function MessagesPage() {
       <div className={styles.leftSidebar}>
         <img
           src="/logo.png"
-          alt="Cordigram"
+          alt={t("chat.messagesPage.socialHomeTitle")}
           className={styles.logoImage}
-          onClick={() => {
-            setJoinedVoiceChannelId(null);
-            setVoiceChannelCallToken(null);
-            setVoiceChannelCallServerUrl("");
-            setSelectedServer(null);
-            setSelectedChannel(null);
-            setShowExploreView(false);
-              setShowBoostUpgradeView(false);
-            setShowJoinApplicationsView(false);
+          role="button"
+          tabIndex={0}
+          title={t("chat.messagesPage.socialHomeTitle")}
+          onClick={() => router.push("/")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              router.push("/");
+            }
           }}
           style={{ cursor: "pointer" }}
         />
@@ -6510,9 +7041,18 @@ export default function MessagesPage() {
         <button
           type="button"
           className={styles.socialHomeBtn}
-          title={t("chat.messagesPage.socialHomeTitle")}
-          aria-label={t("chat.messagesPage.socialHomeTitle")}
-          onClick={() => router.push("/")}
+          title={t("chat.messagesPage.messagesHomeTitle")}
+          aria-label={t("chat.messagesPage.messagesHomeTitle")}
+          onClick={() => {
+            setJoinedVoiceChannelId(null);
+            setVoiceChannelCallToken(null);
+            setVoiceChannelCallServerUrl("");
+            setSelectedServer(null);
+            setSelectedChannel(null);
+            setShowExploreView(false);
+            setShowBoostUpgradeView(false);
+            setShowJoinApplicationsView(false);
+          }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -6863,7 +7403,10 @@ export default function MessagesPage() {
                     <div className={styles.userTextInfo}>
                       <div
                         className={styles.userDisplayName}
-                        style={getDisplayNameTextStyle(currentUserProfile, messagesShellTheme)}
+                        style={getDisplayNameTextStyle(
+                          selfSidebarDisplayStyleSource ?? undefined,
+                          messagesShellTheme,
+                        )}
                       >
                         {currentUserProfile?.displayName ||
                           currentUserProfile?.username ||
@@ -6946,7 +7489,7 @@ export default function MessagesPage() {
                 </div>
               </>
             ) : (
-              // Server Selected - Header (tên máy chủ + mời) + Sự kiện + Nâng cấp + Kênh Chat & Kênh đàm thoại
+              // Server Selected - Header (tên máy chủ + mời) + Sự kiện + Kênh Chat & Kênh đàm thoại
               <>
                 <div className={styles.conversationsScrollArea}>
                 {/* Server header: tên máy chủ + mời tham gia */}
@@ -7046,14 +7589,6 @@ export default function MessagesPage() {
                   {serverEventsTotalCount > 0 && (
                     <span className={styles.eventCountBadge}>{serverEventsTotalCount} {t("chat.sidebar.events")}</span>
                   )}
-                </button>
-                {/* Nâng Cấp Máy Chủ */}
-                <button type="button" className={styles.serverMenuItem}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                  </svg>
-                  <span>{t("chat.sidebar.boostServer")}</span>
                 </button>
                 {canManageJoinApplications && selectedServer && (
                   <button
@@ -7569,7 +8104,10 @@ export default function MessagesPage() {
                     <div className={styles.userTextInfo}>
                       <div
                         className={styles.userDisplayName}
-                        style={getDisplayNameTextStyle(currentUserProfile, messagesShellTheme)}
+                        style={getDisplayNameTextStyle(
+                          selfSidebarDisplayStyleSource ?? undefined,
+                          messagesShellTheme,
+                        )}
                       >
                         {currentServerNickname ||
                           currentUserProfile?.displayName ||
@@ -8496,13 +9034,6 @@ export default function MessagesPage() {
                         {translateChannelName(connectedVoiceChannel.name, language)}
                       </h2>
                     </div>
-                    <div className={styles.chatHeaderActions}>
-                      <button type="button" title={t("chat.composer.voiceHeaderChat")}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                      </button>
-                    </div>
                   </div>
                     )}
                   <div
@@ -8847,6 +9378,15 @@ export default function MessagesPage() {
                           key={message.id}
                           data-message-id={message.id}
                           data-has-reactions={message.reactions?.length ? "true" : undefined}
+                          style={
+                            highlightedJumpMessageId === message.id
+                              ? {
+                                  background: "color-mix(in srgb, var(--color-panel-accent) 22%, transparent)",
+                                  borderRadius: 10,
+                                  transition: "background 220ms ease",
+                                }
+                              : undefined
+                          }
                         >
                           <MessageItem
                             message={message}
@@ -8857,7 +9397,15 @@ export default function MessagesPage() {
                             onReply={handleReplyToMessage}
                             onPin={handlePinMessage}
                             onReport={(msgId) => setShowReportDialog(msgId)}
-                            onDelete={(msgId) => setShowDeleteDialog(msgId)}
+                            // DM bubbles use the split delete flow — each
+                            // menu item fires the action immediately without
+                            // an extra confirmation dialog.
+                            onDeleteForMe={(msgId) =>
+                              handleDeleteMessage(msgId, "for-me")
+                            }
+                            onDeleteForEveryone={(msgId) =>
+                              handleDeleteMessage(msgId, "for-everyone")
+                            }
                             scrollContainerRef={messagesContainerRef}
                             dmPartnerDisplayName={selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username}
                             messagesShellTheme={messagesShellTheme}
@@ -8939,7 +9487,19 @@ export default function MessagesPage() {
                               .slice()
                               .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
                               .map((m) => (
-                                <div key={m.id} data-message-id={m.id}>
+                                <div
+                                  key={m.id}
+                                  data-message-id={m.id}
+                                  style={
+                                    highlightedJumpMessageId === m.id
+                                      ? {
+                                          background: "color-mix(in srgb, var(--color-panel-accent) 22%, transparent)",
+                                          borderRadius: 10,
+                                          transition: "background 220ms ease",
+                                        }
+                                      : undefined
+                                  }
+                                >
                                   {renderMessageContent(m)}
                                 </div>
                               ))}
@@ -8966,7 +9526,19 @@ export default function MessagesPage() {
                       .map((message) => {
                       if (message.messageType === "system") {
                         return (
-                          <div key={message.id} data-message-id={message.id}>
+                          <div
+                            key={message.id}
+                            data-message-id={message.id}
+                            style={
+                              highlightedJumpMessageId === message.id
+                                ? {
+                                    background: "color-mix(in srgb, var(--color-panel-accent) 22%, transparent)",
+                                    borderRadius: 10,
+                                    transition: "background 220ms ease",
+                                  }
+                                : undefined
+                            }
+                          >
                             {renderMessageContent(message)}
                           </div>
                         );
@@ -8976,6 +9548,15 @@ export default function MessagesPage() {
                           key={message.id}
                           data-message-id={message.id}
                           data-has-reactions={message.reactions?.length ? "true" : undefined}
+                          style={
+                            highlightedJumpMessageId === message.id
+                              ? {
+                                  background: "color-mix(in srgb, var(--color-panel-accent) 22%, transparent)",
+                                  borderRadius: 10,
+                                  transition: "background 220ms ease",
+                                }
+                              : undefined
+                          }
                         >
                           <MessageItem
                             message={message}
@@ -8986,7 +9567,12 @@ export default function MessagesPage() {
                             onReply={handleReplyToMessage}
                             onPin={handlePinMessage}
                             onReport={(msgId) => setShowReportDialog(msgId)}
-                            onDelete={(msgId) => setShowDeleteDialog(msgId)}
+                            onDeleteForMe={(msgId) =>
+                              void handleDeleteMessage(msgId, "for-me")
+                            }
+                            onDeleteForEveryone={(msgId) =>
+                              void handleDeleteMessage(msgId, "for-everyone")
+                            }
                             scrollContainerRef={messagesContainerRef}
                             senderColor={memberRoleColors[message.senderId]}
                             senderNameStyle={resolveMessageSenderStyle(message)}
@@ -10160,12 +10746,32 @@ export default function MessagesPage() {
         )}
         dmPartnerId={selectedDirectMessageFriend?._id}
         dmPartnerName={selectedDirectMessageFriend?.displayName || selectedDirectMessageFriend?.username}
-        onResultClick={(messageId, channelId) => {
+        onResultClick={({ messageId, channelId, dmUserId }) => {
           setShowMessageSearch(false);
           setMessageSearchDmConversationOnly(false);
-          if (channelId && selectedServer) {
-            trySelectChannel(channelId);
+          if (selectedServer) {
+            if (channelId) {
+              trySelectChannel(channelId);
+            }
+            setPendingMessageJump({
+              messageId,
+              mode: "server",
+              channelId: channelId || selectedChannel || undefined,
+            });
+            return;
           }
+
+          if (dmUserId && selectedDirectMessageFriend?._id !== dmUserId) {
+            const friend = friends.find((f) => f._id === dmUserId);
+            if (friend) {
+              void handleSelectDirectMessageFriend(friend);
+            }
+          }
+          setPendingMessageJump({
+            messageId,
+            mode: "dm",
+            dmUserId: dmUserId || selectedDirectMessageFriend?._id || undefined,
+          });
         }}
         onQuickSwitchDm={(userId) => {
           setShowMessageSearch(false);
@@ -11084,8 +11690,13 @@ export default function MessagesPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.pollModalHeader}>
-              <h2>Tạo khảo sát</h2>
-              <button className={styles.closeButton} onClick={handleCancelPoll}>
+              <h2>{t("chat.createPoll.title")}</h2>
+              <button
+                type="button"
+                className={styles.closeButton}
+                aria-label={t("chat.createPoll.closeAria")}
+                onClick={handleCancelPoll}
+              >
                 <svg
                   width="20"
                   height="20"
@@ -11103,12 +11714,12 @@ export default function MessagesPage() {
             <div className={styles.pollModalBody}>
               {/* Question */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Câu hỏi</label>
+                <label className={styles.pollLabel}>{t("chat.createPoll.questionLabel")}</label>
                 <div className={styles.pollInputWrapper}>
                   <input
                     type="text"
                     className={styles.pollInput}
-                    placeholder="Bạn muốn hỏi gì?"
+                    placeholder={t("chat.createPoll.questionPlaceholder")}
                     value={pollQuestion}
                     onChange={(e) => setPollQuestion(e.target.value)}
                     maxLength={300}
@@ -11121,10 +11732,10 @@ export default function MessagesPage() {
 
               {/* Options */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Các phương án trả lời</label>
+                <label className={styles.pollLabel}>{t("chat.createPoll.optionsLabel")}</label>
                 {pollOptions.map((option, index) => (
                   <div key={index} className={styles.pollOptionRow}>
-                    <button className={styles.emojiButton}>
+                    <button type="button" className={styles.emojiButton}>
                       <svg
                         width="20"
                         height="20"
@@ -11142,7 +11753,7 @@ export default function MessagesPage() {
                     <input
                       type="text"
                       className={styles.pollOptionInput}
-                      placeholder="Nhập câu trả lời"
+                      placeholder={t("chat.createPoll.optionPlaceholder")}
                       value={option}
                       onChange={(e) =>
                         handlePollOptionChange(index, e.target.value)
@@ -11150,6 +11761,7 @@ export default function MessagesPage() {
                     />
                     {pollOptions.length > 2 && (
                       <button
+                        type="button"
                         className={styles.deleteOptionButton}
                         onClick={() => handleRemovePollOption(index)}
                       >
@@ -11169,27 +11781,28 @@ export default function MessagesPage() {
                   </div>
                 ))}
                 <button
+                  type="button"
                   className={styles.addOptionButton}
                   onClick={handleAddPollOption}
                 >
-                  + Thêm phương án
+                  + {t("chat.createPoll.addOption")}
                 </button>
               </div>
 
               {/* Duration */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Thời gian</label>
+                <label className={styles.pollLabel}>{t("chat.createPoll.durationLabel")}</label>
                 <select
                   className={styles.pollSelect}
                   value={pollDuration}
                   onChange={(e) => setPollDuration(Number(e.target.value))}
                 >
-                  <option value={1}>1 giờ</option>
-                  <option value={4}>4 giờ</option>
-                  <option value={8}>8 giờ</option>
-                  <option value={24}>24 giờ</option>
-                  <option value={72}>3 ngày</option>
-                  <option value={168}>7 ngày</option>
+                  <option value={1}>{t("chat.createPoll.duration1h")}</option>
+                  <option value={4}>{t("chat.createPoll.duration4h")}</option>
+                  <option value={8}>{t("chat.createPoll.duration8h")}</option>
+                  <option value={24}>{t("chat.createPoll.duration24h")}</option>
+                  <option value={72}>{t("chat.createPoll.duration3d")}</option>
+                  <option value={168}>{t("chat.createPoll.duration7d")}</option>
                 </select>
               </div>
 
@@ -11201,22 +11814,24 @@ export default function MessagesPage() {
                   checked={pollAllowMultiple}
                   onChange={(e) => setPollAllowMultiple(e.target.checked)}
                 />
-                <label htmlFor="allowMultiple">Cho phép chọn nhiều phương án</label>
+                <label htmlFor="allowMultiple">{t("chat.createPoll.allowMultiple")}</label>
               </div>
             </div>
 
             <div className={styles.pollModalFooter}>
               <button
+                type="button"
                 className={styles.cancelButton}
                 onClick={handleCancelPoll}
               >
-                Hủy
+                {t("chat.createPoll.cancel")}
               </button>
               <button
+                type="button"
                 className={styles.submitButton}
                 onClick={handleSubmitPoll}
               >
-                Đăng
+                {t("chat.createPoll.submit")}
               </button>
             </div>
           </div>
@@ -11335,16 +11950,6 @@ export default function MessagesPage() {
             handleReportMessage(showReportDialog, reason, description)
           }
           onClose={() => setShowReportDialog(null)}
-        />
-      )}
-
-      {/* Delete Message Dialog */}
-      {showDeleteDialog && (
-        <DeleteMessageDialog
-          onConfirm={(deleteType) =>
-            handleDeleteMessage(showDeleteDialog, deleteType)
-          }
-          onClose={() => setShowDeleteDialog(null)}
         />
       )}
 

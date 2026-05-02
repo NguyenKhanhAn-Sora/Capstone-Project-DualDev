@@ -44,7 +44,12 @@ export class Livestream extends Document {
   @Prop({ type: String, required: true, unique: true, index: true })
   roomName: string;
 
-  @Prop({ type: String, enum: ['livekit', 'ivs'], default: 'livekit', index: true })
+  @Prop({
+    type: String,
+    enum: ['livekit', 'ivs'],
+    default: 'livekit',
+    index: true,
+  })
   provider: 'livekit' | 'ivs';
 
   @Prop({ type: String, default: '', trim: true })

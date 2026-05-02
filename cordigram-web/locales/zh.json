@@ -42,6 +42,47 @@
       "plusUploadFile": "上传文件",
       "plusCreatePoll": "创建投票"
     },
+    "createPoll": {
+      "title": "创建投票",
+      "closeAria": "关闭",
+      "questionLabel": "问题",
+      "questionPlaceholder": "你想问什么？",
+      "optionsLabel": "选项",
+      "optionPlaceholder": "输入选项",
+      "addOption": "添加选项",
+      "durationLabel": "时长",
+      "duration1h": "1 小时",
+      "duration4h": "4 小时",
+      "duration8h": "8 小时",
+      "duration24h": "24 小时",
+      "duration3d": "3 天",
+      "duration7d": "7 天",
+      "allowMultiple": "允许多选",
+      "cancel": "取消",
+      "submit": "发布"
+    },
+    "displayNameStyleModal": {
+      "title": "显示名称样式",
+      "subtitleLocked": "已锁定 — 你可以预览，但在解锁 Boost 之前不会保存。",
+      "closeAria": "关闭",
+      "sectionFont": "字体",
+      "sectionEffect": "效果",
+      "sectionColor": "颜色",
+      "colorPrimary": "主色",
+      "colorAccent": "强调色",
+      "fontDefault": "默认",
+      "fontRounded": "圆体",
+      "fontMono": "等宽",
+      "effectSolid": "纯色",
+      "effectGradient": "渐变",
+      "effectNeon": "霓虹",
+      "previewTitle": "预览",
+      "previewSub": "@cordigram · they/them",
+      "cancel": "取消",
+      "applyTry": "试用",
+      "apply": "应用",
+      "toastNeedBoost": "需要 Boost 才能保存显示名称样式。"
+    },
     "mention": {
       "sectionQuick": "快捷提及",
       "sectionMembers": "成员",
@@ -221,6 +262,19 @@
         "title": "仅对你移除",
         "desc": "这条消息会从你的设备中移除，但仍会对其他成员显示。"
       }
+    },
+    "actions": {
+      "deleteForMe": "仅对我删除",
+      "deleteForEveryone": "对所有人撤回"
+    },
+    "messageRecalled": {
+      "self": "你删除了一条消息",
+      "other": "{name} 删除了一条消息"
+    },
+    "toast": {
+      "deletedForMe": "已为你删除这条消息",
+      "recalled": "已为所有人删除消息",
+      "deleteFailed": "删除消息失败"
     },
     "reportMessage": {
       "title": "举报消息",
@@ -942,6 +996,19 @@
       "errorOpenRecent": "无法打开最近图片（CORS 或网络问题）。",
       "errorGetUrl": "无法获取 URL",
       "comingSoon": "此功能即将推出。",
+      "boostPromoTitleActive": "使用 Boost",
+      "boostPromoTitleDemo": "试用 Boost",
+      "boostPromoTagUnlock": "解锁",
+      "boostPromoTagLocked": "已锁定",
+      "boostPromoDescActive": "打开显示名称样式，选择字体、效果和颜色 — 会立即显示在你的资料上。",
+      "boostPromoDescDemo": "你可以在预览中试用显示名称样式。解锁前更改不会保存。",
+      "boostPromoCtaActive": "立即使用",
+      "boostPromoCtaDemo": "打开演示",
+      "displayNameStyleHeading": "显示名称样式",
+      "displayNameStyleOpen": "编辑名称样式",
+      "displayNameStyleTry": "试用（Boost）",
+      "displayNameStyleApplied": "已应用显示名称样式。",
+      "displayNameStyleError": "无法保存显示名称样式。",
       "cosmetics": {
         "errorLoadShop": "无法加载商店。",
         "itemFallbackDescription": "个人资料装饰物品",
@@ -1033,6 +1100,7 @@
       "soundOn": "取消音频静音",
       "soundOff": "音频静音",
       "createServerTitle": "创建服务器",
+      "messagesHomeTitle": "消息主页",
       "socialHomeTitle": "前往动态",
       "exploreTitle": "发现",
       "exploreClose": "关闭发现",

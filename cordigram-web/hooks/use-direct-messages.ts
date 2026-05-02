@@ -4,6 +4,8 @@ import io, { Socket } from "socket.io-client";
 interface UseDirectMessagesOptions {
   userId: string;
   token: string;
+  /** When false, no socket is opened (use on non-messages routes to avoid duplicate connections with /messages). */
+  enabled?: boolean;
 }
 
 export interface DirectMessage {
@@ -88,6 +90,7 @@ export type PresenceStatus = "online" | "idle" | "offline";
 export const useDirectMessages = ({
   userId,
   token,
+  enabled = true,
 }: UseDirectMessagesOptions) => {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -110,14 +113,54 @@ export const useDirectMessages = ({
   const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceStatus>>({});
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
-  const [messageDeleted, setMessageDeleted] = useState<{ messageId: string } | null>(null);
+  const [messageDeleted, setMessageDeleted] = useState<{
+    messageId: string;
+    deleteType?: "for-everyone" | "for-me";
+    deletedAt?: string;
+    senderId?: string;
+    receiverId?: string;
+  } | null>(null);
   const [userProfileStyleUpdated, setUserProfileStyleUpdated] =
     useState<UserProfileStyleUpdatedEvent | null>(null);
   const [boostEntitlementUpdated, setBoostEntitlementUpdated] =
     useState<BoostEntitlementUpdatedEvent | null>(null);
 
   useEffect(() => {
-    if (!userId || !token) return;
+    if (!enabled) {
+      if (socketRef.current) {
+        try {
+          socketRef.current.disconnect();
+        } catch {
+          // ignore
+        }
+        socketRef.current = null;
+      }
+      setIsConnected(false);
+      setCallEvent(null);
+      setCallEnded(null);
+      setUserTyping(null);
+      setMessagesRead(null);
+      setReactionUpdate(null);
+      setOnlineUsers(new Set());
+      setPresenceByUserId({});
+      return;
+    }
+
+    if (!userId || !token) {
+      // Clear any residual call / presence state so a user logging out
+      // (or the session going anonymous) cannot inherit ringing popups,
+      // "call-answered" auto-join events, or stale online lists from the
+      // previous identity. Without this the very first call after
+      // re-login would re-fire old socket events from React state.
+      setCallEvent(null);
+      setCallEnded(null);
+      setUserTyping(null);
+      setMessagesRead(null);
+      setReactionUpdate(null);
+      setOnlineUsers(new Set());
+      setPresenceByUserId({});
+      return;
+    }
 
     const socket = io(
       `${process.env.NEXT_PUBLIC_API_BASE || "https://api.cordigram.com"}/direct-messages`,
@@ -232,7 +275,28 @@ export const useDirectMessages = ({
       }
     });
 
-    // Call-related events
+    // Call-related events.
+    //
+    // IMPORTANT: every one-shot call signal ("incoming" / "answer" /
+    // "rejected") auto-clears after a short delay. Without this, the
+    // `callEvent` state would stay pinned to the last signal forever and
+    // any downstream `useEffect` that lists `callEvent` in its deps would
+    // re-fire the handler every time a sibling dep (e.g. `outgoingCall`)
+    // changed. That is exactly what caused:
+    //   - Bug 3: user A starts a new call → the effect re-runs with a
+    //     stale "incoming" callEvent from user C and the wrong incoming
+    //     popup flashes on screen.
+    //   - Bug 4: after logout / relogin, the user presses "video call"
+    //     and the stale "answer" callEvent resurrects openCallTab(),
+    //     skipping the accept/reject step.
+    // We only clear if the in-flight event is still the same reference,
+    // so a newer socket event replacing it won't get wiped prematurely.
+    const scheduleClearCallEvent = (evt: CallEvent, delayMs = 1200) => {
+      setTimeout(() => {
+        setCallEvent((prev) => (prev === evt ? null : prev));
+      }, delayMs);
+    };
+
     socket.on(
       "call-incoming",
       (data: {
@@ -245,28 +309,38 @@ export const useDirectMessages = ({
           avatar?: string;
         };
       }) => {
-        if (data.callerInfo) {
-        } else {
+        if (!data.callerInfo) {
           console.error("❌ [SOCKET] callerInfo is UNDEFINED or NULL!");
         }
-        setCallEvent({ ...data, callSignal: "incoming" });
+        const evt: CallEvent = { ...data, callSignal: "incoming" };
+        setCallEvent(evt);
+        scheduleClearCallEvent(evt);
       },
     );
 
     socket.on("call-answer", (data: { from: string; sdpOffer: any }) => {
-      setCallEvent({ ...data, callSignal: "answer" });
+      const evt: CallEvent = { ...data, callSignal: "answer" };
+      setCallEvent(evt);
+      scheduleClearCallEvent(evt);
     });
 
     socket.on("call-rejected", (data: { from: string }) => {
-      setCallEvent({ from: data.from, callSignal: "rejected" });
+      const evt: CallEvent = { from: data.from, callSignal: "rejected" };
+      setCallEvent(evt);
+      scheduleClearCallEvent(evt);
     });
 
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
-      setCallEvent({
+      const evt: CallEvent = {
         from: data.from,
         candidate: data.candidate,
         callSignal: "ice",
-      });
+      };
+      setCallEvent(evt);
+      // ICE candidates are high-frequency; clear even faster so they
+      // can't linger and piggyback into the "answer"/"incoming"
+      // branches of the downstream useEffect.
+      scheduleClearCallEvent(evt, 500);
     });
 
     socket.on("call-ended", (data: { from: string }) => {
@@ -274,10 +348,32 @@ export const useDirectMessages = ({
       setTimeout(() => setCallEnded(null), 1000);
     });
 
-    socket.on("message-deleted", (data: { messageId: string }) => {
-      setMessageDeleted(data);
-      setTimeout(() => setMessageDeleted(null), 1000);
-    });
+    socket.on(
+      "message-deleted",
+      (data: {
+        messageId: string;
+        deleteType?: "for-everyone" | "for-me";
+        deletedAt?: string;
+        senderId?: string;
+        receiverId?: string;
+      }) => {
+        if (!data?.messageId) return;
+        // Always provide a fresh object reference so downstream effects
+        // re-fire even when the same id is deleted twice in a row (e.g.
+        // REST + socket emit for the same message).
+        setMessageDeleted({
+          ...data,
+          messageId: String(data.messageId),
+          deleteType:
+            data.deleteType === "for-everyone" || data.deleteType === "for-me"
+              ? data.deleteType
+              : (data as { type?: string }).type === "message_unsent"
+                ? "for-everyone"
+                : data.deleteType,
+        });
+        setTimeout(() => setMessageDeleted(null), 1500);
+      },
+    );
 
     socket.on("user-profile-style-updated", (data: UserProfileStyleUpdatedEvent) => {
       if (!data?.userId) return;
@@ -314,7 +410,7 @@ export const useDirectMessages = ({
     return () => {
       socket.disconnect();
     };
-  }, [userId, token]);
+  }, [userId, token, enabled]);
 
   // Presence: activity + ping (helps idle/online accuracy)
   useEffect(() => {

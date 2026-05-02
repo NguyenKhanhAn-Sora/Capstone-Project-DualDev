@@ -78,9 +78,11 @@ export class BoostService {
       .lean()
       .exec();
 
-    const tier = (ent?.tier as BoostTier | undefined) ?? null;
+    const tier = ent?.tier ?? null;
     const active = Boolean(ent?._id && tier);
-    const expiresAt = ent?.expiresAt ? new Date(ent.expiresAt).toISOString() : null;
+    const expiresAt = ent?.expiresAt
+      ? new Date(ent.expiresAt).toISOString()
+      : null;
     return {
       tier,
       active,
@@ -145,7 +147,7 @@ export class BoostService {
     let expiresAt: Date;
 
     if (active && doc!.tier === tier) {
-      const baseMs = Math.max(existingExpires!.getTime(), now.getTime());
+      const baseMs = Math.max(existingExpires.getTime(), now.getTime());
       startsAt = new Date(doc!.startsAt ?? now);
       expiresAt = this.addBillingCycleDuration(new Date(baseMs), billingCycle);
     } else if (active && doc!.tier !== tier) {
@@ -239,10 +241,13 @@ export class BoostService {
       // ignore
     }
     try {
-      this.channelMessagesGateway?.emitToUser?.(userId, 'boost-entitlement-updated', payload);
+      this.channelMessagesGateway?.emitToUser?.(
+        userId,
+        'boost-entitlement-updated',
+        payload,
+      );
     } catch {
       // ignore
     }
   }
 }
-

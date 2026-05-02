@@ -42,6 +42,47 @@
       "plusUploadFile": "ファイルをアップロード",
       "plusCreatePoll": "アンケートを作成"
     },
+    "createPoll": {
+      "title": "アンケートを作成",
+      "closeAria": "閉じる",
+      "questionLabel": "質問",
+      "questionPlaceholder": "何を聞きますか？",
+      "optionsLabel": "選択肢",
+      "optionPlaceholder": "選択肢を入力",
+      "addOption": "選択肢を追加",
+      "durationLabel": "期間",
+      "duration1h": "1時間",
+      "duration4h": "4時間",
+      "duration8h": "8時間",
+      "duration24h": "24時間",
+      "duration3d": "3日",
+      "duration7d": "7日",
+      "allowMultiple": "複数選択を許可",
+      "cancel": "キャンセル",
+      "submit": "投稿"
+    },
+    "displayNameStyleModal": {
+      "title": "表示名スタイル",
+      "subtitleLocked": "ロック中 — プレビューはできますが、Boost を解除するまで保存されません。",
+      "closeAria": "閉じる",
+      "sectionFont": "フォント",
+      "sectionEffect": "エフェクト",
+      "sectionColor": "色",
+      "colorPrimary": "プライマリ",
+      "colorAccent": "アクセント",
+      "fontDefault": "デフォルト",
+      "fontRounded": "ラウンド",
+      "fontMono": "等幅",
+      "effectSolid": "単色",
+      "effectGradient": "グラデーション",
+      "effectNeon": "ネオン",
+      "previewTitle": "プレビュー",
+      "previewSub": "@cordigram · they/them",
+      "cancel": "キャンセル",
+      "applyTry": "試す",
+      "apply": "適用",
+      "toastNeedBoost": "表示名スタイルを保存するには Boost が必要です。"
+    },
     "mention": {
       "sectionQuick": "クイックメンション",
       "sectionMembers": "メンバー",
@@ -221,6 +262,19 @@
         "title": "自分だけ削除",
         "desc": "このメッセージはあなたの端末から削除されますが、他のメンバーには表示されたままです。"
       }
+    },
+    "actions": {
+      "deleteForMe": "自分側から削除",
+      "deleteForEveryone": "全員から削除"
+    },
+    "messageRecalled": {
+      "self": "あなたがメッセージを削除しました",
+      "other": "{name} さんがメッセージを削除しました"
+    },
+    "toast": {
+      "deletedForMe": "メッセージを削除しました",
+      "recalled": "全員のメッセージを削除しました",
+      "deleteFailed": "メッセージを削除できませんでした"
     },
     "reportMessage": {
       "title": "メッセージを報告",
@@ -942,6 +996,19 @@
       "errorOpenRecent": "最近の画像を開けませんでした (CORS またはネットワーク)。",
       "errorGetUrl": "URLを取得できませんでした",
       "comingSoon": "この機能は後日追加されます。",
+      "boostPromoTitleActive": "Boost を使う",
+      "boostPromoTitleDemo": "Boost を試す",
+      "boostPromoTagUnlock": "解除",
+      "boostPromoTagLocked": "ロック",
+      "boostPromoDescActive": "表示名スタイルでフォント・エフェクト・色を選ぶと、プロフィールにすぐ反映されます。",
+      "boostPromoDescDemo": "プレビューで表示名スタイルを試せます。解除するまで変更は保存されません。",
+      "boostPromoCtaActive": "使う",
+      "boostPromoCtaDemo": "デモを開く",
+      "displayNameStyleHeading": "表示名スタイル",
+      "displayNameStyleOpen": "スタイルを編集",
+      "displayNameStyleTry": "試す（Boost）",
+      "displayNameStyleApplied": "表示名スタイルを適用しました。",
+      "displayNameStyleError": "表示名スタイルを保存できませんでした。",
       "cosmetics": {
         "errorLoadShop": "ショップを読み込めませんでした。",
         "itemFallbackDescription": "プロフィール用コスメアイテム",
@@ -1033,6 +1100,7 @@
       "soundOn": "ミュートを解除",
       "soundOff": "ミュート",
       "createServerTitle": "サーバーを作成",
+      "messagesHomeTitle": "メッセージホーム",
       "socialHomeTitle": "ソーシャルへ",
       "exploreTitle": "見つける",
       "exploreClose": "見つけるを閉じる",

@@ -106,6 +106,18 @@ export class ChannelMessagesGateway
       .emit('reaction-updated', { messageId, reactions });
   }
 
+  emitMessageDeleted(
+    channelId: string,
+    payload: {
+      channelId: string;
+      messageId: string;
+      deleteType: 'for-everyone' | 'for-me';
+      deletedAt?: string;
+    },
+  ): void {
+    this.server.to(`channel:${channelId}`).emit('message-deleted', payload);
+  }
+
   /**
    * Push a notification event directly to a specific user (by userId),
    * regardless of which channel rooms they have joined.

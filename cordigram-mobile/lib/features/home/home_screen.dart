@@ -15,7 +15,10 @@ import '../following/following_screen.dart';
 import '../hashtag/hashtag_screen.dart';
 import '../livestream/livestream_create_service.dart';
 import '../livestream/livestream_hub_screen.dart';
+import '../messages/call/dm_call_manager.dart';
+import '../messages/call/pending_dm_call_storage.dart';
 import '../messages/message_home_screen.dart';
+import '../messages/services/direct_messages_realtime_service.dart';
 import '../notifications/services/notification_realtime_service.dart';
 import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
@@ -130,6 +133,53 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _startPolling();
     _startLivePolling();
     _startNotificationRealtime();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_consumePendingDmCallFromPush());
+    });
+  }
+
+  Future<void> _consumePendingDmCallFromPush() async {
+    final data = await PendingDmCallStorage.take();
+    if (data == null || !mounted) return;
+    final rawId =
+        data['callerUserId'] ??
+        data['callerId'] ??
+        data['fromUserId'] ??
+        data['peerId'];
+    final callerId = rawId?.toString().trim() ?? '';
+    if (callerId.isEmpty) return;
+    final token = AuthStorage.accessToken;
+    if (token == null || token.isEmpty) return;
+    var video = true;
+    final v = data['video'] ?? data['isVideo'] ?? data['callType'];
+    if (v != null) {
+      final s = v.toString().toLowerCase().trim();
+      if (s == 'audio' || s == 'voice' || s == 'false' || s == '0') {
+        video = false;
+      }
+    }
+    final name =
+        (data['callerName'] ??
+                data['callerDisplayName'] ??
+                data['displayName'] ??
+                '')
+            .toString()
+            .trim();
+    final username =
+        (data['callerUsername'] ?? data['username'] ?? '').toString().trim();
+    final avatar =
+        (data['callerAvatar'] ?? data['avatarUrl'] ?? data['avatar'] ?? '')
+            .toString()
+            .trim();
+    await DirectMessagesRealtimeService.connect();
+    if (!mounted) return;
+    DmCallManager.instance.presentIncomingHintFromPush(
+      callerUserId: callerId,
+      displayName: name.isNotEmpty ? name : null,
+      username: username.isNotEmpty ? username : null,
+      avatarUrl: avatar.isNotEmpty ? avatar : null,
+      video: video,
+    );
   }
 
   @override
@@ -1192,6 +1242,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     } catch (_) {}
     await AuthStorage.clear();
+    // Tear down in-flight call state (active / ringing / outgoing) and
+    // reset the call socket so the NEXT account that logs in on this
+    // device doesn't inherit stale rings or auto-answer events from the
+    // previous session.
+    try {
+      await DmCallManager.instance.onAuthChanged();
+    } catch (_) {}
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
