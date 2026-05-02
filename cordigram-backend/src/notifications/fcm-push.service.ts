@@ -25,25 +25,104 @@ export class FcmPushService {
     return this.app != null;
   }
 
-  async pushNotificationToUser(
-    userId: string,
-    item: NotificationItem,
-  ): Promise<void> {
-    if (!this.app) return;
-
+  private async getFcmTokensForUser(userId: string): Promise<string[]> {
     const user = await this.userModel
       .findById(userId)
       .select('loginDevices.fcmToken')
       .lean()
       .exec();
 
-    const tokens = Array.from(
+    return Array.from(
       new Set(
         (user?.loginDevices ?? [])
           .map((d) => d?.fcmToken?.trim())
           .filter((value): value is string => Boolean(value)),
       ),
     );
+  }
+
+  /**
+   * Wakes the mobile app when the callee has no DM socket (app killed /
+   * background). Data keys match cordigram-mobile PushNotificationService
+   * (`dm_call_incoming`, callerUserId, video, …). FCM `data` values must be
+   * strings for Android.
+   */
+  async pushDmCallIncoming(params: {
+    receiverUserId: string;
+    callerUserId: string;
+    type: 'audio' | 'video';
+    callerInfo: {
+      userId: string;
+      username: string;
+      displayName: string;
+      avatar: string | null;
+    };
+  }): Promise<void> {
+    if (!this.app) return;
+
+    const tokens = await this.getFcmTokensForUser(params.receiverUserId);
+    if (!tokens.length) return;
+
+    const label =
+      params.callerInfo.displayName?.trim() ||
+      params.callerInfo.username?.trim() ||
+      'Someone';
+    const video = params.type === 'video';
+
+    const data: Record<string, string> = {
+      type: 'dm_call_incoming',
+      callerUserId: params.callerUserId,
+      fromUserId: params.callerUserId,
+      video: video ? 'true' : 'false',
+      callType: params.type,
+      callerName: label,
+      callerUsername: (params.callerInfo.username ?? '').trim(),
+      callerDisplayName: (params.callerInfo.displayName ?? '').trim(),
+      callerAvatar: (params.callerInfo.avatar ?? '').trim(),
+    };
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens,
+      notification: {
+        title: 'Incoming call',
+        body: video ? `${label} — video call` : `${label} — voice call`,
+      },
+      data,
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'cordigram_push_high',
+          icon: FcmPushService.androidNotificationIcon,
+          priority: 'high',
+          visibility: 'public',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+          },
+        },
+      },
+    };
+
+    try {
+      await this.app.messaging().sendEachForMulticast(message);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to send DM call FCM to user ${params.receiverUserId}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  async pushNotificationToUser(
+    userId: string,
+    item: NotificationItem,
+  ): Promise<void> {
+    if (!this.app) return;
+
+    const tokens = await this.getFcmTokensForUser(userId);
 
     if (!tokens.length) return;
 

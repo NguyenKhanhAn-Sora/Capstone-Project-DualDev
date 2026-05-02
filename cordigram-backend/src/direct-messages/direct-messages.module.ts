@@ -11,11 +11,13 @@ import { Follow, FollowSchema } from '../users/follow.schema';
 import { MessageReport, MessageReportSchema } from './message-report.schema';
 import { UsersModule } from '../users/users.module';
 import { MessagingProfilesModule } from '../messaging-profiles/messaging-profiles.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     forwardRef(() => UsersModule),
     forwardRef(() => MessagingProfilesModule),
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: DirectMessage.name, schema: DirectMessageSchema },
       { name: User.name, schema: UserSchema },

@@ -8,6 +8,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api_service.dart';
 import 'auth_storage.dart';
+import '../../features/messages/call/dm_call_manager.dart';
+import '../../features/messages/call/pending_dm_call_storage.dart';
+import '../../features/messages/services/direct_messages_realtime_service.dart';
 import '../../features/notifications/notification_screen.dart';
 import '../../features/post/post_detail_screen.dart';
 import '../../features/profile/profile_screen.dart';
@@ -166,6 +169,10 @@ class PushNotificationService {
     Map<String, dynamic> data,
   ) {
     final type = (data['type'] as String?)?.trim() ?? '';
+    if (_isDmCallIncomingType(type)) {
+      unawaited(_routeDmCallIncoming(data));
+      return;
+    }
     final actorId =
         ((data['actorId'] ?? data['userId']) as String?)?.trim() ?? '';
     final postId =
@@ -210,6 +217,74 @@ class PushNotificationService {
     }
 
     _openNotifications();
+  }
+
+  static bool _isDmCallIncomingType(String type) {
+    final t = type.toLowerCase();
+    return t == 'dm_call_incoming' ||
+        t == 'dm_call' ||
+        t == 'incoming_dm_call';
+  }
+
+  static Future<void> _routeDmCallIncoming(Map<String, dynamic> data) async {
+    final token = AuthStorage.accessToken;
+    if (token == null || token.isEmpty) {
+      await PendingDmCallStorage.save(Map<String, dynamic>.from(data));
+      return;
+    }
+    final callerId = _readDmCallerId(data);
+    if (callerId.isEmpty) {
+      _openNotifications();
+      return;
+    }
+    final video = _readDmCallVideoFlag(data);
+    final name =
+        (data['callerName'] ??
+                data['callerDisplayName'] ??
+                data['displayName'] ??
+                '')
+            .toString()
+            .trim();
+    final username =
+        (data['callerUsername'] ?? data['username'] ?? '').toString().trim();
+    final avatar =
+        (data['callerAvatar'] ?? data['avatarUrl'] ?? data['avatar'] ?? '')
+            .toString()
+            .trim();
+    await DirectMessagesRealtimeService.connect();
+    DmCallManager.instance.presentIncomingHintFromPush(
+      callerUserId: callerId,
+      displayName: name.isNotEmpty ? name : null,
+      username: username.isNotEmpty ? username : null,
+      avatarUrl: avatar.isNotEmpty ? avatar : null,
+      video: video,
+    );
+  }
+
+  static String _readDmCallerId(Map<String, dynamic> data) {
+    for (final key in <String>[
+      'callerUserId',
+      'callerId',
+      'fromUserId',
+      'peerId',
+      'userId',
+    ]) {
+      final v = data[key];
+      if (v == null) continue;
+      final s = v.toString().trim();
+      if (s.isNotEmpty) return s;
+    }
+    return '';
+  }
+
+  static bool _readDmCallVideoFlag(Map<String, dynamic> data) {
+    final v = data['video'] ?? data['isVideo'] ?? data['callType'];
+    if (v == null) return true;
+    final s = v.toString().toLowerCase().trim();
+    if (s == 'audio' || s == 'voice' || s == 'false' || s == '0') {
+      return false;
+    }
+    return true;
   }
 
   static void _openNotifications() {
