@@ -352,13 +352,16 @@ function UnifiedCallView({
     mainScreenOrCamera.kind !== "avatar" &&
     !mainScreenOrCamera.ref.participant.isLocal;
 
-  /** Self preview in the corner when remote is on the main stage but local video is off. */
+  /** Self preview in the corner when local video is off but the peer is visible on the main stage:
+   *  - remote camera / screen on main, or
+   *  - full-screen avatar mode (both cameras off — main shows remote, PiP shows self). */
   const showLocalCameraOffPip =
-    mainIsRemote &&
     !showLocalScreenPip &&
     Boolean(localParticipant) &&
+    Boolean(remoteTrackParticipant) &&
     (!localCameraTrack || !isCameraOn) &&
-    pipTrackRef === null;
+    pipTrackRef === null &&
+    (mainIsRemote || mainScreenOrCamera.kind === "avatar");
 
   return (
     <div className={styles.unifiedCallContainer}>
