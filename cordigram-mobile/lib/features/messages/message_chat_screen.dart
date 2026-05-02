@@ -20,6 +20,7 @@ import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
 import 'services/server_media_service.dart';
+import 'services/voice_channel_session_controller.dart';
 // Note: all call/video logic now lives in `DmCallManager` + `GlobalCallOverlay`
 // so DM calls ring globally (not only when this screen is foregrounded) and
 // the native call UI is reused across the app.
@@ -205,6 +206,38 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   }
 
   Future<void> _onStartCall({required bool video}) async {
+    final voiceSession = VoiceChannelSessionController.instance;
+    if (voiceSession.active) {
+      final leaveVoiceFirst = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF0E2247),
+            title: const Text(
+              'Đang ở kênh thoại server',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+            content: Text(
+              'Bạn đang trong kênh ${voiceSession.channelName ?? 'thoại'}. '
+              'Bạn cần rời kênh thoại trước khi gọi DM.',
+              style: const TextStyle(color: Color(0xFFAFC0E2)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Huỷ'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Rời kênh thoại'),
+              ),
+            ],
+          );
+        },
+      );
+      if (leaveVoiceFirst != true) return;
+      await voiceSession.leave();
+    }
     final myName = widget.controller.myUsername?.isNotEmpty == true
         ? widget.controller.myUsername!
         : (widget.controller.myDisplayName?.isNotEmpty == true

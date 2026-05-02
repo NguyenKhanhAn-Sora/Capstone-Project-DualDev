@@ -9,14 +9,26 @@ class ChannelMessagesService {
     'Authorization': 'Bearer ${AuthStorage.accessToken ?? ''}',
   };
 
+  static Future<Map<String, dynamic>> getChannelMessagesEnvelope(
+    String channelId, {
+    int limit = 30,
+    int skip = 0,
+  }) async {
+    return ApiService.get(
+      '/channels/$channelId/messages?limit=$limit&skip=$skip',
+      extraHeaders: _authHeaders,
+    );
+  }
+
   static Future<List<ChannelMessage>> getChannelMessages(
     String channelId, {
     int limit = 30,
     int skip = 0,
   }) async {
-    final res = await ApiService.get(
-      '/channels/$channelId/messages?limit=$limit&skip=$skip',
-      extraHeaders: _authHeaders,
+    final res = await getChannelMessagesEnvelope(
+      channelId,
+      limit: limit,
+      skip: skip,
     );
     final list = (res['messages'] ?? res['items'] ?? res['data']) as List?;
     final entries = list ?? const <dynamic>[];
@@ -28,14 +40,36 @@ class ChannelMessagesService {
 
   static Future<ChannelMessage?> sendChannelMessage(
     String channelId,
-    String content,
-  ) async {
+    String content, {
+    String type = 'text',
+    String? giphyId,
+    String? voiceUrl,
+    int? voiceDuration,
+    String? customStickerUrl,
+    String? serverStickerId,
+    String? serverStickerServerId,
+    List<String>? attachments,
+  }) async {
     final res = await ApiService.post(
       '/channels/$channelId/messages',
       extraHeaders: _authHeaders,
-      body: {'content': content},
+      body: {
+        'content': content,
+        // Channel API uses `messageType` (not `type` like DM endpoint).
+        'messageType': type,
+        if ((giphyId ?? '').isNotEmpty) 'giphyId': giphyId,
+        if ((customStickerUrl ?? '').isNotEmpty)
+          'customStickerUrl': customStickerUrl,
+        if ((serverStickerId ?? '').isNotEmpty) 'serverStickerId': serverStickerId,
+        if ((serverStickerServerId ?? '').isNotEmpty)
+          'serverStickerServerId': serverStickerServerId,
+        if ((voiceUrl ?? '').isNotEmpty) 'voiceUrl': voiceUrl,
+        if (voiceDuration != null) 'voiceDuration': voiceDuration,
+        if ((attachments ?? const <String>[]).isNotEmpty)
+          'attachments': attachments,
+      },
     );
-    final raw = res['message'] ?? res['data'];
+    final raw = res['message'] ?? res['data'] ?? res;
     if (raw is! Map) return null;
     return ChannelMessage.fromJson(Map<String, dynamic>.from(raw));
   }

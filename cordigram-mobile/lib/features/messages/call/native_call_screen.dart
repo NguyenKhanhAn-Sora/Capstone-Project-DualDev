@@ -162,6 +162,12 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
         _connectedAt = DateTime.now();
       });
       _refreshParticipants();
+      DmCallManager.instance.bindActiveAudioControls(
+        micEnabled: _micEnabled,
+        soundEnabled: _speakerOn,
+        onSetMicEnabled: _setMicEnabled,
+        onSetSoundEnabled: _setSpeakerEnabled,
+      );
     } catch (err) {
       if (!mounted) return;
       setState(() {
@@ -193,8 +199,19 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     final lp = _room?.localParticipant;
     if (lp == null) return;
     final next = !_micEnabled;
-    await lp.setMicrophoneEnabled(next);
-    if (mounted) setState(() => _micEnabled = next);
+    await _setMicEnabled(next);
+  }
+
+  Future<void> _setMicEnabled(bool enabled) async {
+    final lp = _room?.localParticipant;
+    if (lp == null) return;
+    await lp.setMicrophoneEnabled(enabled);
+    if (mounted) {
+      setState(() => _micEnabled = enabled);
+    } else {
+      _micEnabled = enabled;
+    }
+    DmCallManager.instance.updateActiveAudioState(micEnabled: enabled);
   }
 
   /// Voice call: flip to a video call by enabling the camera.
@@ -253,10 +270,19 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
 
   Future<void> _toggleSpeaker() async {
     final next = !_speakerOn;
+    await _setSpeakerEnabled(next);
+  }
+
+  Future<void> _setSpeakerEnabled(bool enabled) async {
     try {
-      await Hardware.instance.setSpeakerphoneOn(next);
-      await _applySpeakerState(next);
-      if (mounted) setState(() => _speakerOn = next);
+      await Hardware.instance.setSpeakerphoneOn(enabled);
+      await _applySpeakerState(enabled);
+      if (mounted) {
+        setState(() => _speakerOn = enabled);
+      } else {
+        _speakerOn = enabled;
+      }
+      DmCallManager.instance.updateActiveAudioState(soundEnabled: enabled);
     } catch (_) {}
   }
 
@@ -463,6 +489,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       unawaited(_roomListener?.dispose());
       unawaited(_room?.disconnect());
     }
+    DmCallManager.instance.unbindActiveAudioControls();
     super.dispose();
   }
 
@@ -665,23 +692,18 @@ class _VideoCallBody extends StatelessWidget {
 
     final remote = remotes.isNotEmpty ? remotes.first : null;
     final remoteHasScreen = _ParticipantTile.hasScreenShare(remote);
-    final localHasScreen = _ParticipantTile.hasScreenShare(local);
-    final remoteHasCamera = _ParticipantTile.hasCamera(remote);
+    final localHasCamera = _ParticipantTile.hasCamera(local);
 
+    // 1:1 call layout rule:
+    // - Main always prioritizes remote participant (screen > camera > avatar).
+    // - Local camera stays in PiP whenever it is enabled.
     final mainParticipant = remoteHasScreen
         ? remote
-        : localHasScreen
-            ? local
-            : remoteHasCamera
-                ? remote
-                : (remote ?? local);
-    final mainPrefersScreen =
-        remoteHasScreen || (localHasScreen && !remoteHasScreen);
+        : (remote ?? local);
+    final mainPrefersScreen = remoteHasScreen;
 
-    final pipParticipant = mainParticipant == remote ? local : remote;
-    final showPip = pipParticipant != null &&
-        (_ParticipantTile.hasCamera(pipParticipant) ||
-            (mainParticipant == local && remote != null));
+    final pipParticipant = (remote != null && localHasCamera) ? local : null;
+    final showPip = pipParticipant != null;
 
     return Stack(
       children: [
