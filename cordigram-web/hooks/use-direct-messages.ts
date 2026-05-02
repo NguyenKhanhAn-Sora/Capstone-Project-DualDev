@@ -4,6 +4,8 @@ import io, { Socket } from "socket.io-client";
 interface UseDirectMessagesOptions {
   userId: string;
   token: string;
+  /** When false, no socket is opened (use on non-messages routes to avoid duplicate connections with /messages). */
+  enabled?: boolean;
 }
 
 export interface DirectMessage {
@@ -88,6 +90,7 @@ export type PresenceStatus = "online" | "idle" | "offline";
 export const useDirectMessages = ({
   userId,
   token,
+  enabled = true,
 }: UseDirectMessagesOptions) => {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -123,6 +126,26 @@ export const useDirectMessages = ({
     useState<BoostEntitlementUpdatedEvent | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      if (socketRef.current) {
+        try {
+          socketRef.current.disconnect();
+        } catch {
+          // ignore
+        }
+        socketRef.current = null;
+      }
+      setIsConnected(false);
+      setCallEvent(null);
+      setCallEnded(null);
+      setUserTyping(null);
+      setMessagesRead(null);
+      setReactionUpdate(null);
+      setOnlineUsers(new Set());
+      setPresenceByUserId({});
+      return;
+    }
+
     if (!userId || !token) {
       // Clear any residual call / presence state so a user logging out
       // (or the session going anonymous) cannot inherit ringing popups,
@@ -387,7 +410,7 @@ export const useDirectMessages = ({
     return () => {
       socket.disconnect();
     };
-  }, [userId, token]);
+  }, [userId, token, enabled]);
 
   // Presence: activity + ping (helps idle/online accuracy)
   useEffect(() => {

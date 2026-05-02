@@ -39,6 +39,6 @@ import { OnlineStats, OnlineStatsSchema } from './online-stats.schema';
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsGateway, FcmPushService],
-  exports: [NotificationsService, NotificationsGateway],
+  exports: [NotificationsService, NotificationsGateway, FcmPushService],
 })
 export class NotificationsModule {}

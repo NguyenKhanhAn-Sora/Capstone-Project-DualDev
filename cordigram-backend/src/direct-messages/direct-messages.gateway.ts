@@ -15,6 +15,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Profile } from '../profiles/profile.schema';
 import { User } from '../users/user.schema';
+import { FcmPushService } from '../notifications/fcm-push.service';
 
 @WebSocketGateway({
   namespace: '/direct-messages',
@@ -263,6 +264,7 @@ export class DirectMessagesGateway
     private readonly jwtService: JwtService,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(User.name) private userModel: Model<User>,
+    private readonly fcmPushService: FcmPushService,
   ) {}
 
   async handleConnection(socket: Socket) {
@@ -623,6 +625,12 @@ export class DirectMessagesGateway
           this.server.to(sid).emit('call-incoming', payload);
         }
       } else {
+        void this.fcmPushService.pushDmCallIncoming({
+          receiverUserId: data.receiverId,
+          callerUserId: senderId,
+          type: data.type,
+          callerInfo,
+        });
       }
     } catch (error) {
       console.error('❌ [CALL] Error initiating call:', error);
