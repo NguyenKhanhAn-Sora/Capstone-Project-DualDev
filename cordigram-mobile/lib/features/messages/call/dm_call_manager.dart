@@ -46,6 +46,10 @@ class DmCallManager extends ChangeNotifier {
   Timer? _rejectedTimer;
   bool _isCallMinimized = false;
   Offset _miniCallOffset = const Offset(16, 140);
+  bool _activeMicEnabled = true;
+  bool _activeSoundEnabled = true;
+  Future<void> Function(bool enabled)? _setMicEnabledDelegate;
+  Future<void> Function(bool enabled)? _setSoundEnabledDelegate;
 
   /// Cached display/username of the currently authenticated user. Fetched
   /// lazily (and after login via [onAuthChanged]) so we can pass a real
@@ -62,6 +66,10 @@ class DmCallManager extends ChangeNotifier {
   bool get hasActiveCall => _active != null;
   bool get isCallMinimized => _isCallMinimized;
   Offset get miniCallOffset => _miniCallOffset;
+  bool get activeMicEnabled => _activeMicEnabled;
+  bool get activeSoundEnabled => _activeSoundEnabled;
+  bool get hasBoundAudioControls =>
+      _setMicEnabledDelegate != null && _setSoundEnabledDelegate != null;
 
   /// Call once at app startup (after [AuthStorage.loadAll]) with the root
   /// navigator key. Safe to call multiple times — later calls are no-ops.
@@ -88,6 +96,10 @@ class DmCallManager extends ChangeNotifier {
     _outgoing = null;
     _active = null;
     _isCallMinimized = false;
+    _activeMicEnabled = true;
+    _activeSoundEnabled = true;
+    _setMicEnabledDelegate = null;
+    _setSoundEnabledDelegate = null;
     _myName = null;
     notifyListeners();
     final token = AuthStorage.accessToken;
@@ -254,6 +266,64 @@ class DmCallManager extends ChangeNotifier {
     DirectMessagesRealtimeService.endCall(act.peerUserId);
     _active = null;
     _isCallMinimized = false;
+    _activeMicEnabled = true;
+    _activeSoundEnabled = true;
+    _setMicEnabledDelegate = null;
+    _setSoundEnabledDelegate = null;
+    notifyListeners();
+  }
+
+  void bindActiveAudioControls({
+    required bool micEnabled,
+    required bool soundEnabled,
+    required Future<void> Function(bool enabled) onSetMicEnabled,
+    required Future<void> Function(bool enabled) onSetSoundEnabled,
+  }) {
+    _activeMicEnabled = micEnabled;
+    _activeSoundEnabled = soundEnabled;
+    _setMicEnabledDelegate = onSetMicEnabled;
+    _setSoundEnabledDelegate = onSetSoundEnabled;
+    notifyListeners();
+  }
+
+  void unbindActiveAudioControls() {
+    _setMicEnabledDelegate = null;
+    _setSoundEnabledDelegate = null;
+    _activeMicEnabled = true;
+    _activeSoundEnabled = true;
+    notifyListeners();
+  }
+
+  void updateActiveAudioState({bool? micEnabled, bool? soundEnabled}) {
+    var changed = false;
+    if (micEnabled != null && micEnabled != _activeMicEnabled) {
+      _activeMicEnabled = micEnabled;
+      changed = true;
+    }
+    if (soundEnabled != null && soundEnabled != _activeSoundEnabled) {
+      _activeSoundEnabled = soundEnabled;
+      changed = true;
+    }
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleActiveMic() async {
+    final setMic = _setMicEnabledDelegate;
+    if (_active == null || setMic == null) return;
+    final next = !_activeMicEnabled;
+    await setMic(next);
+    _activeMicEnabled = next;
+    notifyListeners();
+  }
+
+  Future<void> toggleActiveSound() async {
+    final setSound = _setSoundEnabledDelegate;
+    if (_active == null || setSound == null) return;
+    final next = !_activeSoundEnabled;
+    await setSound(next);
+    _activeSoundEnabled = next;
     notifyListeners();
   }
 
@@ -400,6 +470,10 @@ class DmCallManager extends ChangeNotifier {
     if (_active?.peerUserId == fromUserId) {
       _active = null;
       _isCallMinimized = false;
+      _activeMicEnabled = true;
+      _activeSoundEnabled = true;
+      _setMicEnabledDelegate = null;
+      _setSoundEnabledDelegate = null;
       changed = true;
     }
     if (changed) notifyListeners();
@@ -424,6 +498,8 @@ class DmCallManager extends ChangeNotifier {
       video: video,
     );
     _isCallMinimized = false;
+    _activeMicEnabled = true;
+    _activeSoundEnabled = true;
     notifyListeners();
     _pushCallScreen();
   }

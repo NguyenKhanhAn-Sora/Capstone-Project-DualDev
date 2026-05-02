@@ -17,16 +17,32 @@ class VoiceLivekitService {
     return (res['roomName'] ?? res['room'])?.toString();
   }
 
-  static Future<String?> getToken({
+  static Future<Map<String, String>> getTokenBundle({
     required String roomName,
-    required String identity,
+    required String participantName,
   }) async {
     final res = await ApiService.post(
       '/livekit/token',
       extraHeaders: _authHeaders,
-      body: {'roomName': roomName, 'identity': identity},
+      body: {'roomName': roomName, 'participantName': participantName},
     );
-    return (res['token'] ?? res['accessToken'])?.toString();
+    final token = (res['token'] ?? res['accessToken'] ?? '').toString().trim();
+    final url = (res['url'] ?? '').toString().trim();
+    if (token.isEmpty || url.isEmpty) {
+      throw Exception('Không lấy được token voice channel');
+    }
+    return {'token': token, 'url': url};
+  }
+
+  static Future<String?> getToken({
+    required String roomName,
+    required String identity,
+  }) async {
+    final bundle = await getTokenBundle(
+      roomName: roomName,
+      participantName: identity,
+    );
+    return bundle['token'];
   }
 
   static Future<List<Map<String, dynamic>>> getVoiceParticipants({
