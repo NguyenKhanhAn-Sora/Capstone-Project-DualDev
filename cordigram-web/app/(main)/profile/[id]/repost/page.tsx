@@ -84,7 +84,7 @@ function RepostGrid({
 }) {
   const resolveTargetPath = (item: FeedItem) => {
     const kind = (item as any)?.repostKind || item.kind;
-    const isReel = kind === "reel" || item.media?.[0]?.type === "video";
+    const isReel = kind === "reel";
     if (isReel) {
       const originId = (item as any)?.repostOf as string | undefined;
       const query = originId ? `?single=1&origin=${originId}` : "?single=1";
