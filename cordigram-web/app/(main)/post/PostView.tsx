@@ -41,6 +41,7 @@ import {
   getAdsDashboard,
   searchProfiles,
   uploadCommentMedia,
+  translateComment,
   type CommentItem,
   type CommentListResponse,
   type CurrentProfileResponse,
@@ -470,6 +471,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [hasMoreComments, setHasMoreComments] = useState(true);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string>("");
+
+  const [translatedComments, setTranslatedComments] = useState<Map<string, string>>(new Map());
+  const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
 
   const [replyTarget, setReplyTarget] = useState<{
     id: string;
@@ -3644,6 +3648,41 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     [prioritizeRootComments, viewerUserId],
   );
 
+  const handleTranslateComment = useCallback(
+    async (comment: CommentItem) => {
+      if (!token || translatingIds.has(comment.id)) return;
+      if (translatedComments.has(comment.id)) {
+        setTranslatedComments((prev) => {
+          const next = new Map(prev);
+          next.delete(comment.id);
+          return next;
+        });
+        setOpenCommentMenuId(null);
+        return;
+      }
+      setOpenCommentMenuId(null);
+      setTranslatingIds((prev) => new Set(prev).add(comment.id));
+      try {
+        const result = await translateComment({
+          token,
+          postId,
+          commentId: comment.id,
+          targetLang: language,
+        });
+        setTranslatedComments((prev) => new Map(prev).set(comment.id, result.translatedText));
+      } catch {
+        // silently ignore — original text stays
+      } finally {
+        setTranslatingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(comment.id);
+          return next;
+        });
+      }
+    },
+    [token, postId, language, translatingIds, translatedComments],
+  );
+
   const handleTogglePin = useCallback(
     async (comment: CommentItem) => {
       if (!token || !isAuthor || comment.parentId) return;
@@ -3805,7 +3844,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             </div>
             {comment.content ? (
               <div className={styles.commentText}>
-                {renderCommentContent(comment)}
+                {translatedComments.has(comment.id)
+                  ? translatedComments.get(comment.id)
+                  : renderCommentContent(comment)}
               </div>
             ) : null}
             {Array.isArray(comment.linkPreviews) && comment.linkPreviews.length ? (
@@ -3973,6 +4014,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     <div className={styles.commentMenuList}>
                       {isCommentOwner ? (
                         <>
+                          {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
+                            <button
+                              className={styles.commentMoreItem}
+                              onClick={() => handleTranslateComment(comment)}
+                              disabled={translatingIds.has(comment.id)}
+                            >
+                              {translatingIds.has(comment.id)
+                                ? "Translating..."
+                                : translatedComments.has(comment.id)
+                                ? "Hide translation"
+                                : "Translate comment"}
+                            </button>
+                          ) : null}
                           <button
                             className={styles.commentMoreItem}
                             onClick={() => startEditComment(comment)}
@@ -3998,6 +4052,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         </>
                       ) : isAuthor ? (
                         <>
+                          {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
+                            <button
+                              className={styles.commentMoreItem}
+                              onClick={() => handleTranslateComment(comment)}
+                              disabled={translatingIds.has(comment.id)}
+                            >
+                              {translatingIds.has(comment.id)
+                                ? "Translating..."
+                                : translatedComments.has(comment.id)
+                                ? "Hide translation"
+                                : "Translate comment"}
+                            </button>
+                          ) : null}
                           {!comment.parentId ? (
                             <button
                               className={styles.commentMoreItem}
@@ -4034,6 +4101,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         </>
                       ) : (
                         <>
+                          {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
+                            <button
+                              className={styles.commentMoreItem}
+                              onClick={() => handleTranslateComment(comment)}
+                              disabled={translatingIds.has(comment.id)}
+                            >
+                              {translatingIds.has(comment.id)
+                                ? "Translating..."
+                                : translatedComments.has(comment.id)
+                                ? "Hide translation"
+                                : "Translate comment"}
+                            </button>
+                          ) : null}
                           <button
                             className={styles.commentMoreItem}
                             onClick={() => openCommentReportModal(comment.id)}

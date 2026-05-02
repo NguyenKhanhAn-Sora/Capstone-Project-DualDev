@@ -430,6 +430,7 @@ export type CommentItem = {
   repliesCount?: number;
   likesCount?: number;
   liked?: boolean;
+  lang?: string | null;
 };
 
 export type CommentListResponse = {
@@ -828,6 +829,27 @@ export async function updateComment(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function translateComment(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+  targetLang: string;
+}): Promise<{
+  translatedText: string;
+  sourceLang: string;
+  targetLang: string;
+  cached: boolean;
+}> {
+  const { token, postId, commentId, targetLang } = opts;
+  return apiFetch({
+    path: `/posts/${postId}/comments/${commentId}/translate?targetLang=${encodeURIComponent(targetLang)}`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 

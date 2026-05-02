@@ -211,4 +211,22 @@ export class CommentsController {
       commentId,
     );
   }
+
+  @Post(':commentId/translate')
+  async translate(
+    @Req() req: Request,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+    @Query('targetLang') targetLang: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) throw new UnauthorizedException();
+    if (!targetLang) throw new BadRequestException('targetLang is required');
+    return this.commentsService.translateComment(
+      user.userId,
+      postId,
+      commentId,
+      targetLang,
+    );
+  }
 }

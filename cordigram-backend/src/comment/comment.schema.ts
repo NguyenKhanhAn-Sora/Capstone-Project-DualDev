@@ -142,6 +142,12 @@ export class Comment extends Document {
   @Prop({ type: SchemaTypes.ObjectId, ref: 'User', default: null })
   pinnedBy?: Types.ObjectId | null;
 
+  @Prop({ type: String, default: null })
+  lang?: string | null;
+
+  @Prop({ type: SchemaTypes.Mixed, default: undefined })
+  translations?: Record<string, string>;
+
   @Prop({ type: Date })
   createdAt?: Date;
 

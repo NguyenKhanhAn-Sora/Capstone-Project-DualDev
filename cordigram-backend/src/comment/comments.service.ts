@@ -22,6 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ActivityLogService } from '../activity/activity.service';
 import { User } from '../users/user.schema';
 import { LinkPreviewService } from './link-preview.service';
+import { TranslationService } from '../translation/translation.service';
 
 type UploadedFile = {
   originalname: string;
@@ -51,6 +52,7 @@ export class CommentsService {
     private readonly notificationsService: NotificationsService,
     private readonly activityLogService: ActivityLogService,
     private readonly linkPreviewService: LinkPreviewService,
+    private readonly translationService: TranslationService,
   ) {}
 
   private async getCreatorVerifiedMap(userIds: Types.ObjectId[]) {
@@ -145,6 +147,17 @@ export class CommentsService {
     await this.postModel
       .updateOne({ _id: postObjectId }, { $inc: { 'stats.comments': 1 } })
       .exec();
+
+    if (content) {
+      this.translationService.detectLanguage(content).then((lang) => {
+        if (lang) {
+          this.commentModel
+            .updateOne({ _id: created._id }, { $set: { lang } })
+            .exec()
+            .catch(() => undefined);
+        }
+      }).catch(() => undefined);
+    }
 
     await this.notifyMentionedUsers({
       actorId: userObjectId.toString(),
@@ -1128,9 +1141,19 @@ export class CommentsService {
             linkPreviews,
             updatedAt: new Date(),
           },
+          $unset: { translations: '' },
         },
       )
       .exec();
+
+    if (nextContent) {
+      this.translationService.detectLanguage(nextContent).then((lang) => {
+        this.commentModel
+          .updateOne({ _id: commentObjectId }, { $set: { lang: lang ?? null } })
+          .exec()
+          .catch(() => undefined);
+      }).catch(() => undefined);
+    }
 
     if (addedMentions.length) {
       await this.notifyMentionedUsers({
@@ -1334,6 +1357,83 @@ export class CommentsService {
       repliesCount: extras?.repliesCount ?? 0,
       likesCount: extras?.likesCount ?? 0,
       liked: extras?.liked ?? false,
+      lang: (comment as any).lang ?? null,
+    };
+  }
+
+  async translateComment(
+    userId: string,
+    postId: string,
+    commentId: string,
+    targetLang: string,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectId = this.asObjectId(postId, 'postId');
+    const commentObjectId = this.asObjectId(commentId, 'commentId');
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null, moderationState: 'normal' })
+      .select('authorId')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+
+    const comment = await this.commentModel
+      .findOne({
+        _id: commentObjectId,
+        postId: postObjectId,
+        deletedAt: null,
+        moderationState: { $in: ['normal', null] },
+      })
+      .select('content lang translations')
+      .lean();
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    if (!comment.content?.trim()) {
+      throw new BadRequestException('Comment has no text to translate');
+    }
+
+    const cached = (comment.translations as Record<string, string> | undefined)?.[targetLang];
+    if (cached) {
+      return {
+        translatedText: cached,
+        sourceLang: (comment as any).lang ?? null,
+        targetLang,
+        cached: true,
+      };
+    }
+
+    const { translatedText, detectedSourceLang } =
+      await this.translationService.translate(comment.content, targetLang);
+
+    await this.commentModel
+      .updateOne(
+        { _id: commentObjectId },
+        {
+          $set: {
+            [`translations.${targetLang}`]: translatedText,
+            lang: (comment as any).lang ?? detectedSourceLang,
+          },
+        },
+      )
+      .exec();
+
+    return {
+      translatedText,
+      sourceLang: detectedSourceLang,
+      targetLang,
+      cached: false,
     };
   }
 
