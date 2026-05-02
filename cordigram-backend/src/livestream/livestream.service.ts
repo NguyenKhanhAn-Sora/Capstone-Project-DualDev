@@ -344,10 +344,11 @@ export class LivestreamService {
   async joinToken(
     streamId: string,
     user: { userId: string },
-    opts: { asHost?: boolean; participantName?: string },
+    opts: { asHost?: boolean; participantName?: string; isPreview?: boolean },
   ) {
     const stream = await this.getLiveStreamOrThrow(streamId);
     const asHost = Boolean(opts.asHost);
+    const isPreview = Boolean(opts.isPreview);
     const isHost = stream.hostUserId.toString() === user.userId;
 
     if (asHost && !isHost) {
@@ -358,14 +359,16 @@ export class LivestreamService {
       stream.roomName,
     );
 
-    if (!asHost && participants >= MAX_VIEWERS_PER_ROOM + 1) {
+    if (!asHost && !isPreview && participants >= MAX_VIEWERS_PER_ROOM + 1) {
       throw new BadRequestException(
         'This livestream has reached the 30-viewer limit',
       );
     }
 
     const role = asHost ? 'host' : 'viewer';
-    const identity = `${user.userId}-${role}-${Date.now().toString(36)}`;
+    const identity = isPreview
+      ? `preview-${user.userId}-${Date.now().toString(36)}`
+      : `${user.userId}-${role}-${Date.now().toString(36)}`;
     const participantName =
       opts.participantName?.trim() || (asHost ? stream.hostName : 'Viewer');
 

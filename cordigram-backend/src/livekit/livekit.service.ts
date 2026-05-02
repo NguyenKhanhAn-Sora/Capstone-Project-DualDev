@@ -106,7 +106,11 @@ export class LivekitService {
     try {
       const participants =
         await this.getRoomService().listParticipants(roomName);
-      return participants.length;
+      return participants.filter(
+        (p) =>
+          !p.identity?.startsWith('preview-') &&
+          !p.name?.startsWith('preview-'),
+      ).length;
     } catch {
       return 0;
     }

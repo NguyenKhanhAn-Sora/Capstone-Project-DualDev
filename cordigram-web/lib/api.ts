@@ -100,7 +100,7 @@ export function resolveApiErrorMessage(
     lower.includes("networkerror") ||
     lower.includes("network request failed")
   ) {
-    return "Cannot reach server. Check your internet or server URL and try again.";
+    return "Cannot reach server. Please try again!";
   }
 
   const status =

@@ -9,4 +9,8 @@ export class JoinLivestreamDto {
   @IsString()
   @MaxLength(120)
   participantName?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPreview?: boolean;
 }

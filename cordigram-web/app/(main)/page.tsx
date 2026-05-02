@@ -108,6 +108,7 @@ const getUserIdFromToken = (token: string | null): string | undefined => {
 };
 
 const PAGE_SIZE = 12;
+const MS_24H = 24 * 60 * 60 * 1000;
 const VIEW_DEBOUNCE_MS = 800;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 300000;
@@ -540,9 +541,38 @@ export default function HomePage({
   }, [scopeOverride, searchQueryOverride]);
 
   const isSearchMode = Boolean((searchQueryOverride ?? "").trim());
+  const sortedItems = useMemo(() => {
+    if (!viewerId) return items;
+    const now = Date.now();
+    const own24h: PostViewState[] = [];
+    const rest: PostViewState[] = [];
+    for (const entry of items) {
+      const isOwn = entry.item.authorId === viewerId;
+      const isPostKind = entry.item.kind === "post";
+      const ts =
+        (entry.item as any).createdAt ||
+        (entry.item as any).publishedAt;
+      const isRecent = ts
+        ? now - new Date(ts as string).getTime() < MS_24H
+        : false;
+      if (isOwn && isPostKind && isRecent) {
+        own24h.push(entry);
+      } else {
+        rest.push(entry);
+      }
+    }
+    if (!own24h.length) return items;
+    own24h.sort((a, b) => {
+      const aTs = (a.item as any).createdAt || (a.item as any).publishedAt || "";
+      const bTs = (b.item as any).createdAt || (b.item as any).publishedAt || "";
+      return new Date(bTs).getTime() - new Date(aTs).getTime();
+    });
+    return [...own24h, ...rest];
+  }, [items, viewerId]);
+
   const visibleItems = useMemo(
-    () => (maxItems ? items.slice(0, maxItems) : items),
-    [items, maxItems],
+    () => (maxItems ? sortedItems.slice(0, maxItems) : sortedItems),
+    [sortedItems, maxItems],
   );
   const livestreamInsertIndex = useMemo(() => {
     if (!visibleItems.length) return 0;
