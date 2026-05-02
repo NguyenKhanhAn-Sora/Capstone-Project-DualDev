@@ -1130,23 +1130,26 @@ export class CommentsService {
       (m) => !prevMentionNames.includes(m),
     );
 
+    const contentChanged =
+      hasIncomingContent && nextContent !== (comment.content ?? '').trim();
+    const updateOp: Record<string, unknown> = {
+      $set: {
+        content: nextContent,
+        mentions,
+        media: nextMedia,
+        linkPreviews,
+        updatedAt: new Date(),
+      },
+    };
+    if (contentChanged) {
+      (updateOp as any).$unset = { translations: '' };
+    }
+
     await this.commentModel
-      .updateOne(
-        { _id: commentObjectId },
-        {
-          $set: {
-            content: nextContent,
-            mentions,
-            media: nextMedia,
-            linkPreviews,
-            updatedAt: new Date(),
-          },
-          $unset: { translations: '' },
-        },
-      )
+      .updateOne({ _id: commentObjectId }, updateOp)
       .exec();
 
-    if (nextContent) {
+    if (contentChanged) {
       this.translationService.detectLanguage(nextContent).then((lang) => {
         this.commentModel
           .updateOne({ _id: commentObjectId }, { $set: { lang: lang ?? null } })
