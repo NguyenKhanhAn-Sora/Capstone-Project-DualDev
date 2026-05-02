@@ -23,11 +23,15 @@ class NativeCallScreen extends StatefulWidget {
     required this.title,
     required this.onHangup,
     this.peerAvatarUrl,
+    this.localDisplayName,
   });
 
   final CallSession session;
   final String title;
   final String? peerAvatarUrl;
+
+  /// Profile / LiveKit label for self; used in PiP when local camera is off.
+  final String? localDisplayName;
 
   /// Called exactly once when the user leaves the call (hangup, remote left,
   /// or fatal error). The parent should notify the peer over the signaling
@@ -623,6 +627,9 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     return _VideoCallBody(
       participants: _participants,
       peerName: widget.title,
+      localDisplayName: widget.localDisplayName,
+      localMicOn: _micEnabled,
+      localCamOn: _camEnabled,
       localScreenSharing: _screenShareEnabled,
     );
   }
@@ -664,11 +671,17 @@ class _VideoCallBody extends StatelessWidget {
   const _VideoCallBody({
     required this.participants,
     required this.peerName,
+    required this.localMicOn,
+    required this.localCamOn,
     required this.localScreenSharing,
+    this.localDisplayName,
   });
 
   final List<Participant> participants;
   final String peerName;
+  final String? localDisplayName;
+  final bool localMicOn;
+  final bool localCamOn;
   final bool localScreenSharing;
 
   @override
@@ -692,18 +705,18 @@ class _VideoCallBody extends StatelessWidget {
 
     final remote = remotes.isNotEmpty ? remotes.first : null;
     final remoteHasScreen = _ParticipantTile.hasScreenShare(remote);
-    final localHasCamera = _ParticipantTile.hasCamera(local);
 
     // 1:1 call layout rule:
     // - Main always prioritizes remote participant (screen > camera > avatar).
-    // - Local camera stays in PiP whenever it is enabled.
+    // - Local preview stays in PiP whenever the remote is on the main stage:
+    //   live camera when on; otherwise avatar + name (matches web CallRoom).
     final mainParticipant = remoteHasScreen
         ? remote
         : (remote ?? local);
     final mainPrefersScreen = remoteHasScreen;
 
-    final pipParticipant = (remote != null && localHasCamera) ? local : null;
-    final showPip = pipParticipant != null;
+    final showLocalPip = remote != null && local is LocalParticipant;
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Stack(
       children: [
@@ -714,22 +727,130 @@ class _VideoCallBody extends StatelessWidget {
             preferScreenShare: mainPrefersScreen,
           ),
         ),
-        if (showPip)
+        if (showLocalPip)
           Positioned(
-            top: 72,
             right: 16,
-            width: 110,
-            height: 160,
+            bottom: 96 + bottomInset,
+            width: 118,
+            height: 172,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: _ParticipantTile(
-                participant: pipParticipant,
-                fallbackName: pipParticipant == local ? 'Bạn' : peerName,
-                compact: true,
+              child: _CompactSelfPip(
+                local: local as LocalParticipant,
+                nameHint: localDisplayName,
+                micOn: localMicOn,
+                camOn: localCamOn,
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Local preview in the corner: video when camera on, else avatar + username + status.
+class _CompactSelfPip extends StatelessWidget {
+  const _CompactSelfPip({
+    required this.local,
+    required this.micOn,
+    required this.camOn,
+    this.nameHint,
+  });
+
+  final LocalParticipant local;
+  final String? nameHint;
+  final bool micOn;
+  final bool camOn;
+
+  VideoTrack? _cameraTrack() {
+    for (final pub in local.videoTrackPublications) {
+      final t = pub.track;
+      if (t is! VideoTrack || pub.muted) continue;
+      if (pub.source == TrackSource.camera) {
+        return t;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final track = _cameraTrack();
+    if (track != null && camOn) {
+      return ColoredBox(
+        color: Colors.black,
+        child: VideoTrackRenderer(
+          track,
+          fit: VideoViewFit.cover,
+        ),
+      );
+    }
+
+    final fromRoom = local.name?.trim();
+    final identity = local.identity?.trim();
+    final name = (fromRoom != null && fromRoom.isNotEmpty)
+        ? fromRoom
+        : (identity != null && identity.isNotEmpty)
+            ? identity
+            : (nameHint?.trim().isNotEmpty == true ? nameHint!.trim() : 'Bạn');
+    final initial =
+        name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
+
+    return ColoredBox(
+      color: const Color(0xFF0F1B37),
+      child: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: CircleAvatar(
+                radius: 36,
+                backgroundColor: const Color(0xFF1B2A4A),
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Icon(
+                  camOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

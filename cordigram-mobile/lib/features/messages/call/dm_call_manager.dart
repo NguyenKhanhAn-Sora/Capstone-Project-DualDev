@@ -71,6 +71,9 @@ class DmCallManager extends ChangeNotifier {
   bool get hasBoundAudioControls =>
       _setMicEnabledDelegate != null && _setSoundEnabledDelegate != null;
 
+  /// Display name for the signed-in user (for in-call self preview labels).
+  String? get myDisplayName => _myName;
+
   /// Call once at app startup (after [AuthStorage.loadAll]) with the root
   /// navigator key. Safe to call multiple times — later calls are no-ops.
   Future<void> attach(GlobalKey<NavigatorState> navigatorKey) async {
@@ -521,8 +524,9 @@ class DmCallManager extends ChangeNotifier {
         fullscreenDialog: true,
         builder: (_) => NativeCallScreen(
           session: act.session,
-          title: act.video ? 'Video call' : 'Voice call',
+          title: act.peerName.isNotEmpty ? act.peerName : 'Cuộc gọi',
           peerAvatarUrl: act.peerAvatarUrl,
+          localDisplayName: _myName,
           onHangup: hangupActive,
         ),
       ),

@@ -589,8 +589,9 @@
 
 .unifiedPip {
   position: absolute;
-  top: 24px;
-  right: 24px;
+  top: auto;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   width: 180px;
   height: 250px;
   border-radius: 16px;
@@ -666,6 +667,71 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: center;
+}
+
+/* Local self PiP when camera is off (remote on main) — avatar + name + mic/cam hints. */
+.unifiedPipLocalSelf {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+}
+
+.unifiedPipLocalSelfMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px 10px 0;
+}
+
+.unifiedPipLocalAvatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.unifiedPipLocalName {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.unifiedPipLocalSelfStatus {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px 8px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.unifiedPipStatusIcon {
+  display: flex;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.unifiedPipStatusIcon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .unifiedAvatarMain {

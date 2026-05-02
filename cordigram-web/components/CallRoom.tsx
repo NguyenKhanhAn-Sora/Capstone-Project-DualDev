@@ -99,11 +99,11 @@ export default function CallRoom({
 //   5. End call
 // =============================================================================
 function UnifiedCallView({
-  participantName: _participantName,
+  participantName,
   onDisconnect,
   startedAsAudioOnly,
 }: {
-  /** Local user's LiveKit display name from the token URL — not used for UI labels (peer names come from the room). */
+  /** Local user's LiveKit display name from the call URL — used for self PiP when camera is off. */
   participantName: string;
   onDisconnect: () => void;
   startedAsAudioOnly: boolean;
@@ -339,6 +339,27 @@ function UnifiedCallView({
     (remoteDisplayName.charAt(0) || "?").toUpperCase();
   const mainAvatarLabel = remoteDisplayName || "Participant";
 
+  const localDisplayName =
+    localParticipant?.name?.trim() ||
+    localParticipant?.identity ||
+    participantName.trim() ||
+    "Bạn";
+  const localAvatarInitial =
+    (localDisplayName.charAt(0) || "?").toUpperCase();
+
+  /** Main stage shows the remote participant (their camera or screen share). */
+  const mainIsRemote =
+    mainScreenOrCamera.kind !== "avatar" &&
+    !mainScreenOrCamera.ref.participant.isLocal;
+
+  /** Self preview in the corner when remote is on the main stage but local video is off. */
+  const showLocalCameraOffPip =
+    mainIsRemote &&
+    !showLocalScreenPip &&
+    Boolean(localParticipant) &&
+    (!localCameraTrack || !isCameraOn) &&
+    pipTrackRef === null;
+
   return (
     <div className={styles.unifiedCallContainer}>
       <div className={styles.unifiedStage}>
@@ -391,6 +412,32 @@ function UnifiedCallView({
                       {remoteDisplayName}
                     </span>
                   ) : null}
+                </div>
+              </div>
+            ) : showLocalCameraOffPip ? (
+              <div
+                className={`${styles.unifiedPip} ${styles.unifiedPipLocalSelf}`}
+                title={localDisplayName}
+              >
+                <div className={styles.unifiedPipLocalSelfMain}>
+                  <div className={styles.unifiedPipLocalAvatar}>
+                    {localAvatarInitial}
+                  </div>
+                  <span className={styles.unifiedPipLocalName}>{localDisplayName}</span>
+                </div>
+                <div className={styles.unifiedPipLocalSelfStatus} aria-hidden>
+                  {isMicOn ? (
+                    <span className={styles.unifiedPipStatusIcon}>
+                      <MicIcon />
+                    </span>
+                  ) : (
+                    <span className={styles.unifiedPipStatusIcon}>
+                      <MicOffIcon />
+                    </span>
+                  )}
+                  <span className={styles.unifiedPipStatusIcon}>
+                    <CameraOffIcon />
+                  </span>
                 </div>
               </div>
             ) : showRemoteAvatarPip ? (
