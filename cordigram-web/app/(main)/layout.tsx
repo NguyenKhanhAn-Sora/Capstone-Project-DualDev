@@ -3,6 +3,7 @@
 import Sidebar from "@/ui/Sidebar/sidebar";
 import { usePathname } from "next/navigation";
 import { AuthGuard } from "../../component/auth-guard";
+import GlobalDmIncomingCalls from "@/components/GlobalDmIncomingCalls";
 
 export default function MainLayout({
   children,
@@ -14,19 +15,22 @@ export default function MainLayout({
   const pathname = usePathname();
   const isMessagesPage = pathname?.startsWith("/messages");
 
-  if (isMessagesPage) {
-    return <>{children}</>;
-  }
-
   return (
-    <AuthGuard>
-      <div className="app-shell flex">
-        <Sidebar />
-        <div className="page flex-1" data-scroll-root>
-          {children}
-        </div>
-        {modal}
-      </div>
-    </AuthGuard>
+    <>
+      <GlobalDmIncomingCalls />
+      {isMessagesPage ? (
+        <>{children}</>
+      ) : (
+        <AuthGuard>
+          <div className="app-shell flex">
+            <Sidebar />
+            <div className="page flex-1" data-scroll-root>
+              {children}
+            </div>
+            {modal}
+          </div>
+        </AuthGuard>
+      )}
+    </>
   );
 }

@@ -5,6 +5,7 @@ import 'core/config/app_config.dart';
 import 'core/config/app_theme.dart';
 import 'core/services/auth_storage.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/services/session_bootstrap.dart';
 import 'core/services/theme_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
@@ -42,9 +43,7 @@ void main() async {
   }
   await _requestNotificationPermission();
   await AuthStorage.loadAll();
-  if (AuthStorage.hasExpiredAccessToken()) {
-    await AuthStorage.clear();
-  }
+  await SessionBootstrap.tryRefreshExpiredAccessToken();
   await PushNotificationService.initialize(navigatorKey: appNavigatorKey);
   // Attach the global call manager so incoming DM calls ring anywhere in
   // the app — not only while the user is inside the matching chat screen.

@@ -88,6 +88,34 @@ class DmCallManager extends ChangeNotifier {
 
   /// Explicit refresh when the auth token changes (login / logout) so the
   /// socket is reopened with the new bearer token.
+  /// Shows incoming-call UI from an FCM tap when the app was backgrounded or
+  /// killed; the socket may emit the same event shortly after — dedupe logic in
+  /// [_handleIncoming] keeps the latest ring for that caller.
+  void presentIncomingHintFromPush({
+    required String callerUserId,
+    String? displayName,
+    String? username,
+    String? avatarUrl,
+    bool video = true,
+  }) {
+    final dn = (displayName ?? '').trim();
+    final un = (username ?? '').trim();
+    _handleIncoming(
+      DmCallEvent(
+        fromUserId: callerUserId,
+        signal: 'incoming',
+        type: video ? 'video' : 'audio',
+        callerInfo: <String, dynamic>{
+          if (dn.isNotEmpty) 'displayName': dn,
+          if (un.isNotEmpty) 'username': un,
+          if (dn.isEmpty && un.isEmpty) 'username': 'Người dùng',
+          if (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+            'avatar': avatarUrl.trim(),
+        },
+      ),
+    );
+  }
+
   Future<void> onAuthChanged() async {
     if (!_initialized) return;
     await DirectMessagesRealtimeService.disconnect();
