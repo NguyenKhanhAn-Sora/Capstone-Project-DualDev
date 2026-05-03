@@ -6,6 +6,7 @@ import 'core/config/app_theme.dart';
 import 'core/services/auth_storage.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/session_bootstrap.dart';
+import 'core/services/language_controller.dart';
 import 'core/services/theme_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
@@ -69,26 +70,30 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     ThemeController.instance.load();
+    LanguageController.instance.load();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: ThemeController.instance,
-      builder: (context, _) => MaterialApp(
-        navigatorKey: appNavigatorKey,
-        title: 'Cordigram Mobile',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: ThemeController.instance.themeMode,
-        // Wrap every route with the global call overlay so ring-ins show up
-        // on top of home, feed, profile, settings — everywhere.
-        builder: (ctx, child) =>
-            GlobalCallOverlay(child: child ?? const SizedBox.shrink()),
-        home: AuthStorage.accessToken != null
-            ? const HomeScreen()
-            : const LoginScreen(),
+      animation: LanguageController.instance,
+      builder: (_, __) => AnimatedBuilder(
+        animation: ThemeController.instance,
+        builder: (context, _) => MaterialApp(
+          navigatorKey: appNavigatorKey,
+          title: 'Cordigram Mobile',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeController.instance.themeMode,
+          // Wrap every route with the global call overlay so ring-ins show up
+          // on top of home, feed, profile, settings — everywhere.
+          builder: (ctx, child) =>
+              GlobalCallOverlay(child: child ?? const SizedBox.shrink()),
+          home: AuthStorage.accessToken != null
+              ? const HomeScreen()
+              : const LoginScreen(),
+        ),
       ),
     );
   }

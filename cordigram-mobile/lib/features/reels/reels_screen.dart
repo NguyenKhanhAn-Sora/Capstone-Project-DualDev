@@ -30,6 +30,7 @@ import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../report/report_comment_sheet.dart';
 import '../report/report_post_sheet.dart';
+import '../../core/services/language_controller.dart';
 
 // ── Reels screen ──────────────────────────────────────────────────────────────
 
@@ -775,8 +776,8 @@ class _ReelsScreenState extends State<ReelsScreen> {
       case PostMenuAction.deletePost:
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Delete reel',
-          message: 'This action cannot be undone.',
+          title: LanguageController.instance.t('reels.deleteReel.title'),
+          message: LanguageController.instance.t('common.cannotUndo'),
           confirmLabel: 'Delete',
           danger: true,
         );
@@ -816,7 +817,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
           authHeader: {'Authorization': 'Bearer $token'},
           subjectLabel: 'reel',
         );
-        if (reported) _showSnack('Report submitted');
+        if (reported) _showSnack(LanguageController.instance.t('reels.reportSubmitted'));
         return;
       case PostMenuAction.blockAccount:
         final userId = reel.authorId ?? reel.author?.id;
@@ -824,8 +825,8 @@ class _ReelsScreenState extends State<ReelsScreen> {
         final username = reel.authorUsername ?? reel.author?.username ?? 'user';
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Block @$username?',
-          message: 'You will no longer see reels from this account.',
+          title: LanguageController.instance.t('reels.blockUserConfirm.title', {'username': username}),
+          message: LanguageController.instance.t('reels.blockUserConfirm.message'),
           confirmLabel: 'Block',
           danger: true,
         );
@@ -859,7 +860,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
     final s = _reels[index];
     final commentsLocked = s.post.allowComments == false;
     if (commentsLocked) {
-      _showSnack('Comments are turned off for this reel');
+      _showSnack(LanguageController.instance.t('reels.commentsTurnedOff'));
       return;
     }
     _controllers[index]?.pause();
@@ -1082,11 +1083,12 @@ class _ReelPageState extends State<_ReelPage> {
 
     final entries = <({String id, String label, bool danger})>[];
     final canDownload = reel.allowDownload == true && reel.media.isNotEmpty;
+    final lc = LanguageController.instance;
     if (isOwner) {
-      entries.add((id: 'editReel', label: 'Edit reel', danger: false));
+      entries.add((id: 'editReel', label: lc.t('reels.menu.editReel'), danger: false));
       entries.add((
         id: 'editVisibility',
-        label: 'Edit visibility',
+        label: lc.t('reels.menu.editVisibility'),
         danger: false,
       ));
       entries.add((
@@ -1101,25 +1103,25 @@ class _ReelPageState extends State<_ReelPage> {
         label: reel.hideLikeCount == true ? 'Show like' : 'Hide like',
         danger: false,
       ));
-      entries.add((id: 'muteReel', label: 'Mute this reel', danger: false));
+      entries.add((id: 'muteReel', label: lc.t('reels.menu.muteReel'), danger: false));
       if (canDownload) {
         entries.add((
           id: 'downloadReel',
-          label: 'Download this reel',
+          label: lc.t('reels.menu.download'),
           danger: false,
         ));
       }
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
-      entries.add((id: 'deleteReel', label: 'Delete reel', danger: true));
+      entries.add((id: 'copyLink', label: lc.t('reels.menu.copyLink'), danger: false));
+      entries.add((id: 'deleteReel', label: lc.t('reels.menu.deleteReel'), danger: true));
     } else {
       if (canDownload) {
         entries.add((
           id: 'downloadReel',
-          label: 'Download this reel',
+          label: lc.t('reels.menu.download'),
           danger: false,
         ));
       }
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'copyLink', label: lc.t('reels.menu.copyLink'), danger: false));
       entries.add((
         id: 'followToggle',
         label: widget.state.following ? 'Unfollow' : 'Follow',
@@ -1130,11 +1132,11 @@ class _ReelPageState extends State<_ReelPage> {
         label: widget.state.saved ? 'Unsave this reel' : 'Save this reel',
         danger: false,
       ));
-      entries.add((id: 'hideReel', label: 'Hide this reel', danger: false));
-      entries.add((id: 'reportReel', label: 'Report', danger: false));
+      entries.add((id: 'hideReel', label: lc.t('reels.menu.hideReel'), danger: false));
+      entries.add((id: 'reportReel', label: lc.t('reels.menu.report'), danger: false));
       entries.add((
         id: 'blockAccount',
-        label: 'Block this account',
+        label: lc.t('reels.menu.blockAccount'),
         danger: true,
       ));
     }
@@ -1292,7 +1294,7 @@ class _ReelPageState extends State<_ReelPage> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: const Text('View image'),
+                        child: Text(LanguageController.instance.t('common.viewImage')),
                       ),
                     ],
                   ),
@@ -2247,9 +2249,9 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
     if (!widget.allowComments) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comments are turned off for this reel'),
-          backgroundColor: Color(0xFF1A2235),
+        SnackBar(
+          content: Text(LanguageController.instance.t('reels.commentsTurnedOff')),
+          backgroundColor: const Color(0xFF1A2235),
         ),
       );
       return;
@@ -2444,7 +2446,7 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                     12 + MediaQuery.of(context).viewPadding.bottom,
                   ),
                   child: Text(
-                    'Comments are turned off for this reel.',
+                    LanguageController.instance.t('reels.commentsTurnedOff'),
                     style: TextStyle(color: tokens.textMuted, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
@@ -2656,24 +2658,24 @@ class _RCommentTileState extends State<_RCommentTile> {
       if (_isOwnComment) ...[
         CommentSheetAction(
           icon: Icons.edit_outlined,
-          label: 'Edit comment',
+          label: LanguageController.instance.t('reels.commentMenu.edit'),
           onTap: _onEditComment,
         ),
         CommentSheetAction(
           icon: Icons.delete_outline_rounded,
-          label: 'Delete comment',
+          label: LanguageController.instance.t('reels.commentMenu.delete'),
           onTap: _onDeleteComment,
           danger: true,
         ),
       ] else ...[
         CommentSheetAction(
           icon: Icons.flag_outlined,
-          label: 'Report comment',
+          label: LanguageController.instance.t('reels.commentMenu.report'),
           onTap: _onReportComment,
         ),
         CommentSheetAction(
           icon: Icons.block_rounded,
-          label: 'Block this user',
+          label: LanguageController.instance.t('reels.commentMenu.block'),
           onTap: _onBlockUser,
           danger: true,
         ),
@@ -2709,8 +2711,8 @@ class _RCommentTileState extends State<_RCommentTile> {
   Future<void> _onDeleteComment() async {
     final confirmed = await showPostConfirmDialog(
       context,
-      title: 'Delete comment',
-      message: 'This will permanently delete your comment.',
+      title: LanguageController.instance.t('reels.deleteComment.title'),
+      message: LanguageController.instance.t('reels.deleteComment.message'),
       confirmLabel: 'Delete',
       danger: true,
     );
@@ -2723,19 +2725,19 @@ class _RCommentTileState extends State<_RCommentTile> {
       if (!mounted) return;
       widget.onDeleted?.call();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comment deleted'),
-          backgroundColor: Color(0xFF1A2235),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('reels.commentDeleted')),
+          backgroundColor: const Color(0xFF1A2235),
+          duration: const Duration(seconds: 2),
         ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to delete comment'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('reels.failedDeleteComment')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -2749,10 +2751,10 @@ class _RCommentTileState extends State<_RCommentTile> {
     ).then((reported) {
       if (!reported || !mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report submitted'),
-          backgroundColor: Color(0xFF1A2235),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('reels.reportSubmitted')),
+          backgroundColor: const Color(0xFF1A2235),
+          duration: const Duration(seconds: 2),
         ),
       );
     });
@@ -2767,8 +2769,8 @@ class _RCommentTileState extends State<_RCommentTile> {
     if (userId == null) return;
     final confirmed = await showPostConfirmDialog(
       context,
-      title: 'Block $username?',
-      message: 'Blocking @$username will hide their content from you.',
+      title: LanguageController.instance.t('reels.blockUserDialog.title', {'username': username}),
+      message: LanguageController.instance.t('reels.blockUserDialog.message', {'username': username}),
       confirmLabel: 'Block',
       danger: true,
     );
@@ -2781,7 +2783,7 @@ class _RCommentTileState extends State<_RCommentTile> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Blocked $username'),
+          content: Text(LanguageController.instance.t('reels.blocked', {'username': username})),
           backgroundColor: const Color(0xFF1A2235),
           duration: const Duration(seconds: 2),
         ),
@@ -2789,10 +2791,10 @@ class _RCommentTileState extends State<_RCommentTile> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to block user'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('reels.failedBlockUser')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -2819,10 +2821,10 @@ class _RCommentTileState extends State<_RCommentTile> {
       if (!mounted) return;
       setState(() => _isTranslating = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to translate comment'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('reels.failedTranslate')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -3522,7 +3524,7 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
               : AppSemanticColors.light);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to post comment: $e'),
+          content: Text(LanguageController.instance.t('reels.failedPostComment', {'error': e.toString()})),
           backgroundColor: tokens.panelMuted,
         ),
       );

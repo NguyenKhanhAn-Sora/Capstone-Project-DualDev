@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 import '../../core/services/theme_controller.dart';
 import '../post/post_detail_screen.dart';
 import '../profile/models/profile_detail.dart';
@@ -1670,6 +1671,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmAndUnhide(_HiddenPostItem item) async {
+    final lc = LanguageController.instance;
     final postId = item.id;
     if (postId.isEmpty) return;
     final confirmed = await showDialog<bool>(
@@ -1684,11 +1686,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel'),
+            child: Text(lc.t('common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Unhide'),
+            child: Text(lc.t('settings.unhide')),
           ),
         ],
       ),
@@ -1740,6 +1742,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmAndUnblock(_BlockedUserItem item) async {
+    final lc = LanguageController.instance;
     if (item.userId.isEmpty) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1756,11 +1759,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel'),
+            child: Text(lc.t('common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Unblock'),
+            child: Text(lc.t('settings.unblock')),
           ),
         ],
       ),
@@ -1777,6 +1780,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool mutedIndefinitely,
     required Future<void> Function(String? until, bool indefinitely) onSave,
   }) async {
+    final lc = LanguageController.instance;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -2022,7 +2026,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: saving
                               ? null
                               : () => Navigator.of(dialogCtx).pop(),
-                          child: Text('Cancel'),
+                          child: Text(lc.t('common.cancel')),
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
@@ -2861,23 +2865,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _sectionTitle(SettingsTab tab) {
+    final lc = LanguageController.instance;
     switch (tab) {
       case SettingsTab.personalInfo:
-        return 'Personal info';
+        return lc.t('settings.tab.personalInfo');
       case SettingsTab.profile:
-        return 'Profile';
+        return lc.t('settings.tab.profile');
       case SettingsTab.creatorVerification:
-        return 'Creator verification';
+        return lc.t('settings.tab.creatorVerification');
       case SettingsTab.passwordSecurity:
-        return 'Password & Security';
+        return lc.t('settings.tab.passwordSecurity');
       case SettingsTab.content:
-        return 'Content';
+        return lc.t('settings.tab.content');
       case SettingsTab.violations:
-        return 'Violation Center';
+        return lc.t('settings.tab.violations');
       case SettingsTab.notifications:
-        return 'Notifications';
+        return lc.t('settings.tab.notifications');
       case SettingsTab.system:
-        return 'System';
+        return lc.t('settings.tab.system');
     }
   }
 
@@ -2903,23 +2908,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _sectionDescription(SettingsTab tab) {
+    final lc = LanguageController.instance;
     switch (tab) {
       case SettingsTab.personalInfo:
-        return 'Account email and personal details shown on your profile.';
+        return lc.t('settings.tab.personalInfoDesc');
       case SettingsTab.profile:
-        return 'Control who can view profile sections and follower lists.';
+        return lc.t('settings.tab.profileDesc');
       case SettingsTab.creatorVerification:
-        return 'Check eligibility and request creator badge verification.';
+        return lc.t('settings.tab.creatorVerificationDesc');
       case SettingsTab.passwordSecurity:
-        return 'Manage password, two-factor, passkey, and login devices.';
+        return lc.t('settings.tab.passwordSecurityDesc');
       case SettingsTab.content:
-        return 'Review activity log, hidden posts, and blocked users.';
+        return lc.t('settings.tab.contentDesc');
       case SettingsTab.violations:
-        return 'Review moderation actions and your strike history.';
+        return lc.t('settings.tab.violationsDesc');
       case SettingsTab.notifications:
-        return 'Control when notification alerts are delivered.';
+        return lc.t('settings.tab.notificationsDesc');
       case SettingsTab.system:
-        return 'Manage app appearance and global behavior.';
+        return lc.t('settings.tab.systemDesc');
     }
   }
 
@@ -3233,66 +3239,141 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSystemTab() {
+    final lc = LanguageController.instance;
     return AnimatedBuilder(
-      animation: ThemeController.instance,
-      builder: (context, _) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: _accent.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                ThemeController.instance.isDarkMode
-                    ? Icons.dark_mode_rounded
-                    : Icons.light_mode_rounded,
-                color: _accent,
-                size: 20,
-              ),
+      animation: Listenable.merge([ThemeController.instance, lc]),
+      builder: (context, _) => Column(
+        children: [
+          // Appearance toggle
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _border),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Appearance',
-                    style: TextStyle(
-                      color: _textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: _accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Switch between Dark and Light mode',
-                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  child: Icon(
+                    ThemeController.instance.isDarkMode
+                        ? Icons.dark_mode_rounded
+                        : Icons.light_mode_rounded,
+                    color: _accent,
+                    size: 20,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lc.t('settings.system.appearance.title'),
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        lc.t('settings.system.appearance.description'),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Switch(
+                  value: ThemeController.instance.isDarkMode,
+                  activeColor: _accent,
+                  onChanged: (value) {
+                    ThemeController.instance.setThemeMode(
+                      value ? ThemeMode.dark : ThemeMode.light,
+                    );
+                    setState(() {});
+                  },
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Switch(
-              value: ThemeController.instance.isDarkMode,
-              activeColor: _accent,
-              onChanged: (value) {
-                ThemeController.instance.setThemeMode(
-                  value ? ThemeMode.dark : ThemeMode.light,
-                );
-                setState(() {});
-              },
+          ),
+          const SizedBox(height: 10),
+          // Language picker
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _border),
             ),
-          ],
-        ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: _accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.language_rounded,
+                    color: _accent,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lc.t('settings.system.language.title'),
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        lc.t('settings.system.language.description'),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                DropdownButton<String>(
+                  value: lc.language,
+                  dropdownColor: _surface,
+                  underline: const SizedBox.shrink(),
+                  style: TextStyle(color: _textPrimary, fontSize: 13),
+                  items: LanguageController.supported.map((code) {
+                    return DropdownMenuItem(
+                      value: code,
+                      child: Text(
+                        lc.t('settings.system.language.options.$code'),
+                        style: TextStyle(color: _textPrimary, fontSize: 13),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (code) {
+                    if (code != null) {
+                      lc.setLanguage(code);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3310,17 +3391,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _stepLabel() {
+    final lc = LanguageController.instance;
     switch (_emailStep) {
       case _EmailChangeStep.password:
-        return 'Step 1 · Verify password';
+        return lc.t('settings.emailStep.verifyPassword');
       case _EmailChangeStep.currentOtp:
-        return 'Step 2 · Current email OTP';
+        return lc.t('settings.emailStep.currentOtp');
       case _EmailChangeStep.newEmail:
-        return 'Step 3 · Enter new email';
+        return lc.t('settings.emailStep.enterNewEmail');
       case _EmailChangeStep.newOtp:
-        return 'Step 4 · New email OTP';
+        return lc.t('settings.emailStep.newOtp');
       case _EmailChangeStep.done:
-        return 'Completed';
+        return lc.t('settings.emailStep.completed');
     }
   }
 
@@ -3394,7 +3476,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildAccountEmailSection() {
-    final currentEmail = _currentEmail ?? 'Loading...';
+    final lc = LanguageController.instance;
+    final currentEmail = _currentEmail ?? lc.t('common.loading');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3458,7 +3541,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: Text('Change email'),
+                      child: Text(lc.t('settings.changeEmail')),
                     ),
                   ],
                 ),
@@ -3483,7 +3566,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: _textPrimary,
                           ),
                           label: Text(
-                            'Back',
+                            lc.t('common.back'),
                             style: TextStyle(color: _textPrimary),
                           ),
                         ),
@@ -3791,6 +3874,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildPersonalInfoTab() {
+    final lc = LanguageController.instance;
     final profile = _profile;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3807,46 +3891,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Details shown on your profile.',
+          lc.t('settings.tab.personalInfoDesc'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 14),
         _buildCard(
           children: [
             _buildInfoRow(
-              title: 'Display name',
+              title: lc.t('settings.personalInfo.displayName'),
               value: _valueOrNotSet(profile?.displayName),
             ),
             _buildInfoRow(
-              title: 'Username',
+              title: lc.t('settings.personalInfo.username'),
               value: _valueOrNotSet(profile?.username, prefixAt: true),
             ),
             _buildInfoRow(
-              title: 'Birthdate',
+              title: lc.t('settings.personalInfo.birthdate'),
               value: _displayBirthdate(profile?.birthdate),
               field: 'birthdate',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Gender',
+              title: lc.t('settings.personalInfo.gender'),
               value: _valueOrNotSet(profile?.gender),
               field: 'gender',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Location',
+              title: lc.t('settings.personalInfo.location'),
               value: _valueOrNotSet(profile?.location),
               field: 'location',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Workplace',
+              title: lc.t('settings.personalInfo.workplace'),
               value: _valueOrNotSet(profile?.workplace?.companyName),
               field: 'workplace',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Bio',
+              title: lc.t('settings.personalInfo.bio'),
               value: _valueOrNotSet(profile?.bio),
               field: 'bio',
               enabled: profile != null,
@@ -3882,7 +3966,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: Text('Edit profile'),
+            child: Text(lc.t('settings.editProfile')),
           ),
         ),
       ],
@@ -3890,6 +3974,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildProfileTab() {
+    final lc = LanguageController.instance;
     final profile = _profile;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3911,25 +3996,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             _buildInfoRow(
-              title: 'Profile page',
+              title: lc.t('settings.profile.profilePage'),
               value: 'Who can view your profile page and tabs.',
               field: 'profile',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'About this user',
+              title: lc.t('settings.profile.aboutThisUser'),
               value: 'Who can open the About overlay on your profile.',
               field: 'about',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Followers list',
+              title: lc.t('settings.profile.followersList'),
               value: 'Who can view your followers list.',
               field: 'followers',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Following list',
+              title: lc.t('settings.profile.followingList'),
               value: 'Who can view the accounts you follow.',
               field: 'following',
               enabled: profile != null,
@@ -4072,6 +4157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildCreatorVerificationTab() {
+    final lc = LanguageController.instance;
     final status = _creatorStatus;
 
     return Column(
@@ -4169,7 +4255,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _buildCard(
                       children: [
                         _buildCreatorMetricRow(
-                          title: 'Account age',
+                          title: lc.t('settings.profile.accountAge'),
                           value: '${status.eligibility.accountAgeDays} days',
                           threshold:
                               'Minimum ${status.criteria.minAccountAgeDays} days',
@@ -4181,7 +4267,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               'Minimum ${status.criteria.minFollowersCount}',
                         ),
                         _buildCreatorMetricRow(
-                          title: 'Published posts',
+                          title: lc.t('settings.profile.publishedPosts'),
                           value: '${status.eligibility.postsCount}',
                           threshold: 'Minimum ${status.criteria.minPostsCount}',
                         ),
@@ -4269,7 +4355,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            child: Text('Refresh status'),
+                            child: Text(lc.t('settings.refreshStatus')),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -4317,33 +4403,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _passwordStepLabel() {
-    if (_passwordStep == _PasswordChangeStep.otp) return 'Step 1 · Email OTP';
+    final lc = LanguageController.instance;
+    if (_passwordStep == _PasswordChangeStep.otp) return lc.t('settings.emailStep.currentOtp');
     if (_passwordStep == _PasswordChangeStep.form) {
-      return 'Step 2 · Update password';
+      return lc.t('settings.emailStep.updatePassword');
     }
-    return 'Completed';
+    return lc.t('settings.emailStep.completed');
   }
 
   String _passkeyStepLabel() {
-    if (_passkeyStep == _PasskeyStep.password)
-      return 'Step 1 · Verify password';
-    if (_passkeyStep == _PasskeyStep.otp) return 'Step 2 · Email OTP';
-    if (_passkeyStep == _PasskeyStep.form) {
-      return _hasPasskey ? 'Step 3 · Change passkey' : 'Step 3 · Set passkey';
+    final lc = LanguageController.instance;
+    if (_passkeyStep == _PasskeyStep.password) {
+      return lc.t('settings.emailStep.verifyPassword');
     }
-    return 'Completed';
+    if (_passkeyStep == _PasskeyStep.otp) return lc.t('settings.emailStep.currentOtp');
+    if (_passkeyStep == _PasskeyStep.form) {
+      return _hasPasskey ? lc.t('settings.emailStep.changePasskey') : lc.t('settings.emailStep.setPasskey');
+    }
+    return lc.t('settings.emailStep.completed');
   }
 
   Widget _buildActionHeader({
     required VoidCallback? onBack,
     required String stepLabel,
   }) {
+    final lc = LanguageController.instance;
     return Row(
       children: [
         TextButton.icon(
           onPressed: onBack,
           icon: Icon(Icons.arrow_back_rounded, size: 16),
-          label: Text('Back'),
+          label: Text(lc.t('common.back')),
           style: TextButton.styleFrom(foregroundColor: _textPrimary),
         ),
         const Spacer(),
@@ -4367,6 +4457,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildPasswordSecurityTab() {
+    final lc = LanguageController.instance;
     String sixDigits(String value) {
       final digits = value.replaceAll(RegExp(r'\D'), '');
       return digits.length > 6 ? digits.substring(0, 6) : digits;
@@ -4399,7 +4490,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Change password',
+                      lc.t('settings.changePassword'),
                       style: TextStyle(
                         color: _textPrimary,
                         fontSize: 14,
@@ -4424,7 +4515,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           backgroundColor: _accent,
                           foregroundColor: Colors.white,
                         ),
-                        child: Text('Change password'),
+                        child: Text(lc.t('settings.changePassword')),
                       ),
                     ),
                   ],
@@ -4557,7 +4648,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildStepActions(
                         primaryLabel: _passwordSubmitting
                             ? 'Updating...'
-                            : 'Change password',
+                            : lc.t('settings.changePassword'),
                         onPrimary: _passwordSubmitting
                             ? null
                             : _confirmPasswordChange,
@@ -4658,8 +4749,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Text(
                           _twoFactorLoading
-                              ? 'Loading...'
-                              : (_twoFactorEnabled ? 'Disable' : 'Enable'),
+                              ? lc.t('common.loading')
+                              : (_twoFactorEnabled ? 'Disable' : lc.t('common.enable')),
                         ),
                       ),
                     ),
@@ -4677,8 +4768,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ? null
                           : _handleTwoFactorBack,
                       stepLabel: _twoFactorStep == _TwoFactorStep.otp
-                          ? 'Step 1 - Email OTP'
-                          : 'Completed',
+                          ? lc.t('settings.emailStep.currentOtp')
+                          : lc.t('settings.emailStep.completed'),
                     ),
                     const SizedBox(height: 8),
                     if (_twoFactorStep == _TwoFactorStep.otp) ...[
@@ -4821,7 +4912,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Text(
                           _passkeyStatusLoading
-                              ? 'Loading...'
+                              ? lc.t('common.loading')
                               : (_hasPasskey
                                     ? 'Change passkey'
                                     : 'Set passkey'),
@@ -5091,7 +5182,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
                       ),
-                      child: Text('View devices'),
+                      child: Text(lc.t('settings.viewDevices')),
                     ),
                   ),
                 ],
@@ -5243,6 +5334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildContentTab() {
+    final lc = LanguageController.instance;
     final visibleActivityItems = _activityItems
         .take(_activityVisibleCount)
         .toList(growable: false);
@@ -5348,7 +5440,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             buildAccordionHeader(
-              title: 'Activity log',
+              title: lc.t('settings.activity.activityLog'),
               desc: 'Track all of your interactions across the platform.',
               isOpen: _contentActivityOpen,
               onTap: () => _toggleContentSection('activity'),
@@ -5532,7 +5624,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? null
                         : _handleSeeMoreActivity,
                     child: Text(
-                      _activityLoadingMore ? 'Loading...' : 'See more',
+                      _activityLoadingMore ? lc.t('common.loading') : lc.t('common.seeMore'),
                     ),
                   ),
                 ),
@@ -5545,7 +5637,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             buildAccordionHeader(
-              title: 'Hidden posts',
+              title: lc.t('settings.activity.hiddenPosts'),
               desc:
                   'Posts you hide are removed from your feed. You can unhide them anytime.',
               isOpen: _contentHiddenOpen,
@@ -5661,7 +5753,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: isSubmitting
                               ? null
                               : () => _confirmAndUnhide(post),
-                          child: Text(isSubmitting ? 'Unhiding...' : 'Unhide'),
+                          child: Text(isSubmitting ? '${lc.t('settings.unhide')}...' : lc.t('settings.unhide')),
                         ),
                       ],
                     ),
@@ -5673,7 +5765,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                   child: OutlinedButton(
                     onPressed: _handleSeeMoreHiddenPosts,
-                    child: Text('See more'),
+                    child: Text(lc.t('common.seeMore')),
                   ),
                 ),
             ],
@@ -5685,7 +5777,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             buildAccordionHeader(
-              title: 'Blocked users',
+              title: lc.t('settings.activity.blockedUsers'),
               desc: 'People you block cannot view your profile or content.',
               isOpen: _contentBlockedOpen,
               onTap: () => _toggleContentSection('blocked'),
@@ -5789,7 +5881,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ? null
                               : () => _confirmAndUnblock(user),
                           child: Text(
-                            isSubmitting ? 'Unblocking...' : 'Unblock',
+                            isSubmitting ? '${lc.t('settings.unblock')}...' : lc.t('settings.unblock'),
                           ),
                         ),
                       ],
@@ -5985,6 +6077,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildNotificationsTab() {
+    final lc = LanguageController.instance;
     final settings = _notificationSettings;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -6048,7 +6141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
                       ),
-                      child: Text('Enable'),
+                      child: Text(lc.t('common.enable')),
                     ),
                 ],
               ),
@@ -6079,9 +6172,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             buildRow(
-              title: 'Push notifications',
+              title: lc.t('settings.notifications.pushNotifications'),
               status: _notificationLoading
-                  ? 'Loading...'
+                  ? lc.t('common.loading')
                   : _notificationStatusLabel(
                       enabled: settings?.enabled ?? true,
                       mutedUntil: settings?.mutedUntil,
@@ -6093,7 +6186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onMute: settings == null
                   ? null
                   : () => _openNotificationMuteOverlay(
-                      title: 'Mute notifications',
+                      title: lc.t('settings.notifications.muteNotifications'),
                       subtitle:
                           'Choose how long to pause alerts for your account.',
                       mutedUntil: settings.mutedUntil,
@@ -6174,7 +6267,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   return buildRow(
                     title: label,
                     status: _notificationLoading
-                        ? 'Loading...'
+                        ? lc.t('common.loading')
                         : _notificationStatusLabel(
                             enabled: categorySettings?.enabled ?? true,
                             mutedUntil: categorySettings?.mutedUntil,
@@ -6186,7 +6279,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onMute: categorySettings == null
                         ? null
                         : () => _openNotificationMuteOverlay(
-                            title: 'Mute notifications',
+                            title: lc.t('settings.notifications.muteNotifications'),
                             subtitle:
                                 'Choose how long to pause alerts for $label.',
                             mutedUntil: categorySettings.mutedUntil,
@@ -6253,6 +6346,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildContent() {
+    final lc = LanguageController.instance;
     if (_loading) {
       return Center(child: CircularProgressIndicator(color: _accent));
     }
@@ -6270,7 +6364,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(color: _danger, fontSize: 14),
               ),
               const SizedBox(height: 12),
-              ElevatedButton(onPressed: _loadProfile, child: Text('Retry')),
+              ElevatedButton(onPressed: _loadProfile, child: Text(lc.t('common.retry'))),
             ],
           ),
         ),
@@ -6507,6 +6601,7 @@ class _ViolationDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lc = LanguageController.instance;
     final tokens = _tokens(context);
     final recordedAt = _formatRelativeTime(item.createdAt);
     final severityText = _formatSeverityLabel(item.severity);
@@ -6641,7 +6736,7 @@ class _ViolationDetailScreen extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => Navigator.of(context).pop(),
               icon: Icon(Icons.close_rounded),
-              label: Text('Close'),
+              label: Text(lc.t('common.close')),
             ),
           ),
         ],

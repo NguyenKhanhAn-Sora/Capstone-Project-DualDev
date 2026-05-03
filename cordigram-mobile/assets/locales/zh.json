@@ -1,0 +1,591 @@
+{
+  "common": {
+    "cancel": "取消",
+    "save": "保存",
+    "done": "完成",
+    "retry": "重试",
+    "back": "返回",
+    "close": "关闭",
+    "delete": "删除",
+    "edit": "编辑",
+    "report": "举报",
+    "block": "屏蔽",
+    "enable": "启用",
+    "refresh": "刷新",
+    "tryAgain": "重试",
+    "seeMore": "查看更多",
+    "viewImage": "查看图片",
+    "copyLink": "复制链接",
+    "cannotUndo": "此操作无法撤销。",
+    "loadMore": "加载更多",
+    "clearAll": "全部清除",
+    "add": "添加",
+    "remove": "删除",
+    "send": "发送",
+    "updating": "更新中...",
+    "clear": "清除",
+    "loading": "加载中..."
+  },
+  "settings": {
+    "system": {
+      "title": "系统",
+      "appearance": {
+        "title": "外观",
+        "description": "切换深色模式和浅色模式"
+      },
+      "language": {
+        "title": "语言",
+        "description": "选择您偏好的显示语言",
+        "options": {
+          "vi": "越南语",
+          "en": "英语",
+          "ja": "日语",
+          "zh": "中文"
+        }
+      }
+    },
+    "personalInfo": {
+      "displayName": "显示名称",
+      "username": "用户名",
+      "birthdate": "生日",
+      "gender": "性别",
+      "location": "位置",
+      "workplace": "工作单位",
+      "bio": "个人简介"
+    },
+    "profile": {
+      "profilePage": "个人主页",
+      "aboutThisUser": "关于此用户",
+      "followersList": "粉丝列表",
+      "followingList": "关注列表",
+      "accountAge": "账号年龄",
+      "followers": "粉丝",
+      "publishedPosts": "已发布帖子",
+      "activePostingDays": "活跃发帖天数（30天）",
+      "avgEngagement": "平均互动/帖（30天）",
+      "recentViolations": "近期违规（90天）"
+    },
+    "activity": {
+      "activityLog": "活动日志",
+      "hiddenPosts": "已隐藏帖子",
+      "blockedUsers": "已屏蔽用户"
+    },
+    "notifications": {
+      "pushNotifications": "推送通知",
+      "muteNotifications": "静音通知"
+    },
+    "changeEmail": "更改邮箱",
+    "editProfile": "编辑资料",
+    "refreshStatus": "刷新状态",
+    "changePassword": "更改密码",
+    "viewDevices": "查看设备",
+    "unhide": "取消隐藏",
+    "unblock": "取消屏蔽",
+    "emailStep": {
+      "verifyPassword": "第1步 · 验证密码",
+      "currentOtp": "第2步 · 当前邮箱OTP",
+      "enterNewEmail": "第3步 · 输入新邮箱",
+      "newOtp": "第4步 · 新邮箱OTP",
+      "completed": "已完成",
+      "emailOtp": "第1步 · 邮箱OTP",
+      "updatePassword": "第2步 · 更新密码",
+      "changePasskey": "第3步 · 更改通行密钥",
+      "setPasskey": "第3步 · 设置通行密钥"
+    }
+  },
+  "auth": {
+    "login": {
+      "email": "邮箱",
+      "password": "密码",
+      "forgotPassword": "忘记密码？",
+      "continueWithGoogle": "使用Google继续",
+      "deleteAll": "全部删除",
+      "button": "登录",
+      "cancel": "取消"
+    },
+    "signup": {
+      "cropPhoto": "裁剪照片",
+      "emailAddress": "电子邮件地址",
+      "displayName": "显示名称",
+      "username": "用户名",
+      "password": "密码",
+      "confirmPassword": "确认密码",
+      "shortBio": "简短介绍（可选）",
+      "chooseFromGallery": "从相册选择",
+      "continueWithGoogle": "使用Google继续",
+      "googleSignInFailed": "Google登录失败，请重试。"
+    },
+    "forgotPassword": {
+      "email": "邮箱",
+      "verificationCode": "验证码",
+      "newPassword": "新密码",
+      "confirmPassword": "确认密码",
+      "resendCode": "重新发送验证码",
+      "otpResent": "OTP已重新发送 – 请查看您的收件箱。",
+      "passwordUpdated": "密码已更新！请登录。"
+    }
+  },
+  "home": {
+    "exitApp": "再次按返回键退出应用",
+    "savedItemsUnavailable": "暂时无法打开已保存的内容",
+    "deletePost": {
+      "title": "删除帖子",
+      "message": "此操作无法撤销。"
+    },
+    "blockUser": {
+      "title": "屏蔽 @{username}？",
+      "message": "您将不再看到此账号的帖子。"
+    },
+    "menu": {
+      "profile": "个人主页",
+      "settings": "设置",
+      "saved": "已保存",
+      "ads": "广告",
+      "reportProblem": "报告问题",
+      "logout": "退出登录"
+    },
+    "visibility": {
+      "public": "公开",
+      "followers": "粉丝",
+      "private": "私密",
+      "cancel": "取消",
+      "shareQuote": "分享引用"
+    }
+  },
+  "post": {
+    "menu": {
+      "goToAds": "前往广告",
+      "detailAds": "广告详情",
+      "copyLink": "复制链接",
+      "editPost": "编辑帖子",
+      "editVisibility": "编辑可见性",
+      "deletePost": "删除帖子",
+      "report": "举报",
+      "blockAccount": "屏蔽此账号"
+    },
+    "actions": {
+      "like": "点赞",
+      "repost": "转发",
+      "save": "保存"
+    },
+    "downloadSuccess": "已下载: {path}",
+    "downloadFailed": "下载媒体失败",
+    "create": {
+      "photos": "照片",
+      "video": "视频",
+      "camera": "相机",
+      "postNow": "立即发布",
+      "postNowDescription": "点击完成后立即发布。",
+      "schedule": "定时发布",
+      "scheduleDescription": "在您选择的时间自动发布。",
+      "date": "日期",
+      "time": "时间",
+      "allowComments": "允许评论",
+      "allowDownload": "允许下载",
+      "hideLikeCount": "隐藏点赞数",
+      "cancel": "取消",
+      "done": "完成"
+    },
+    "createReel": {
+      "gallery": "相册",
+      "camera": "相机"
+    },
+    "createTab": {
+      "post": "帖子",
+      "reel": "短视频",
+      "live": "直播"
+    },
+    "edit": {
+      "caption": "说明文字",
+      "location": "位置（可选）",
+      "hashtags": "话题标签（例如 #音乐 #flutter）",
+      "allowComments": "允许评论",
+      "allowDownload": "允许下载",
+      "hideLikeCount": "隐藏点赞数",
+      "saveChanges": "保存更改",
+      "saveVisibility": "保存可见性"
+    },
+    "detail": {
+      "commentsTurnedOff": "此帖子的评论已关闭",
+      "commentDeleted": "评论已删除",
+      "failedDeleteComment": "删除评论失败",
+      "reportSubmitted": "举报已提交",
+      "blocked": "已屏蔽 {username}",
+      "failedBlockUser": "屏蔽用户失败",
+      "failedTranslate": "翻译评论失败",
+      "failedPostComment": "发布评论失败: {error}",
+      "deleteComment": {
+        "title": "删除评论",
+        "message": "此评论将被永久删除。"
+      },
+      "blockUser": {
+        "title": "屏蔽 {username}？",
+        "message": "屏蔽 @{username} 将对您隐藏其内容。"
+      },
+      "commentMenu": {
+        "edit": "编辑评论",
+        "delete": "删除评论",
+        "report": "举报评论",
+        "block": "屏蔽此用户"
+      }
+    }
+  },
+  "reels": {
+    "commentsTurnedOff": "此短视频的评论已关闭",
+    "commentDeleted": "评论已删除",
+    "failedDeleteComment": "删除评论失败",
+    "reportSubmitted": "举报已提交",
+    "blocked": "已屏蔽 {username}",
+    "failedBlockUser": "屏蔽用户失败",
+    "failedTranslate": "翻译评论失败",
+    "failedPostComment": "发布评论失败: {error}",
+    "deleteReel": {
+      "title": "删除短视频",
+      "message": "此操作无法撤销。"
+    },
+    "blockUserConfirm": {
+      "title": "屏蔽 @{username}？",
+      "message": "您将不再看到此账号的短视频。"
+    },
+    "blockUserDialog": {
+      "title": "屏蔽 {username}？",
+      "message": "屏蔽 @{username} 将对您隐藏其内容。"
+    },
+    "deleteComment": {
+      "title": "删除评论",
+      "message": "此评论将被永久删除。"
+    },
+    "menu": {
+      "editReel": "编辑短视频",
+      "editVisibility": "编辑可见性",
+      "muteReel": "静音此短视频",
+      "download": "下载此短视频",
+      "copyLink": "复制链接",
+      "deleteReel": "删除短视频",
+      "hideReel": "隐藏此短视频",
+      "report": "举报",
+      "blockAccount": "屏蔽此账号"
+    },
+    "commentMenu": {
+      "edit": "编辑评论",
+      "delete": "删除评论",
+      "report": "举报评论",
+      "block": "屏蔽此用户"
+    }
+  },
+  "profile": {
+    "cannotRender": {
+      "title": "无法显示个人主页",
+      "message": "个人主页数据不可用。请重试。"
+    },
+    "cropPhoto": "裁剪照片",
+    "tabs": {
+      "posts": "帖子",
+      "followers": "粉丝",
+      "following": "关注"
+    },
+    "editProfile": "编辑资料",
+    "updating": "更新中...",
+    "message": "发消息",
+    "privateProfile": "此个人主页是私密的",
+    "unableToLoad": "无法加载个人主页",
+    "fields": {
+      "displayName": "显示名称",
+      "username": "用户名",
+      "location": "位置",
+      "workplace": "工作单位",
+      "birthday": "生日",
+      "gender": "性别"
+    },
+    "menu": {
+      "aboutUser": "关于此用户",
+      "block": "屏蔽此用户",
+      "report": "举报",
+      "copyLink": "复制链接"
+    },
+    "editSheet": {
+      "displayName": "显示名称",
+      "cancel": "取消",
+      "save": "保存"
+    },
+    "itemViewer": {
+      "deleteReel": {
+        "title": "删除短视频",
+        "message": "此操作无法撤销。"
+      },
+      "blockUser": {
+        "title": "屏蔽 @{username}？",
+        "message": "您将不再看到此账号的短视频。"
+      },
+      "menu": {
+        "editReel": "编辑短视频",
+        "editVisibility": "编辑可见性",
+        "muteReel": "静音此短视频",
+        "download": "下载此短视频",
+        "copyLink": "复制链接",
+        "deleteReel": "删除短视频",
+        "hideReel": "隐藏此短视频",
+        "report": "举报",
+        "blockAccount": "屏蔽此账号"
+      }
+    }
+  },
+  "messages": {
+    "failedSend": "无法发送消息: {error}",
+    "failedSendVoice": "无法发送语音消息: {error}",
+    "fileTooLarge": "文件太大（最大25MB）",
+    "addOption": "添加选项",
+    "hours": "{h}小时",
+    "cancel": "取消",
+    "create": "创建",
+    "reopen": "重新开放",
+    "startRecording": "开始录音",
+    "send": "发送",
+    "viewResults": "查看结果",
+    "vote": "投票",
+    "leaveVoiceChannel": "离开语音频道",
+    "microphonePermission": "录音需要麦克风权限",
+    "goToServer": "前往服务器",
+    "retry": "重试",
+    "muteNotifications": "静音消息通知",
+    "block": "屏蔽",
+    "quickReaction": "快速反应",
+    "imageUploadFailed": "图片上传失败: {error}",
+    "failedCreateServer": "无法创建服务器: {error}",
+    "createNewServer": "创建新服务器",
+    "serverNoChatChannel": "此服务器没有可打开的聊天频道。",
+    "chatChannel": "聊天频道",
+    "voiceChannel": "语音频道",
+    "voiceMessage": "语音消息",
+    "messageRecalled": "消息已撤回",
+    "call": {
+      "reject": "拒绝",
+      "leaveAndAccept": "离开频道并接听",
+      "close": "关闭"
+    }
+  },
+  "notifications": {
+    "tabs": {
+      "allActivity": "全部动态",
+      "likes": "点赞",
+      "comments": "评论",
+      "mentions": "提及",
+      "followers": "粉丝",
+      "system": "系统"
+    },
+    "cancel": "取消",
+    "done": "完成"
+  },
+  "search": {
+    "clearAll": "全部清除",
+    "loadMore": "加载更多",
+    "deletePost": {
+      "title": "删除帖子",
+      "message": "此操作无法撤销。"
+    }
+  },
+  "explore": {
+    "viewImage": "查看图片",
+    "refresh": "刷新",
+    "tryAgain": "重试",
+    "retry": "重试"
+  },
+  "hashtag": {
+    "viewImage": "查看图片",
+    "retry": "重试",
+    "refresh": "刷新",
+    "deletePost": {
+      "title": "删除帖子",
+      "message": "此操作无法撤销。"
+    },
+    "blockUser": {
+      "title": "屏蔽 @{username}？",
+      "message": "您将不再看到此账号的帖子。"
+    }
+  },
+  "following": {
+    "viewImage": "查看图片",
+    "retry": "重试",
+    "refresh": "刷新"
+  },
+  "livestream": {
+    "createdSuccessfully": "直播创建成功",
+    "openAppSettings": "打开应用设置",
+    "fields": {
+      "title": "标题",
+      "description": "描述（可选）",
+      "pinnedComment": "置顶评论（可选）",
+      "location": "位置（可选）"
+    },
+    "qualityPriority": "质量优先",
+    "balancedQuality": "均衡质量",
+    "lowLatency": "低延迟",
+    "microphone": "麦克风",
+    "camera": "相机",
+    "hub": {
+      "adaptive": "自适应",
+      "balanced": "均衡",
+      "lowLatency": "低延迟",
+      "endLive": "结束直播",
+      "endLiveDialog": {
+        "title": "结束直播？",
+        "cancel": "取消",
+        "confirm": "结束直播"
+      },
+      "retryConnect": "重新连接",
+      "back": "返回",
+      "liveNow": "正在直播",
+      "noLivestream": "目前没有活跃的直播。",
+      "fields": {
+        "title": "标题",
+        "description": "描述",
+        "pinnedComment": "置顶评论",
+        "location": "位置"
+      }
+    }
+  },
+  "report": {
+    "submit": "提交举报",
+    "post": {
+      "harassment": "骚扰 / 仇恨言论",
+      "targetsIndividual": "针对个人的骚扰",
+      "hateSpeech": "仇恨言论或歧视",
+      "violence": "暴力 / 威胁",
+      "threatenViolence": "威胁或煽动暴力",
+      "graphicViolence": "残暴暴力图像",
+      "impersonation": "冒充 / 虚假信息",
+      "falseInfo": "虚假或误导性信息",
+      "impersonatePerson": "冒充个人或组织",
+      "spam": "垃圾信息 / 诈骗",
+      "spamContent": "垃圾或无关内容",
+      "financialScam": "金融诈骗",
+      "other": "其他",
+      "otherReason": "其他原因"
+    },
+    "user": {
+      "harassment": "骚扰 / 仇恨",
+      "harassmentBullying": "骚扰或霸凌",
+      "hateSpeech": "仇恨言论或侮辱",
+      "discrimination": "攻击性歧视",
+      "threats": "威胁 / 安全",
+      "violence": "暴力或身体威胁",
+      "graphicViolence": "残暴暴力",
+      "selfHarm": "鼓励自我伤害",
+      "extremism": "极端主义或恐怖主义",
+      "impersonation": "冒充 / 误导",
+      "impersonatingOther": "假装成他人",
+      "fakeNews": "假新闻或错误信息",
+      "spam": "垃圾信息 / 诈骗",
+      "spamMentions": "垃圾信息或大量提及",
+      "scam": "诈骗或欺诈",
+      "unwantedPromo": "不需要的推广",
+      "privacy": "侵犯隐私",
+      "privateInfo": "分享私人信息",
+      "intimateContent": "未经同意的亲密内容",
+      "other": "其他",
+      "otherReason": "其他原因"
+    }
+  },
+  "ads": {
+    "packages": {
+      "light": "轻度推广",
+      "standard": "标准推广",
+      "strong": "强力推广"
+    },
+    "paymentVerified": "付款验证成功。",
+    "paymentNotConfirmed": "付款未确认，请重试。",
+    "formats": {
+      "singleImage": "单张图片",
+      "carousel": "轮播",
+      "video": "视频"
+    },
+    "labels": {
+      "boostPackage": "推广套餐",
+      "durationPackage": "时长套餐",
+      "total": "总计",
+      "status": "状态",
+      "statusFilter": "状态筛选",
+      "sortBy": "排序",
+      "sortCampaigns": "排序广告系列",
+      "from": "从",
+      "to": "到",
+      "spentVnd": "花费（越南盾）",
+      "impr": "展示次数",
+      "ctr": "点击率",
+      "clicks": "点击",
+      "clear": "清除",
+      "add": "添加"
+    },
+    "campaigns": {
+      "totalCampaigns": "总广告系列数",
+      "active": "活跃",
+      "totalSpent": "总花费",
+      "totalImpressions": "总展示次数"
+    },
+    "detail": {
+      "spent": "花费",
+      "impressions": "展示次数",
+      "clicks": "点击次数",
+      "ctr": "点击率",
+      "performanceBreakdown": "效果详情",
+      "reach": "覆盖人数",
+      "views": "观看次数",
+      "engagements": "互动",
+      "engagementRate": "互动率",
+      "avgDwell": "平均停留时间",
+      "budgetUsage": "预算使用情况",
+      "campaignConfig": "广告系列配置",
+      "objective": "目标",
+      "adFormat": "广告格式",
+      "boostPackage": "推广套餐",
+      "durationDays": "时长（天）",
+      "deliveryStateReason": "投放状态原因",
+      "adminCancelReason": "管理员取消原因",
+      "elapsedTotal": "已用 / 总计",
+      "reactionsSplit": "互动分布",
+      "adCreativeAudience": "广告创意与受众",
+      "primaryText": "主要文字",
+      "headline": "标题",
+      "description": "描述",
+      "ctaButton": "CTA按钮",
+      "destinationUrl": "目标URL",
+      "locationTargeting": "地理位置定向",
+      "ageTargeting": "年龄定向",
+      "interests": "兴趣",
+      "campaignActions": "广告系列操作",
+      "currentBoost": "当前推广",
+      "boostUpgrade": "升级推广差价",
+      "extendDays": "延长天数套餐",
+      "needToPay": "现在需要支付",
+      "newTotalBudget": "新总预算",
+      "hideCampaign": {
+        "title": "隐藏此广告系列？",
+        "button": "隐藏广告系列"
+      },
+      "reopenCampaign": {
+        "title": "重新开放此广告系列？",
+        "button": "重新开放广告系列"
+      },
+      "campaignName": "广告系列名称",
+      "cta": "CTA",
+      "creativeMedia": "创意媒体",
+      "remove": "删除",
+      "cancel": "取消"
+    },
+    "dashboard": {
+      "spentVnd": "花费（越南盾）",
+      "impr": "展示次数",
+      "ctr": "点击率",
+      "clicks": "点击",
+      "totalBudget": "总预算",
+      "impressions": "展示次数",
+      "avgCtr": "平均点击率",
+      "activeCampaigns": "活跃广告系列"
+    },
+    "payment": {
+      "sessionId": "会话ID",
+      "paymentStatus": "付款状态",
+      "amount": "金额"
+    }
+  }
+}

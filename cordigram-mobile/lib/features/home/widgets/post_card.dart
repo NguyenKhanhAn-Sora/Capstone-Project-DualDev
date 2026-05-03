@@ -8,6 +8,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 import '../models/feed_post.dart';
 import '../../profile/profile_screen.dart';
 import 'media_carousel.dart';
+import '../../../core/services/language_controller.dart';
 
 // ── Sponsored ad creative ────────────────────────────────────────────────────
 
@@ -276,6 +277,7 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _openMoreMenu(BuildContext triggerContext) async {
     final scheme = Theme.of(context).colorScheme;
+    final lc = LanguageController.instance;
     final isOwner =
         widget.viewerId != null &&
         widget.state.post.authorId != null &&
@@ -290,19 +292,19 @@ class _PostCardState extends State<PostCard> {
 
     final entries = <({String id, String label, bool danger})>[];
     if (isOwner && isAdPost && widget.useAdsMenuMode) {
-      entries.add((id: 'goToAdsPost', label: 'Go to ads', danger: false));
-      entries.add((id: 'detailAds', label: 'Detail ads', danger: false));
+      entries.add((id: 'goToAdsPost', label: lc.t('post.menu.goToAds'), danger: false));
+      entries.add((id: 'detailAds', label: lc.t('post.menu.detailAds'), danger: false));
       entries.add((
         id: 'toggleHideLike',
         label: post.hideLikeCount == true ? 'Show like' : 'Hide like',
         danger: false,
       ));
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
     } else if (isOwner) {
-      entries.add((id: 'editPost', label: 'Edit post', danger: false));
+      entries.add((id: 'editPost', label: lc.t('post.menu.editPost'), danger: false));
       entries.add((
         id: 'editVisibility',
-        label: 'Edit visibility',
+        label: lc.t('post.menu.editVisibility'),
         danger: false,
       ));
       entries.add((
@@ -324,10 +326,10 @@ class _PostCardState extends State<PostCard> {
             : 'Mute this post',
         danger: false,
       ));
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
-      entries.add((id: 'deletePost', label: 'Delete post', danger: true));
+      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
+      entries.add((id: 'deletePost', label: lc.t('post.menu.deletePost'), danger: true));
     } else {
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
       entries.add((
         id: 'followToggle',
         label: widget.state.following ? 'Unfollow' : 'Follow',
@@ -347,10 +349,10 @@ class _PostCardState extends State<PostCard> {
             : 'Hide this post',
         danger: false,
       ));
-      entries.add((id: 'reportPost', label: 'Report', danger: false));
+      entries.add((id: 'reportPost', label: lc.t('post.menu.report'), danger: false));
       entries.add((
         id: 'blockAccount',
-        label: 'Block this account',
+        label: lc.t('post.menu.blockAccount'),
         danger: true,
       ));
     }
@@ -1439,6 +1441,7 @@ class _ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final lc = LanguageController.instance;
     final commentsLocked = state.post.allowComments == false;
 
     return Padding(
@@ -1454,7 +1457,7 @@ class _ActionBar extends StatelessWidget {
                     ? const Color(0xFF2b74b0)
                     : scheme.onSurfaceVariant,
               ),
-              label: 'Like',
+              label: lc.t('post.actions.like'),
               color: state.liked
                   ? const Color(0xFF2b74b0)
                   : scheme.onSurfaceVariant,
@@ -1475,7 +1478,7 @@ class _ActionBar extends StatelessWidget {
           Expanded(
             child: _ActionButton(
               icon: Icons.repeat_rounded,
-              label: 'Repost',
+              label: lc.t('post.actions.repost'),
               color: scheme.onSurfaceVariant,
               onTap:
                   onRepost ??
@@ -1494,7 +1497,7 @@ class _ActionBar extends StatelessWidget {
               icon: state.saved
                   ? Icons.bookmark_rounded
                   : Icons.bookmark_border_rounded,
-              label: 'Save',
+              label: lc.t('post.actions.save'),
               color: state.saved
                   ? const Color(0xFF4AA3E4)
                   : scheme.onSurfaceVariant,

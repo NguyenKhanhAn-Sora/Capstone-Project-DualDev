@@ -1,0 +1,609 @@
+{
+  "common": {
+    "cancel": "キャンセル",
+    "save": "保存",
+    "done": "完了",
+    "retry": "再試行",
+    "back": "戻る",
+    "close": "閉じる",
+    "delete": "削除",
+    "edit": "編集",
+    "report": "報告",
+    "block": "ブロック",
+    "enable": "有効にする",
+    "refresh": "更新",
+    "tryAgain": "再試行",
+    "seeMore": "もっと見る",
+    "viewImage": "画像を見る",
+    "copyLink": "リンクをコピー",
+    "cannotUndo": "この操作は元に戻せません。",
+    "loadMore": "もっと読み込む",
+    "clearAll": "すべてクリア",
+    "add": "追加",
+    "remove": "削除",
+    "send": "送信",
+    "updating": "更新中...",
+    "clear": "クリア",
+    "loading": "読み込み中..."
+  },
+  "settings": {
+    "system": {
+      "title": "システム",
+      "appearance": {
+        "title": "外観",
+        "description": "ダークモードとライトモードを切り替える"
+      },
+      "language": {
+        "title": "言語",
+        "description": "表示言語を選択してください",
+        "options": {
+          "vi": "ベトナム語",
+          "en": "英語",
+          "ja": "日本語",
+          "zh": "中国語"
+        }
+      }
+    },
+    "personalInfo": {
+      "displayName": "表示名",
+      "username": "ユーザー名",
+      "birthdate": "生年月日",
+      "gender": "性別",
+      "location": "場所",
+      "workplace": "職場",
+      "bio": "自己紹介"
+    },
+    "profile": {
+      "profilePage": "プロフィールページ",
+      "aboutThisUser": "このユーザーについて",
+      "followersList": "フォロワー一覧",
+      "followingList": "フォロー中一覧",
+      "accountAge": "アカウント年齢",
+      "followers": "フォロワー",
+      "publishedPosts": "投稿済み",
+      "activePostingDays": "アクティブ投稿日数（30日）",
+      "avgEngagement": "平均エンゲージメント/投稿（30日）",
+      "recentViolations": "最近の違反（90日）"
+    },
+    "activity": {
+      "activityLog": "アクティビティログ",
+      "hiddenPosts": "非表示の投稿",
+      "blockedUsers": "ブロックユーザー"
+    },
+    "notifications": {
+      "pushNotifications": "プッシュ通知",
+      "muteNotifications": "通知をミュート"
+    },
+    "changeEmail": "メールアドレス変更",
+    "editProfile": "プロフィール編集",
+    "refreshStatus": "ステータス更新",
+    "changePassword": "パスワード変更",
+    "viewDevices": "デバイスを表示",
+    "unhide": "表示に戻す",
+    "unblock": "ブロック解除",
+    "emailStep": {
+      "verifyPassword": "ステップ1 · パスワード確認",
+      "currentOtp": "ステップ2 · 現在のメールOTP",
+      "enterNewEmail": "ステップ3 · 新しいメールを入力",
+      "newOtp": "ステップ4 · 新しいメールOTP",
+      "completed": "完了",
+      "emailOtp": "ステップ1 · メールOTP",
+      "updatePassword": "ステップ2 · パスワード更新",
+      "changePasskey": "ステップ3 · パスキー変更",
+      "setPasskey": "ステップ3 · パスキー設定"
+    },
+    "tab": {
+      "personalInfo": "個人情報",
+      "profile": "プロフィール",
+      "creatorVerification": "クリエイター認証",
+      "passwordSecurity": "パスワードとセキュリティ",
+      "content": "コンテンツ",
+      "violations": "違反センター",
+      "notifications": "通知",
+      "system": "システム",
+      "personalInfoDesc": "プロフィールに表示されるアカウントメールと個人情報。",
+      "profileDesc": "プロフィールセクションとフォロワーリストの閲覧権限を管理。",
+      "creatorVerificationDesc": "資格を確認してクリエイターバッジの認証をリクエスト。",
+      "passwordSecurityDesc": "パスワード、二要素認証、パスキー、ログインデバイスを管理。",
+      "contentDesc": "アクティビティログ、非表示の投稿、ブロックユーザーを確認。",
+      "violationsDesc": "モデレーションアクションとストライク履歴を確認。",
+      "notificationsDesc": "通知アラートの配信タイミングを管理。",
+      "systemDesc": "アプリの外観とグローバル動作を管理。"
+    }
+  },
+  "auth": {
+    "login": {
+      "email": "メールアドレス",
+      "password": "パスワード",
+      "forgotPassword": "パスワードを忘れた？",
+      "continueWithGoogle": "Googleで続ける",
+      "deleteAll": "すべて削除",
+      "button": "ログイン",
+      "cancel": "キャンセル"
+    },
+    "signup": {
+      "cropPhoto": "写真をトリミング",
+      "emailAddress": "メールアドレス",
+      "displayName": "表示名",
+      "username": "ユーザー名",
+      "password": "パスワード",
+      "confirmPassword": "パスワードの確認",
+      "shortBio": "短い自己紹介（任意）",
+      "chooseFromGallery": "ギャラリーから選ぶ",
+      "continueWithGoogle": "Googleで続ける",
+      "googleSignInFailed": "Googleサインインに失敗しました。もう一度お試しください。"
+    },
+    "forgotPassword": {
+      "email": "メールアドレス",
+      "verificationCode": "認証コード",
+      "newPassword": "新しいパスワード",
+      "confirmPassword": "パスワードの確認",
+      "resendCode": "コードを再送信",
+      "otpResent": "OTPを再送信しました – 受信箱を確認してください。",
+      "passwordUpdated": "パスワードを更新しました！サインインしてください。"
+    }
+  },
+  "home": {
+    "exitApp": "もう一度Backを押してアプリを終了",
+    "savedItemsUnavailable": "現在保存済みアイテムを開けません",
+    "deletePost": {
+      "title": "投稿を削除",
+      "message": "この操作は元に戻せません。"
+    },
+    "blockUser": {
+      "title": "@{username}をブロック？",
+      "message": "このアカウントの投稿は表示されなくなります。"
+    },
+    "menu": {
+      "profile": "プロフィール",
+      "settings": "設定",
+      "saved": "保存済み",
+      "ads": "広告",
+      "reportProblem": "問題を報告",
+      "logout": "ログアウト"
+    },
+    "visibility": {
+      "public": "公開",
+      "followers": "フォロワー",
+      "private": "非公開",
+      "cancel": "キャンセル",
+      "shareQuote": "引用をシェア"
+    }
+  },
+  "post": {
+    "menu": {
+      "goToAds": "広告へ",
+      "detailAds": "広告の詳細",
+      "copyLink": "リンクをコピー",
+      "editPost": "投稿を編集",
+      "editVisibility": "公開範囲を編集",
+      "deletePost": "投稿を削除",
+      "report": "報告",
+      "blockAccount": "このアカウントをブロック"
+    },
+    "actions": {
+      "like": "いいね",
+      "repost": "リポスト",
+      "save": "保存"
+    },
+    "downloadSuccess": "ダウンロード完了: {path}",
+    "downloadFailed": "メディアのダウンロードに失敗しました",
+    "create": {
+      "photos": "写真",
+      "video": "動画",
+      "camera": "カメラ",
+      "postNow": "今すぐ投稿",
+      "postNowDescription": "完了をタップするとすぐに公開されます。",
+      "schedule": "スケジュール",
+      "scheduleDescription": "設定した時間に自動で投稿されます。",
+      "date": "日付",
+      "time": "時刻",
+      "allowComments": "コメントを許可",
+      "allowDownload": "ダウンロードを許可",
+      "hideLikeCount": "いいね数を非表示",
+      "cancel": "キャンセル",
+      "done": "完了"
+    },
+    "createReel": {
+      "gallery": "ギャラリー",
+      "camera": "カメラ"
+    },
+    "createTab": {
+      "post": "投稿",
+      "reel": "リール",
+      "live": "ライブ"
+    },
+    "edit": {
+      "caption": "キャプション",
+      "location": "場所（任意）",
+      "hashtags": "ハッシュタグ（例: #音楽 #flutter）",
+      "allowComments": "コメントを許可",
+      "allowDownload": "ダウンロードを許可",
+      "hideLikeCount": "いいね数を非表示",
+      "saveChanges": "変更を保存",
+      "saveVisibility": "公開設定を保存"
+    },
+    "detail": {
+      "commentsTurnedOff": "この投稿のコメントはオフになっています",
+      "commentDeleted": "コメントを削除しました",
+      "failedDeleteComment": "コメントの削除に失敗しました",
+      "reportSubmitted": "報告を送信しました",
+      "blocked": "{username}をブロックしました",
+      "failedBlockUser": "ユーザーのブロックに失敗しました",
+      "failedTranslate": "コメントの翻訳に失敗しました",
+      "failedPostComment": "コメントの投稿に失敗しました: {error}",
+      "deleteComment": {
+        "title": "コメントを削除",
+        "message": "このコメントは完全に削除されます。"
+      },
+      "blockUser": {
+        "title": "{username}をブロック？",
+        "message": "@{username}をブロックすると、そのコンテンツが非表示になります。"
+      },
+      "commentMenu": {
+        "edit": "コメントを編集",
+        "delete": "コメントを削除",
+        "report": "コメントを報告",
+        "block": "このユーザーをブロック"
+      }
+    }
+  },
+  "reels": {
+    "commentsTurnedOff": "このリールのコメントはオフになっています",
+    "commentDeleted": "コメントを削除しました",
+    "failedDeleteComment": "コメントの削除に失敗しました",
+    "reportSubmitted": "報告を送信しました",
+    "blocked": "{username}をブロックしました",
+    "failedBlockUser": "ユーザーのブロックに失敗しました",
+    "failedTranslate": "コメントの翻訳に失敗しました",
+    "failedPostComment": "コメントの投稿に失敗しました: {error}",
+    "deleteReel": {
+      "title": "リールを削除",
+      "message": "この操作は元に戻せません。"
+    },
+    "blockUserConfirm": {
+      "title": "@{username}をブロック？",
+      "message": "このアカウントのリールは表示されなくなります。"
+    },
+    "blockUserDialog": {
+      "title": "{username}をブロック？",
+      "message": "@{username}をブロックすると、そのコンテンツが非表示になります。"
+    },
+    "deleteComment": {
+      "title": "コメントを削除",
+      "message": "このコメントは完全に削除されます。"
+    },
+    "menu": {
+      "editReel": "リールを編集",
+      "editVisibility": "公開範囲を編集",
+      "muteReel": "このリールをミュート",
+      "download": "このリールをダウンロード",
+      "copyLink": "リンクをコピー",
+      "deleteReel": "リールを削除",
+      "hideReel": "このリールを非表示",
+      "report": "報告",
+      "blockAccount": "このアカウントをブロック"
+    },
+    "commentMenu": {
+      "edit": "コメントを編集",
+      "delete": "コメントを削除",
+      "report": "コメントを報告",
+      "block": "このユーザーをブロック"
+    }
+  },
+  "profile": {
+    "cannotRender": {
+      "title": "プロフィールを表示できません",
+      "message": "プロフィールデータが利用できません。もう一度お試しください。"
+    },
+    "cropPhoto": "写真をトリミング",
+    "tabs": {
+      "posts": "投稿",
+      "followers": "フォロワー",
+      "following": "フォロー中"
+    },
+    "editProfile": "プロフィール編集",
+    "updating": "更新中...",
+    "message": "メッセージ",
+    "privateProfile": "このプロフィールは非公開です",
+    "unableToLoad": "プロフィールを読み込めません",
+    "fields": {
+      "displayName": "表示名",
+      "username": "ユーザー名",
+      "location": "場所",
+      "workplace": "職場",
+      "birthday": "生年月日",
+      "gender": "性別"
+    },
+    "menu": {
+      "aboutUser": "このユーザーについて",
+      "block": "このユーザーをブロック",
+      "report": "報告",
+      "copyLink": "リンクをコピー"
+    },
+    "editSheet": {
+      "displayName": "表示名",
+      "cancel": "キャンセル",
+      "save": "保存"
+    },
+    "itemViewer": {
+      "deleteReel": {
+        "title": "リールを削除",
+        "message": "この操作は元に戻せません。"
+      },
+      "blockUser": {
+        "title": "@{username}をブロック？",
+        "message": "このアカウントのリールは表示されなくなります。"
+      },
+      "menu": {
+        "editReel": "リールを編集",
+        "editVisibility": "公開範囲を編集",
+        "muteReel": "このリールをミュート",
+        "download": "このリールをダウンロード",
+        "copyLink": "リンクをコピー",
+        "deleteReel": "リールを削除",
+        "hideReel": "このリールを非表示",
+        "report": "報告",
+        "blockAccount": "このアカウントをブロック"
+      }
+    }
+  },
+  "messages": {
+    "failedSend": "メッセージを送信できませんでした: {error}",
+    "failedSendVoice": "音声メッセージを送信できませんでした: {error}",
+    "fileTooLarge": "ファイルが大きすぎます（最大25MB）",
+    "addOption": "選択肢を追加",
+    "hours": "{h}時間",
+    "cancel": "キャンセル",
+    "create": "作成",
+    "reopen": "再開",
+    "startRecording": "録音開始",
+    "send": "送信",
+    "viewResults": "結果を見る",
+    "vote": "投票",
+    "leaveVoiceChannel": "ボイスチャンネルを退出",
+    "microphonePermission": "録音にはマイクの権限が必要です",
+    "goToServer": "サーバーへ",
+    "retry": "再試行",
+    "muteNotifications": "メッセージ通知をミュート",
+    "block": "ブロック",
+    "quickReaction": "クイックリアクション",
+    "imageUploadFailed": "画像のアップロードに失敗しました: {error}",
+    "failedCreateServer": "サーバーを作成できませんでした: {error}",
+    "createNewServer": "新しいサーバーを作成",
+    "serverNoChatChannel": "このサーバーには開くチャットチャンネルがありません。",
+    "chatChannel": "チャットチャンネル",
+    "voiceChannel": "ボイスチャンネル",
+    "voiceMessage": "音声メッセージ",
+    "messageRecalled": "メッセージが取り消されました",
+    "call": {
+      "reject": "拒否",
+      "leaveAndAccept": "チャンネルを退出して受信",
+      "close": "閉じる"
+    }
+  },
+  "notifications": {
+    "tabs": {
+      "allActivity": "すべてのアクティビティ",
+      "likes": "いいね",
+      "comments": "コメント",
+      "mentions": "メンション",
+      "followers": "フォロワー",
+      "system": "システム"
+    },
+    "cancel": "キャンセル",
+    "done": "完了"
+  },
+  "search": {
+    "clearAll": "すべてクリア",
+    "loadMore": "もっと読み込む",
+    "deletePost": {
+      "title": "投稿を削除",
+      "message": "この操作は元に戻せません。"
+    }
+  },
+  "explore": {
+    "viewImage": "画像を見る",
+    "refresh": "更新",
+    "tryAgain": "再試行",
+    "retry": "再試行"
+  },
+  "hashtag": {
+    "viewImage": "画像を見る",
+    "retry": "再試行",
+    "refresh": "更新",
+    "deletePost": {
+      "title": "投稿を削除",
+      "message": "この操作は元に戻せません。"
+    },
+    "blockUser": {
+      "title": "@{username}をブロック？",
+      "message": "このアカウントの投稿は表示されなくなります。"
+    }
+  },
+  "following": {
+    "viewImage": "画像を見る",
+    "retry": "再試行",
+    "refresh": "更新"
+  },
+  "livestream": {
+    "createdSuccessfully": "ライブストリームを作成しました",
+    "openAppSettings": "アプリ設定を開く",
+    "fields": {
+      "title": "タイトル",
+      "description": "説明（任意）",
+      "pinnedComment": "ピン留めコメント（任意）",
+      "location": "場所（任意）"
+    },
+    "qualityPriority": "品質優先",
+    "balancedQuality": "バランス品質",
+    "lowLatency": "低遅延",
+    "microphone": "マイク",
+    "camera": "カメラ",
+    "hub": {
+      "adaptive": "アダプティブ",
+      "balanced": "バランス",
+      "lowLatency": "低遅延",
+      "endLive": "ライブ終了",
+      "endLiveDialog": {
+        "title": "ライブストリームを終了？",
+        "cancel": "キャンセル",
+        "confirm": "ライブ終了"
+      },
+      "retryConnect": "再接続",
+      "back": "戻る",
+      "liveNow": "配信中",
+      "noLivestream": "現在アクティブなライブストリームはありません。",
+      "fields": {
+        "title": "タイトル",
+        "description": "説明",
+        "pinnedComment": "ピン留めコメント",
+        "location": "場所"
+      }
+    }
+  },
+  "report": {
+    "submit": "報告を送信",
+    "post": {
+      "harassment": "ハラスメント / ヘイトスピーチ",
+      "targetsIndividual": "個人をターゲットにしたハラスメント",
+      "hateSpeech": "ヘイトスピーチまたは差別",
+      "violence": "暴力 / 脅迫",
+      "threatenViolence": "暴力を脅迫または助長",
+      "graphicViolence": "残虐な暴力的描写",
+      "impersonation": "なりすまし / 誤情報",
+      "falseInfo": "虚偽または誤解を招く情報",
+      "impersonatePerson": "個人または組織へのなりすまし",
+      "spam": "スパム / 詐欺",
+      "spamContent": "スパムまたは無関係なコンテンツ",
+      "financialScam": "金融詐欺",
+      "other": "その他",
+      "otherReason": "その他の理由"
+    },
+    "user": {
+      "harassment": "ハラスメント / ヘイト",
+      "harassmentBullying": "ハラスメントまたはいじめ",
+      "hateSpeech": "ヘイトスピーチまたは侮辱",
+      "discrimination": "攻撃的な差別",
+      "threats": "脅迫 / 安全",
+      "violence": "暴力または身体的脅迫",
+      "graphicViolence": "残虐な暴力",
+      "selfHarm": "自傷行為の奨励",
+      "extremism": "過激主義またはテロリズム",
+      "impersonation": "なりすまし / 誤解を招く",
+      "impersonatingOther": "他人になりすます",
+      "fakeNews": "フェイクニュースまたは誤情報",
+      "spam": "スパム / 詐欺",
+      "spamMentions": "スパムまたは大量メンション",
+      "scam": "詐欺または不正行為",
+      "unwantedPromo": "不要なプロモーション",
+      "privacy": "プライバシー侵害",
+      "privateInfo": "個人情報の共有",
+      "intimateContent": "同意のない親密なコンテンツ",
+      "other": "その他",
+      "otherReason": "その他の理由"
+    }
+  },
+  "ads": {
+    "packages": {
+      "light": "ライトブースト",
+      "standard": "スタンダードブースト",
+      "strong": "ストロングブースト"
+    },
+    "paymentVerified": "支払いが正常に確認されました。",
+    "paymentNotConfirmed": "支払いが確認できませんでした。もう一度お試しください。",
+    "formats": {
+      "singleImage": "単一画像",
+      "carousel": "カルーセル",
+      "video": "動画"
+    },
+    "labels": {
+      "boostPackage": "ブーストパッケージ",
+      "durationPackage": "期間パッケージ",
+      "total": "合計",
+      "status": "ステータス",
+      "statusFilter": "ステータスフィルター",
+      "sortBy": "並び替え",
+      "sortCampaigns": "キャンペーンを並び替え",
+      "from": "から",
+      "to": "まで",
+      "spentVnd": "支出（VND）",
+      "impr": "表示回数",
+      "ctr": "CTR",
+      "clicks": "クリック",
+      "clear": "クリア",
+      "add": "追加"
+    },
+    "campaigns": {
+      "totalCampaigns": "総キャンペーン数",
+      "active": "アクティブ",
+      "totalSpent": "総支出",
+      "totalImpressions": "総表示回数"
+    },
+    "detail": {
+      "spent": "支出",
+      "impressions": "表示回数",
+      "clicks": "クリック数",
+      "ctr": "CTR",
+      "performanceBreakdown": "パフォーマンス詳細",
+      "reach": "リーチ",
+      "views": "閲覧数",
+      "engagements": "エンゲージメント",
+      "engagementRate": "エンゲージメント率",
+      "avgDwell": "平均滞在時間",
+      "budgetUsage": "予算使用率",
+      "campaignConfig": "キャンペーン設定",
+      "objective": "目標",
+      "adFormat": "広告フォーマット",
+      "boostPackage": "ブーストパッケージ",
+      "durationDays": "期間（日）",
+      "deliveryStateReason": "配信状態の理由",
+      "adminCancelReason": "管理者キャンセル理由",
+      "elapsedTotal": "経過 / 合計",
+      "reactionsSplit": "リアクション内訳",
+      "adCreativeAudience": "広告クリエイティブ & オーディエンス",
+      "primaryText": "メインテキスト",
+      "headline": "見出し",
+      "description": "説明",
+      "ctaButton": "CTAボタン",
+      "destinationUrl": "リンク先URL",
+      "locationTargeting": "場所ターゲティング",
+      "ageTargeting": "年齢ターゲティング",
+      "interests": "興味関心",
+      "campaignActions": "キャンペーンアクション",
+      "currentBoost": "現在のブースト",
+      "boostUpgrade": "ブーストアップグレード差額",
+      "extendDays": "日数延長パッケージ",
+      "needToPay": "今すぐ支払う金額",
+      "newTotalBudget": "新しい総予算",
+      "hideCampaign": {
+        "title": "このキャンペーンを非表示にしますか？",
+        "button": "キャンペーンを非表示"
+      },
+      "reopenCampaign": {
+        "title": "このキャンペーンを再開しますか？",
+        "button": "キャンペーンを再開"
+      },
+      "campaignName": "キャンペーン名",
+      "cta": "CTA",
+      "creativeMedia": "クリエイティブメディア",
+      "remove": "削除",
+      "cancel": "キャンセル"
+    },
+    "dashboard": {
+      "spentVnd": "支出（VND）",
+      "impr": "表示回数",
+      "ctr": "CTR",
+      "clicks": "クリック",
+      "totalBudget": "総予算",
+      "impressions": "表示回数",
+      "avgCtr": "平均CTR",
+      "activeCampaigns": "アクティブキャンペーン"
+    },
+    "payment": {
+      "sessionId": "セッションID",
+      "paymentStatus": "支払いステータス",
+      "amount": "金額"
+    }
+  }
+}

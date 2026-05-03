@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../../core/widgets/comment_sheet_widgets.dart';
 import '../profile/profile_screen.dart';
 import '../report/report_comment_sheet.dart';
@@ -782,10 +783,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         }
         return;
       case PostMenuAction.deletePost:
+        final lc = LanguageController.instance;
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Delete post',
-          message: 'This action cannot be undone.',
+          title: lc.t('home.deletePost.title'),
+          message: lc.t('common.cannotUndo'),
           confirmLabel: 'Delete',
           danger: true,
         );
@@ -826,17 +828,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           postId: post.id,
           authHeader: {'Authorization': 'Bearer $token'},
         );
-        if (reported) _showSnack('Report submitted');
+        if (reported) _showSnack(LanguageController.instance.t('post.detail.reportSubmitted'));
         return;
       case PostMenuAction.blockAccount:
         final userId = post.authorId;
         if (userId == null || userId.isEmpty) return;
         final username =
             post.authorUsername ?? post.author?.username ?? post.displayName;
+        final lc2 = LanguageController.instance;
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Block @$username?',
-          message: 'You will no longer see posts from this account.',
+          title: lc2.t('home.blockUser.title', {'username': username}),
+          message: lc2.t('home.blockUser.message'),
           confirmLabel: 'Block',
           danger: true,
         );
@@ -869,9 +872,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (commentsLocked) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comments are turned off for this post'),
-          backgroundColor: Color(0xFF1A2235),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.commentsTurnedOff')),
+          backgroundColor: const Color(0xFF1A2235),
         ),
       );
       return;
@@ -998,7 +1001,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 12 + MediaQuery.of(context).viewPadding.bottom,
               ),
               child: Text(
-                'Comments are turned off for this post.',
+                LanguageController.instance.t('post.detail.commentsTurnedOff'),
                 style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -1434,6 +1437,7 @@ class _CommentTileState extends State<_CommentTile> {
   }
 
   void _showCommentMenu() {
+    final lc = LanguageController.instance;
     final isReply = widget.depth > 0;
     final showTranslate =
         (widget.comment.lang != null &&
@@ -1459,24 +1463,24 @@ class _CommentTileState extends State<_CommentTile> {
       if (_isOwnComment) ...[
         CommentSheetAction(
           icon: Icons.edit_outlined,
-          label: 'Edit comment',
+          label: lc.t('post.detail.commentMenu.edit'),
           onTap: _onEditComment,
         ),
         CommentSheetAction(
           icon: Icons.delete_outline_rounded,
-          label: 'Delete comment',
+          label: lc.t('post.detail.commentMenu.delete'),
           onTap: _onDeleteComment,
           danger: true,
         ),
       ] else ...[
         CommentSheetAction(
           icon: Icons.flag_outlined,
-          label: 'Report comment',
+          label: lc.t('post.detail.commentMenu.report'),
           onTap: _onReportComment,
         ),
         CommentSheetAction(
           icon: Icons.block_rounded,
-          label: 'Block this user',
+          label: lc.t('post.detail.commentMenu.block'),
           onTap: _onBlockUser,
           danger: true,
         ),
@@ -1510,10 +1514,11 @@ class _CommentTileState extends State<_CommentTile> {
   }
 
   Future<void> _onDeleteComment() async {
+    final lc = LanguageController.instance;
     final confirmed = await showPostConfirmDialog(
       context,
-      title: 'Delete comment',
-      message: 'This will permanently delete your comment.',
+      title: lc.t('post.detail.deleteComment.title'),
+      message: lc.t('post.detail.deleteComment.message'),
       confirmLabel: 'Delete',
       danger: true,
     );
@@ -1526,19 +1531,19 @@ class _CommentTileState extends State<_CommentTile> {
       if (!mounted) return;
       widget.onDeleted?.call();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comment deleted'),
-          backgroundColor: Color(0xFF1A2235),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.commentDeleted')),
+          backgroundColor: const Color(0xFF1A2235),
+          duration: const Duration(seconds: 2),
         ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to delete comment'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.failedDeleteComment')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -1552,10 +1557,10 @@ class _CommentTileState extends State<_CommentTile> {
     ).then((reported) {
       if (!reported || !mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report submitted'),
-          backgroundColor: Color(0xFF1A2235),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.reportSubmitted')),
+          backgroundColor: const Color(0xFF1A2235),
+          duration: const Duration(seconds: 2),
         ),
       );
     });
@@ -1568,10 +1573,11 @@ class _CommentTileState extends State<_CommentTile> {
         widget.comment.author?.displayName ??
         'this user';
     if (userId == null) return;
+    final lc = LanguageController.instance;
     final confirmed = await showPostConfirmDialog(
       context,
-      title: 'Block $username?',
-      message: 'Blocking @$username will hide their content from you.',
+      title: lc.t('post.detail.blockUser.title', {'username': username}),
+      message: lc.t('post.detail.blockUser.message', {'username': username}),
       confirmLabel: 'Block',
       danger: true,
     );
@@ -1584,7 +1590,7 @@ class _CommentTileState extends State<_CommentTile> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Blocked $username'),
+          content: Text(LanguageController.instance.t('post.detail.blocked', {'username': username})),
           backgroundColor: const Color(0xFF1A2235),
           duration: const Duration(seconds: 2),
         ),
@@ -1592,10 +1598,10 @@ class _CommentTileState extends State<_CommentTile> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to block user'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.failedBlockUser')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -1622,10 +1628,10 @@ class _CommentTileState extends State<_CommentTile> {
       if (!mounted) return;
       setState(() => _isTranslating = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to translate comment'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.failedTranslate')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -2928,7 +2934,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
               : AppSemanticColors.light);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to post comment: $e'),
+          content: Text(LanguageController.instance.t('post.detail.failedPostComment', {'error': e.toString()})),
           backgroundColor: tokens.panelMuted,
         ),
       );

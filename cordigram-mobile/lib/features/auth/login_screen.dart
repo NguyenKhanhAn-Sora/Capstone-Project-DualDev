@@ -6,6 +6,7 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../../core/services/push_notification_service.dart';
 import '../home/home_screen.dart';
 import '../messages/call/dm_call_manager.dart';
@@ -463,7 +464,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   keyboardType: TextInputType.emailAddress,
                                   autofillHints: const [AutofillHints.email],
                                   decoration: _fieldDecoration(
-                                    label: 'Email',
+                                    label: LanguageController.instance.t('auth.login.email'),
                                     hint: 'you@example.com',
                                     icon: Icons.mail_outline_rounded,
                                   ),
@@ -484,7 +485,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   obscureText: !_showPassword,
                                   autofillHints: const [AutofillHints.password],
                                   decoration: _fieldDecoration(
-                                    label: 'Password',
+                                    label: LanguageController.instance.t('auth.login.password'),
                                     hint: 'Enter your password',
                                     icon: Icons.lock_outline_rounded,
                                     suffix: IconButton(
@@ -540,7 +541,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                         );
                                       },
-                                      child: const Text('Forgot password?'),
+                                      child: Text(LanguageController.instance.t('auth.login.forgotPassword')),
                                     ),
                                   ],
                                 ),
@@ -624,7 +625,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                             ),
                                           )
                                         : const _GoogleBadge(),
-                                    label: const Text('Continue with Google'),
+                                    label: Text(LanguageController.instance.t('auth.login.continueWithGoogle')),
                                     style: OutlinedButton.styleFrom(
                                       side: const BorderSide(
                                         color: Color(0xFFD7E5F2),
@@ -705,7 +706,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       vertical: 6,
                                     ),
                                   ),
-                                  child: const Text('Delete all'),
+                                  child: Text(LanguageController.instance.t('auth.login.deleteAll')),
                                 ),
                               ],
                             ),
@@ -918,7 +919,7 @@ class _RecentPasswordDialogState extends State<_RecentPasswordDialog> {
             autofocus: true,
             onSubmitted: (_) => _submit(),
             decoration: InputDecoration(
-              labelText: 'Password',
+              labelText: LanguageController.instance.t('auth.login.password'),
               suffixIcon: IconButton(
                 onPressed: () {
                   setState(() => _showPassword = !_showPassword);
@@ -951,9 +952,9 @@ class _RecentPasswordDialogState extends State<_RecentPasswordDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(LanguageController.instance.t('common.cancel')),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Log in')),
+        FilledButton(onPressed: _submit, child: Text(LanguageController.instance.t('auth.login.button'))),
       ],
     );
   }

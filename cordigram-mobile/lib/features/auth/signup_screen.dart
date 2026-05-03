@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../home/home_screen.dart';
 import '../messages/call/dm_call_manager.dart';
 
@@ -320,7 +321,7 @@ class _SignupScreenState extends State<SignupScreen> {
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Crop photo',
+            toolbarTitle: LanguageController.instance.t('auth.signup.cropPhoto'),
             toolbarColor: const Color(0xFF1F4F7A),
             toolbarWidgetColor: Colors.white,
             activeControlsWidgetColor: const Color(0xFF3470A2),
@@ -328,7 +329,7 @@ class _SignupScreenState extends State<SignupScreen> {
             lockAspectRatio: true,
           ),
           IOSUiSettings(
-            title: 'Crop photo',
+            title: LanguageController.instance.t('auth.signup.cropPhoto'),
             aspectRatioLockEnabled: true,
             resetAspectRatioEnabled: false,
           ),
@@ -599,7 +600,7 @@ class _SignupScreenState extends State<SignupScreen> {
         children: [
           _InputField(
             controller: _emailController,
-            label: 'Email address',
+            label: LanguageController.instance.t('auth.signup.emailAddress'),
             hint: 'email@example.com',
             icon: Icons.mail_outline_rounded,
             keyboardType: TextInputType.emailAddress,
@@ -714,7 +715,7 @@ class _SignupScreenState extends State<SignupScreen> {
           // Display name + Username side-by-side on wider screens, stacked on narrow
           _InputField(
             controller: _displayNameController,
-            label: 'Display name',
+            label: LanguageController.instance.t('auth.signup.displayName'),
             hint: 'E.g. Cordigrammer',
             icon: Icons.badge_outlined,
             onChanged: (_) => _clearError(),
@@ -733,7 +734,7 @@ class _SignupScreenState extends State<SignupScreen> {
           const SizedBox(height: 12),
           _InputField(
             controller: _usernameController,
-            label: 'Username',
+            label: LanguageController.instance.t('auth.signup.username'),
             hint: 'username',
             icon: Icons.alternate_email_rounded,
             onChanged: (_) {
@@ -764,7 +765,7 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 12),
             _PasswordField(
               controller: _passwordController,
-              label: 'Password',
+              label: LanguageController.instance.t('auth.signup.password'),
               hint: 'At least 8 characters',
               show: _showPassword,
               onToggle: () => setState(() => _showPassword = !_showPassword),
@@ -783,7 +784,7 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 12),
             _PasswordField(
               controller: _confirmPasswordController,
-              label: 'Confirm password',
+              label: LanguageController.instance.t('auth.signup.confirmPassword'),
               hint: 'Re-enter to confirm',
               show: _showConfirmPassword,
               onToggle: () =>
@@ -813,7 +814,7 @@ class _SignupScreenState extends State<SignupScreen> {
           const SizedBox(height: 12),
           _InputField(
             controller: _bioController,
-            label: 'Short bio (optional)',
+            label: LanguageController.instance.t('auth.signup.shortBio'),
             hint: 'Share a little about yourself',
             icon: Icons.edit_note_rounded,
             maxLines: 3,
@@ -870,7 +871,7 @@ class _SignupScreenState extends State<SignupScreen> {
         OutlinedButton.icon(
           onPressed: _loading ? null : _pickAndCropAvatar,
           icon: const Icon(Icons.photo_library_outlined, size: 18),
-          label: const Text('Choose from gallery'),
+          label: Text(LanguageController.instance.t('auth.signup.chooseFromGallery')),
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Color(0xFFD7E5F2)),
             foregroundColor: const Color(0xFF3470A2),
@@ -1474,8 +1475,8 @@ class _GoogleSignupButtonState extends State<_GoogleSignupButton> {
     } on PlatformException catch (e) {
       if (e.code != 'CANCELED' && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google sign-in failed. Please try again.'),
+          SnackBar(
+            content: Text(LanguageController.instance.t('auth.signup.googleSignInFailed')),
           ),
         );
       }
@@ -1483,8 +1484,8 @@ class _GoogleSignupButtonState extends State<_GoogleSignupButton> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google sign-in failed. Please try again.'),
+          SnackBar(
+            content: Text(LanguageController.instance.t('auth.signup.googleSignInFailed')),
           ),
         );
         setState(() => _loading = false);
@@ -1512,7 +1513,7 @@ class _GoogleSignupButtonState extends State<_GoogleSignupButton> {
                 width: 22,
                 height: 22,
               ),
-        label: const Text('Continue with Google'),
+        label: Text(LanguageController.instance.t('auth.signup.continueWithGoogle')),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFFD7E5F2)),
           foregroundColor: const Color(0xFF1F2937),

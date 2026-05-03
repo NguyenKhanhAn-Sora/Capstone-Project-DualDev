@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostMenuAction;
@@ -1376,8 +1377,8 @@ class _ItemPageState extends State<_ItemPage> {
       case PostMenuAction.deletePost:
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Delete reel',
-          message: 'This action cannot be undone.',
+          title: LanguageController.instance.t('profile.itemViewer.deleteReel.title'),
+          message: LanguageController.instance.t('common.cannotUndo'),
           confirmLabel: 'Delete',
           danger: true,
         );
@@ -1430,8 +1431,8 @@ class _ItemPageState extends State<_ItemPage> {
             'user';
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Block @$username?',
-          message: 'You will no longer see reels from this account.',
+          title: LanguageController.instance.t('profile.itemViewer.blockUser.title', {'username': username}),
+          message: LanguageController.instance.t('profile.itemViewer.blockUser.message'),
           confirmLabel: 'Block',
           danger: true,
         );
@@ -1478,12 +1479,13 @@ class _ItemPageState extends State<_ItemPage> {
     final allowComments = normalized['allowComments'] != false;
     final hideLike = _asBool(normalized['hideLikeCount']);
 
+    final lc = LanguageController.instance;
     final entries = <({String id, String label, bool danger})>[];
     if (isOwner) {
-      entries.add((id: 'editReel', label: 'Edit reel', danger: false));
+      entries.add((id: 'editReel', label: lc.t('profile.itemViewer.menu.editReel'), danger: false));
       entries.add((
         id: 'editVisibility',
-        label: 'Edit visibility',
+        label: lc.t('profile.itemViewer.menu.editVisibility'),
         danger: false,
       ));
       entries.add((
@@ -1496,25 +1498,25 @@ class _ItemPageState extends State<_ItemPage> {
         label: hideLike ? 'Show like' : 'Hide like',
         danger: false,
       ));
-      entries.add((id: 'muteReel', label: 'Mute this reel', danger: false));
+      entries.add((id: 'muteReel', label: lc.t('profile.itemViewer.menu.muteReel'), danger: false));
       if (canDownload) {
         entries.add((
           id: 'downloadReel',
-          label: 'Download this reel',
+          label: lc.t('profile.itemViewer.menu.download'),
           danger: false,
         ));
       }
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
-      entries.add((id: 'deleteReel', label: 'Delete reel', danger: true));
+      entries.add((id: 'copyLink', label: lc.t('profile.itemViewer.menu.copyLink'), danger: false));
+      entries.add((id: 'deleteReel', label: lc.t('profile.itemViewer.menu.deleteReel'), danger: true));
     } else {
       if (canDownload) {
         entries.add((
           id: 'downloadReel',
-          label: 'Download this reel',
+          label: lc.t('profile.itemViewer.menu.download'),
           danger: false,
         ));
       }
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'copyLink', label: lc.t('profile.itemViewer.menu.copyLink'), danger: false));
       entries.add((
         id: 'followToggle',
         label: _following ? 'Unfollow' : 'Follow',
@@ -1525,11 +1527,11 @@ class _ItemPageState extends State<_ItemPage> {
         label: _saved ? 'Unsave this reel' : 'Save this reel',
         danger: false,
       ));
-      entries.add((id: 'hideReel', label: 'Hide this reel', danger: false));
-      entries.add((id: 'reportReel', label: 'Report', danger: false));
+      entries.add((id: 'hideReel', label: lc.t('profile.itemViewer.menu.hideReel'), danger: false));
+      entries.add((id: 'reportReel', label: lc.t('profile.itemViewer.menu.report'), danger: false));
       entries.add((
         id: 'blockAccount',
-        label: 'Block this account',
+        label: lc.t('profile.itemViewer.menu.blockAccount'),
         danger: true,
       ));
     }
@@ -1817,7 +1819,7 @@ class _ItemPageState extends State<_ItemPage> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: const Text('View image'),
+                        child: Text(LanguageController.instance.t('common.viewImage')),
                       ),
                     ],
                   ),
@@ -2538,7 +2540,7 @@ class _ItemPageState extends State<_ItemPage> {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
-                                child: const Text('View image'),
+                                child: Text(LanguageController.instance.t('common.viewImage')),
                               ),
                             ],
                           ),

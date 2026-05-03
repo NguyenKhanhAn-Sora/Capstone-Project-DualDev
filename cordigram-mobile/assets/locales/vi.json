@@ -1,0 +1,609 @@
+{
+  "common": {
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "done": "Xong",
+    "retry": "Thử lại",
+    "back": "Quay lại",
+    "close": "Đóng",
+    "delete": "Xóa",
+    "edit": "Chỉnh sửa",
+    "report": "Báo cáo",
+    "block": "Chặn",
+    "enable": "Bật",
+    "refresh": "Làm mới",
+    "tryAgain": "Thử lại",
+    "seeMore": "Xem thêm",
+    "viewImage": "Xem ảnh",
+    "copyLink": "Sao chép liên kết",
+    "cannotUndo": "Hành động này không thể hoàn tác.",
+    "loadMore": "Tải thêm",
+    "clearAll": "Xóa tất cả",
+    "add": "Thêm",
+    "remove": "Xóa",
+    "send": "Gửi",
+    "updating": "Đang cập nhật...",
+    "clear": "Xóa",
+    "loading": "Đang tải..."
+  },
+  "settings": {
+    "system": {
+      "title": "Hệ thống",
+      "appearance": {
+        "title": "Giao diện",
+        "description": "Chuyển đổi giữa chế độ Tối và Sáng"
+      },
+      "language": {
+        "title": "Ngôn ngữ",
+        "description": "Chọn ngôn ngữ hiển thị ưa thích",
+        "options": {
+          "vi": "Tiếng Việt",
+          "en": "Tiếng Anh",
+          "ja": "Tiếng Nhật",
+          "zh": "Tiếng Trung"
+        }
+      }
+    },
+    "personalInfo": {
+      "displayName": "Tên hiển thị",
+      "username": "Tên người dùng",
+      "birthdate": "Ngày sinh",
+      "gender": "Giới tính",
+      "location": "Vị trí",
+      "workplace": "Nơi làm việc",
+      "bio": "Tiểu sử"
+    },
+    "profile": {
+      "profilePage": "Trang cá nhân",
+      "aboutThisUser": "Về người dùng này",
+      "followersList": "Danh sách người theo dõi",
+      "followingList": "Danh sách đang theo dõi",
+      "accountAge": "Tuổi tài khoản",
+      "followers": "Người theo dõi",
+      "publishedPosts": "Bài đã đăng",
+      "activePostingDays": "Ngày đăng bài tích cực (30 ngày)",
+      "avgEngagement": "Tương tác trung bình/bài (30 ngày)",
+      "recentViolations": "Vi phạm gần đây (90 ngày)"
+    },
+    "activity": {
+      "activityLog": "Nhật ký hoạt động",
+      "hiddenPosts": "Bài đã ẩn",
+      "blockedUsers": "Người dùng bị chặn"
+    },
+    "notifications": {
+      "pushNotifications": "Thông báo đẩy",
+      "muteNotifications": "Tắt thông báo"
+    },
+    "changeEmail": "Đổi email",
+    "editProfile": "Chỉnh sửa hồ sơ",
+    "refreshStatus": "Làm mới trạng thái",
+    "changePassword": "Đổi mật khẩu",
+    "viewDevices": "Xem thiết bị",
+    "unhide": "Bỏ ẩn",
+    "unblock": "Bỏ chặn",
+    "emailStep": {
+      "verifyPassword": "Bước 1 · Xác minh mật khẩu",
+      "currentOtp": "Bước 2 · OTP email hiện tại",
+      "enterNewEmail": "Bước 3 · Nhập email mới",
+      "newOtp": "Bước 4 · OTP email mới",
+      "completed": "Hoàn thành",
+      "emailOtp": "Bước 1 · OTP email",
+      "updatePassword": "Bước 2 · Cập nhật mật khẩu",
+      "changePasskey": "Bước 3 · Đổi passkey",
+      "setPasskey": "Bước 3 · Cài passkey"
+    },
+    "tab": {
+      "personalInfo": "Thông tin cá nhân",
+      "profile": "Hồ sơ",
+      "creatorVerification": "Xác minh nhà sáng tạo",
+      "passwordSecurity": "Mật khẩu & Bảo mật",
+      "content": "Nội dung",
+      "violations": "Trung tâm vi phạm",
+      "notifications": "Thông báo",
+      "system": "Hệ thống",
+      "personalInfoDesc": "Email tài khoản và thông tin cá nhân hiển thị trên hồ sơ của bạn.",
+      "profileDesc": "Kiểm soát ai có thể xem các phần hồ sơ và danh sách người theo dõi.",
+      "creatorVerificationDesc": "Kiểm tra điều kiện và yêu cầu xác minh huy hiệu nhà sáng tạo.",
+      "passwordSecurityDesc": "Quản lý mật khẩu, xác thực hai yếu tố, passkey và thiết bị đăng nhập.",
+      "contentDesc": "Xem nhật ký hoạt động, bài đã ẩn và người dùng bị chặn.",
+      "violationsDesc": "Xem các hành động kiểm duyệt và lịch sử cảnh báo của bạn.",
+      "notificationsDesc": "Kiểm soát thời điểm gửi thông báo.",
+      "systemDesc": "Quản lý giao diện ứng dụng và hành vi toàn cục."
+    }
+  },
+  "auth": {
+    "login": {
+      "email": "Email",
+      "password": "Mật khẩu",
+      "forgotPassword": "Quên mật khẩu?",
+      "continueWithGoogle": "Tiếp tục với Google",
+      "deleteAll": "Xóa tất cả",
+      "button": "Đăng nhập",
+      "cancel": "Hủy"
+    },
+    "signup": {
+      "cropPhoto": "Cắt ảnh",
+      "emailAddress": "Địa chỉ email",
+      "displayName": "Tên hiển thị",
+      "username": "Tên người dùng",
+      "password": "Mật khẩu",
+      "confirmPassword": "Xác nhận mật khẩu",
+      "shortBio": "Tiểu sử ngắn (tuỳ chọn)",
+      "chooseFromGallery": "Chọn từ thư viện",
+      "continueWithGoogle": "Tiếp tục với Google",
+      "googleSignInFailed": "Đăng nhập Google thất bại. Vui lòng thử lại."
+    },
+    "forgotPassword": {
+      "email": "Email",
+      "verificationCode": "Mã xác minh",
+      "newPassword": "Mật khẩu mới",
+      "confirmPassword": "Xác nhận mật khẩu",
+      "resendCode": "Gửi lại mã",
+      "otpResent": "Đã gửi lại OTP – kiểm tra hộp thư của bạn.",
+      "passwordUpdated": "Đã cập nhật mật khẩu! Vui lòng đăng nhập."
+    }
+  },
+  "home": {
+    "exitApp": "Nhấn Back lần nữa để thoát ứng dụng",
+    "savedItemsUnavailable": "Không thể mở mục đã lưu lúc này",
+    "deletePost": {
+      "title": "Xóa bài viết",
+      "message": "Hành động này không thể hoàn tác."
+    },
+    "blockUser": {
+      "title": "Chặn @{username}?",
+      "message": "Bạn sẽ không còn thấy bài viết từ tài khoản này."
+    },
+    "menu": {
+      "profile": "Trang cá nhân",
+      "settings": "Cài đặt",
+      "saved": "Đã lưu",
+      "ads": "Quảng cáo",
+      "reportProblem": "Báo cáo sự cố",
+      "logout": "Đăng xuất"
+    },
+    "visibility": {
+      "public": "Công khai",
+      "followers": "Người theo dõi",
+      "private": "Riêng tư",
+      "cancel": "Hủy",
+      "shareQuote": "Chia sẻ trích dẫn"
+    }
+  },
+  "post": {
+    "menu": {
+      "goToAds": "Đến quảng cáo",
+      "detailAds": "Chi tiết quảng cáo",
+      "copyLink": "Sao chép liên kết",
+      "editPost": "Chỉnh sửa bài viết",
+      "editVisibility": "Chỉnh sửa hiển thị",
+      "deletePost": "Xóa bài viết",
+      "report": "Báo cáo",
+      "blockAccount": "Chặn tài khoản này"
+    },
+    "actions": {
+      "like": "Thích",
+      "repost": "Đăng lại",
+      "save": "Lưu"
+    },
+    "downloadSuccess": "Đã tải xuống: {path}",
+    "downloadFailed": "Tải xuống media thất bại",
+    "create": {
+      "photos": "Ảnh",
+      "video": "Video",
+      "camera": "Máy ảnh",
+      "postNow": "Đăng ngay",
+      "postNowDescription": "Đăng ngay sau khi bạn nhấn hoàn thành.",
+      "schedule": "Lên lịch",
+      "scheduleDescription": "Tự động đăng vào thời gian bạn chọn.",
+      "date": "Ngày",
+      "time": "Giờ",
+      "allowComments": "Cho phép bình luận",
+      "allowDownload": "Cho phép tải xuống",
+      "hideLikeCount": "Ẩn số lượt thích",
+      "cancel": "Hủy",
+      "done": "Xong"
+    },
+    "createReel": {
+      "gallery": "Thư viện",
+      "camera": "Máy ảnh"
+    },
+    "createTab": {
+      "post": "Bài viết",
+      "reel": "Reel",
+      "live": "Trực tiếp"
+    },
+    "edit": {
+      "caption": "Chú thích",
+      "location": "Vị trí (tuỳ chọn)",
+      "hashtags": "Hashtag (vd: #âm nhạc #flutter)",
+      "allowComments": "Cho phép bình luận",
+      "allowDownload": "Cho phép tải xuống",
+      "hideLikeCount": "Ẩn số lượt thích",
+      "saveChanges": "Lưu thay đổi",
+      "saveVisibility": "Lưu hiển thị"
+    },
+    "detail": {
+      "commentsTurnedOff": "Bình luận đã bị tắt cho bài viết này",
+      "commentDeleted": "Đã xóa bình luận",
+      "failedDeleteComment": "Xóa bình luận thất bại",
+      "reportSubmitted": "Đã gửi báo cáo",
+      "blocked": "Đã chặn {username}",
+      "failedBlockUser": "Chặn người dùng thất bại",
+      "failedTranslate": "Dịch bình luận thất bại",
+      "failedPostComment": "Đăng bình luận thất bại: {error}",
+      "deleteComment": {
+        "title": "Xóa bình luận",
+        "message": "Bình luận này sẽ bị xóa vĩnh viễn."
+      },
+      "blockUser": {
+        "title": "Chặn {username}?",
+        "message": "Chặn @{username} sẽ ẩn nội dung của họ khỏi bạn."
+      },
+      "commentMenu": {
+        "edit": "Chỉnh sửa bình luận",
+        "delete": "Xóa bình luận",
+        "report": "Báo cáo bình luận",
+        "block": "Chặn người dùng này"
+      }
+    }
+  },
+  "reels": {
+    "commentsTurnedOff": "Bình luận đã bị tắt cho reel này",
+    "commentDeleted": "Đã xóa bình luận",
+    "failedDeleteComment": "Xóa bình luận thất bại",
+    "reportSubmitted": "Đã gửi báo cáo",
+    "blocked": "Đã chặn {username}",
+    "failedBlockUser": "Chặn người dùng thất bại",
+    "failedTranslate": "Dịch bình luận thất bại",
+    "failedPostComment": "Đăng bình luận thất bại: {error}",
+    "deleteReel": {
+      "title": "Xóa reel",
+      "message": "Hành động này không thể hoàn tác."
+    },
+    "blockUserConfirm": {
+      "title": "Chặn @{username}?",
+      "message": "Bạn sẽ không còn thấy reel từ tài khoản này."
+    },
+    "blockUserDialog": {
+      "title": "Chặn {username}?",
+      "message": "Chặn @{username} sẽ ẩn nội dung của họ khỏi bạn."
+    },
+    "deleteComment": {
+      "title": "Xóa bình luận",
+      "message": "Bình luận này sẽ bị xóa vĩnh viễn."
+    },
+    "menu": {
+      "editReel": "Chỉnh sửa reel",
+      "editVisibility": "Chỉnh sửa hiển thị",
+      "muteReel": "Tắt tiếng reel này",
+      "download": "Tải xuống reel này",
+      "copyLink": "Sao chép liên kết",
+      "deleteReel": "Xóa reel",
+      "hideReel": "Ẩn reel này",
+      "report": "Báo cáo",
+      "blockAccount": "Chặn tài khoản này"
+    },
+    "commentMenu": {
+      "edit": "Chỉnh sửa bình luận",
+      "delete": "Xóa bình luận",
+      "report": "Báo cáo bình luận",
+      "block": "Chặn người dùng này"
+    }
+  },
+  "profile": {
+    "cannotRender": {
+      "title": "Không thể hiển thị hồ sơ",
+      "message": "Dữ liệu hồ sơ không khả dụng. Vui lòng thử lại."
+    },
+    "cropPhoto": "Cắt ảnh",
+    "tabs": {
+      "posts": "Bài viết",
+      "followers": "Người theo dõi",
+      "following": "Đang theo dõi"
+    },
+    "editProfile": "Chỉnh sửa hồ sơ",
+    "updating": "Đang cập nhật...",
+    "message": "Nhắn tin",
+    "privateProfile": "Hồ sơ này là riêng tư",
+    "unableToLoad": "Không thể tải hồ sơ",
+    "fields": {
+      "displayName": "Tên hiển thị",
+      "username": "Tên người dùng",
+      "location": "Vị trí",
+      "workplace": "Nơi làm việc",
+      "birthday": "Ngày sinh",
+      "gender": "Giới tính"
+    },
+    "menu": {
+      "aboutUser": "Về người dùng này",
+      "block": "Chặn người dùng này",
+      "report": "Báo cáo",
+      "copyLink": "Sao chép liên kết"
+    },
+    "editSheet": {
+      "displayName": "Tên hiển thị",
+      "cancel": "Hủy",
+      "save": "Lưu"
+    },
+    "itemViewer": {
+      "deleteReel": {
+        "title": "Xóa reel",
+        "message": "Hành động này không thể hoàn tác."
+      },
+      "blockUser": {
+        "title": "Chặn @{username}?",
+        "message": "Bạn sẽ không còn thấy reel từ tài khoản này."
+      },
+      "menu": {
+        "editReel": "Chỉnh sửa reel",
+        "editVisibility": "Chỉnh sửa hiển thị",
+        "muteReel": "Tắt tiếng reel này",
+        "download": "Tải xuống reel này",
+        "copyLink": "Sao chép liên kết",
+        "deleteReel": "Xóa reel",
+        "hideReel": "Ẩn reel này",
+        "report": "Báo cáo",
+        "blockAccount": "Chặn tài khoản này"
+      }
+    }
+  },
+  "messages": {
+    "failedSend": "Không gửi được tin nhắn: {error}",
+    "failedSendVoice": "Không gửi được voice message: {error}",
+    "fileTooLarge": "File quá lớn (tối đa 25MB)",
+    "addOption": "Thêm phương án",
+    "hours": "{h} giờ",
+    "cancel": "Hủy",
+    "create": "Tạo",
+    "reopen": "Mở lại",
+    "startRecording": "Bắt đầu ghi",
+    "send": "Gửi",
+    "viewResults": "Xem kết quả",
+    "vote": "Bình chọn",
+    "leaveVoiceChannel": "Rời kênh thoại",
+    "microphonePermission": "Cần quyền microphone để ghi âm",
+    "goToServer": "Đi tới Máy chủ",
+    "retry": "Thử lại",
+    "muteNotifications": "Tắt thông báo tin nhắn",
+    "block": "Chặn",
+    "quickReaction": "Cảm xúc nhanh",
+    "imageUploadFailed": "Upload ảnh thất bại: {error}",
+    "failedCreateServer": "Không tạo được server: {error}",
+    "createNewServer": "Tạo server mới",
+    "serverNoChatChannel": "Server chưa có kênh chat để mở.",
+    "chatChannel": "Kênh chat",
+    "voiceChannel": "Kênh đàm thoại",
+    "voiceMessage": "Tin nhắn thoại",
+    "messageRecalled": "Tin nhắn đã được thu hồi",
+    "call": {
+      "reject": "Từ chối",
+      "leaveAndAccept": "Rời kênh và nhận",
+      "close": "Đóng"
+    }
+  },
+  "notifications": {
+    "tabs": {
+      "allActivity": "Tất cả hoạt động",
+      "likes": "Lượt thích",
+      "comments": "Bình luận",
+      "mentions": "Đề cập",
+      "followers": "Người theo dõi",
+      "system": "Hệ thống"
+    },
+    "cancel": "Hủy",
+    "done": "Xong"
+  },
+  "search": {
+    "clearAll": "Xóa tất cả",
+    "loadMore": "Tải thêm",
+    "deletePost": {
+      "title": "Xóa bài viết",
+      "message": "Hành động này không thể hoàn tác."
+    }
+  },
+  "explore": {
+    "viewImage": "Xem ảnh",
+    "refresh": "Làm mới",
+    "tryAgain": "Thử lại",
+    "retry": "Thử lại"
+  },
+  "hashtag": {
+    "viewImage": "Xem ảnh",
+    "retry": "Thử lại",
+    "refresh": "Làm mới",
+    "deletePost": {
+      "title": "Xóa bài viết",
+      "message": "Hành động này không thể hoàn tác."
+    },
+    "blockUser": {
+      "title": "Chặn @{username}?",
+      "message": "Bạn sẽ không còn thấy bài viết từ tài khoản này."
+    }
+  },
+  "following": {
+    "viewImage": "Xem ảnh",
+    "retry": "Thử lại",
+    "refresh": "Làm mới"
+  },
+  "livestream": {
+    "createdSuccessfully": "Tạo livestream thành công",
+    "openAppSettings": "Mở cài đặt ứng dụng",
+    "fields": {
+      "title": "Tiêu đề",
+      "description": "Mô tả (tuỳ chọn)",
+      "pinnedComment": "Bình luận ghim (tuỳ chọn)",
+      "location": "Vị trí (tuỳ chọn)"
+    },
+    "qualityPriority": "Ưu tiên chất lượng",
+    "balancedQuality": "Chất lượng cân bằng",
+    "lowLatency": "Độ trễ thấp",
+    "microphone": "Micro",
+    "camera": "Camera",
+    "hub": {
+      "adaptive": "Tự động",
+      "balanced": "Cân bằng",
+      "lowLatency": "Độ trễ thấp",
+      "endLive": "Kết thúc live",
+      "endLiveDialog": {
+        "title": "Kết thúc livestream?",
+        "cancel": "Hủy",
+        "confirm": "Kết thúc live"
+      },
+      "retryConnect": "Thử kết nối lại",
+      "back": "Quay lại",
+      "liveNow": "Đang live",
+      "noLivestream": "Hiện không có livestream nào đang hoạt động.",
+      "fields": {
+        "title": "Tiêu đề",
+        "description": "Mô tả",
+        "pinnedComment": "Bình luận ghim",
+        "location": "Vị trí"
+      }
+    }
+  },
+  "report": {
+    "submit": "Gửi báo cáo",
+    "post": {
+      "harassment": "Quấy rối / Ngôn ngữ thù ghét",
+      "targetsIndividual": "Nhắm vào cá nhân để quấy rối",
+      "hateSpeech": "Ngôn ngữ thù ghét hoặc phân biệt đối xử",
+      "violence": "Bạo lực / Đe dọa",
+      "threatenViolence": "Đe dọa hoặc kích động bạo lực",
+      "graphicViolence": "Hình ảnh bạo lực kinh dị",
+      "impersonation": "Mạo danh / Thông tin sai lệch",
+      "falseInfo": "Thông tin sai hoặc gây hiểu lầm",
+      "impersonatePerson": "Mạo danh cá nhân hoặc tổ chức",
+      "spam": "Spam / Lừa đảo",
+      "spamContent": "Nội dung spam hoặc không liên quan",
+      "financialScam": "Lừa đảo tài chính",
+      "other": "Khác",
+      "otherReason": "Lý do khác"
+    },
+    "user": {
+      "harassment": "Quấy rối / Thù ghét",
+      "harassmentBullying": "Quấy rối hoặc bắt nạt",
+      "hateSpeech": "Ngôn ngữ thù ghét hoặc xúc phạm",
+      "discrimination": "Phân biệt đối xử xúc phạm",
+      "threats": "Đe dọa / An toàn",
+      "violence": "Bạo lực hoặc đe dọa thể chất",
+      "graphicViolence": "Bạo lực kinh dị",
+      "selfHarm": "Khuyến khích tự làm hại bản thân",
+      "extremism": "Chủ nghĩa cực đoan hoặc khủng bố",
+      "impersonation": "Mạo danh / Gây hiểu lầm",
+      "impersonatingOther": "Giả vờ là người khác",
+      "fakeNews": "Tin giả hoặc thông tin sai lệch",
+      "spam": "Spam / Lừa đảo",
+      "spamMentions": "Spam hoặc đề cập hàng loạt",
+      "scam": "Lừa đảo hoặc gian lận",
+      "unwantedPromo": "Quảng cáo không mong muốn",
+      "privacy": "Vi phạm quyền riêng tư",
+      "privateInfo": "Chia sẻ thông tin riêng tư",
+      "intimateContent": "Nội dung thân mật không được đồng ý",
+      "other": "Khác",
+      "otherReason": "Lý do khác"
+    }
+  },
+  "ads": {
+    "packages": {
+      "light": "Boost Nhẹ",
+      "standard": "Boost Tiêu Chuẩn",
+      "strong": "Boost Mạnh"
+    },
+    "paymentVerified": "Xác minh thanh toán thành công.",
+    "paymentNotConfirmed": "Thanh toán chưa được xác nhận. Vui lòng thử lại.",
+    "formats": {
+      "singleImage": "Ảnh đơn",
+      "carousel": "Carousel",
+      "video": "Video"
+    },
+    "labels": {
+      "boostPackage": "Gói boost",
+      "durationPackage": "Gói thời gian",
+      "total": "Tổng cộng",
+      "status": "Trạng thái",
+      "statusFilter": "Lọc trạng thái",
+      "sortBy": "Sắp xếp theo",
+      "sortCampaigns": "Sắp xếp chiến dịch",
+      "from": "Từ",
+      "to": "Đến",
+      "spentVnd": "Chi tiêu (VND)",
+      "impr": "Hiển thị",
+      "ctr": "CTR",
+      "clicks": "Nhấp",
+      "clear": "Xóa",
+      "add": "Thêm"
+    },
+    "campaigns": {
+      "totalCampaigns": "Tổng chiến dịch",
+      "active": "Đang hoạt động",
+      "totalSpent": "Tổng chi tiêu",
+      "totalImpressions": "Tổng lượt hiển thị"
+    },
+    "detail": {
+      "spent": "Chi tiêu",
+      "impressions": "Lượt hiển thị",
+      "clicks": "Nhấp chuột",
+      "ctr": "CTR",
+      "performanceBreakdown": "Phân tích hiệu suất",
+      "reach": "Phạm vi tiếp cận",
+      "views": "Lượt xem",
+      "engagements": "Tương tác",
+      "engagementRate": "Tỷ lệ tương tác",
+      "avgDwell": "Thời gian xem TB",
+      "budgetUsage": "Sử dụng ngân sách",
+      "campaignConfig": "Cấu hình chiến dịch",
+      "objective": "Mục tiêu",
+      "adFormat": "Định dạng quảng cáo",
+      "boostPackage": "Gói boost",
+      "durationDays": "Số ngày",
+      "deliveryStateReason": "Lý do trạng thái phân phối",
+      "adminCancelReason": "Lý do hủy từ admin",
+      "elapsedTotal": "Đã qua / tổng",
+      "reactionsSplit": "Phân bổ cảm xúc",
+      "adCreativeAudience": "Sáng tạo & Đối tượng quảng cáo",
+      "primaryText": "Văn bản chính",
+      "headline": "Tiêu đề",
+      "description": "Mô tả",
+      "ctaButton": "Nút CTA",
+      "destinationUrl": "URL đích",
+      "locationTargeting": "Nhắm mục tiêu vị trí",
+      "ageTargeting": "Nhắm mục tiêu độ tuổi",
+      "interests": "Sở thích",
+      "campaignActions": "Hành động chiến dịch",
+      "currentBoost": "Boost hiện tại",
+      "boostUpgrade": "Chênh lệch nâng cấp boost",
+      "extendDays": "Gói gia hạn ngày",
+      "needToPay": "Cần thanh toán ngay",
+      "newTotalBudget": "Tổng ngân sách mới",
+      "hideCampaign": {
+        "title": "Ẩn chiến dịch này?",
+        "button": "Ẩn chiến dịch"
+      },
+      "reopenCampaign": {
+        "title": "Mở lại chiến dịch này?",
+        "button": "Mở lại chiến dịch"
+      },
+      "campaignName": "Tên chiến dịch",
+      "cta": "CTA",
+      "creativeMedia": "Media sáng tạo",
+      "remove": "Xóa",
+      "cancel": "Hủy"
+    },
+    "dashboard": {
+      "spentVnd": "Chi tiêu (VND)",
+      "impr": "Hiển thị",
+      "ctr": "CTR",
+      "clicks": "Nhấp",
+      "totalBudget": "Tổng ngân sách",
+      "impressions": "Lượt hiển thị",
+      "avgCtr": "CTR trung bình",
+      "activeCampaigns": "Chiến dịch đang hoạt động"
+    },
+    "payment": {
+      "sessionId": "ID phiên",
+      "paymentStatus": "Trạng thái thanh toán",
+      "amount": "Số tiền"
+    }
+  }
+}

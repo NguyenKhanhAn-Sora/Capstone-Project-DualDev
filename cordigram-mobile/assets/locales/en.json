@@ -1,0 +1,609 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "done": "Done",
+    "retry": "Retry",
+    "back": "Back",
+    "close": "Close",
+    "delete": "Delete",
+    "edit": "Edit",
+    "report": "Report",
+    "block": "Block",
+    "enable": "Enable",
+    "refresh": "Refresh",
+    "tryAgain": "Try again",
+    "seeMore": "See more",
+    "viewImage": "View image",
+    "copyLink": "Copy link",
+    "cannotUndo": "This action cannot be undone.",
+    "loadMore": "Load more",
+    "clearAll": "Clear all",
+    "add": "Add",
+    "remove": "Remove",
+    "send": "Send",
+    "updating": "Updating...",
+    "clear": "Clear",
+    "loading": "Loading..."
+  },
+  "settings": {
+    "system": {
+      "title": "System",
+      "appearance": {
+        "title": "Appearance",
+        "description": "Switch between Dark and Light mode"
+      },
+      "language": {
+        "title": "Language",
+        "description": "Select your preferred display language",
+        "options": {
+          "vi": "Vietnamese",
+          "en": "English",
+          "ja": "Japanese",
+          "zh": "Chinese"
+        }
+      }
+    },
+    "personalInfo": {
+      "displayName": "Display name",
+      "username": "Username",
+      "birthdate": "Birthdate",
+      "gender": "Gender",
+      "location": "Location",
+      "workplace": "Workplace",
+      "bio": "Bio"
+    },
+    "profile": {
+      "profilePage": "Profile page",
+      "aboutThisUser": "About this user",
+      "followersList": "Followers list",
+      "followingList": "Following list",
+      "accountAge": "Account age",
+      "followers": "Followers",
+      "publishedPosts": "Published posts",
+      "activePostingDays": "Active posting days (30d)",
+      "avgEngagement": "Avg engagement/post (30d)",
+      "recentViolations": "Recent violations (90d)"
+    },
+    "activity": {
+      "activityLog": "Activity log",
+      "hiddenPosts": "Hidden posts",
+      "blockedUsers": "Blocked users"
+    },
+    "notifications": {
+      "pushNotifications": "Push notifications",
+      "muteNotifications": "Mute notifications"
+    },
+    "changeEmail": "Change email",
+    "editProfile": "Edit profile",
+    "refreshStatus": "Refresh status",
+    "changePassword": "Change password",
+    "viewDevices": "View devices",
+    "unhide": "Unhide",
+    "unblock": "Unblock",
+    "emailStep": {
+      "verifyPassword": "Step 1 · Verify password",
+      "currentOtp": "Step 2 · Current email OTP",
+      "enterNewEmail": "Step 3 · Enter new email",
+      "newOtp": "Step 4 · New email OTP",
+      "completed": "Completed",
+      "emailOtp": "Step 1 · Email OTP",
+      "updatePassword": "Step 2 · Update password",
+      "changePasskey": "Step 3 · Change passkey",
+      "setPasskey": "Step 3 · Set passkey"
+    },
+    "tab": {
+      "personalInfo": "Personal Info",
+      "profile": "Profile",
+      "creatorVerification": "Creator verification",
+      "passwordSecurity": "Password & Security",
+      "content": "Content",
+      "violations": "Violation Center",
+      "notifications": "Notifications",
+      "system": "System",
+      "personalInfoDesc": "Account email and personal details shown on your profile.",
+      "profileDesc": "Control who can view profile sections and follower lists.",
+      "creatorVerificationDesc": "Check eligibility and request creator badge verification.",
+      "passwordSecurityDesc": "Manage password, two-factor, passkey, and login devices.",
+      "contentDesc": "Review activity log, hidden posts, and blocked users.",
+      "violationsDesc": "Review moderation actions and your strike history.",
+      "notificationsDesc": "Control when notification alerts are delivered.",
+      "systemDesc": "Manage app appearance and global behavior."
+    }
+  },
+  "auth": {
+    "login": {
+      "email": "Email",
+      "password": "Password",
+      "forgotPassword": "Forgot password?",
+      "continueWithGoogle": "Continue with Google",
+      "deleteAll": "Delete all",
+      "button": "Log in",
+      "cancel": "Cancel"
+    },
+    "signup": {
+      "cropPhoto": "Crop photo",
+      "emailAddress": "Email address",
+      "displayName": "Display name",
+      "username": "Username",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "shortBio": "Short bio (optional)",
+      "chooseFromGallery": "Choose from gallery",
+      "continueWithGoogle": "Continue with Google",
+      "googleSignInFailed": "Google sign-in failed. Please try again."
+    },
+    "forgotPassword": {
+      "email": "Email",
+      "verificationCode": "Verification code",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "resendCode": "Resend code",
+      "otpResent": "OTP resent – check your inbox.",
+      "passwordUpdated": "Password updated! Please sign in."
+    }
+  },
+  "home": {
+    "exitApp": "Press Back again to exit the app",
+    "savedItemsUnavailable": "Unable to open saved items right now",
+    "deletePost": {
+      "title": "Delete post",
+      "message": "This action cannot be undone."
+    },
+    "blockUser": {
+      "title": "Block @{username}?",
+      "message": "You will no longer see posts from this account."
+    },
+    "menu": {
+      "profile": "Profile",
+      "settings": "Settings",
+      "saved": "Saved",
+      "ads": "Ads",
+      "reportProblem": "Report a problem",
+      "logout": "Log out"
+    },
+    "visibility": {
+      "public": "Public",
+      "followers": "Followers",
+      "private": "Private",
+      "cancel": "Cancel",
+      "shareQuote": "Share quote"
+    }
+  },
+  "post": {
+    "menu": {
+      "goToAds": "Go to ads",
+      "detailAds": "Detail ads",
+      "copyLink": "Copy link",
+      "editPost": "Edit post",
+      "editVisibility": "Edit visibility",
+      "deletePost": "Delete post",
+      "report": "Report",
+      "blockAccount": "Block this account"
+    },
+    "actions": {
+      "like": "Like",
+      "repost": "Repost",
+      "save": "Save"
+    },
+    "downloadSuccess": "Downloaded: {path}",
+    "downloadFailed": "Failed to download media",
+    "create": {
+      "photos": "Photos",
+      "video": "Video",
+      "camera": "Camera",
+      "postNow": "Post now",
+      "postNowDescription": "Publish immediately after you tap finish.",
+      "schedule": "Schedule",
+      "scheduleDescription": "Post automatically at your chosen time.",
+      "date": "Date",
+      "time": "Time",
+      "allowComments": "Allow comments",
+      "allowDownload": "Allow download",
+      "hideLikeCount": "Hide like count",
+      "cancel": "Cancel",
+      "done": "Done"
+    },
+    "createReel": {
+      "gallery": "Gallery",
+      "camera": "Camera"
+    },
+    "createTab": {
+      "post": "Post",
+      "reel": "Reel",
+      "live": "Live"
+    },
+    "edit": {
+      "caption": "Caption",
+      "location": "Location (optional)",
+      "hashtags": "Hashtags (e.g. #music #flutter)",
+      "allowComments": "Allow comments",
+      "allowDownload": "Allow download",
+      "hideLikeCount": "Hide like count",
+      "saveChanges": "Save changes",
+      "saveVisibility": "Save visibility"
+    },
+    "detail": {
+      "commentsTurnedOff": "Comments are turned off for this post",
+      "commentDeleted": "Comment deleted",
+      "failedDeleteComment": "Failed to delete comment",
+      "reportSubmitted": "Report submitted",
+      "blocked": "Blocked {username}",
+      "failedBlockUser": "Failed to block user",
+      "failedTranslate": "Failed to translate comment",
+      "failedPostComment": "Failed to post comment: {error}",
+      "deleteComment": {
+        "title": "Delete comment",
+        "message": "This will permanently delete your comment."
+      },
+      "blockUser": {
+        "title": "Block {username}?",
+        "message": "Blocking @{username} will hide their content from you."
+      },
+      "commentMenu": {
+        "edit": "Edit comment",
+        "delete": "Delete comment",
+        "report": "Report comment",
+        "block": "Block this user"
+      }
+    }
+  },
+  "reels": {
+    "commentsTurnedOff": "Comments are turned off for this reel",
+    "commentDeleted": "Comment deleted",
+    "failedDeleteComment": "Failed to delete comment",
+    "reportSubmitted": "Report submitted",
+    "blocked": "Blocked {username}",
+    "failedBlockUser": "Failed to block user",
+    "failedTranslate": "Failed to translate comment",
+    "failedPostComment": "Failed to post comment: {error}",
+    "deleteReel": {
+      "title": "Delete reel",
+      "message": "This action cannot be undone."
+    },
+    "blockUserConfirm": {
+      "title": "Block @{username}?",
+      "message": "You will no longer see reels from this account."
+    },
+    "blockUserDialog": {
+      "title": "Block {username}?",
+      "message": "Blocking @{username} will hide their content from you."
+    },
+    "deleteComment": {
+      "title": "Delete comment",
+      "message": "This will permanently delete your comment."
+    },
+    "menu": {
+      "editReel": "Edit reel",
+      "editVisibility": "Edit visibility",
+      "muteReel": "Mute this reel",
+      "download": "Download this reel",
+      "copyLink": "Copy link",
+      "deleteReel": "Delete reel",
+      "hideReel": "Hide this reel",
+      "report": "Report",
+      "blockAccount": "Block this account"
+    },
+    "commentMenu": {
+      "edit": "Edit comment",
+      "delete": "Delete comment",
+      "report": "Report comment",
+      "block": "Block this user"
+    }
+  },
+  "profile": {
+    "cannotRender": {
+      "title": "Cannot render profile",
+      "message": "Profile data is unavailable. Please try again."
+    },
+    "cropPhoto": "Crop photo",
+    "tabs": {
+      "posts": "Posts",
+      "followers": "Followers",
+      "following": "Following"
+    },
+    "editProfile": "Edit profile",
+    "updating": "Updating...",
+    "message": "Message",
+    "privateProfile": "This profile is private",
+    "unableToLoad": "Unable to load profile",
+    "fields": {
+      "displayName": "Display name",
+      "username": "Username",
+      "location": "Location",
+      "workplace": "Workplace",
+      "birthday": "Birthday",
+      "gender": "Gender"
+    },
+    "menu": {
+      "aboutUser": "About this user",
+      "block": "Block this user",
+      "report": "Report",
+      "copyLink": "Copy link"
+    },
+    "editSheet": {
+      "displayName": "Display Name",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "itemViewer": {
+      "deleteReel": {
+        "title": "Delete reel",
+        "message": "This action cannot be undone."
+      },
+      "blockUser": {
+        "title": "Block @{username}?",
+        "message": "You will no longer see reels from this account."
+      },
+      "menu": {
+        "editReel": "Edit reel",
+        "editVisibility": "Edit visibility",
+        "muteReel": "Mute this reel",
+        "download": "Download this reel",
+        "copyLink": "Copy link",
+        "deleteReel": "Delete reel",
+        "hideReel": "Hide this reel",
+        "report": "Report",
+        "blockAccount": "Block this account"
+      }
+    }
+  },
+  "messages": {
+    "failedSend": "Unable to send message: {error}",
+    "failedSendVoice": "Unable to send voice message: {error}",
+    "fileTooLarge": "File too large (max 25MB)",
+    "addOption": "Add option",
+    "hours": "{h} hours",
+    "cancel": "Cancel",
+    "create": "Create",
+    "reopen": "Reopen",
+    "startRecording": "Start recording",
+    "send": "Send",
+    "viewResults": "View results",
+    "vote": "Vote",
+    "leaveVoiceChannel": "Leave voice channel",
+    "microphonePermission": "Microphone permission required for recording",
+    "goToServer": "Go to Server",
+    "retry": "Retry",
+    "muteNotifications": "Mute message notifications",
+    "block": "Block",
+    "quickReaction": "Quick reaction",
+    "imageUploadFailed": "Image upload failed: {error}",
+    "failedCreateServer": "Unable to create server: {error}",
+    "createNewServer": "Create new server",
+    "serverNoChatChannel": "Server has no chat channel to open.",
+    "chatChannel": "Chat channel",
+    "voiceChannel": "Voice channel",
+    "voiceMessage": "Voice message",
+    "messageRecalled": "Message has been recalled",
+    "call": {
+      "reject": "Reject",
+      "leaveAndAccept": "Leave channel and accept",
+      "close": "Close"
+    }
+  },
+  "notifications": {
+    "tabs": {
+      "allActivity": "All activity",
+      "likes": "Likes",
+      "comments": "Comments",
+      "mentions": "Mentions",
+      "followers": "Followers",
+      "system": "System"
+    },
+    "cancel": "Cancel",
+    "done": "Done"
+  },
+  "search": {
+    "clearAll": "Clear all",
+    "loadMore": "Load more",
+    "deletePost": {
+      "title": "Delete post",
+      "message": "This action cannot be undone."
+    }
+  },
+  "explore": {
+    "viewImage": "View image",
+    "refresh": "Refresh",
+    "tryAgain": "Try again",
+    "retry": "Retry"
+  },
+  "hashtag": {
+    "viewImage": "View image",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "deletePost": {
+      "title": "Delete post",
+      "message": "This action cannot be undone."
+    },
+    "blockUser": {
+      "title": "Block @{username}?",
+      "message": "You will no longer see posts from this account."
+    }
+  },
+  "following": {
+    "viewImage": "View image",
+    "retry": "Retry",
+    "refresh": "Refresh"
+  },
+  "livestream": {
+    "createdSuccessfully": "Livestream created successfully",
+    "openAppSettings": "Open app settings",
+    "fields": {
+      "title": "Title",
+      "description": "Description (optional)",
+      "pinnedComment": "Pinned comment (optional)",
+      "location": "Location (optional)"
+    },
+    "qualityPriority": "Quality priority",
+    "balancedQuality": "Balanced quality",
+    "lowLatency": "Low latency",
+    "microphone": "Microphone",
+    "camera": "Camera",
+    "hub": {
+      "adaptive": "Adaptive",
+      "balanced": "Balanced",
+      "lowLatency": "Low latency",
+      "endLive": "End live",
+      "endLiveDialog": {
+        "title": "End livestream?",
+        "cancel": "Cancel",
+        "confirm": "End live"
+      },
+      "retryConnect": "Retry connect",
+      "back": "Back",
+      "liveNow": "Live now",
+      "noLivestream": "No livestream is active right now.",
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "pinnedComment": "Pinned comment",
+        "location": "Location"
+      }
+    }
+  },
+  "report": {
+    "submit": "Submit report",
+    "post": {
+      "harassment": "Harassment / Hate speech",
+      "targetsIndividual": "Targets an individual to harass",
+      "hateSpeech": "Hate speech or discrimination",
+      "violence": "Violence / Threats",
+      "threatenViolence": "Threatens or promotes violence",
+      "graphicViolence": "Graphic violent imagery",
+      "impersonation": "Impersonation / Misinformation",
+      "falseInfo": "False or misleading information",
+      "impersonatePerson": "Impersonation of a person or organization",
+      "spam": "Spam / Scam",
+      "spamContent": "Spam or irrelevant content",
+      "financialScam": "Financial scam",
+      "other": "Other",
+      "otherReason": "Other reason"
+    },
+    "user": {
+      "harassment": "Harassment / Hate",
+      "harassmentBullying": "Harassment or bullying",
+      "hateSpeech": "Hate speech or slurs",
+      "discrimination": "Offensive discrimination",
+      "threats": "Threats / Safety",
+      "violence": "Violence or physical threats",
+      "graphicViolence": "Graphic violence",
+      "selfHarm": "Encouraging self-harm",
+      "extremism": "Extremism or terrorism",
+      "impersonation": "Impersonation / Misleading",
+      "impersonatingOther": "Pretending to be someone else",
+      "fakeNews": "Fake news or misinformation",
+      "spam": "Spam / Scam",
+      "spamMentions": "Spam or mass mentions",
+      "scam": "Scam or fraud",
+      "unwantedPromo": "Unwanted promotions",
+      "privacy": "Privacy violation",
+      "privateInfo": "Sharing private information",
+      "intimateContent": "Non-consensual intimate content",
+      "other": "Other",
+      "otherReason": "Other reason"
+    }
+  },
+  "ads": {
+    "packages": {
+      "light": "Light Boost",
+      "standard": "Standard Boost",
+      "strong": "Strong Boost"
+    },
+    "paymentVerified": "Payment verified successfully.",
+    "paymentNotConfirmed": "Payment not confirmed. Please try again.",
+    "formats": {
+      "singleImage": "Single image",
+      "carousel": "Carousel",
+      "video": "Video"
+    },
+    "labels": {
+      "boostPackage": "Boost package",
+      "durationPackage": "Duration package",
+      "total": "Total",
+      "status": "Status",
+      "statusFilter": "Status filter",
+      "sortBy": "Sort by",
+      "sortCampaigns": "Sort campaigns",
+      "from": "From",
+      "to": "To",
+      "spentVnd": "Spent (VND)",
+      "impr": "Impr.",
+      "ctr": "CTR",
+      "clicks": "Clicks",
+      "clear": "Clear",
+      "add": "Add"
+    },
+    "campaigns": {
+      "totalCampaigns": "Total campaigns",
+      "active": "Active",
+      "totalSpent": "Total spent",
+      "totalImpressions": "Total impressions"
+    },
+    "detail": {
+      "spent": "Spent",
+      "impressions": "Impressions",
+      "clicks": "Clicks",
+      "ctr": "CTR",
+      "performanceBreakdown": "Performance Breakdown",
+      "reach": "Reach",
+      "views": "Views",
+      "engagements": "Engagements",
+      "engagementRate": "Engagement rate",
+      "avgDwell": "Avg dwell",
+      "budgetUsage": "Budget usage",
+      "campaignConfig": "Campaign Configuration",
+      "objective": "Objective",
+      "adFormat": "Ad format",
+      "boostPackage": "Boost package",
+      "durationDays": "Duration days",
+      "deliveryStateReason": "Delivery state reason",
+      "adminCancelReason": "Admin cancellation reason",
+      "elapsedTotal": "Elapsed / total",
+      "reactionsSplit": "Reactions split",
+      "adCreativeAudience": "Ad Creative & Audience",
+      "primaryText": "Primary text",
+      "headline": "Headline",
+      "description": "Description",
+      "ctaButton": "CTA button",
+      "destinationUrl": "Destination URL",
+      "locationTargeting": "Location targeting",
+      "ageTargeting": "Age targeting",
+      "interests": "Interests",
+      "campaignActions": "Campaign Actions",
+      "currentBoost": "Current boost",
+      "boostUpgrade": "Boost upgrade difference",
+      "extendDays": "Extend days package",
+      "needToPay": "Need to pay now",
+      "newTotalBudget": "New total budget",
+      "hideCampaign": {
+        "title": "Hide this campaign?",
+        "button": "Hide Campaign"
+      },
+      "reopenCampaign": {
+        "title": "Reopen this campaign?",
+        "button": "Reopen Campaign"
+      },
+      "campaignName": "Campaign name",
+      "cta": "CTA",
+      "creativeMedia": "Creative media",
+      "remove": "Remove",
+      "cancel": "Cancel"
+    },
+    "dashboard": {
+      "spentVnd": "Spent (VND)",
+      "impr": "Impr.",
+      "ctr": "CTR",
+      "clicks": "Clicks",
+      "totalBudget": "Total budget",
+      "impressions": "Impressions",
+      "avgCtr": "Average CTR",
+      "activeCampaigns": "Active campaigns"
+    },
+    "payment": {
+      "sessionId": "Session ID",
+      "paymentStatus": "Payment status",
+      "amount": "Amount"
+    }
+  }
+}

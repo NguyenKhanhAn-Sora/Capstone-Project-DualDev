@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import '../models/feed_post.dart';
+import '../../../core/services/language_controller.dart';
 
 bool _isVideoMediaType(String type) {
   final normalized = type.trim().toLowerCase();
@@ -158,18 +159,20 @@ class _MediaCarouselState extends State<MediaCarousel> {
       await file.writeAsBytes(bytes, flush: true);
 
       if (!mounted) return;
+      final lc = LanguageController.instance;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Downloaded: ${file.path}'),
+          content: Text(lc.t('post.downloadSuccess', {'path': file.path})),
           backgroundColor: const Color(0xFF1A2235),
         ),
       );
     } catch (_) {
       if (!mounted) return;
+      final lc = LanguageController.instance;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to download media'),
-          backgroundColor: Color(0xFFB91C1C),
+        SnackBar(
+          content: Text(lc.t('post.downloadFailed')),
+          backgroundColor: const Color(0xFFB91C1C),
         ),
       );
     }
@@ -312,7 +315,7 @@ class _MediaCarouselState extends State<MediaCarousel> {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
-                                child: const Text('View image'),
+                                child: Text(LanguageController.instance.t('common.viewImage')),
                               ),
                             ],
                           ),
@@ -647,7 +650,7 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
-                                child: const Text('View image'),
+                                child: Text(LanguageController.instance.t('common.viewImage')),
                               ),
                             ],
                           ),

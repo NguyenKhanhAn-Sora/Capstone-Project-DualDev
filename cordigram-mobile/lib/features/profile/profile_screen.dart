@@ -6,6 +6,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../post/post_detail_screen.dart';
 import '../report/report_user_sheet.dart';
 import '../settings/settings_screen.dart';
@@ -880,7 +881,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             _MoreMenuItem(
               icon: Icons.info_outline_rounded,
-              label: 'About this user',
+              label: LanguageController.instance.t('profile.menu.aboutUser'),
               onTap: () {
                 Navigator.pop(context);
                 _showAboutSheet();
@@ -888,7 +889,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             _MoreMenuItem(
               icon: Icons.block_rounded,
-              label: 'Block this user',
+              label: LanguageController.instance.t('profile.menu.block'),
               onTap: () {
                 Navigator.pop(context);
                 _onBlockUser();
@@ -896,7 +897,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             _MoreMenuItem(
               icon: Icons.flag_outlined,
-              label: 'Report',
+              label: LanguageController.instance.t('profile.menu.report'),
               onTap: () {
                 Navigator.pop(context);
                 _onReportUser();
@@ -904,7 +905,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             _MoreMenuItem(
               icon: Icons.link_rounded,
-              label: 'Copy link',
+              label: LanguageController.instance.t('profile.menu.copyLink'),
               onTap: () {
                 Navigator.pop(context);
                 _showToast('Link copied (coming soon)');
@@ -1057,19 +1058,19 @@ class _ProfileScreenState extends State<ProfileScreen>
             const SizedBox(height: 16),
             _AboutRow(
               icon: Icons.badge_outlined,
-              label: 'Display name',
+              label: LanguageController.instance.t('profile.fields.displayName'),
               value: p.displayName,
               muted: false,
             ),
             _AboutRow(
               icon: Icons.alternate_email_rounded,
-              label: 'Username',
+              label: LanguageController.instance.t('profile.fields.username'),
               value: '@${p.username}',
               muted: false,
             ),
             _buildAboutField(
               icon: Icons.location_on_outlined,
-              label: 'Location',
+              label: LanguageController.instance.t('profile.fields.location'),
               value: p.location,
               visibility: vis?.location,
               isOwner: isOwner,
@@ -1077,7 +1078,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             _buildAboutField(
               icon: Icons.business_center_outlined,
-              label: 'Workplace',
+              label: LanguageController.instance.t('profile.fields.workplace'),
               value: p.workplace?.companyName,
               visibility: vis?.workplace,
               isOwner: isOwner,
@@ -1085,7 +1086,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             _buildAboutField(
               icon: Icons.cake_outlined,
-              label: 'Birthday',
+              label: LanguageController.instance.t('profile.fields.birthday'),
               value: _formatBirthdate(p.birthdate),
               visibility: vis?.birthdate,
               isOwner: isOwner,
@@ -1093,7 +1094,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             _buildAboutField(
               icon: Icons.person_outline_rounded,
-              label: 'Gender',
+              label: LanguageController.instance.t('profile.fields.gender'),
               value: _formatGender(p.gender),
               visibility: vis?.gender,
               isOwner: isOwner,
@@ -1150,7 +1151,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         body: _SpecialStateView(
           icon: Icons.error_outline_rounded,
           iconColor: _danger,
-          title: 'Cannot render profile',
+          title: LanguageController.instance.t('profile.cannotRender.title'),
           body: e.toString(),
           buttonLabel: 'Retry',
           onButton: _loadProfile,
@@ -1217,7 +1218,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   fontWeight: FontWeight.w400,
                 ),
                 tabs: [
-                  const Tab(text: 'Posts'),
+                  Tab(text: LanguageController.instance.t('profile.tabs.posts')),
                   const Tab(text: 'Reels'),
                   if (isOwner) const Tab(text: 'Saved'),
                   const Tab(text: 'Repost'),
@@ -1607,7 +1608,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Crop photo',
+            toolbarTitle: LanguageController.instance.t('profile.cropPhoto'),
             toolbarColor: const Color(0xFF1F4F7A),
             toolbarWidgetColor: Colors.white,
             activeControlsWidgetColor: const Color(0xFF3470A2),
@@ -1615,7 +1616,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             lockAspectRatio: true,
           ),
           IOSUiSettings(
-            title: 'Crop photo',
+            title: LanguageController.instance.t('profile.cropPhoto'),
             aspectRatioLockEnabled: true,
             resetAspectRatioEnabled: false,
           ),
@@ -1772,13 +1773,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       child: Row(
         children: [
           _StatCard(
-            label: 'Posts',
+            label: LanguageController.instance.t('profile.tabs.posts'),
             value: _formatCount(totalPosts),
             onTap: null,
           ),
           const SizedBox(width: 10),
           _StatCard(
-            label: 'Followers',
+            label: LanguageController.instance.t('profile.tabs.followers'),
             value: canFollowers ? _formatCount(p.stats.followers) : '—',
             onTap: canFollowers
                 ? () => _openFollowSheet(p, FollowTab.followers)
@@ -1789,7 +1790,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           const SizedBox(width: 10),
           _StatCard(
-            label: 'Following',
+            label: LanguageController.instance.t('profile.tabs.following'),
             value: canFollowing ? _formatCount(p.stats.following) : '—',
             onTap: canFollowing
                 ? () => _openFollowSheet(p, FollowTab.following)
@@ -1818,7 +1819,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         Expanded(
           flex: 3,
           child: _PrimaryButton(
-            label: 'Edit profile',
+            label: LanguageController.instance.t('profile.editProfile'),
             onTap: () {
               showProfileEditSheet(
                 context,
@@ -1856,7 +1857,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           flex: 3,
           child: _followLoading
               ? _PrimaryButton(
-                  label: 'Updating...',
+                  label: LanguageController.instance.t('profile.updating'),
                   onTap: null,
                   ghost: p.isFollowing,
                   followStyle: true,
@@ -1872,7 +1873,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         Expanded(
           flex: 2,
           child: _SecondaryButton(
-            label: 'Message',
+            label: LanguageController.instance.t('profile.message'),
             onTap: () => _showToast('Messaging coming soon'),
           ),
         ),
@@ -2143,7 +2144,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return _SpecialStateView(
       icon: Icons.lock_rounded,
       iconColor: _accent,
-      title: 'This profile is private',
+      title: LanguageController.instance.t('profile.privateProfile'),
       body:
           'The owner has limited access to their profile. Follow requests may be required to view their content.',
       buttonLabel: 'Go back',
@@ -2155,7 +2156,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return _SpecialStateView(
       icon: Icons.error_outline_rounded,
       iconColor: _danger,
-      title: 'Unable to load profile',
+      title: LanguageController.instance.t('profile.unableToLoad'),
       body: message ?? _error ?? 'Something went wrong',
       buttonLabel: 'Retry',
       onButton: _loadProfile,

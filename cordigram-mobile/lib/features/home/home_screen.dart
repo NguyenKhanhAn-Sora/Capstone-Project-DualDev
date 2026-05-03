@@ -40,6 +40,7 @@ import 'services/feed_service.dart';
 import 'services/post_interaction_service.dart';
 import 'widgets/post_card.dart';
 import 'widgets/people_you_may_know.dart';
+import '../../core/services/language_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -336,12 +337,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     _lastBackPressedAt = now;
     if (mounted) {
+      final lc = LanguageController.instance;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Nhấn Back lần nữa để thoát ứng dụng'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(lc.t('home.exitApp')),
+            duration: const Duration(seconds: 2),
           ),
         );
     }
@@ -1093,10 +1095,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _showSnack('Link copied');
         return;
       case PostMenuAction.deletePost:
+        final lc = LanguageController.instance;
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Delete post',
-          message: 'This action cannot be undone.',
+          title: lc.t('home.deletePost.title'),
+          message: lc.t('common.cannotUndo'),
           confirmLabel: 'Delete',
           danger: true,
         );
@@ -1144,10 +1147,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (userId == null || userId.isEmpty) return;
         final username =
             post.authorUsername ?? post.author?.username ?? post.displayName;
+        final lc2 = LanguageController.instance;
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Block @$username?',
-          message: 'You will no longer see posts from this account.',
+          title: lc2.t('home.blockUser.title', {'username': username}),
+          message: lc2.t('home.blockUser.message'),
           confirmLabel: 'Block',
           danger: true,
         );
@@ -1739,8 +1743,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Unable to open saved items right now'),
+              SnackBar(
+                content: Text(LanguageController.instance.t('home.savedItemsUnavailable')),
               ),
             );
           }
@@ -2436,6 +2440,7 @@ class _ProfileMenuSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final lc = LanguageController.instance;
     return SafeArea(
       child: SingleChildScrollView(
         child: Column(
@@ -2503,17 +2508,17 @@ class _ProfileMenuSheet extends StatelessWidget {
             Divider(color: scheme.outline, height: 1),
             _SheetItem(
               icon: Icons.person_outline_rounded,
-              label: 'Profile',
+              label: lc.t('home.menu.profile'),
               onTap: onProfile,
             ),
             _SheetItem(
               icon: Icons.settings_outlined,
-              label: 'Settings',
+              label: lc.t('home.menu.settings'),
               onTap: onSettings,
             ),
             _SheetItem(
               icon: Icons.bookmark_border_rounded,
-              label: 'Saved',
+              label: lc.t('home.menu.saved'),
               onTap: onSaved,
             ),
             AnimatedBuilder(
@@ -2533,17 +2538,17 @@ class _ProfileMenuSheet extends StatelessWidget {
             ),
             _SheetItem(
               icon: Icons.campaign_outlined,
-              label: 'Ads',
+              label: lc.t('home.menu.ads'),
               onTap: onAds,
             ),
             _SheetItem(
               icon: Icons.flag_outlined,
-              label: 'Report a problem',
+              label: lc.t('home.menu.reportProblem'),
               onTap: onReportProblem,
             ),
             _SheetItem(
               icon: Icons.logout_rounded,
-              label: 'Log out',
+              label: lc.t('home.menu.logout'),
               labelColor: const Color(0xFFE53935),
               iconColor: const Color(0xFFE53935),
               onTap: onLogout,
@@ -2717,6 +2722,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final lc = LanguageController.instance;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return SafeArea(
       top: false,
@@ -2763,13 +2769,13 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _visibility,
-                items: const [
-                  DropdownMenuItem(value: 'public', child: Text('Public')),
+                items: [
+                  DropdownMenuItem(value: 'public', child: Text(lc.t('home.visibility.public'))),
                   DropdownMenuItem(
                     value: 'followers',
-                    child: Text('Followers'),
+                    child: Text(lc.t('home.visibility.followers')),
                   ),
-                  DropdownMenuItem(value: 'private', child: Text('Private')),
+                  DropdownMenuItem(value: 'private', child: Text(lc.t('home.visibility.private'))),
                 ],
                 dropdownColor: const Color(0xFF111C37),
                 iconEnabledColor: const Color(0xFF9BAECF),
@@ -2824,7 +2830,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                         foregroundColor: const Color(0xFFE8ECF8),
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
-                      child: const Text('Cancel'),
+                      child: Text(lc.t('common.cancel')),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -2847,7 +2853,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
-                      child: const Text('Share quote'),
+                      child: Text(lc.t('home.visibility.shareQuote')),
                     ),
                   ),
                 ],
