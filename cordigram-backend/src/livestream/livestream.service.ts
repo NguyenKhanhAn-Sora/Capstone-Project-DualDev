@@ -214,26 +214,23 @@ export class LivestreamService {
       .limit(MAX_CONCURRENT_LIVESTREAMS)
       .exec();
 
-    const rooms = await this.livekitService.listRoomsByPrefix('live-');
-    const roomParticipantMap = new Map<string, number>();
-    rooms.forEach((room) => {
-      roomParticipantMap.set(room.name, room.numParticipants ?? 0);
-    });
-
-    const hostIdentityMap = await this.getHostIdentityMap(streams);
+    const [participantCounts, hostIdentityMap] = await Promise.all([
+      Promise.all(
+        streams.map((stream) =>
+          this.livekitService.getParticipantCount(stream.roomName),
+        ),
+      ),
+      this.getHostIdentityMap(streams),
+    ]);
 
     return {
       maxConcurrentLivestreams: MAX_CONCURRENT_LIVESTREAMS,
       maxViewersPerRoom: MAX_VIEWERS_PER_ROOM,
       activeCount: streams.length,
-      items: streams.map((stream) => {
+      items: streams.map((stream, i) => {
         const hostId = stream.hostUserId?.toString?.() ?? '';
         const hostIdentity = hostIdentityMap.get(hostId);
-        return this.toResponse(
-          stream,
-          roomParticipantMap.get(stream.roomName) ?? 0,
-          hostIdentity,
-        );
+        return this.toResponse(stream, participantCounts[i], hostIdentity);
       }),
     };
   }

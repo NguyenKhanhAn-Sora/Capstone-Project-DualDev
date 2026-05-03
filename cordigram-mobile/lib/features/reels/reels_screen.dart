@@ -11,6 +11,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/config/app_theme.dart';
@@ -2103,13 +2104,36 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
   Timer? _pollTimer;
   static const Duration _kPollInterval = Duration(seconds: 4);
 
+  // ── User language (for translate comment feature) ─────────────────────────
+  String _userLanguage = 'en';
+
   static Map<String, String> get _authHeader => {
     'Authorization': 'Bearer ${AuthStorage.accessToken}',
   };
 
+  Future<void> _loadUserLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('cordigram-language');
+    if (cached != null && mounted) setState(() => _userLanguage = cached);
+    try {
+      final data = await ApiService.get(
+        '/users/settings',
+        extraHeaders: _authHeader,
+      );
+      final raw = (data['language'] ?? '').toString().toLowerCase();
+      const valid = {'vi', 'en', 'ja', 'zh'};
+      final resolved = valid.contains(raw) ? raw : 'en';
+      await prefs.setString('cordigram-language', resolved);
+      if (mounted) setState(() => _userLanguage = resolved);
+    } catch (_) {
+      if (cached == null && mounted) setState(() => _userLanguage = 'en');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadUserLanguage();
     _loadComments();
     _scrollCtrl.addListener(_onScroll);
     _startPolling();
@@ -2385,6 +2409,7 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                             allTileKeys: _allTileKeys,
                             viewerId: widget.viewerId,
                             postAuthorId: widget.postAuthorId,
+                            userLanguage: _userLanguage,
                             onDeleted: () => setState(
                               () =>
                                   _comments.removeWhere((cm) => cm.id == c.id),
@@ -2447,6 +2472,7 @@ class _RCommentTile extends StatefulWidget {
     this.onReply,
     this.onPinToggled,
     this.depth = 0,
+    this.userLanguage = 'en',
   });
   final CommentItem comment;
   final String postId;
@@ -2458,6 +2484,7 @@ class _RCommentTile extends StatefulWidget {
   final void Function(String id, String? username)? onReply;
   final void Function(String commentId, bool pinned)? onPinToggled;
   final int depth;
+  final String userLanguage;
 
   @override
   State<_RCommentTile> createState() => _RCommentTileState();
@@ -2474,6 +2501,8 @@ class _RCommentTileState extends State<_RCommentTile> {
   late bool _liked;
   late int _likesCount;
   late String _content;
+  String? _translatedText;
+  bool _isTranslating = false;
   final List<TapGestureRecognizer> _urlRecognizers = [];
 
   static final _urlRegex = RegExp(
@@ -2603,7 +2632,19 @@ class _RCommentTileState extends State<_RCommentTile> {
   }
 
   void _showCommentMenu() {
+    final showTranslate =
+        (widget.comment.lang != null &&
+            widget.comment.lang != widget.userLanguage) ||
+        _translatedText != null;
     final actions = <CommentSheetAction>[
+      if (showTranslate)
+        CommentSheetAction(
+          icon: Icons.translate_rounded,
+          label: _translatedText != null
+              ? 'Hide translation'
+              : 'Translate comment',
+          onTap: _translateComment,
+        ),
       if (_isPostOwner && widget.depth == 0)
         CommentSheetAction(
           icon: Icons.push_pin_rounded,
@@ -2659,7 +2700,7 @@ class _RCommentTileState extends State<_RCommentTile> {
             body: {'content': newContent},
             extraHeaders: widget.authHeader,
           );
-          if (mounted) setState(() => _content = newContent);
+          if (mounted) setState(() { _content = newContent; _translatedText = null; });
         },
       ),
     );
@@ -2750,6 +2791,36 @@ class _RCommentTileState extends State<_RCommentTile> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Failed to block user'),
+          backgroundColor: Color(0xFFEF4444),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _translateComment() async {
+    if (_translatedText != null) {
+      setState(() => _translatedText = null);
+      return;
+    }
+    setState(() => _isTranslating = true);
+    try {
+      final data = await ApiService.post(
+        '/posts/${widget.postId}/comments/${widget.comment.id}/translate'
+        '?targetLang=${widget.userLanguage}',
+        extraHeaders: widget.authHeader,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translatedText = data['translatedText'] as String?;
+        _isTranslating = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isTranslating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to translate comment'),
           backgroundColor: Color(0xFFEF4444),
           duration: Duration(seconds: 2),
         ),
@@ -2931,12 +3002,26 @@ class _RCommentTileState extends State<_RCommentTile> {
                             ),
                             const SizedBox(height: 4),
                             // Content
-                            if (_content.isNotEmpty)
+                            if (_isTranslating)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4),
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    color: Color(0xFF4AA3E4),
+                                  ),
+                                ),
+                              )
+                            else if (_content.isNotEmpty)
                               LayoutBuilder(
                                 builder: (context, constraints) {
+                                  final displayText =
+                                      _translatedText ?? _content;
                                   final tp = TextPainter(
                                     text: TextSpan(
-                                      text: _content,
+                                      text: displayText,
                                       style: const TextStyle(
                                         fontSize: 14,
                                         height: 1.45,
@@ -2953,7 +3038,7 @@ class _RCommentTileState extends State<_RCommentTile> {
                                       RichText(
                                         text: TextSpan(
                                           children: _buildContentSpans(
-                                            _content,
+                                            displayText,
                                           ),
                                         ),
                                         maxLines: _textExpanded ? null : 4,
@@ -2980,6 +3065,18 @@ class _RCommentTileState extends State<_RCommentTile> {
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w600,
                                               ),
+                                            ),
+                                          ),
+                                        ),
+                                      if (_translatedText != null)
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 3),
+                                          child: Text(
+                                            'Translated',
+                                            style: TextStyle(
+                                              color: Color(0xFF7A8BB0),
+                                              fontSize: 11,
+                                              fontStyle: FontStyle.italic,
                                             ),
                                           ),
                                         ),
@@ -3119,6 +3216,7 @@ class _RCommentTileState extends State<_RCommentTile> {
               allTileKeys: widget.allTileKeys,
               viewerId: widget.viewerId,
               postAuthorId: widget.postAuthorId,
+              userLanguage: widget.userLanguage,
               onDeleted: () =>
                   setState(() => _replies.removeWhere((rep) => rep.id == r.id)),
               onReply: widget.onReply,

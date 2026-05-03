@@ -52,6 +52,10 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
   bool _hostMediaStarted = false;
   bool _switchingCamera = false;
   bool _isFrontCamera = true;
+  // Tracks the host's current camera facing for viewer-side mirror correction.
+  // Front camera streams are mirrored at hardware level; viewers must scaleX(-1)
+  // to restore natural orientation. Back camera streams are not mirrored.
+  bool _hostIsFrontCamera = true;
 
   String? _myUserId;
   String _myParticipantName = 'Viewer';
@@ -316,6 +320,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
     _hostMediaStarted = false;
     _switchingCamera = false;
     _isFrontCamera = true;
+    _hostIsFrontCamera = true;
 
     if (room != null) {
       room.removeListener(_pickStageTrack);
@@ -378,6 +383,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
       _isFrontCamera = initialIsFront;
       LivestreamPendingSessionStore.clear();
       _pickStageTrack();
+      unawaited(_broadcastCameraState(initialIsFront));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -414,6 +420,22 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
     return null;
   }
 
+  Future<void> _broadcastCameraState(bool isFront) async {
+    final participant = _room?.localParticipant;
+    if (participant == null) return;
+    try {
+      await participant.publishData(
+        utf8.encode(
+          jsonEncode(<String, dynamic>{
+            'type': 'camera_flip',
+            'isFrontCamera': isFront,
+          }),
+        ),
+        reliable: true,
+      );
+    } catch (_) {}
+  }
+
   Future<void> _toggleHostCamera() async {
     if (!_isHostSession || _switchingCamera || _startingHostMedia) return;
     if (!_roomConnected || !_hostMediaStarted) return;
@@ -441,6 +463,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
         _isFrontCamera = nextIsFront;
       });
       _pickStageTrack();
+      unawaited(_broadcastCameraState(nextIsFront));
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
@@ -575,6 +598,13 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
       final targetId = event.participant?.identity;
       if (targetId == null || targetId.isEmpty) return;
       unawaited(_sendCommentHistory(targetId));
+      return;
+    }
+
+    if (type == 'camera_flip') {
+      final isFront = payload['isFrontCamera'] == true;
+      if (!mounted) return;
+      setState(() => _hostIsFrontCamera = isFront);
       return;
     }
 
@@ -1263,7 +1293,6 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
   }
 
   Widget _buildActiveLivestreamScreen(LivestreamItem stream) {
-    final tokens = _tokens;
     final viewerCount = max(stream.viewerCount - 1, 0);
 
     return Scaffold(
@@ -1442,7 +1471,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
                     Expanded(
                       child: TextField(
                         controller: _commentCtrl,
-                        style: TextStyle(color: tokens.text),
+                        style: const TextStyle(color: Colors.white),
                         minLines: 1,
                         maxLines: 2,
                         textInputAction: TextInputAction.send,
@@ -1501,7 +1530,21 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
       );
     }
 
-    return VideoTrackRenderer(track, fit: VideoViewFit.contain);
+    final renderer = VideoTrackRenderer(track, fit: VideoViewFit.contain);
+
+    // For viewers watching a mobile host using the front camera, the published
+    // stream is horizontally mirrored at the hardware level. Apply scaleX(-1)
+    // to restore natural orientation. The host's own local view is handled
+    // automatically by VideoTrackRenderer's mirrorMode.auto.
+    if (!_isHostSession && _hostIsFrontCamera) {
+      return Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.diagonal3Values(-1, 1, 1),
+        child: renderer,
+      );
+    }
+
+    return renderer;
   }
 
   Widget _buildCommentOverlay() {
