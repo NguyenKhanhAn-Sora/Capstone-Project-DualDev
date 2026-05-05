@@ -79,6 +79,15 @@ export class Message extends Document {
   @Prop({ type: Date, default: null })
   deletedAt: Date | null;
 
+  @Prop({ type: Boolean, default: false })
+  isPinned: boolean;
+
+  @Prop({ type: Date, default: null })
+  pinnedAt: Date | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  pinnedBy: Types.ObjectId | null;
+
   /** Người đã chọn "Xóa ở phía tôi" — tin vẫn tồn tại cho người khác (trừ khi đã thu hồi). */
   @Prop({ type: [Types.ObjectId], ref: 'User', default: [] })
   deletedFor: Types.ObjectId[];

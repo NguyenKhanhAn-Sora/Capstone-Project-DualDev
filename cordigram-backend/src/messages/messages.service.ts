@@ -1524,6 +1524,109 @@ export class MessagesService {
     return message.save();
   }
 
+  async pinMessage(
+    channelId: string,
+    messageId: string,
+    userId: string,
+  ): Promise<any> {
+    const canView = await this.userCanJoinChannelRoom(channelId, userId);
+    if (!canView) {
+      throw new ForbiddenException('Bạn không được phép thao tác trên kênh này');
+    }
+
+    const message = await this.messageModel.findById(messageId).exec();
+    if (!message) {
+      throw new NotFoundException(`Message with id ${messageId} not found`);
+    }
+    if (message.channelId.toString() != channelId) {
+      throw new BadRequestException('Message does not belong to this channel');
+    }
+    if (message.isDeleted) {
+      throw new ForbiddenException('Cannot pin a deleted message');
+    }
+
+    const channel = await this.channelModel
+      .findById(channelId)
+      .select('serverId')
+      .lean()
+      .exec();
+    if (!channel) {
+      throw new NotFoundException('Channel not found');
+    }
+
+    const isMine = message.senderId.toString() === userId;
+    if (!isMine) {
+      const canPin = await this.rolesService.hasPermission(
+        channel.serverId.toString(),
+        userId,
+        'pinMessages',
+      );
+      if (!canPin) {
+        throw new ForbiddenException('Bạn không có quyền ghim tin nhắn');
+      }
+    }
+
+    message.isPinned = !message.isPinned;
+    message.pinnedAt = message.isPinned ? new Date() : null;
+    message.pinnedBy = message.isPinned ? new Types.ObjectId(userId) : null;
+    await message.save();
+    return this.getMessageById(messageId);
+  }
+
+  async getPinnedMessagesByChannelId(
+    channelId: string,
+    viewerId: string,
+  ): Promise<any[]> {
+    const canView = await this.userCanJoinChannelRoom(channelId, viewerId);
+    if (!canView) {
+      throw new ForbiddenException('Bạn không được phép xem kênh này');
+    }
+
+    const viewerObjectId = new Types.ObjectId(viewerId);
+    const messages = await this.messageModel
+      .find({
+        channelId: new Types.ObjectId(channelId),
+        isDeleted: false,
+        isPinned: true,
+        deletedFor: { $nin: [viewerObjectId] },
+      })
+      .populate('senderId', 'email')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'email' },
+      })
+      .sort({ pinnedAt: -1, createdAt: -1 })
+      .lean()
+      .exec();
+
+    return Promise.all(
+      messages.map(async (msg: any) => {
+        const senderId = msg.senderId?._id ?? msg.senderId;
+        const senderUserId =
+          senderId != null ? new Types.ObjectId(senderId.toString()) : null;
+        const senderProfile = senderUserId
+          ? await this.profileModel
+              .findOne({ userId: senderUserId })
+              .select('username displayName avatarUrl')
+              .lean()
+              .exec()
+          : null;
+
+        return {
+          ...msg,
+          senderId: {
+            ...(typeof msg.senderId === 'object'
+              ? msg.senderId
+              : { _id: msg.senderId, email: '' }),
+            displayName: senderProfile?.displayName ?? undefined,
+            username: senderProfile?.username ?? undefined,
+            avatarUrl: senderProfile?.avatarUrl ?? undefined,
+          },
+        };
+      }),
+    );
+  }
+
   /** Đánh dấu toàn bộ tin nhắn trong kênh là đã đọc đến thời điểm hiện tại. */
   async markChannelAsRead(userId: string, channelId: string): Promise<void> {
     const userObjectId = new Types.ObjectId(userId);

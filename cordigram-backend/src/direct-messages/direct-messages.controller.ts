@@ -9,7 +9,9 @@ import {
   Query,
   UseGuards,
   HttpCode,
+  BadRequestException,
 } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { DirectMessagesService } from './direct-messages.service';
 import { DirectMessagesGateway } from './direct-messages.gateway';
 import {
@@ -76,12 +78,36 @@ export class DirectMessagesController {
     return this.performDeleteForMe(messageId, user);
   }
 
+  @Post(':messageId/pin')
+  @Post('pin/:messageId')
+  async pinMessage(@Param('messageId') messageId: string, @CurrentUser() user: any) {
+    const message = await this.directMessagesService.pinMessage(
+      messageId,
+      user.userId,
+    );
+    return this.directMessagesService.getDirectMessageById(
+      message._id.toString(),
+    );
+  }
+
+  @Get('pinned/:userId')
+  @Get('pins/:userId')
+  async getPinnedMessages(
+    @Param('userId') userId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.directMessagesService.getPinnedMessages(user.userId, userId);
+  }
+
   @Post(':receiverId')
   async createDirectMessage(
     @Param('receiverId') receiverId: string,
     @Body() createDirectMessageDto: CreateDirectMessageDto,
     @CurrentUser() user: any,
   ) {
+    if (!Types.ObjectId.isValid(receiverId)) {
+      throw new BadRequestException('Invalid receiverId');
+    }
     const message = await this.directMessagesService.createDirectMessage(
       user.userId,
       receiverId,
