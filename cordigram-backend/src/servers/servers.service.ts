@@ -970,6 +970,7 @@ export class ServersService {
         ...(updateServerDto.safetySettings || {}),
       };
     const saved = await server.save();
+    this.emitServerUpdated(saved, userId);
     await this.auditLogService.logServerEvent({
       serverId,
       actorUserId: userId,
@@ -979,6 +980,80 @@ export class ServersService {
       changes: [{ field: 'name', from: beforeName, to: saved.name }],
     });
     return saved;
+  }
+
+  private serverRealtimeSnapshot(server: any): {
+    id: string;
+    name: string;
+    description: string | null;
+    avatarUrl: string | null;
+    bannerUrl: string | null;
+    bannerImageUrl: string | null;
+    bannerColor: string | null;
+    memberCount: number;
+  } {
+    return {
+      id: String(server?._id ?? ''),
+      name: String(server?.name ?? ''),
+      description:
+        server?.description == null ? null : String(server.description),
+      avatarUrl: server?.avatarUrl == null ? null : String(server.avatarUrl),
+      bannerUrl: server?.bannerUrl == null ? null : String(server.bannerUrl),
+      bannerImageUrl:
+        server?.bannerImageUrl == null ? null : String(server.bannerImageUrl),
+      bannerColor:
+        server?.bannerColor == null ? null : String(server.bannerColor),
+      memberCount: Number(server?.memberCount ?? 0),
+    };
+  }
+
+  private memberUserIdsForRealtime(server: any): string[] {
+    const ids = new Set<string>();
+    const ownerId = server?.ownerId?.toString?.();
+    if (ownerId) ids.add(ownerId);
+    for (const m of server?.members ?? []) {
+      const uid = (m as any)?.userId?.toString?.();
+      if (uid) ids.add(uid);
+    }
+    return [...ids];
+  }
+
+  private emitServerUpdated(server: any, actorUserId: string): void {
+    const recipients = this.memberUserIdsForRealtime(server);
+    const payload = {
+      serverId: String(server?._id ?? ''),
+      actorUserId: String(actorUserId),
+      server: this.serverRealtimeSnapshot(server),
+      updatedAt: new Date().toISOString(),
+    };
+    for (const uid of recipients) {
+      this.channelMessagesGateway.emitToUser(uid, 'server-updated', payload);
+    }
+  }
+
+  private emitServerMembershipUpdated(params: {
+    server: any;
+    changedUserId: string;
+    action: 'joined' | 'left';
+    actorUserId?: string | null;
+    recipients: string[];
+  }): void {
+    const payload = {
+      serverId: String(params.server?._id ?? ''),
+      userId: String(params.changedUserId),
+      action: params.action,
+      actorUserId: params.actorUserId ? String(params.actorUserId) : null,
+      server: this.serverRealtimeSnapshot(params.server),
+      updatedAt: new Date().toISOString(),
+    };
+    const dedup = new Set(params.recipients.map((x) => String(x)).filter(Boolean));
+    for (const uid of dedup) {
+      this.channelMessagesGateway.emitToUser(
+        uid,
+        'server-membership-updated',
+        payload,
+      );
+    }
   }
 
   async getServerSafetySettings(serverId: string, userId: string) {
@@ -1158,6 +1233,13 @@ export class ServersService {
     server.memberCount = server.members.length;
 
     const saved = await server.save();
+    this.emitServerMembershipUpdated({
+      server: saved,
+      changedUserId: memberId,
+      action: 'joined',
+      actorUserId: memberId,
+      recipients: this.memberUserIdsForRealtime(saved),
+    });
 
     this.sendWelcomeMessage(serverId, memberId).catch((err) => {
       console.error('[sendWelcomeMessage] Failed:', err?.message || err);
@@ -1668,6 +1750,7 @@ export class ServersService {
       throw new ForbiddenException('Only server owner can remove members');
     }
 
+    const recipientUserIds = this.memberUserIdsForRealtime(server);
     server.members = server.members.filter(
       (m) => m.userId.toString() !== memberId,
     );
@@ -1675,6 +1758,13 @@ export class ServersService {
     server.memberCount = server.members.length;
 
     const saved = await server.save();
+    this.emitServerMembershipUpdated({
+      server: saved,
+      changedUserId: memberId,
+      action: 'left',
+      actorUserId: userId,
+      recipients: [...recipientUserIds, memberId],
+    });
     await this.cleanupAfterMemberRemoved(serverId, memberId);
     return saved;
   }
@@ -1700,11 +1790,19 @@ export class ServersService {
       return;
     }
 
+    const recipientUserIds = this.memberUserIdsForRealtime(server);
     server.members = server.members.filter(
       (m) => m.userId.toString() !== userId,
     );
     server.memberCount = server.members.length;
-    await server.save();
+    const saved = await server.save();
+    this.emitServerMembershipUpdated({
+      server: saved,
+      changedUserId: userId,
+      action: 'left',
+      actorUserId: userId,
+      recipients: [...recipientUserIds, userId],
+    });
     await this.cleanupAfterMemberRemoved(serverId, userId);
   }
 

@@ -12,15 +12,14 @@ import '../../../core/config/app_config.dart';
 import 'models/channel_message.dart';
 import 'models/message_reaction.dart';
 import 'models/server_models.dart';
+import 'pinned_messages_screen.dart';
 import 'services/channel_messages_realtime_service.dart';
 import 'services/channel_messages_service.dart';
 import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
 import 'services/server_media_service.dart';
-import 'services/voice_channel_session_controller.dart';
-import 'voice_channel_room_screen.dart';
-
+import 'search/message_search_sheet.dart';
 class ChannelChatScreen extends StatefulWidget {
   const ChannelChatScreen({
     super.key,
@@ -49,6 +48,53 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final Map<String, String> _serverEmojiMap = {};
+  final Map<String, GlobalKey> _channelMessageKeys = {};
+  String? _highlightChannelMessageId;
+
+  GlobalKey _keyForChannelMessage(String id) =>
+      _channelMessageKeys.putIfAbsent(id, () => GlobalKey());
+
+  Future<void> _scrollToChannelMessageId(String messageId) async {
+    if (!mounted) return;
+    setState(() => _highlightChannelMessageId = messageId);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
+    final ctx = _channelMessageKeys[messageId]?.currentContext;
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        alignment: 0.25,
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tin nhắn không có trong đoạn đang tải'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted && _highlightChannelMessageId == messageId) {
+      setState(() => _highlightChannelMessageId = null);
+    }
+  }
+
+  Future<void> _openChannelMessageSearch() async {
+    await MessageSearchSheet.present(
+      context,
+      child: MessageSearchSheet.serverChannel(
+        serverId: widget.server.id,
+        serverName: widget.server.name,
+        channelId: widget.channel.id,
+        channelName: widget.channel.name,
+        onPickMessage: (messageId, _) {
+          _scrollToChannelMessageId(messageId);
+        },
+      ),
+    );
+  }
 
   List<ChannelMessage> _messages = const [];
   bool _loading = true;
@@ -56,49 +102,19 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   bool _chatBlocked = false;
   String? _chatBlockReason;
   String? _error;
+  ChannelMessage? _replyingTo;
   StreamSubscription<ChannelMessage>? _newMessageSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
 
-  VoiceChannelSessionController get _voiceSession =>
-      VoiceChannelSessionController.instance;
-
-  bool get _hasMinimizedVoiceInThisServer =>
-      _voiceSession.active && _voiceSession.serverId == widget.server.id;
-
-  Future<void> _openVoiceRoomFromMiniBar() async {
-    if (!_hasMinimizedVoiceInThisServer) return;
-    final channelId = (_voiceSession.channelId ?? '').trim();
-    final channelName = (_voiceSession.channelName ?? '').trim();
-    if (channelId.isEmpty || channelName.isEmpty) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VoiceChannelRoomScreen(
-          server: widget.server,
-          channel: ServerChannel(
-            id: channelId,
-            serverId: widget.server.id,
-            name: channelName,
-            type: 'voice',
-          ),
-          participantName: (widget.participantName ?? '').trim().isNotEmpty
-              ? widget.participantName!.trim()
-              : 'Người dùng',
-        ),
-      ),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
-    _voiceSession.addListener(_onVoiceSessionChanged);
     _bootstrap();
   }
 
   @override
   void dispose() {
-    _voiceSession.removeListener(_onVoiceSessionChanged);
     _newMessageSub?.cancel();
     _reactionSub?.cancel();
     _deletedSub?.cancel();
@@ -106,11 +122,6 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onVoiceSessionChanged() {
-    if (!mounted) return;
-    setState(() {});
   }
 
   Future<void> _bootstrap() async {
@@ -162,6 +173,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           customStickerUrl: curr.customStickerUrl,
           attachments: curr.attachments,
           reactions: incomingReactions,
+          isPinned: curr.isPinned,
+          pinnedAt: curr.pinnedAt,
+          replyTo: curr.replyTo,
         );
         final copied = [..._messages];
         copied[idx] = next;
@@ -219,7 +233,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   Future<void> _sendText() async {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
-    await _sendChannelMessage(content: text);
+    await _sendChannelMessage(content: text, replyTo: _replyingTo?.id);
     if (mounted) _inputController.clear();
   }
 
@@ -233,6 +247,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     String? voiceUrl,
     int? voiceDuration,
     List<String>? attachments,
+    String? replyTo,
   }) async {
     if (content.trim().isEmpty || _sending || _chatBlocked) return;
     setState(() => _sending = true);
@@ -248,12 +263,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         voiceUrl: voiceUrl,
         voiceDuration: voiceDuration,
         attachments: attachments,
+        replyTo: replyTo ?? _replyingTo?.id,
       );
       if (sent != null && mounted) {
         setState(() {
           if (!_messages.any((m) => m.id == sent.id)) {
             _messages = [..._messages, sent];
           }
+          _replyingTo = null;
         });
         _scrollToBottom();
       }
@@ -834,6 +851,210 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     );
   }
 
+  Future<void> _showMessageActions(ChannelMessage message) async {
+    final isMine = _isMine(message);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0B1424),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            const Text(
+              'Hành động tin nhắn',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              leading: const Icon(Icons.reply_rounded, color: Colors.white),
+              title: const Text(
+                'Trả lời tin nhắn',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                setState(() => _replyingTo = message);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_reaction_outlined, color: Colors.white),
+              title: const Text(
+                'Chọn emoji khác',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showCustomReactionPicker(message);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.push_pin_outlined, color: Colors.white),
+              title: const Text(
+                'Ghim tin nhắn',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                await _togglePinMessage(message);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text(
+                'Xóa tin nhắn',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                final deleteType = await showModalBottomSheet<String>(
+                  context: context,
+                  backgroundColor: const Color(0xFF0B1424),
+                  builder: (dCtx) {
+                    return SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            leading: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.white,
+                            ),
+                            title: const Text(
+                              'Xóa ở phía tôi',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            onTap: () => Navigator.of(dCtx).pop('for-me'),
+                          ),
+                          if (isMine)
+                            ListTile(
+                              leading: const Icon(
+                                Icons.delete_forever_outlined,
+                                color: Colors.redAccent,
+                              ),
+                              title: const Text(
+                                'Thu hồi cho mọi người',
+                                style: TextStyle(color: Colors.redAccent),
+                              ),
+                              onTap: () =>
+                                  Navigator.of(dCtx).pop('for-everyone'),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+                if (deleteType == null) return;
+                await _deleteChannelMessage(
+                  messageId: message.id,
+                  deleteType: deleteType,
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCustomReactionPicker(ChannelMessage message) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0B1424),
+      builder: (ctx) {
+        return SizedBox(
+          height: 360,
+          child: EmojiPicker(
+            onEmojiSelected: (_, emoji) async {
+              Navigator.of(ctx).pop();
+              await ChannelMessagesService.addReaction(
+                channelId: widget.channel.id,
+                messageId: message.id,
+                emoji: emoji.emoji,
+              );
+            },
+            config: const Config(
+              emojiViewConfig: EmojiViewConfig(
+                backgroundColor: Color(0xFF0B1424),
+              ),
+              categoryViewConfig: CategoryViewConfig(
+                backgroundColor: Color(0xFF121e36),
+                iconColor: Color(0xFF8A98B8),
+                iconColorSelected: Colors.white,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteChannelMessage({
+    required String messageId,
+    required String deleteType,
+  }) async {
+    try {
+      await ChannelMessagesService.deleteMessage(
+        channelId: widget.channel.id,
+        messageId: messageId,
+        deleteType: deleteType,
+      );
+      if (!mounted) return;
+      setState(() {
+        _messages = _messages.where((m) => m.id != messageId).toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể xóa tin nhắn: $e')),
+      );
+    }
+  }
+
+  Future<void> _togglePinMessage(ChannelMessage message) async {
+    try {
+      final updated = await ChannelMessagesService.togglePin(
+        channelId: widget.channel.id,
+        messageId: message.id,
+      );
+      if (updated != null) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == message.id);
+          if (idx != -1) _messages[idx] = updated;
+        });
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Bạn đã ghim tin nhắn'),
+          action: SnackBarAction(
+            label: 'Xem tất cả',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PinnedMessagesScreen.channel(
+                    channelId: widget.channel.id,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể ghim tin nhắn: $e')),
+      );
+    }
+  }
+
   Future<void> _openVoiceRecorder() async {
     if (_chatBlocked) return;
     final status = await Permission.microphone.request();
@@ -1016,6 +1237,12 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     return _buildEmojiAwareText(text);
   }
 
+  String _replyPreviewText(ChannelReplyMessage reply) {
+    if ((reply.type ?? '') == 'voice') return '🔊 Tin nhắn thoại';
+    if (reply.content.trim().isEmpty) return 'Tin nhắn';
+    return reply.content.trim();
+  }
+
   bool _isMine(ChannelMessage msg) {
     final me = widget.currentUserId ?? '';
     return me.isNotEmpty && msg.senderId == me;
@@ -1029,6 +1256,13 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         backgroundColor: _pageColor,
         elevation: 0,
         titleSpacing: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Tìm tin nhắn',
+            onPressed: _openChannelMessageSearch,
+            icon: const Icon(Icons.search_rounded, color: Colors.white),
+          ),
+        ],
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1053,50 +1287,6 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       ),
       body: Column(
         children: [
-          if (_hasMinimizedVoiceInThisServer)
-            Container(
-              margin: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0E2247),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2A3F69)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.call_rounded,
-                    color: Color(0xFF7FB6FF),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Đang ở kênh thoại ${_voiceSession.channelName ?? ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFFC9D7F5),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _openVoiceRoomFromMiniBar,
-                    child: const Text('Mở lại'),
-                  ),
-                  const SizedBox(width: 4),
-                  TextButton(
-                    onPressed: () => _voiceSession.leave(),
-                    child: const Text(
-                      'Rời phòng',
-                      style: TextStyle(color: Color(0xFFFF9CAB)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           const Divider(height: 1, color: _lineColor),
           Expanded(
             child: _loading
@@ -1130,26 +1320,45 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
                       final mine = _isMine(msg);
-                      return Align(
+                      final hi = _highlightChannelMessageId == msg.id;
+                      return KeyedSubtree(
+                        key: _keyForChannelMessage(msg.id),
+                        child: Align(
                         alignment: mine
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 9),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 9,
-                          ),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-                          ),
-                          decoration: BoxDecoration(
-                            color: mine
-                                ? const Color(0xFF1D63E9)
-                                : const Color(0xFF112950),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: hi
+                              ? BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x664A90E2),
+                                      blurRadius: 12,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                )
+                              : null,
+                        child: GestureDetector(
+                          onLongPress: () => _showMessageActions(msg),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 9),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 9,
+                            ),
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+                            ),
+                            decoration: BoxDecoration(
+                              color: mine
+                                  ? const Color(0xFF1D63E9)
+                                  : const Color(0xFF112950),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (!mine)
@@ -1164,6 +1373,44 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                     ),
+                                  ),
+                                ),
+                              if (msg.replyTo != null)
+                                Container(
+                                  width: double.infinity,
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        msg.replyTo?.senderName?.isNotEmpty == true
+                                            ? msg.replyTo!.senderName!
+                                            : 'Đang trả lời',
+                                        style: const TextStyle(
+                                          color: Color(0xFFB6C2DC),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _replyPreviewText(msg.replyTo!),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               _buildMessageContent(msg),
@@ -1204,6 +1451,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                             ],
                           ),
                         ),
+                        ),
+                        ),
+                        ),
                       );
                     },
                   ),
@@ -1222,10 +1472,62 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             ),
           SafeArea(
             top: false,
-            minimum: const EdgeInsets.fromLTRB(6, 4, 6, 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                if (_replyingTo != null)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF17284A),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF3A4F77)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Đang trả lời',
+                                style: TextStyle(
+                                  color: Color(0xFFB6C2DC),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _replyingTo!.content.isNotEmpty
+                                    ? _replyingTo!.content
+                                    : (_replyingTo!.type == 'voice'
+                                          ? '🔊 Tin nhắn thoại'
+                                          : 'Tin nhắn'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => setState(() => _replyingTo = null),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
@@ -1342,6 +1644,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
                     ],
                   ),
                 ),

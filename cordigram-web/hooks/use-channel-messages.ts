@@ -79,6 +79,31 @@ export interface JoinApplicationUpdatedEvent {
   status: "accepted" | "rejected" | "withdrawn";
 }
 
+export interface ServerUpdatedEvent {
+  serverId: string;
+  actorUserId?: string | null;
+  server?: {
+    id: string;
+    name: string;
+    description?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
+    bannerImageUrl?: string | null;
+    bannerColor?: string | null;
+    memberCount?: number;
+  };
+  updatedAt?: string;
+}
+
+export interface ServerMembershipUpdatedEvent {
+  serverId: string;
+  userId: string;
+  action: "joined" | "left";
+  actorUserId?: string | null;
+  server?: ServerUpdatedEvent["server"];
+  updatedAt?: string;
+}
+
 export interface ChannelMessageDeletedEvent {
   channelId: string;
   messageId: string;
@@ -92,6 +117,8 @@ interface UseChannelMessagesOptions {
 
 export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   const socketRef = useRef<Socket | null>(null);
+  /** Re-subscribe to the current channel room after each socket reconnect (rooms are not persisted). */
+  const lastJoinedChannelIdRef = useRef<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [newMessageChannel, setNewMessageChannel] = useState<ChannelNewMessageEvent | null>(null);
   const [reactionUpdateChannel, setReactionUpdateChannel] = useState<ChannelReactionUpdateEvent | null>(null);
@@ -103,6 +130,9 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     useState<UserProfileStyleUpdatedEvent | null>(null);
   const [boostEntitlementUpdated, setBoostEntitlementUpdated] =
     useState<BoostEntitlementUpdatedEvent | null>(null);
+  const [serverUpdated, setServerUpdated] = useState<ServerUpdatedEvent | null>(null);
+  const [serverMembershipUpdated, setServerMembershipUpdated] =
+    useState<ServerMembershipUpdatedEvent | null>(null);
   const [channelMessageDeleted, setChannelMessageDeleted] =
     useState<ChannelMessageDeletedEvent | null>(null);
 
@@ -119,7 +149,13 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
 
     socketRef.current = socket;
 
-    socket.on("connect", () => setIsConnected(true));
+    socket.on("connect", () => {
+      setIsConnected(true);
+      const ch = lastJoinedChannelIdRef.current;
+      if (ch && socketRef.current?.connected) {
+        socketRef.current.emit("join-channel", { channelId: ch });
+      }
+    });
     socket.on("disconnect", () => setIsConnected(false));
 
     socket.on("new-message", (data: ChannelNewMessageEvent) => {
@@ -191,6 +227,32 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
       }
     });
 
+    socket.on("server-updated", (data: ServerUpdatedEvent) => {
+      if (!data?.serverId) return;
+      setServerUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-server-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setServerUpdated(null), 500);
+    });
+
+    socket.on("server-membership-updated", (data: ServerMembershipUpdatedEvent) => {
+      if (!data?.serverId || !data?.userId) return;
+      setServerMembershipUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-server-membership-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setServerMembershipUpdated(null), 500);
+    });
+
     socket.on("message-deleted", (data: ChannelMessageDeletedEvent) => {
       if (!data?.messageId || !data?.channelId || !data?.deleteType) return;
       setChannelMessageDeleted({
@@ -209,12 +271,16 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   }, [token]);
 
   const joinChannel = useCallback((channelId: string) => {
+    lastJoinedChannelIdRef.current = channelId || null;
     if (socketRef.current?.connected && channelId) {
       socketRef.current.emit("join-channel", { channelId });
     }
   }, []);
 
   const leaveChannel = useCallback((channelId: string) => {
+    if (lastJoinedChannelIdRef.current === channelId) {
+      lastJoinedChannelIdRef.current = null;
+    }
     if (socketRef.current?.connected && channelId) {
       socketRef.current.emit("leave-channel", { channelId });
     }
@@ -233,6 +299,8 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     serverMemberProfileUpdated,
     userProfileStyleUpdated,
     boostEntitlementUpdated,
+    serverUpdated,
+    serverMembershipUpdated,
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,

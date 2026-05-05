@@ -1,10 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'channel_chat_screen.dart';
+import 'create_server_event_screen.dart';
 import 'models/server_models.dart';
+import 'models/server_permissions.dart';
+import 'server_settings_hub_screen.dart';
+import 'services/server_sidebar_prefs_store.dart';
+import 'services/channel_messages_realtime_service.dart';
 import 'services/servers_service.dart';
 import 'services/voice_channel_session_controller.dart';
 import 'voice_channel_room_screen.dart';
+import 'widgets/channel_context_sheet.dart';
+import 'widgets/server_context_sheet.dart';
 
 class ServerDetailScreen extends StatefulWidget {
   const ServerDetailScreen({
@@ -12,11 +21,14 @@ class ServerDetailScreen extends StatefulWidget {
     required this.server,
     required this.currentUserId,
     required this.participantName,
+    this.initialTextChannelId,
   });
 
   final ServerSummary server;
   final String? currentUserId;
   final String participantName;
+  /// When set (e.g. from inbox), opens this text channel once after channels load.
+  final String? initialTextChannelId;
 
   @override
   State<ServerDetailScreen> createState() => _ServerDetailScreenState();
@@ -28,14 +40,89 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   bool _loading = true;
   String? _error;
   List<ServerCategory> _categories = const [];
-  List<ServerChannel> _textChannels = const [];
-  List<ServerChannel> _voiceChannels = const [];
+  /// Full list from API (server menu: đánh dấu đọc tất cả, v.v.).
+  List<ServerChannel> _allTextChannels = const [];
+  List<ServerChannel> _allVoiceChannels = const [];
+  /// Sau lọc quyền kênh riêng + ẩn kênh tắt âm (prefs).
+  List<ServerChannel> _displayTextChannels = const [];
+  List<ServerChannel> _displayVoiceChannels = const [];
+  CurrentUserServerPermissions _permissions =
+      CurrentUserServerPermissions.memberFallback();
+  /// Sau khi lưu hồ sơ từ hub / [ServerSettingsHubScreen], cập nhật AppBar.
+  ServerSummary? _serverOverride;
   String? _lastOpenedTextChannelId;
+  bool _openedInitialChannel = false;
+  StreamSubscription<Map<String, dynamic>>? _serverRealtimeSub;
+  bool _didAutoPopByRealtime = false;
+
+  ServerSummary get _effectiveServer =>
+      _serverOverride ?? widget.server;
 
   @override
   void initState() {
     super.initState();
+    _serverRealtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
+      _onServerRealtimeEvent,
+    );
     _loadChannels();
+  }
+
+  @override
+  void dispose() {
+    _serverRealtimeSub?.cancel();
+    super.dispose();
+  }
+
+  void _onServerRealtimeEvent(Map<String, dynamic> payload) {
+    final sid = (payload['serverId'] ?? '').toString();
+    if (sid.isEmpty || sid != widget.server.id) return;
+    final event = (payload['event'] ?? '').toString();
+
+    if (event == 'server-updated') {
+      final rawServer = payload['server'];
+      if (rawServer is Map) {
+        final mapped = Map<String, dynamic>.from(rawServer);
+        if (mounted) {
+          setState(() {
+            _serverOverride = ServerSummary(
+              id: _effectiveServer.id,
+              name: (mapped['name'] ?? _effectiveServer.name).toString(),
+              description:
+                  mapped['description']?.toString() ?? _effectiveServer.description,
+              avatarUrl: mapped['avatarUrl']?.toString() ?? _effectiveServer.avatarUrl,
+              memberCount: mapped['memberCount'] is num
+                  ? (mapped['memberCount'] as num).toInt()
+                  : _effectiveServer.memberCount,
+              unreadCount: _effectiveServer.unreadCount,
+              ownerId: _effectiveServer.ownerId,
+              communityEnabled: _effectiveServer.communityEnabled,
+            );
+          });
+        }
+      }
+      return;
+    }
+
+    if (event != 'server-membership-updated') return;
+    final action = (payload['action'] ?? '').toString();
+    final changedUserId = (payload['userId'] ?? '').toString();
+    final myUserId = (widget.currentUserId ?? '').trim();
+
+    // Nếu chính mình rời/bị kick khỏi server đang mở -> thoát màn ngay.
+    if (myUserId.isNotEmpty &&
+        changedUserId == myUserId &&
+        action == 'left' &&
+        !_didAutoPopByRealtime &&
+        mounted) {
+      _didAutoPopByRealtime = true;
+      Navigator.of(context).pop('left');
+      return;
+    }
+
+    // Thành viên join/leave trong server hiện tại -> refresh danh sách kênh/quyền.
+    if (mounted) {
+      _loadChannels();
+    }
   }
 
   Future<void> _loadChannels() async {
@@ -44,18 +131,36 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        ServersService.getServerChannels(widget.server.id),
-        ServersService.getServerCategories(widget.server.id),
-      ]);
-      final channels = results[0] as List<ServerChannel>;
-      final categories = results[1] as List<ServerCategory>;
+      final channels = await ServersService.getServerChannels(widget.server.id);
+      final categories =
+          await ServersService.getServerCategories(widget.server.id);
+      final perms = await ServersService.getCurrentUserPermissions(
+        widget.server.id,
+        ownerId: widget.server.ownerId,
+        currentUserId: widget.currentUserId,
+      );
+      final uid = widget.currentUserId ?? '';
+      var hideMuted = false;
+      if (uid.isNotEmpty) {
+        hideMuted =
+            await ServerSidebarPrefsStore.hideMutedChannels(uid, widget.server.id);
+      }
+      final textAll = channels.where((e) => e.isText).toList();
+      final voiceAll = channels.where((e) => e.isVoice).toList();
+      final textDisplay =
+          await _filterChannelsForDisplay(textAll, perms, hideMuted);
+      final voiceDisplay =
+          await _filterChannelsForDisplay(voiceAll, perms, hideMuted);
       if (!mounted) return;
       setState(() {
         _categories = categories;
-        _textChannels = channels.where((e) => e.isText).toList();
-        _voiceChannels = channels.where((e) => e.isVoice).toList();
+        _allTextChannels = textAll;
+        _allVoiceChannels = voiceAll;
+        _displayTextChannels = textDisplay;
+        _displayVoiceChannels = voiceDisplay;
+        _permissions = perms;
       });
+      _maybeOpenInitialTextChannel();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
@@ -64,12 +169,143 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
     }
   }
 
+  Future<List<ServerChannel>> _filterChannelsForDisplay(
+    List<ServerChannel> list,
+    CurrentUserServerPermissions perms,
+    bool hideMuted,
+  ) async {
+    final uid = widget.currentUserId ?? '';
+    final sid = widget.server.id;
+    final out = <ServerChannel>[];
+    for (final c in list) {
+      if (c.isPrivate && !perms.canAccessPrivateChannel) continue;
+      if (hideMuted && uid.isNotEmpty) {
+        final muted = await ServerSidebarPrefsStore.isChannelOrCategoryMuted(
+          uid,
+          sid,
+          c.id,
+          c.categoryId,
+        );
+        if (muted) continue;
+      }
+      out.add(c);
+    }
+    return out;
+  }
+
+  Future<void> _openServerSheet() async {
+    await ServerContextSheet.show(
+      context,
+      server: _effectiveServer,
+      userId: widget.currentUserId,
+      permissions: _permissions,
+      textChannels: _allTextChannels,
+      onServerChanged: () {
+        if (mounted) _loadChannels();
+      },
+      onLeaveSuccess: () async {
+        if (mounted) Navigator.of(context).pop('left');
+      },
+      onOpenServerSettings: () {
+        if (!mounted) return;
+        final oid = widget.server.ownerId;
+        final uid = widget.currentUserId;
+        final isOwner = oid != null &&
+            oid.isNotEmpty &&
+            uid != null &&
+            uid.isNotEmpty &&
+            oid == uid;
+        Navigator.of(context).push<dynamic>(
+          MaterialPageRoute(
+            builder: (_) => ServerSettingsHubScreen(
+              server: _effectiveServer,
+              permissions: _permissions,
+              currentUserId: widget.currentUserId,
+              isOwner: isOwner,
+              communityEnabled: _effectiveServer.communityEnabled,
+            ),
+          ),
+        ).then((result) {
+          if (!mounted) return;
+          if (result == 'deleted') {
+            Navigator.of(context).pop('deleted');
+            return;
+          }
+          if (result is ServerSummary) {
+            setState(() => _serverOverride = result);
+          }
+          _loadChannels();
+        });
+      },
+      onOpenCreateEvent: () {
+        if (!mounted) return;
+        Navigator.of(context)
+            .push<void>(
+          MaterialPageRoute(
+            builder: (_) => CreateServerEventScreen(
+              serverId: widget.server.id,
+              textChannels: _allTextChannels,
+              voiceChannels: _allVoiceChannels,
+            ),
+          ),
+        )
+            .then((_) {
+          if (mounted) _loadChannels();
+        });
+      },
+    );
+  }
+
+  Future<void> _openChannelSheet(
+    ServerChannel channel,
+    String? categoryId,
+  ) async {
+    await ChannelContextSheet.show(
+      context,
+      server: _effectiveServer,
+      channel: channel,
+      categoryId: categoryId,
+      userId: widget.currentUserId,
+      permissions: _permissions,
+      onChanged: () {
+        if (mounted) _loadChannels();
+      },
+      onInviteToChannel: () {
+        if (!mounted) return;
+        if (channel.isText) {
+          _openTextChannel(channel);
+        } else if (channel.isVoice) {
+          _openVoiceChannel(channel);
+        }
+      },
+    );
+  }
+
+  void _maybeOpenInitialTextChannel() {
+    if (_openedInitialChannel) return;
+    final want = widget.initialTextChannelId;
+    if (want == null || want.isEmpty) return;
+    ServerChannel? match;
+    for (final c in _allTextChannels) {
+      if (c.id == want) {
+        match = c;
+        break;
+      }
+    }
+    if (match == null) return;
+    _openedInitialChannel = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _openTextChannel(match!);
+    });
+  }
+
   void _openTextChannel(ServerChannel channel) {
     _lastOpenedTextChannelId = channel.id;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ChannelChatScreen(
-          server: widget.server,
+          server: _effectiveServer,
           channel: channel,
           currentUserId: widget.currentUserId,
           participantName: widget.participantName,
@@ -79,10 +315,13 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   }
 
   Future<void> _openVoiceChannel(ServerChannel channel) async {
-    final minimizedToChat = await Navigator.of(context).push<bool>(
+    VoiceChannelSessionController.instance.clearVoiceMinimized();
+    final minimizedToChat =
+        await Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(
+        fullscreenDialog: true,
         builder: (_) => VoiceChannelRoomScreen(
-          server: widget.server,
+          server: _effectiveServer,
           channel: channel,
           participantName: widget.participantName,
         ),
@@ -102,14 +341,15 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   }
 
   ServerChannel? _pickChatChannelForQuickReturn() {
-    if (_textChannels.isEmpty) return null;
+    if (_allTextChannels.isEmpty) return null;
     if ((_lastOpenedTextChannelId ?? '').isNotEmpty) {
-      final matched = _textChannels.where((c) => c.id == _lastOpenedTextChannelId);
+      final matched =
+          _allTextChannels.where((c) => c.id == _lastOpenedTextChannelId);
       if (matched.isNotEmpty) return matched.first;
     }
-    final preferred = _textChannels.firstWhere(
+    final preferred = _allTextChannels.firstWhere(
       (channel) => channel.name.trim().toLowerCase() == 'general',
-      orElse: () => _textChannels.first,
+      orElse: () => _allTextChannels.first,
     );
     return preferred;
   }
@@ -136,10 +376,20 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
               Navigator.of(context).pop();
             },
           ),
-          title: Text(
-            widget.server.name,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          title: GestureDetector(
+            onLongPress: _openServerSheet,
+            child: Text(
+              _effectiveServer.name,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'Tùy chọn máy chủ',
+              icon: const Icon(Icons.more_vert_rounded),
+              onPressed: _openServerSheet,
+            ),
+          ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -162,10 +412,10 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                   children: [
                     if (_categories.isNotEmpty)
                       ..._categories.map((cat) {
-                        final catText = _textChannels
+                        final catText = _displayTextChannels
                             .where((c) => c.categoryId == cat.id)
                             .toList();
-                        final catVoice = _voiceChannels
+                        final catVoice = _displayVoiceChannels
                             .where((c) => c.categoryId == cat.id)
                             .toList();
                         if (catText.isEmpty && catVoice.isEmpty) {
@@ -185,6 +435,8 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                                 unreadCount: channel.unreadCount,
                                 isPrivate: channel.isPrivate,
                                 onTap: () => _openTextChannel(channel),
+                                onLongPress: () =>
+                                    _openChannelSheet(channel, cat.id),
                               ),
                             ),
                             ...catVoice.map(
@@ -194,20 +446,23 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                                 subtitle: channel.description,
                                 unreadCount: channel.unreadCount,
                                 isPrivate: channel.isPrivate,
-                                trailingText: 'Tham gia',
                                 onTap: () => _openVoiceChannel(channel),
+                                onLongPress: () =>
+                                    _openChannelSheet(channel, cat.id),
                               ),
                             ),
                             const Divider(height: 22, color: _lineColor),
                           ],
                         );
                       }),
-                    if (_textChannels.where((c) => c.categoryId == null).isNotEmpty) ...[
+                    if (_displayTextChannels
+                        .where((c) => c.categoryId == null)
+                        .isNotEmpty) ...[
                       const _SectionHeader(
                         icon: Icons.tag_rounded,
                         title: 'Kênh chat',
                       ),
-                      ..._textChannels
+                      ..._displayTextChannels
                           .where((c) => c.categoryId == null)
                           .map(
                             (channel) => _ChannelTile(
@@ -217,16 +472,20 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                               unreadCount: channel.unreadCount,
                               isPrivate: channel.isPrivate,
                               onTap: () => _openTextChannel(channel),
+                              onLongPress: () =>
+                                  _openChannelSheet(channel, null),
                             ),
                           ),
                     ],
-                    if (_voiceChannels.where((c) => c.categoryId == null).isNotEmpty) ...[
+                    if (_displayVoiceChannels
+                        .where((c) => c.categoryId == null)
+                        .isNotEmpty) ...[
                       const Divider(height: 22, color: _lineColor),
                       const _SectionHeader(
                         icon: Icons.volume_up_rounded,
                         title: 'Kênh đàm thoại',
                       ),
-                      ..._voiceChannels
+                      ..._displayVoiceChannels
                           .where((c) => c.categoryId == null)
                           .map(
                             (channel) => _ChannelTile(
@@ -235,12 +494,13 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                               subtitle: channel.description,
                               unreadCount: channel.unreadCount,
                               isPrivate: channel.isPrivate,
-                              trailingText: 'Tham gia',
                               onTap: () => _openVoiceChannel(channel),
+                              onLongPress: () =>
+                                  _openChannelSheet(channel, null),
                             ),
                           ),
                     ],
-                    if (_textChannels.isEmpty && _voiceChannels.isEmpty)
+                    if (_allTextChannels.isEmpty && _allVoiceChannels.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(top: 56),
                         child: Center(
@@ -294,8 +554,8 @@ class _ChannelTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
+    this.onLongPress,
     this.subtitle,
-    this.trailingText,
     this.unreadCount = 0,
     this.isPrivate = false,
   });
@@ -303,10 +563,10 @@ class _ChannelTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
-  final String? trailingText;
   final int unreadCount;
   final bool isPrivate;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -353,17 +613,9 @@ class _ChannelTile extends StatelessWidget {
                 ),
               ),
             )
-          : (trailingText == null
-                ? const Icon(Icons.chevron_right_rounded, color: Color(0xFF7E8CA8))
-                : Text(
-                    trailingText!,
-                    style: const TextStyle(
-                      color: Color(0xFF7FB6FF),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  )),
+          : const Icon(Icons.chevron_right_rounded, color: Color(0xFF7E8CA8)),
       onTap: onTap,
+      onLongPress: onLongPress,
     );
   }
 }

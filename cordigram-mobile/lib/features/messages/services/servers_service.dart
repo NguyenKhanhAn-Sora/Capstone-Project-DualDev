@@ -1,6 +1,8 @@
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
 import '../models/server_models.dart';
+import '../models/server_permissions.dart';
+import '../models/server_role_models.dart';
 
 class ServersService {
   ServersService._();
@@ -63,6 +65,121 @@ class ServersService {
     return channels;
   }
 
+  static Future<Map<String, dynamic>> getServerAccessSettings(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/access/settings',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<void> acceptServerInvite(String inviteId) async {
+    await ApiService.post(
+      '/server-invites/$inviteId/accept',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<void> declineServerInvite(String inviteId) async {
+    await ApiService.post(
+      '/server-invites/$inviteId/decline',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<CurrentUserServerPermissions> getCurrentUserPermissions(
+    String serverId, {
+    String? ownerId,
+    String? currentUserId,
+  }) async {
+    try {
+      final res = await ApiService.get(
+        '/servers/$serverId/my-permissions',
+        extraHeaders: _authHeaders,
+      );
+      return CurrentUserServerPermissions.fromJson(
+        Map<String, dynamic>.from(res),
+      );
+    } catch (_) {
+      if (ownerId != null &&
+          currentUserId != null &&
+          ownerId.isNotEmpty &&
+          ownerId == currentUserId) {
+        return CurrentUserServerPermissions.ownerFallback();
+      }
+      return CurrentUserServerPermissions.memberFallback();
+    }
+  }
+
+  static Future<void> leaveServer(String serverId) async {
+    await ApiService.post(
+      '/servers/$serverId/leave',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<Map<String, dynamic>> createChannel({
+    required String serverId,
+    required String name,
+    required String type, // text | voice
+    String? description,
+    bool isPrivate = false,
+    String? categoryId,
+  }) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/channels',
+      extraHeaders: _authHeaders,
+      body: {
+        'name': name,
+        'type': type,
+        if ((description ?? '').trim().isNotEmpty) 'description': description!.trim(),
+        'isPrivate': isPrivate,
+        if (categoryId != null && categoryId.isNotEmpty) 'categoryId': categoryId,
+      },
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> createCategory({
+    required String serverId,
+    required String name,
+    String type = 'mixed',
+  }) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/channels/categories',
+      extraHeaders: _authHeaders,
+      body: {'name': name, 'type': type},
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> updateChannel({
+    required String serverId,
+    required String channelId,
+    String? name,
+    String? description,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (description != null) body['description'] = description;
+    final res = await ApiService.patch(
+      '/servers/$serverId/channels/$channelId',
+      extraHeaders: _authHeaders,
+      body: body,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<void> deleteChannel({
+    required String serverId,
+    required String channelId,
+  }) async {
+    await ApiService.delete(
+      '/servers/$serverId/channels/$channelId',
+      extraHeaders: _authHeaders,
+    );
+  }
+
   static Future<List<ServerCategory>> getServerCategories(String serverId) async {
     final list = await _getListResponse(
       '/servers/$serverId/channels/categories/list',
@@ -75,6 +192,535 @@ class ServersService {
         .toList();
     categories.sort((a, b) => a.position.compareTo(b.position));
     return categories;
+  }
+
+  /// GET `/servers/:id` — full server doc (profile, banner, traits).
+  static Future<Map<String, dynamic>> getServerById(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// PATCH `/servers/:id` — same body as cordigram-web `serversApi.updateServer`.
+  static Future<Map<String, dynamic>> updateServer({
+    required String serverId,
+    String? name,
+    String? description,
+    String? avatarUrl,
+    String? bannerUrl,
+    String? bannerImageUrl,
+    String? bannerColor,
+    List<Map<String, String>>? profileTraits,
+    bool? isPublic,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (description != null) body['description'] = description;
+    if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
+    if (bannerUrl != null) body['bannerUrl'] = bannerUrl;
+    if (bannerImageUrl != null) body['bannerImageUrl'] = bannerImageUrl;
+    if (bannerColor != null) body['bannerColor'] = bannerColor;
+    if (profileTraits != null) body['profileTraits'] = profileTraits;
+    if (isPublic != null) body['isPublic'] = isPublic;
+    final res = await ApiService.patch(
+      '/servers/$serverId',
+      extraHeaders: _authHeaders,
+      body: body,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// GET `/servers/:id/events` — active + upcoming (same as web).
+  static Future<({
+    List<Map<String, dynamic>> active,
+    List<Map<String, dynamic>> upcoming,
+  })> getServerEvents(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/events',
+      extraHeaders: _authHeaders,
+    );
+    List<Map<String, dynamic>> parse(String key) {
+      final v = res[key];
+      if (v is! List) return [];
+      return v
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+
+    return (
+      active: parse('active'),
+      upcoming: parse('upcoming'),
+    );
+  }
+
+  /// POST `/servers/:id/events` — body matches `CreateEventDto` / web `createServerEvent`.
+  static Future<Map<String, dynamic>> createServerEvent({
+    required String serverId,
+    required String topic,
+    required String startAt,
+    required String frequency,
+    required String locationType,
+    String? endAt,
+    String? channelId,
+    String? description,
+    String? coverImageUrl,
+  }) async {
+    final body = <String, dynamic>{
+      'topic': topic,
+      'startAt': startAt,
+      'frequency': frequency,
+      'locationType': locationType,
+    };
+    if (endAt != null && endAt.isNotEmpty) body['endAt'] = endAt;
+    if (channelId != null && channelId.isNotEmpty) body['channelId'] = channelId;
+    if (description != null && description.isNotEmpty) {
+      body['description'] = description;
+    }
+    if (coverImageUrl != null && coverImageUrl.isNotEmpty) {
+      body['coverImageUrl'] = coverImageUrl;
+    }
+    final res = await ApiService.post(
+      '/servers/$serverId/events',
+      extraHeaders: _authHeaders,
+      body: body,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  // ── Roles (web `serversApi` roles API) ─────────────────────────────
+
+  static Future<List<ServerRole>> getRoles(String serverId) async {
+    final direct = await ApiService.getList(
+      '/servers/$serverId/roles',
+      extraHeaders: _authHeaders,
+    );
+    return direct
+        .whereType<Map>()
+        .map((e) => ServerRole.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  static Future<ServerRole> createRole({
+    required String serverId,
+    required String name,
+    String color = '#99AAB5',
+  }) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/roles',
+      extraHeaders: _authHeaders,
+      body: {'name': name, 'color': color},
+    );
+    return ServerRole.fromJson(Map<String, dynamic>.from(res));
+  }
+
+  static Future<ServerRole> updateRole({
+    required String serverId,
+    required String roleId,
+    String? name,
+    String? color,
+    bool? displaySeparately,
+    bool? mentionable,
+    Map<String, dynamic>? permissions,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (color != null) body['color'] = color;
+    if (displaySeparately != null) {
+      body['displaySeparately'] = displaySeparately;
+    }
+    if (mentionable != null) body['mentionable'] = mentionable;
+    if (permissions != null) body['permissions'] = permissions;
+    final res = await ApiService.patch(
+      '/servers/$serverId/roles/$roleId',
+      extraHeaders: _authHeaders,
+      body: body,
+    );
+    return ServerRole.fromJson(Map<String, dynamic>.from(res));
+  }
+
+  static Future<void> deleteRole({
+    required String serverId,
+    required String roleId,
+  }) async {
+    await ApiService.delete(
+      '/servers/$serverId/roles/$roleId',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<void> addMemberToRole({
+    required String serverId,
+    required String roleId,
+    required String memberId,
+  }) async {
+    await ApiService.post(
+      '/servers/$serverId/roles/$roleId/members/$memberId',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<void> removeMemberFromRole({
+    required String serverId,
+    required String roleId,
+    required String memberId,
+  }) async {
+    await ApiService.delete(
+      '/servers/$serverId/roles/$roleId/members/$memberId',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  // ── Members with roles ────────────────────────────────────────────
+
+  static Future<MembersWithRolesResult> getServerMembersWithRoles(
+    String serverId,
+  ) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/members-with-roles',
+      extraHeaders: _authHeaders,
+    );
+    final list = res['members'];
+    final out = <MemberWithRolesRow>[];
+    if (list is List) {
+      for (final e in list) {
+        if (e is Map) {
+          out.add(
+            MemberWithRolesRow.fromJson(
+              Map<String, dynamic>.from(e),
+            ),
+          );
+        }
+      }
+    }
+    final cup = res['currentUserPermissions'];
+    var canKick = false;
+    var canBan = false;
+    var canTimeout = false;
+    var listIsOwner = false;
+    if (cup is Map) {
+      canKick = cup['canKick'] == true;
+      canBan = cup['canBan'] == true;
+      canTimeout = cup['canTimeout'] == true;
+      listIsOwner = cup['isOwner'] == true;
+    }
+    return MembersWithRolesResult(
+      members: out,
+      canKick: canKick,
+      canBan: canBan,
+      canTimeout: canTimeout,
+      listIsOwner: listIsOwner,
+    );
+  }
+
+  /// Owner-only list fallback (web `getServerMembers`).
+  static Future<List<Map<String, dynamic>>> getServerMembersRaw(
+    String serverId,
+  ) async {
+    final list = await ApiService.getList(
+      '/servers/$serverId/members',
+      extraHeaders: _authHeaders,
+    );
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  // ── Moderation ────────────────────────────────────────────────────
+
+  static Future<void> kickMember(
+    String serverId,
+    String memberId, {
+    String? reason,
+  }) async {
+    await ApiService.post(
+      '/servers/$serverId/kick/$memberId',
+      extraHeaders: _authHeaders,
+      body: reason != null ? {'reason': reason} : null,
+    );
+  }
+
+  static Future<void> banMember(
+    String serverId,
+    String memberId, {
+    String? reason,
+    int? deleteMessageDays,
+  }) async {
+    await ApiService.post(
+      '/servers/$serverId/ban/$memberId',
+      extraHeaders: _authHeaders,
+      body: {
+        if (reason != null) 'reason': reason,
+        if (deleteMessageDays != null) 'deleteMessageDays': deleteMessageDays,
+      },
+    );
+  }
+
+  static Future<void> timeoutMember(
+    String serverId,
+    String memberId,
+    int durationSeconds, {
+    String? reason,
+  }) async {
+    await ApiService.post(
+      '/servers/$serverId/timeout/$memberId',
+      extraHeaders: _authHeaders,
+      body: {
+        'durationSeconds': durationSeconds,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      },
+    );
+  }
+
+  // ── Profile stats / interaction / safety / access (web servers-api) ──
+
+  static Future<Map<String, dynamic>> getServerProfileStats(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/profile-stats',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> getInteractionSettings(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/interaction-settings',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> patchInteractionSettings(
+    String serverId,
+    Map<String, dynamic> body,
+  ) async {
+    return ApiService.patch(
+      '/servers/$serverId/interaction-settings',
+      body: body,
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<Map<String, dynamic>> postRoleNotification(
+    String serverId, {
+    required String title,
+    required String content,
+    required String targetType,
+    String? roleId,
+  }) async {
+    return ApiService.post(
+      '/servers/$serverId/role-notifications',
+      extraHeaders: _authHeaders,
+      body: {
+        'title': title,
+        'content': content,
+        'targetType': targetType,
+        if (roleId != null && roleId.isNotEmpty) 'roleId': roleId,
+      },
+    );
+  }
+
+  static Future<Map<String, dynamic>> getServerSafetySettings(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/safety-settings',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> patchServerSafetySettings(
+    String serverId,
+    Map<String, dynamic> patch,
+  ) async {
+    return ApiService.patch(
+      '/servers/$serverId/safety-settings',
+      body: patch,
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<Map<String, dynamic>> patchServerAccessSettings(
+    String serverId, {
+    String? accessMode,
+    bool? isAgeRestricted,
+    bool? hasRules,
+  }) async {
+    final body = <String, dynamic>{};
+    if (accessMode != null) body['accessMode'] = accessMode;
+    if (isAgeRestricted != null) body['isAgeRestricted'] = isAgeRestricted;
+    if (hasRules != null) body['hasRules'] = hasRules;
+    return ApiService.patch(
+      '/servers/$serverId/access/settings',
+      body: body,
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<Map<String, dynamic>> postAccessRule(
+    String serverId,
+    String content,
+  ) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/access/rules',
+      extraHeaders: _authHeaders,
+      body: {'content': content},
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> getJoinApplicationForm(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/access/join-form',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> patchJoinApplicationForm(
+    String serverId,
+    Map<String, dynamic> body,
+  ) async {
+    return ApiService.patch(
+      '/servers/$serverId/access/join-form',
+      body: body,
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getBannedUsers(String serverId) async {
+    try {
+      final list = await ApiService.getList(
+        '/servers/$serverId/bans',
+        extraHeaders: _authHeaders,
+      );
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      final res = await ApiService.get(
+        '/servers/$serverId/bans',
+        extraHeaders: _authHeaders,
+      );
+      final map = Map<String, dynamic>.from(res);
+      final list = map['bans'] ?? map['items'] ?? map['data'];
+      if (list is List) {
+        return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    }
+  }
+
+  static Future<void> unbanMember(String serverId, String memberId) async {
+    await ApiService.post(
+      '/servers/$serverId/unban/$memberId',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<Map<String, dynamic>> getServerEmojisManage(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/emojis/manage',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> addServerEmoji(
+    String serverId, {
+    required String imageUrl,
+    String? name,
+    bool? animated,
+  }) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/emojis',
+      extraHeaders: _authHeaders,
+      body: {
+        'imageUrl': imageUrl,
+        if (name != null && name.isNotEmpty) 'name': name,
+        if (animated != null) 'animated': animated,
+      },
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> getServerStickersManage(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/stickers/manage',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> addServerSticker(
+    String serverId, {
+    required String imageUrl,
+    String? name,
+    bool? animated,
+  }) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/stickers',
+      extraHeaders: _authHeaders,
+      body: {
+        'imageUrl': imageUrl,
+        if (name != null && name.isNotEmpty) 'name': name,
+        if (animated != null) 'animated': animated,
+      },
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> setServerStickerBoostTier(
+    String serverId, {
+    required String? tier,
+  }) async {
+    return ApiService.patch(
+      '/servers/sticker-boost/$serverId',
+      body: {'tier': tier},
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<Map<String, dynamic>> getCommunitySettings(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/community',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> activateCommunity(
+    String serverId, {
+    Map<String, dynamic>? body,
+  }) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/community/activate',
+      extraHeaders: _authHeaders,
+      body: body ?? {},
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<Map<String, dynamic>> updateCommunityOverview(
+    String serverId, {
+    String? rulesChannelId,
+    String? primaryLanguage,
+    String? description,
+  }) async {
+    final b = <String, dynamic>{};
+    if (rulesChannelId != null) b['rulesChannelId'] = rulesChannelId;
+    if (primaryLanguage != null) b['primaryLanguage'] = primaryLanguage;
+    if (description != null) b['description'] = description;
+    final res = await ApiService.post(
+      '/servers/$serverId/community/overview',
+      extraHeaders: _authHeaders,
+      body: b,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<void> deleteServer(String serverId) async {
+    await ApiService.delete(
+      '/servers/$serverId',
+      extraHeaders: _authHeaders,
+    );
   }
 
   static Future<List<dynamic>> _getListResponse(

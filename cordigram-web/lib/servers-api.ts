@@ -183,6 +183,9 @@ export interface Message {
   isDeleted?: boolean;
   deletedAt?: string | null;
   deletedFor?: string[];
+  isPinned?: boolean;
+  pinnedAt?: string | null;
+  pinnedBy?: string | null;
   createdAt: string;
   updatedAt: string;
   replyTo?: string | {
@@ -2278,6 +2281,51 @@ export async function addMessageReaction(
   }
 
   return response.json();
+}
+
+export async function pinChannelMessage(
+  channelId: string,
+  messageId: string,
+): Promise<Message> {
+  let response = await fetch(
+    `${API_BASE_URL}/channels/${channelId}/messages/${messageId}/pin`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+    },
+  );
+  if (response.status === 404) {
+    response = await fetch(
+      `${API_BASE_URL}/channels/${channelId}/messages/pin/${messageId}`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+      },
+    );
+  }
+  if (!response.ok) throw new Error("Không thể ghim tin nhắn");
+  return response.json();
+}
+
+export async function getPinnedChannelMessages(
+  channelId: string,
+): Promise<Message[]> {
+  let response = await fetch(
+    `${API_BASE_URL}/channels/${channelId}/messages/pinned`,
+    {
+      method: "GET",
+      headers: getHeaders(),
+    },
+  );
+  if (response.status === 404) {
+    response = await fetch(`${API_BASE_URL}/channels/${channelId}/messages/pins`, {
+      method: "GET",
+      headers: getHeaders(),
+    });
+  }
+  if (!response.ok) throw new Error("Không tải được tin nhắn đã ghim");
+  const data = await response.json();
+  return Array.isArray(data) ? (data as Message[]) : [];
 }
 
 // Message Search

@@ -13,16 +13,28 @@ class ChannelMessagesRealtimeService {
   static io.Socket? _socket;
   static String? _token;
 
+  /// Channel rooms the client should stay subscribed to (re-joined after reconnect).
+  static final Set<String> _joinedChannelIds = <String>{};
+
   static final StreamController<ChannelMessage> _messagesController =
       StreamController<ChannelMessage>.broadcast();
   static final StreamController<Map<String, dynamic>> _reactionController =
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _deletedController =
       StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _channelNotificationController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _serverRealtimeController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   static Stream<ChannelMessage> get messages => _messagesController.stream;
   static Stream<Map<String, dynamic>> get reactions => _reactionController.stream;
   static Stream<Map<String, dynamic>> get deleted => _deletedController.stream;
+  /// Per-user pushes from the gateway (mentions, inbox-related) without joining a channel room.
+  static Stream<Map<String, dynamic>> get channelNotifications =>
+      _channelNotificationController.stream;
+  static Stream<Map<String, dynamic>> get serverRealtime =>
+      _serverRealtimeController.stream;
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -69,16 +81,54 @@ class ChannelMessagesRealtimeService {
       _deletedController.add(Map<String, dynamic>.from(payload));
     });
 
+    socket.on('channel-notification', (payload) {
+      if (payload is! Map) return;
+      _channelNotificationController.add(Map<String, dynamic>.from(payload));
+    });
+
+    socket.on('server-updated', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'server-updated';
+      _serverRealtimeController.add(mapped);
+    });
+
+    socket.on('server-membership-updated', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'server-membership-updated';
+      _serverRealtimeController.add(mapped);
+    });
+
+    socket.on('connect', (_) {
+      for (final id in _joinedChannelIds) {
+        _emitJoinChannel(id);
+      }
+    });
+
     socket.connect();
     _socket = socket;
   }
 
+  static void _emitJoinChannel(String channelId) {
+    final s = _socket;
+    if (s == null || !s.connected || channelId.isEmpty) return;
+    s.emit('join-channel', {'channelId': channelId});
+  }
+
   static void joinChannel(String channelId) {
-    _socket?.emit('join-channel', {'channelId': channelId});
+    if (channelId.isEmpty) return;
+    _joinedChannelIds.add(channelId);
+    _emitJoinChannel(channelId);
   }
 
   static void leaveChannel(String channelId) {
-    _socket?.emit('leave-channel', {'channelId': channelId});
+    if (channelId.isEmpty) return;
+    _joinedChannelIds.remove(channelId);
+    final s = _socket;
+    if (s != null && s.connected) {
+      s.emit('leave-channel', {'channelId': channelId});
+    }
   }
 
   static Future<void> disconnect() async {
@@ -87,10 +137,15 @@ class ChannelMessagesRealtimeService {
       socket.off('new-message');
       socket.off('reaction-updated');
       socket.off('message-deleted');
+      socket.off('channel-notification');
+      socket.off('server-updated');
+      socket.off('server-membership-updated');
+      socket.off('connect');
       socket.disconnect();
       socket.dispose();
     }
     _socket = null;
     _token = null;
+    _joinedChannelIds.clear();
   }
 }

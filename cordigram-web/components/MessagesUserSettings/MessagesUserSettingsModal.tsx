@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import styles from "./MessagesUserSettingsModal.module.css";
 import { useLanguage } from "@/component/language-provider";
 import {
+  clearMessagesShellThemeOverride,
   getMessagesShellTheme,
   setMessagesShellTheme as persistMessagesShellTheme,
   type MessagesShellTheme,
@@ -104,14 +105,26 @@ export default function MessagesUserSettingsModal({
   >([]);
   const [listOpen, setListOpen] = useState<"none" | "blocked">("none");
   const [boostUnlocked, setBoostUnlocked] = useState(false);
+  const [boostStatus, setBoostStatus] = useState<{
+    tier?: "basic" | "boost" | null;
+    active?: boolean;
+    expiresAt?: string | null;
+    billingCycle?: "monthly" | "yearly" | null;
+    source?: "purchase" | "gift" | null;
+  } | null>(null);
   const [messagesShellTheme, setMessagesShellTheme] = useState<MessagesShellTheme>("dark");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setMessagesShellTheme(getMessagesShellTheme());
     const onShell = () => setMessagesShellTheme(getMessagesShellTheme());
+    const onChatSettings = () => setMessagesShellTheme(getMessagesShellTheme());
     window.addEventListener("cordigram-messages-shell-theme", onShell);
-    return () => window.removeEventListener("cordigram-messages-shell-theme", onShell);
+    window.addEventListener("cordigram-chat-settings", onChatSettings);
+    return () => {
+      window.removeEventListener("cordigram-messages-shell-theme", onShell);
+      window.removeEventListener("cordigram-chat-settings", onChatSettings);
+    };
   }, []);
 
   const commitMessagesShellTheme = useCallback((mode: MessagesShellTheme) => {
@@ -122,16 +135,6 @@ export default function MessagesUserSettingsModal({
   const backgroundThemeOptions = useMemo(
     () =>
       [
-        {
-          id: "default" as const,
-          color: "#5865F2",
-          labelKey: "settings.appearanceBg.presetDefault" as const,
-        },
-        {
-          id: "social-dark" as const,
-          color: "#0C1220",
-          labelKey: "settings.appearanceBg.presetSocialDark" as const,
-        },
         {
           id: "graphite" as const,
           color: "#3A3D49",
@@ -186,8 +189,17 @@ export default function MessagesUserSettingsModal({
     if (!open) return;
     if (typeof window === "undefined") return;
     migrateMessagesChromeStorageOnce(currentUserId);
-    setChromeHex(readMessagesChromeHex(currentUserId));
-    setAppearanceSource(readMessagesAppearanceSource(currentUserId));
+    const nextChromeHex = readMessagesChromeHex(currentUserId);
+    const nextSource = readMessagesAppearanceSource(currentUserId);
+    setChromeHex(nextChromeHex);
+    setAppearanceSource(nextSource);
+    // Legacy presets "default"/"social-dark" giờ được xem là trạng thái follow Social.
+    if (
+      nextSource === "background" &&
+      (nextChromeHex === "#5865F2" || nextChromeHex === "#0C1220")
+    ) {
+      clearMessagesShellThemeOverride();
+    }
     setMessagesShellTheme(getMessagesShellTheme());
   }, [open, currentUserId]);
 
@@ -205,6 +217,7 @@ export default function MessagesUserSettingsModal({
       const unlocked =
         Boolean(b?.active) || Boolean(b?.unlocked) || Boolean(b?.accountBoost);
       setBoostUnlocked(unlocked);
+      setBoostStatus(b);
       if (!unlocked) {
         setAppearanceSource((prev) => {
           if (prev === "accent") {
@@ -302,6 +315,19 @@ export default function MessagesUserSettingsModal({
   );
 
   if (!open || typeof document === "undefined") return null;
+
+  const boostTierLabel =
+    boostStatus?.tier === "boost"
+      ? "Boost"
+      : boostStatus?.tier === "basic"
+        ? "Boost cơ bản"
+        : "Chưa có gói";
+  const boostCycleLabel =
+    boostStatus?.billingCycle === "yearly"
+      ? "Năm"
+      : boostStatus?.billingCycle === "monthly"
+        ? "Tháng"
+        : null;
 
   const portalHost = getMessagesRoot() ?? document.body;
 
@@ -578,6 +604,22 @@ export default function MessagesUserSettingsModal({
 
             {section === "appearance" ? (
               <>
+                <div className={styles.panel} style={{ marginBottom: 12 }}>
+                  <div className={styles.row}>
+                    <span className={styles.rowLabel}>Gói Boost đã mua</span>
+                    <strong>
+                      {boostStatus?.active ? boostTierLabel : "Không hoạt động"}
+                    </strong>
+                  </div>
+                  {boostStatus?.active ? (
+                    <div className={styles.hint} style={{ marginTop: 8, marginBottom: 0 }}>
+                      {boostCycleLabel ? `Chu kỳ: ${boostCycleLabel}. ` : ""}
+                      {boostStatus?.expiresAt
+                        ? `Hết hạn: ${new Date(boostStatus.expiresAt).toLocaleDateString()}`
+                        : ""}
+                    </div>
+                  ) : null}
+                </div>
                 <p className={styles.appearanceMutualHint}>
                   {t("settings.appearance.mutualHint")}
                 </p>
@@ -627,6 +669,7 @@ export default function MessagesUserSettingsModal({
                                     "background",
                                   );
                                   setAppearanceSource("background");
+                                  // User custom nền Messages => tách khỏi Social mode.
                                   commitMessagesShellTheme("dark");
                                   const h = normalizeMessagesChromeHex(option.color);
                                   persistMessagesChromeHex(currentUserId, h);

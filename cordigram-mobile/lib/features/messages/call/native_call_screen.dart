@@ -197,6 +197,56 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       ];
       _screenShareEnabled = localSharing;
     });
+    _syncMinimizedPipIfNeeded();
+  }
+
+  void _syncMinimizedPipIfNeeded() {
+    if (!mounted || _hangupCalled) return;
+    final mgr = DmCallManager.instance;
+    if (!mgr.isCallMinimized || mgr.active == null) return;
+
+    if (!_isVideoCall || _room == null) {
+      mgr.setMinimizedPipVideoTracks(
+        remoteMain: null,
+        localPip: null,
+        remoteMainIsScreenShare: false,
+      );
+      return;
+    }
+
+    LocalParticipant? local;
+    final remotes = <Participant>[];
+    for (final p in _participants) {
+      if (p is LocalParticipant) {
+        local = p;
+      } else {
+        remotes.add(p);
+      }
+    }
+    final remote = remotes.isNotEmpty ? remotes.first : null;
+    final remoteHasScreen = _ParticipantTile.hasScreenShare(remote);
+    final mainParticipant = remoteHasScreen ? remote : (remote ?? local);
+    final mainPrefersScreen = remoteHasScreen;
+
+    final remoteMain = _ParticipantTile.pickRenderableVideo(
+      mainParticipant,
+      preferScreenShare: mainPrefersScreen,
+    );
+    final remoteMainIsScreen = _ParticipantTile.videoTrackIsScreenShare(
+      mainParticipant,
+      remoteMain,
+    );
+
+    VideoTrack? localPip;
+    if (remote != null && local != null) {
+      localPip = _ParticipantTile.pickLocalCameraVideo(local!, camOn: _camEnabled);
+    }
+
+    mgr.setMinimizedPipVideoTracks(
+      remoteMain: remoteMain,
+      localPip: localPip,
+      remoteMainIsScreenShare: remoteMainIsScreen,
+    );
   }
 
   Future<void> _toggleMic() async {
@@ -568,6 +618,11 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       );
     } finally {
       _isMinimizeNavigating = false;
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _syncMinimizedPipIfNeeded();
+        });
+      }
     }
   }
 
@@ -627,6 +682,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     return _VideoCallBody(
       participants: _participants,
       peerName: widget.title,
+      peerAvatarUrl: widget.peerAvatarUrl,
       localDisplayName: widget.localDisplayName,
       localMicOn: _micEnabled,
       localCamOn: _camEnabled,
@@ -667,6 +723,70 @@ class _CallHeader extends StatelessWidget {
   }
 }
 
+/// Full-stage placeholder before the remote LiveKit participant appears.
+class _RemoteCallPlaceholder extends StatelessWidget {
+  const _RemoteCallPlaceholder({
+    required this.name,
+    this.avatarUrl,
+  });
+
+  final String name;
+  final String? avatarUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = name.trim();
+    final display = trimmed.isNotEmpty ? trimmed : 'Cuộc gọi';
+    final initial =
+        display.isNotEmpty ? display.substring(0, 1).toUpperCase() : '?';
+    final url = avatarUrl?.trim();
+
+    return ColoredBox(
+      color: const Color(0xFF0F1B37),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 56,
+            backgroundColor: const Color(0xFF1B2A4A),
+            backgroundImage:
+                (url != null && url.isNotEmpty) ? NetworkImage(url!) : null,
+            onBackgroundImageError: (_, __) {},
+            child: (url == null || url.isEmpty)
+                ? Text(
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              display,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Đang kết nối...',
+            style: TextStyle(color: Color(0xFFB6C2DC)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _VideoCallBody extends StatelessWidget {
   const _VideoCallBody({
     required this.participants,
@@ -674,11 +794,13 @@ class _VideoCallBody extends StatelessWidget {
     required this.localMicOn,
     required this.localCamOn,
     required this.localScreenSharing,
+    this.peerAvatarUrl,
     this.localDisplayName,
   });
 
   final List<Participant> participants;
   final String peerName;
+  final String? peerAvatarUrl;
   final String? localDisplayName;
   final bool localMicOn;
   final bool localCamOn;
@@ -707,25 +829,31 @@ class _VideoCallBody extends StatelessWidget {
     final remoteHasScreen = _ParticipantTile.hasScreenShare(remote);
 
     // 1:1 call layout rule:
-    // - Main always prioritizes remote participant (screen > camera > avatar).
-    // - Local preview stays in PiP whenever the remote is on the main stage:
-    //   live camera when on; otherwise avatar + name (matches web CallRoom).
-    final mainParticipant = remoteHasScreen
-        ? remote
-        : (remote ?? local);
+    // - Main stage shows the peer (remote). While waiting for them to join,
+    //   show peer name + avatar from signaling — not the local camera.
+    // - Local preview stays in PiP (video or avatar + name).
+    final mainParticipant =
+        remoteHasScreen ? remote : (remote ?? local);
     final mainPrefersScreen = remoteHasScreen;
 
-    final showLocalPip = remote != null && local is LocalParticipant;
+    final waitingForPeer = remote == null;
+    final showLocalPip = local is LocalParticipant;
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Stack(
       children: [
         Positioned.fill(
-          child: _ParticipantTile(
-            participant: mainParticipant,
-            fallbackName: remotes.isEmpty ? 'Bạn' : peerName,
-            preferScreenShare: mainPrefersScreen,
-          ),
+          child: waitingForPeer
+              ? _RemoteCallPlaceholder(
+                  name: peerName,
+                  avatarUrl: peerAvatarUrl,
+                )
+              : _ParticipantTile(
+                  participant: mainParticipant,
+                  fallbackName: peerName,
+                  preferScreenShare: mainPrefersScreen,
+                  avatarUrl: peerAvatarUrl,
+                ),
         ),
         if (showLocalPip)
           Positioned(
@@ -967,12 +1095,15 @@ class _ParticipantTile extends StatelessWidget {
     required this.fallbackName,
     this.compact = false,
     this.preferScreenShare = false,
+    this.avatarUrl,
   });
 
   final Participant? participant;
   final String fallbackName;
   final bool compact;
   final bool preferScreenShare;
+  /// Profile photo when there is no renderable video (e.g. camera off).
+  final String? avatarUrl;
 
   static bool hasScreenShare(Participant? participant) {
     if (participant == null) return false;
@@ -988,12 +1119,15 @@ class _ParticipantTile extends StatelessWidget {
     );
   }
 
-  VideoTrack? _pickVideoTrack() {
-    final p = participant;
-    if (p == null) return null;
+  /// Shared with minimized PiP overlay.
+  static VideoTrack? pickRenderableVideo(
+    Participant? participant, {
+    required bool preferScreenShare,
+  }) {
+    if (participant == null) return null;
     VideoTrack? camera;
     VideoTrack? screen;
-    for (final pub in p.videoTrackPublications) {
+    for (final pub in participant.videoTrackPublications) {
       final track = pub.track;
       if (track is! VideoTrack || pub.muted) continue;
       if (pub.source == TrackSource.screenShareVideo) {
@@ -1004,6 +1138,28 @@ class _ParticipantTile extends StatelessWidget {
     }
     return preferScreenShare ? (screen ?? camera) : (camera ?? screen);
   }
+
+  static bool videoTrackIsScreenShare(Participant? participant, VideoTrack? track) {
+    if (participant == null || track == null) return false;
+    return participant.videoTrackPublications.any(
+      (pub) => pub.track == track && pub.source == TrackSource.screenShareVideo,
+    );
+  }
+
+  static VideoTrack? pickLocalCameraVideo(LocalParticipant local, {required bool camOn}) {
+    if (!camOn) return null;
+    for (final pub in local.videoTrackPublications) {
+      final t = pub.track;
+      if (t is! VideoTrack || pub.muted) continue;
+      if (pub.source == TrackSource.camera) {
+        return t;
+      }
+    }
+    return null;
+  }
+
+  VideoTrack? _pickVideoTrack() =>
+      pickRenderableVideo(participant, preferScreenShare: preferScreenShare);
 
   @override
   Widget build(BuildContext context) {
@@ -1022,6 +1178,36 @@ class _ParticipantTile extends StatelessWidget {
       );
     }
     final name = participant?.name ?? participant?.identity ?? fallbackName;
+    final initial =
+        name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
+    final url = avatarUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      final r = compact ? 28.0 : 56.0;
+      return Container(
+        color: const Color(0xFF0F1B37),
+        alignment: Alignment.center,
+        child: ClipOval(
+          child: Image.network(
+            url,
+            width: r * 2,
+            height: r * 2,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => CircleAvatar(
+              radius: r,
+              backgroundColor: const Color(0xFF1B2A4A),
+              child: Text(
+                initial,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: compact ? 20 : 34,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Container(
       color: const Color(0xFF0F1B37),
       alignment: Alignment.center,
@@ -1029,7 +1215,7 @@ class _ParticipantTile extends StatelessWidget {
         radius: compact ? 24 : 44,
         backgroundColor: const Color(0xFF1B2A4A),
         child: Text(
-          name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
+          initial,
           style: TextStyle(
             color: Colors.white,
             fontSize: compact ? 20 : 34,

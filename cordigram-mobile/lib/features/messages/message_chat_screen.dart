@@ -16,6 +16,8 @@ import 'services/direct_messages_realtime_service.dart';
 import 'services/direct_messages_service.dart';
 import 'models/dm_message.dart';
 import 'models/message_thread.dart';
+import 'pinned_messages_screen.dart';
+import 'search/message_search_sheet.dart';
 import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
@@ -55,7 +57,50 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   Timer? _typingTimer;
   bool _typingOn = false;
   final Map<String, String> _serverEmojiMap = {};
+  final Map<String, GlobalKey> _messageKeys = {};
+  String? _highlightMessageId;
   String _lang = 'vi';
+
+  GlobalKey _keyForMessage(String id) =>
+      _messageKeys.putIfAbsent(id, () => GlobalKey());
+
+  Future<void> _scrollToMessageId(String messageId) async {
+    if (!mounted) return;
+    setState(() => _highlightMessageId = messageId);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
+    final ctx = _messageKeys[messageId]?.currentContext;
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        alignment: 0.35,
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tin nhắn không có trong đoạn đang tải'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted && _highlightMessageId == messageId) {
+      setState(() => _highlightMessageId = null);
+    }
+  }
+
+  Future<void> _openDmConversationSearch() async {
+    await MessageSearchSheet.present(
+      context,
+      child: MessageSearchSheet.dmConversation(
+        partnerId: widget.thread.id,
+        partnerName: widget.thread.name,
+        onPickMessageInThread: (id) => _scrollToMessageId(id),
+      ),
+    );
+  }
   @override
   void initState() {
     super.initState();
@@ -1174,121 +1219,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                       widget.controller.blockUser(widget.thread.id);
                     },
                   ),
-                  _MenuActionRow(
-                    title: 'Cảm xúc nhanh',
-                    onTap: () {
-                      Navigator.of(dialogContext).pop();
-                      _showQuickReactionSheet();
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _showQuickReactionSheet() async {
-    const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
-    await showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.3),
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Container(
-            width: 360,
-            height: 420,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A1737),
-              border: Border.all(color: const Color(0xFF5D6B87)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Cảm xúc nhanh',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => Navigator.of(dialogContext).pop(),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          color: Color(0xFF32446D),
-                          size: 26,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A3859),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Icon Category',
-                    style: TextStyle(
-                      color: Color(0xFFD9E1F3),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFF5D6B87)),
-                      ),
-                      child: GridView.builder(
-                        itemCount: reactions.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 5,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                            ),
-                        itemBuilder: (context, index) {
-                          final emoji = reactions[index];
-                          return InkWell(
-                            onTap: () async {
-                              Navigator.of(dialogContext).pop();
-                              if (_messages.isEmpty) return;
-                              await widget.controller.addReaction(
-                                messageId: _messages.last.id,
-                                emoji: emoji,
-                              );
-                            },
-                            child: Center(
-                              child: Text(
-                                emoji,
-                                style: const TextStyle(fontSize: 24),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -1302,7 +1232,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     required DmMessage message,
     required bool isMine,
   }) async {
-    const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0B1424),
@@ -1321,26 +1250,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                children: reactions.map((emoji) {
-                  return ActionChip(
-                    label: Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                    onPressed: () async {
-                      Navigator.of(ctx).pop();
-                      await widget.controller.addReaction(
-                        messageId: message.id,
-                        emoji: emoji,
-                      );
-                    },
-                    backgroundColor: const Color(0xFF1F2D4D),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 8),
               ListTile(
                 leading: const Icon(Icons.reply_rounded, color: Colors.white),
                 title: const Text(
@@ -1361,6 +1270,17 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _showCustomReactionPicker(message);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.push_pin_outlined, color: Colors.white),
+                title: const Text(
+                  'Ghim tin nhắn',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  await _togglePinMessage(message);
                 },
               ),
               ListTile(
@@ -1428,6 +1348,40 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     );
   }
 
+  Future<void> _togglePinMessage(DmMessage message) async {
+    try {
+      final updated = await DirectMessagesService.togglePin(message.id);
+      if (updated == null) return;
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == message.id);
+        if (idx != -1) _messages[idx] = updated;
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Bạn đã ghim tin nhắn'),
+          action: SnackBarAction(
+            label: 'Xem tất cả',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PinnedMessagesScreen.dm(
+                    peerUserId: widget.thread.id,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể ghim tin nhắn: $e')),
+      );
+    }
+  }
+
   Future<void> _showCustomReactionPicker(DmMessage message) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1473,6 +1427,37 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       default:
         return message.content;
     }
+  }
+
+  String _senderNameForBubble(DmMessage message) {
+    final name = (message.senderDisplayName ?? '').trim();
+    if (name.isNotEmpty) return name;
+    final username = (message.senderUsername ?? '').trim();
+    if (username.isNotEmpty) return username;
+    return widget.thread.name;
+  }
+
+  Widget _senderAvatarForBubble(DmMessage message) {
+    final avatarUrl = (message.senderAvatarUrl ?? '').trim();
+    final fallback = _senderNameForBubble(message);
+    if (avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 13,
+        backgroundImage: NetworkImage(avatarUrl),
+      );
+    }
+    return CircleAvatar(
+      radius: 13,
+      backgroundColor: const Color(0xFFDDDDDD),
+      child: Text(
+        fallback.isNotEmpty ? fallback.substring(0, 1).toUpperCase() : 'U',
+        style: const TextStyle(
+          color: Color(0xFF1B2A4A),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 
   String _replyPreviewText(DmReplyMessage reply) {
@@ -1684,6 +1669,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
         ),
         actions: [
           _TopActionIcon(
+            icon: Icons.search_rounded,
+            onTap: _openDmConversationSearch,
+          ),
+          _TopActionIcon(
             icon: Icons.call_rounded,
             onTap: () => _onStartCall(video: false),
           ),
@@ -1715,81 +1704,124 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                       final isMine = myId != null
                           ? message.senderId == myId
                           : message.senderId != widget.thread.id;
-                      return Align(
+                      final hi = _highlightMessageId == message.id;
+                      return KeyedSubtree(
+                        key: _keyForMessage(message.id),
+                        child: Align(
                         alignment: isMine
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: hi
+                              ? BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x664A90E2),
+                                      blurRadius: 12,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                )
+                              : null,
                         child: Column(
                           crossAxisAlignment: isMine
                               ? CrossAxisAlignment.end
                               : CrossAxisAlignment.start,
                           children: [
-                            GestureDetector(
-                              onLongPress: () => _showMessageActions(
-                                message: message,
-                                isMine: isMine,
-                              ),
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.sizeOf(context).width * 0.72,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isMine
-                                      ? const Color(0xFF2B3C66)
-                                      : const Color(0xFF1D2E52),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (message.replyTo != null)
-                                      Container(
-                                        margin: const EdgeInsets.only(bottom: 6),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0x33232f4a),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: const Color(0xFF44577F),
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              message.replyTo!.senderName ??
-                                                  message.replyTo!.senderId,
-                                              style: const TextStyle(
-                                                color: Color(0xFFB6C2DC),
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              _replyPreviewText(message.replyTo!),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                if (!isMine) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6, bottom: 6),
+                                    child: _senderAvatarForBubble(message),
+                                  ),
+                                ],
+                                Flexible(
+                                  child: GestureDetector(
+                                    onLongPress: () => _showMessageActions(
+                                      message: message,
+                                      isMine: isMine,
+                                    ),
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
                                       ),
-                                    _buildMessageContent(message),
-                                  ],
+                                      constraints: BoxConstraints(
+                                        maxWidth: MediaQuery.sizeOf(context).width * 0.72,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isMine
+                                            ? const Color(0xFF2B3C66)
+                                            : const Color(0xFF1D2E52),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (!isMine)
+                                            Padding(
+                                              padding: const EdgeInsets.only(bottom: 4),
+                                              child: Text(
+                                                _senderNameForBubble(message),
+                                                style: const TextStyle(
+                                                  color: Color(0xFFC3D4F7),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          if (message.replyTo != null)
+                                            Container(
+                                              margin: const EdgeInsets.only(bottom: 6),
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 6,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0x33232f4a),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: const Color(0xFF44577F),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    message.replyTo!.senderName ??
+                                                        message.replyTo!.senderId,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFFB6C2DC),
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    _replyPreviewText(message.replyTo!),
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      color: Colors.white70,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          _buildMessageContent(message),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                             if (message.reactions.isNotEmpty)
                               Padding(
@@ -1820,11 +1852,24 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                       .toList(),
                                 ),
                               ),
+                            if (isMine)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3, right: 2),
+                                child: Text(
+                                  message.read ? 'Đã xem' : 'Đã gửi',
+                                  style: const TextStyle(
+                                    color: Color(0xFF9FB3DA),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
                           ],
+                        ),
+                        ),
                         ),
                       );
                     },
-                      ),
+                    ),
               ),
             ],
           ),

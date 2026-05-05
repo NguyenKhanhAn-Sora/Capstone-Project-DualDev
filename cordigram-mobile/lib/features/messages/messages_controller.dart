@@ -7,6 +7,7 @@ import 'models/message_reaction.dart';
 import 'models/message_thread.dart';
 import 'models/presence_state.dart';
 import 'models/voice_control_state.dart';
+import 'services/channel_messages_realtime_service.dart';
 import 'services/direct_messages_realtime_service.dart';
 import 'services/direct_messages_service.dart';
 import 'services/inbox_service.dart';
@@ -25,6 +26,8 @@ class MessagesController extends ChangeNotifier {
   StreamSubscription<PresenceState>? _presenceSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
+  StreamSubscription<Map<String, dynamic>>? _messagesReadSub;
+  StreamSubscription<Map<String, dynamic>>? _channelInboxSub;
   Timer? _inboxPollTimer;
 
   bool _loadingThreads = false;
@@ -57,6 +60,10 @@ class MessagesController extends ChangeNotifier {
   Future<void> init() async {
     _myUserId = DirectMessagesService.currentUserId;
     await DirectMessagesRealtimeService.connect();
+    await ChannelMessagesRealtimeService.connect();
+    _channelInboxSub = ChannelMessagesRealtimeService.channelNotifications.listen(
+      (_) => refreshInboxCount(),
+    );
     _newMessageSub = DirectMessagesRealtimeService.newMessages.listen(
       _onNewMessage,
     );
@@ -68,6 +75,9 @@ class MessagesController extends ChangeNotifier {
     _reactionSub = DirectMessagesRealtimeService.reactions.listen(_onReactionEvent);
     _deletedSub = DirectMessagesRealtimeService.messageDeleted.listen(
       _onDeletedEvent,
+    );
+    _messagesReadSub = DirectMessagesRealtimeService.messagesRead.listen(
+      _onMessagesReadEvent,
     );
     _startInboxPolling();
     await refreshInboxCount();
@@ -95,8 +105,12 @@ class MessagesController extends ChangeNotifier {
     await _presenceSub?.cancel();
     await _reactionSub?.cancel();
     await _deletedSub?.cancel();
+    await _messagesReadSub?.cancel();
+    await _channelInboxSub?.cancel();
     _inboxPollTimer?.cancel();
-    await DirectMessagesRealtimeService.disconnect();
+    // Do not disconnect the shared DM socket here. [DmCallManager] needs it
+    // app-wide for incoming calls while the user is on Home / social tabs.
+    // Teardown happens on logout via [DmCallManager.onAuthChanged].
   }
 
   void _startInboxPolling() {
@@ -335,6 +349,14 @@ class MessagesController extends ChangeNotifier {
           replyTo: old.replyTo,
           attachments: const <String>[],
           reactions: const <MessageReaction>[],
+          isPinned: old.isPinned,
+          pinnedAt: old.pinnedAt,
+          senderDisplayName: old.senderDisplayName,
+          senderUsername: old.senderUsername,
+          senderAvatarUrl: old.senderAvatarUrl,
+          receiverDisplayName: old.receiverDisplayName,
+          receiverUsername: old.receiverUsername,
+          receiverAvatarUrl: old.receiverAvatarUrl,
         );
       }
     } else {
@@ -373,6 +395,14 @@ class MessagesController extends ChangeNotifier {
         replyTo: old.replyTo,
         attachments: old.attachments,
         reactions: reactions,
+        isPinned: old.isPinned,
+        pinnedAt: old.pinnedAt,
+        senderDisplayName: old.senderDisplayName,
+        senderUsername: old.senderUsername,
+        senderAvatarUrl: old.senderAvatarUrl,
+        receiverDisplayName: old.receiverDisplayName,
+        receiverUsername: old.receiverUsername,
+        receiverAvatarUrl: old.receiverAvatarUrl,
       );
       changed = true;
     }
@@ -402,8 +432,62 @@ class MessagesController extends ChangeNotifier {
         replyTo: old.replyTo,
         attachments: const <String>[],
         reactions: const <MessageReaction>[],
+        isPinned: old.isPinned,
+        pinnedAt: old.pinnedAt,
+        senderDisplayName: old.senderDisplayName,
+        senderUsername: old.senderUsername,
+        senderAvatarUrl: old.senderAvatarUrl,
+        receiverDisplayName: old.receiverDisplayName,
+        receiverUsername: old.receiverUsername,
+        receiverAvatarUrl: old.receiverAvatarUrl,
       );
       changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
+  void _onMessagesReadEvent(Map<String, dynamic> payload) {
+    final byUserId = payload['byUserId']?.toString() ?? '';
+    if (byUserId.isEmpty) return;
+    final all = payload['all'] == true;
+    final idsRaw = payload['messageIds'];
+    final ids = idsRaw is List
+        ? idsRaw.map((e) => e.toString()).where((e) => e.isNotEmpty).toSet()
+        : const <String>{};
+    final myId = _myUserId ?? DirectMessagesService.currentUserId;
+    var changed = false;
+    for (final entry in _messagesByUser.entries) {
+      if (entry.key != byUserId) continue;
+      final list = entry.value;
+      for (var i = 0; i < list.length; i++) {
+        final old = list[i];
+        if (old.senderId != myId || old.read) continue;
+        if (!all && !ids.contains(old.id)) continue;
+        list[i] = DmMessage(
+          id: old.id,
+          senderId: old.senderId,
+          receiverId: old.receiverId,
+          content: old.content,
+          createdAt: old.createdAt,
+          type: old.type,
+          read: true,
+          voiceUrl: old.voiceUrl,
+          voiceDurationSec: old.voiceDurationSec,
+          giphyId: old.giphyId,
+          replyTo: old.replyTo,
+          attachments: old.attachments,
+          reactions: old.reactions,
+          isPinned: old.isPinned,
+          pinnedAt: old.pinnedAt,
+          senderDisplayName: old.senderDisplayName,
+          senderUsername: old.senderUsername,
+          senderAvatarUrl: old.senderAvatarUrl,
+          receiverDisplayName: old.receiverDisplayName,
+          receiverUsername: old.receiverUsername,
+          receiverAvatarUrl: old.receiverAvatarUrl,
+        );
+        changed = true;
+      }
     }
     if (changed) notifyListeners();
   }
