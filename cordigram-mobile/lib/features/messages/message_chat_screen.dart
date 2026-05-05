@@ -16,6 +16,7 @@ import 'services/direct_messages_realtime_service.dart';
 import 'services/direct_messages_service.dart';
 import 'models/dm_message.dart';
 import 'models/message_thread.dart';
+import 'search/message_search_sheet.dart';
 import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
@@ -55,7 +56,50 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   Timer? _typingTimer;
   bool _typingOn = false;
   final Map<String, String> _serverEmojiMap = {};
+  final Map<String, GlobalKey> _messageKeys = {};
+  String? _highlightMessageId;
   String _lang = 'vi';
+
+  GlobalKey _keyForMessage(String id) =>
+      _messageKeys.putIfAbsent(id, () => GlobalKey());
+
+  Future<void> _scrollToMessageId(String messageId) async {
+    if (!mounted) return;
+    setState(() => _highlightMessageId = messageId);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
+    final ctx = _messageKeys[messageId]?.currentContext;
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        alignment: 0.35,
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tin nhắn không có trong đoạn đang tải'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted && _highlightMessageId == messageId) {
+      setState(() => _highlightMessageId = null);
+    }
+  }
+
+  Future<void> _openDmConversationSearch() async {
+    await MessageSearchSheet.present(
+      context,
+      child: MessageSearchSheet.dmConversation(
+        partnerId: widget.thread.id,
+        partnerName: widget.thread.name,
+        onPickMessageInThread: (id) => _scrollToMessageId(id),
+      ),
+    );
+  }
   @override
   void initState() {
     super.initState();
@@ -1174,121 +1218,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                       widget.controller.blockUser(widget.thread.id);
                     },
                   ),
-                  _MenuActionRow(
-                    title: 'Cảm xúc nhanh',
-                    onTap: () {
-                      Navigator.of(dialogContext).pop();
-                      _showQuickReactionSheet();
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _showQuickReactionSheet() async {
-    const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
-    await showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.3),
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Container(
-            width: 360,
-            height: 420,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A1737),
-              border: Border.all(color: const Color(0xFF5D6B87)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Cảm xúc nhanh',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => Navigator.of(dialogContext).pop(),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          color: Color(0xFF32446D),
-                          size: 26,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A3859),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Icon Category',
-                    style: TextStyle(
-                      color: Color(0xFFD9E1F3),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFF5D6B87)),
-                      ),
-                      child: GridView.builder(
-                        itemCount: reactions.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 5,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                            ),
-                        itemBuilder: (context, index) {
-                          final emoji = reactions[index];
-                          return InkWell(
-                            onTap: () async {
-                              Navigator.of(dialogContext).pop();
-                              if (_messages.isEmpty) return;
-                              await widget.controller.addReaction(
-                                messageId: _messages.last.id,
-                                emoji: emoji,
-                              );
-                            },
-                            child: Center(
-                              child: Text(
-                                emoji,
-                                style: const TextStyle(fontSize: 24),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -1302,7 +1231,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     required DmMessage message,
     required bool isMine,
   }) async {
-    const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0B1424),
@@ -1321,26 +1249,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                children: reactions.map((emoji) {
-                  return ActionChip(
-                    label: Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                    onPressed: () async {
-                      Navigator.of(ctx).pop();
-                      await widget.controller.addReaction(
-                        messageId: message.id,
-                        emoji: emoji,
-                      );
-                    },
-                    backgroundColor: const Color(0xFF1F2D4D),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 8),
               ListTile(
                 leading: const Icon(Icons.reply_rounded, color: Colors.white),
                 title: const Text(
@@ -1684,6 +1592,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
         ),
         actions: [
           _TopActionIcon(
+            icon: Icons.search_rounded,
+            onTap: _openDmConversationSearch,
+          ),
+          _TopActionIcon(
             icon: Icons.call_rounded,
             onTap: () => _onStartCall(video: false),
           ),
@@ -1715,10 +1627,27 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                       final isMine = myId != null
                           ? message.senderId == myId
                           : message.senderId != widget.thread.id;
-                      return Align(
+                      final hi = _highlightMessageId == message.id;
+                      return KeyedSubtree(
+                        key: _keyForMessage(message.id),
+                        child: Align(
                         alignment: isMine
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: hi
+                              ? BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x664A90E2),
+                                      blurRadius: 12,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                )
+                              : null,
                         child: Column(
                           crossAxisAlignment: isMine
                               ? CrossAxisAlignment.end
@@ -1822,9 +1751,11 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                               ),
                           ],
                         ),
+                        ),
+                        ),
                       );
                     },
-                      ),
+                    ),
               ),
             ],
           ),

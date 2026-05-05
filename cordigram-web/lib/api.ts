@@ -3559,6 +3559,8 @@ export type BoostStatusResponse = {
   tier?: "basic" | "boost" | null;
   active?: boolean;
   expiresAt?: string | null;
+  billingCycle?: "monthly" | "yearly" | null;
+  source?: "purchase" | "gift" | null;
   limits?: any;
   // backwards compatible fields from older endpoint shape
   accountBoost?: boolean;

@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'call/dm_call_manager.dart';
+import 'channel_chat_screen.dart';
 import 'server_detail_screen.dart';
 import 'server_list_controller.dart';
 import 'message_chat_screen.dart';
+import 'search/message_search_sheet.dart';
+import 'services/servers_service.dart';
+import 'voice_channel_room_screen.dart';
 import 'messages_controller.dart';
 import 'models/message_thread.dart';
 import 'models/server_models.dart';
@@ -14,10 +18,11 @@ import 'services/direct_messages_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/voice_channel_session_controller.dart';
 import 'widgets/message_folder_dropdown.dart';
+import 'widgets/messages_inbox_sheet.dart';
 import 'widgets/message_thread_tile.dart';
 
 class MessageHomeScreen extends StatefulWidget {
-  const MessageHomeScreen({super.key});
+  const MessageHomeScreen({super.key}); 
 
   @override
   State<MessageHomeScreen> createState() => _MessageHomeScreenState();
@@ -41,6 +46,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     _messagesController.addListener(_onControllerChanged);
     _serverListController.addListener(_onControllerChanged);
     _messagesController.init();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _serverListController.loadServers();
+    });
   }
 
   @override
@@ -57,16 +65,6 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
   void _onControllerChanged() {
     if (!mounted) return;
     setState(() {});
-  }
-
-  List<MessageThread> get _filteredThreads {
-    final source = _messagesController.threads;
-    final query = _searchController.text.trim().toLowerCase();
-    return source.where((thread) {
-      if (query.isEmpty) return true;
-      return thread.name.toLowerCase().contains(query) ||
-          thread.lastMessage.toLowerCase().contains(query);
-    }).toList();
   }
 
   List<ServerSummary> get _filteredServers {
@@ -160,22 +158,81 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     });
   }
 
-  Future<void> _openServer(ServerSummary server) async {
+  Future<void> _openInboxSheet() async {
+    await MessagesInboxSheet.show(
+      context,
+      onNavigateToChannel: (serverId, channelId) async {
+        await _serverListController.loadServers();
+        if (!mounted) return;
+        ServerSummary? server;
+        for (final s in _serverListController.servers) {
+          if (s.id == serverId) {
+            server = s;
+            break;
+          }
+        }
+        if (server == null) return;
+        final ch = channelId.trim();
+        await _openServer(
+          server,
+          initialTextChannelId: ch.isEmpty ? null : ch,
+        );
+      },
+      onNavigateToDm: (userId, displayName, username, avatarUrl) {
+        final thread = MessageThread(
+          id: userId,
+          name: displayName.trim().isNotEmpty ? displayName.trim() : username,
+          lastMessage: '',
+          lastActiveLabel: '',
+          unreadCount: 0,
+          avatarUrl: (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+              ? avatarUrl.trim()
+              : null,
+        );
+        _openThread(thread);
+        unawaited(_messagesController.refreshThreads());
+      },
+      onAcceptInvite: (serverId) async {
+        await _serverListController.loadServers();
+        if (!mounted) return;
+        for (final s in _serverListController.servers) {
+          if (s.id == serverId) {
+            await _openServer(s);
+            return;
+          }
+        }
+      },
+      onMarkSeen: () {
+        unawaited(_messagesController.refreshInboxCount());
+      },
+    );
+    if (mounted) await _messagesController.refreshInboxCount();
+  }
+
+  Future<void> _openServer(
+    ServerSummary server, {
+    String? initialTextChannelId,
+  }) async {
     _serverListController.selectServer(server.id);
     final displayName = (_messagesController.myDisplayName ?? '').trim();
     final username = (_messagesController.myUsername ?? '').trim();
     final participantName = displayName.isNotEmpty
         ? displayName
         : (username.isNotEmpty ? username : 'Người dùng');
-    await Navigator.of(context).push(
+    final hubResult = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
         builder: (_) => ServerDetailScreen(
           server: server,
           currentUserId: _messagesController.myUserId,
           participantName: participantName,
+          initialTextChannelId: initialTextChannelId,
         ),
       ),
     );
+    if (!mounted) return;
+    if (hubResult == 'deleted' || hubResult == 'left') {
+      unawaited(_serverListController.loadServers());
+    }
   }
 
   Future<void> _createServerDialog() async {
@@ -448,6 +505,109 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     );
   }
 
+  String _participantNameForVoice() {
+    final displayName = (_messagesController.myDisplayName ?? '').trim();
+    final username = (_messagesController.myUsername ?? '').trim();
+    return displayName.isNotEmpty
+        ? displayName
+        : (username.isNotEmpty ? username : 'Người dùng');
+  }
+
+  Future<void> _openGlobalMessageSearch() async {
+    if (_serverListController.servers.isEmpty) {
+      await _serverListController.loadServers();
+    }
+    if (!mounted) return;
+    final threads = _messagesController.threads;
+    final servers = _serverListController.servers;
+    Future<QuickSwitchServerData?> loadQuick(ServerSummary s) async {
+      try {
+        final ch = await ServersService.getServerChannels(s.id);
+        final text = ch
+            .where(
+              (c) =>
+                  c.isText &&
+                  (c.category ?? '').trim().toLowerCase() != 'info',
+            )
+            .toList();
+        final voice = ch.where((c) => c.isVoice).toList();
+        return QuickSwitchServerData(
+          id: s.id,
+          name: s.name,
+          textChannels: text,
+          voiceChannels: voice,
+        );
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final quick = (await Future.wait(servers.map(loadQuick)))
+        .whereType<QuickSwitchServerData>()
+        .toList();
+    if (!mounted) return;
+    await MessageSearchSheet.present(
+      context,
+      child: MessageSearchSheet.globalDm(
+        dmPeers: threads,
+        quickServers: quick,
+        searchUiLanguage: _messagesController.languageCode,
+        onOpenDm: _openThread,
+        onOpenServerChannel: (serverId, channelId) async {
+          ServerSummary? server;
+          for (final s in servers) {
+            if (s.id == serverId) {
+              server = s;
+              break;
+            }
+          }
+          if (server == null || !mounted) return;
+          final chosenServer = server;
+          if (channelId == null || channelId.isEmpty) {
+            await _openServer(chosenServer);
+            return;
+          }
+          try {
+            final channels =
+                await ServersService.getServerChannels(chosenServer.id);
+            ServerChannel? ch;
+            for (final c in channels) {
+              if (c.id == channelId) {
+                ch = c;
+                break;
+              }
+            }
+            if (ch == null || !mounted) return;
+            final chosenChannel = ch;
+            final name = _participantNameForVoice();
+            if (chosenChannel.isVoice) {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => VoiceChannelRoomScreen(
+                    server: chosenServer,
+                    channel: chosenChannel,
+                    participantName: name,
+                  ),
+                ),
+              );
+            } else {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ChannelChatScreen(
+                    server: chosenServer,
+                    channel: chosenChannel,
+                    currentUserId: _messagesController.myUserId,
+                    participantName: name,
+                  ),
+                ),
+              );
+            }
+          } catch (_) {}
+        },
+      ),
+    );
+  }
+
   MessageThread _toServerThread(ServerSummary server) {
     return MessageThread(
       id: server.id,
@@ -563,7 +723,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final threads = _filteredThreads;
+    final threads = _messagesController.threads;
     final servers = _filteredServers;
 
     return AnimatedBuilder(
@@ -614,10 +774,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                 clipBehavior: Clip.none,
                 children: [
                   IconButton(
-                    tooltip: 'Inbox',
-                    onPressed: () async {
-                      await _messagesController.refreshInboxCount();
-                    },
+                    tooltip: 'Hộp thư',
+                    onPressed: _openInboxSheet,
                     constraints: const BoxConstraints.tightFor(
                       width: 30,
                       height: 30,
@@ -660,45 +818,86 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: _isServerMode
-                      ? 'Tìm server...'
-                      : 'Tìm hoặc bắt đầu cuộc trò chuyện ....',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFFAFC0E2),
-                    fontSize: 13,
-                  ),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFAFC0E2),
-                      width: 1,
+              child: _isServerMode
+                  ? TextField(
+                      controller: _searchController,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Tìm server...',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFFAFC0E2),
+                          fontSize: 13,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFAFC0E2),
+                            width: 1,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFAFC0E2),
+                            width: 1,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(
+                            color: Colors.white,
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                    )
+                  : TextField(
+                      readOnly: true,
+                      onTap: _openGlobalMessageSearch,
+                      decoration: InputDecoration(
+                        hintText: 'Tìm hoặc bắt đầu cuộc trò chuyện',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFFAFC0E2),
+                          fontSize: 13,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          color: Color(0xFFAFC0E2),
+                          size: 22,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFAFC0E2),
+                            width: 1,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFAFC0E2),
+                            width: 1,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFAFC0E2),
+                            width: 1,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFAFC0E2),
-                      width: 1,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(
-                      color: Colors.white,
-                      width: 1.2,
-                    ),
-                  ),
-                ),
-              ),
             ),
             const Divider(height: 1, thickness: 1, color: _lineColor),
             Expanded(

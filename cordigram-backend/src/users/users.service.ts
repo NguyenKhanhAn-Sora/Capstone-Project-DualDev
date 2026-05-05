@@ -122,6 +122,8 @@ export class UsersService {
     tier?: 'basic' | 'boost' | null;
     active?: boolean;
     expiresAt?: string | null;
+    billingCycle?: 'monthly' | 'yearly' | null;
+    source?: 'purchase' | 'gift' | null;
     limits?: any;
   }> {
     const user = await this.userModel
@@ -155,6 +157,8 @@ export class UsersService {
       tier: ent.tier,
       active: ent.active,
       expiresAt: ent.expiresAt,
+      billingCycle: ent.billingCycle ?? null,
+      source: ent.source ?? null,
       limits: ent.limits,
     };
   }
