@@ -661,10 +661,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     try {
       if (!wasSaved) {
         await PostInteractionService.save(widget.postId);
-        _showSnack('Saved');
+        _showSnack(LanguageController.instance.t('home.snack.saved'));
       } else {
         await PostInteractionService.unsave(widget.postId);
-        _showSnack('Removed from saved');
+        _showSnack(LanguageController.instance.t('home.snack.removedFromSaved'));
       }
     } catch (_) {
       if (!mounted) return;
@@ -679,7 +679,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           impressions: s.stats.impressions,
         );
       });
-      _showSnack('Failed to update save', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.saveError'), error: true);
     }
   }
 
@@ -702,7 +702,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             stats: updated.stats,
           );
         });
-        _showSnack('Post updated');
+        _showSnack(LanguageController.instance.t('home.snack.postUpdated'));
         return;
       case PostMenuAction.editVisibility:
         final nextVisibility = await showEditVisibilitySheet(
@@ -716,7 +716,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             post: post.copyWith(visibility: nextVisibility),
           );
         });
-        _showSnack('Visibility updated');
+        _showSnack(LanguageController.instance.t('home.snack.visibilityUpdated'));
         return;
       case PostMenuAction.toggleComments:
         final currentAllowed = post.allowComments != false;
@@ -729,7 +729,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         try {
           await PostInteractionService.setAllowComments(post.id, nextAllowed);
           _showSnack(
-            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+            nextAllowed ? LanguageController.instance.t('home.snack.commentsOn') : LanguageController.instance.t('home.snack.commentsOff'),
           );
         } catch (_) {
           if (!mounted) return;
@@ -738,7 +738,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               post: post.copyWith(allowComments: currentAllowed),
             );
           });
-          _showSnack('Failed to update comments', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.commentsError'), error: true);
         }
         return;
       case PostMenuAction.toggleHideLike:
@@ -751,7 +751,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         });
         try {
           await PostInteractionService.setHideLikeCount(post.id, nextHidden);
-          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+          _showSnack(nextHidden ? LanguageController.instance.t('home.snack.likeHidden') : LanguageController.instance.t('home.snack.likeVisible'));
         } catch (_) {
           if (!mounted) return;
           setState(() {
@@ -759,13 +759,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               post: post.copyWith(hideLikeCount: currentHidden),
             );
           });
-          _showSnack('Failed to update like visibility', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.likeError'), error: true);
         }
         return;
       case PostMenuAction.copyLink:
         final link = PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
-        _showSnack('Link copied');
+        _showSnack(LanguageController.instance.t('home.snack.linkCopied'));
         return;
       case PostMenuAction.muteNotifications:
         final label = post.kind.toLowerCase() == 'reel' ? 'reel' : 'post';
@@ -777,8 +777,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         if (muted) {
           _showSnack(
             label == 'reel'
-                ? 'Reel notifications muted'
-                : 'Post notifications muted',
+                ? LanguageController.instance.t('home.snack.reelMuted')
+                : LanguageController.instance.t('home.snack.postMuted'),
           );
         }
         return;
@@ -788,7 +788,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           context,
           title: lc.t('home.deletePost.title'),
           message: lc.t('common.cannotUndo'),
-          confirmLabel: 'Delete',
+          confirmLabel: LanguageController.instance.t('common.delete'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -797,7 +797,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           if (!mounted) return;
           Navigator.of(context).pop({'deletedPostId': post.id});
         } catch (_) {
-          _showSnack('Failed to delete post', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.deleteError'), error: true);
         }
         return;
       case PostMenuAction.followToggle:
@@ -814,13 +814,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           if (!mounted) return;
           Navigator.of(context).pop();
         } catch (_) {
-          _showSnack('Failed to hide post', error: true);
+          _showSnack(LanguageController.instance.t('post.detail.hideError'), error: true);
         }
         return;
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack('Please sign in first', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.signInFirst'), error: true);
           return;
         }
         final reported = await showReportPostSheet(
@@ -840,7 +840,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           context,
           title: lc2.t('home.blockUser.title', {'username': username}),
           message: lc2.t('home.blockUser.message'),
-          confirmLabel: 'Block',
+          confirmLabel: lc2.t('common.block'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -849,14 +849,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           if (!mounted) return;
           Navigator.of(context).pop();
         } catch (_) {
-          _showSnack('Failed to block account', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.blockError'), error: true);
         }
         return;
       case PostMenuAction.goToAdsPost:
-        _showSnack('Already on this ads post');
+        _showSnack(LanguageController.instance.t('post.detail.alreadyOnAds'));
         return;
       case PostMenuAction.detailAds:
-        _showSnack('Ads detail is available from Home feed', error: true);
+        _showSnack(LanguageController.instance.t('post.detail.adsFromFeed'), error: true);
         return;
     }
   }
@@ -964,7 +964,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
         title: Text(
-          'Post',
+          LanguageController.instance.t('post.detail.title'),
           style: TextStyle(
             color: scheme.onSurface,
             fontWeight: FontWeight.w700,
@@ -1054,9 +1054,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3470A2),
                 ),
-                child: const Text(
-                  'Retry',
-                  style: TextStyle(color: Colors.white),
+                child: Text(
+                  LanguageController.instance.t('common.retry'),
+                  style: const TextStyle(color: Colors.white),
                 ),
               ),
             ],
@@ -1106,7 +1106,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               child: Row(
                 children: [
                   Text(
-                    'Comments',
+                    LanguageController.instance.t('post.detail.comments.title'),
                     style: TextStyle(
                       color: tokens.text,
                       fontWeight: FontWeight.w700,
@@ -1142,7 +1142,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'No comments yet.',
+                      LanguageController.instance.t('post.detail.comments.empty'),
                       style: TextStyle(color: tokens.textMuted, fontSize: 14),
                     ),
                   ],
@@ -1210,9 +1210,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                     TextButton(
                       onPressed: _loadComments,
-                      child: const Text(
-                        'Retry',
-                        style: TextStyle(color: Color(0xFF4AA3E4)),
+                      child: Text(
+                        LanguageController.instance.t('common.retry'),
+                        style: const TextStyle(color: Color(0xFF4AA3E4)),
                       ),
                     ),
                   ],
@@ -1426,7 +1426,7 @@ class _CommentTileState extends State<_CommentTile> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isPinned ? 'Comment unpinned' : 'Comment pinned'),
+          content: Text(LanguageController.instance.t(isPinned ? 'post.detail.comments.unpinned' : 'post.detail.comments.pinned')),
           backgroundColor: const Color(0xFF1A2235),
           duration: const Duration(seconds: 2),
         ),
@@ -1448,16 +1448,16 @@ class _CommentTileState extends State<_CommentTile> {
         CommentSheetAction(
           icon: Icons.translate_rounded,
           label: _translatedText != null
-              ? 'Hide translation'
-              : 'Translate comment',
+              ? lc.t('post.detail.comments.hideTranslation')
+              : lc.t('post.detail.comments.translate'),
           onTap: _translateComment,
         ),
       if (_isPostOwner && !isReply)
         CommentSheetAction(
           icon: Icons.push_pin_rounded,
           label: widget.comment.pinnedAt != null
-              ? 'Unpin comment'
-              : 'Pin comment',
+              ? lc.t('post.detail.comments.unpin')
+              : lc.t('post.detail.comments.pin'),
           onTap: _onPinComment,
         ),
       if (_isOwnComment) ...[
@@ -1802,7 +1802,7 @@ class _CommentTileState extends State<_CommentTile> {
                                   ),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'Pinned',
+                                    LanguageController.instance.t('post.detail.comments.pinnedBadge'),
                                     style: TextStyle(
                                       color: tokens.textMuted,
                                       fontSize: 11,
@@ -1882,8 +1882,8 @@ class _CommentTileState extends State<_CommentTile> {
                                             ),
                                             child: Text(
                                               _textExpanded
-                                                  ? 'See less'
-                                                  : 'See more',
+                                                  ? LanguageController.instance.t('post.seeLess')
+                                                  : LanguageController.instance.t('post.seeMore'),
                                               style: TextStyle(
                                                 color: tokens.primary,
                                                 fontSize: 13,
@@ -1898,7 +1898,7 @@ class _CommentTileState extends State<_CommentTile> {
                                             top: 3,
                                           ),
                                           child: Text(
-                                            'Translated',
+                                            LanguageController.instance.t('post.detail.comments.translated'),
                                             style: TextStyle(
                                               color: tokens.textMuted,
                                               fontSize: 11,
@@ -1969,7 +1969,7 @@ class _CommentTileState extends State<_CommentTile> {
                                     comment.author?.username,
                                   ),
                                   child: Text(
-                                    'Reply',
+                                    LanguageController.instance.t('post.detail.comments.reply'),
                                     style: TextStyle(
                                       color: tokens.textMuted,
                                       fontSize: 12,
@@ -2005,9 +2005,8 @@ class _CommentTileState extends State<_CommentTile> {
                                     else
                                       Text(
                                         _expanded
-                                            ? 'Hide replies'
-                                            : 'View replies'
-                                                  '${displayReplyCount > 0 ? " ($displayReplyCount)" : ""}',
+                                            ? LanguageController.instance.t('post.detail.comments.hideReplies')
+                                            : '${LanguageController.instance.t('post.detail.comments.viewReplies')}${displayReplyCount > 0 ? " ($displayReplyCount)" : ""}',
 
                                         style: TextStyle(
                                           color: tokens.primary,
@@ -2075,7 +2074,7 @@ class _CommentTileState extends State<_CommentTile> {
                             ),
                           )
                         : Text(
-                            'Load more replies',
+                            LanguageController.instance.t('post.detail.comments.loadMoreReplies'),
                             style: TextStyle(
                               color: tokens.primary,
                               fontSize: 12,
@@ -2116,9 +2115,9 @@ class _CommentTileState extends State<_CommentTile> {
                   ),
                   GestureDetector(
                     onTap: () => _loadReplies(nextPage: 1),
-                    child: const Text(
-                      'Retry',
-                      style: TextStyle(
+                    child: Text(
+                      LanguageController.instance.t('common.retry'),
+                      style: const TextStyle(
                         color: Color(0xFF4AA3E4),
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -2135,30 +2134,31 @@ class _CommentTileState extends State<_CommentTile> {
 
   static String _timeAgo(String? iso) {
     if (iso == null || iso.isEmpty) return '';
+    final lc = LanguageController.instance;
     try {
       final dt = DateTime.parse(iso).toLocal();
       final diff = DateTime.now().difference(dt);
-      if (diff.isNegative) return 'just now';
+      if (diff.isNegative) return lc.t('post.time.justNow');
       final mins = (diff.inSeconds / 60).round();
-      if (mins < 1) return 'just now';
-      if (mins < 2) return '1 minute ago';
-      if (mins < 45) return '$mins minutes ago';
-      if (mins < 90) return 'about 1 hour ago';
-      if (mins < 1440) return 'about ${(mins / 60).round()} hours ago';
-      if (mins < 2520) return '1 day ago';
-      if (mins < 43200) return '${(mins / 1440).round()} days ago';
-      if (mins < 86400) return 'about ${(mins / 43200).round()} months ago';
+      if (mins < 1) return lc.t('post.time.justNow');
+      if (mins < 2) return lc.t('post.time.minuteAgo', {'n': '1'});
+      if (mins < 45) return lc.t('post.time.minutesAgo', {'n': '$mins'});
+      if (mins < 90) return lc.t('post.time.aboutHourAgo');
+      if (mins < 1440) return lc.t('post.time.hoursAgo', {'n': '${(mins / 60).round()}'});
+      if (mins < 2520) return lc.t('post.time.dayAgo');
+      if (mins < 43200) return lc.t('post.time.daysAgo', {'n': '${(mins / 1440).round()}'});
+      if (mins < 86400) return lc.t('post.time.monthsAgo', {'n': '${(mins / 43200).round()}'});
       const int minsPerYear = 525960;
-      if (mins < minsPerYear) return '${(mins / 43200).round()} months ago';
+      if (mins < minsPerYear) return lc.t('post.time.monthsAgo', {'n': '${(mins / 43200).round()}'});
       final months = (mins / 43200).round();
-      if (months < 15) return 'about 1 year ago';
-      if (months < 21) return 'over 1 year ago';
-      if (months < 24) return 'almost 2 years ago';
+      if (months < 15) return lc.t('post.time.aboutYearAgo');
+      if (months < 21) return lc.t('post.time.overYearAgo');
+      if (months < 24) return lc.t('post.time.almostTwoYearsAgo');
       final years = months ~/ 12;
       final rem = months % 12;
-      if (rem < 3) return 'about $years years ago';
-      if (rem < 9) return 'over $years years ago';
-      return 'almost ${years + 1} years ago';
+      if (rem < 3) return lc.t('post.time.aboutYearsAgo', {'n': '$years'});
+      if (rem < 9) return lc.t('post.time.overYearsAgo', {'n': '$years'});
+      return lc.t('post.time.almostYearsAgo', {'n': '${years + 1}'});
     } catch (_) {
       return '';
     }
@@ -2971,7 +2971,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Replying to @${widget.replyTarget!.username ?? 'user'}',
+                      LanguageController.instance.t('post.detail.comments.replyingTo', {'username': widget.replyTarget!.username ?? 'user'}),
                       style: TextStyle(color: tokens.primary, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -3019,7 +3019,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                           ),
                           SizedBox(width: 10),
                           Text(
-                            'Searching users…',
+                            LanguageController.instance.t('post.detail.comments.searchingUsers'),
                             style: TextStyle(
                               color: tokens.textMuted,
                               fontSize: 12,
@@ -3032,7 +3032,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                   ? Padding(
                       padding: EdgeInsets.all(12),
                       child: Text(
-                        'No users found',
+                        LanguageController.instance.t('post.detail.comments.noUsers'),
                         style: TextStyle(color: tokens.textMuted, fontSize: 12),
                       ),
                     )
@@ -3131,7 +3131,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                             minLines: 1,
                             style: TextStyle(color: tokens.text, fontSize: 14),
                             decoration: InputDecoration(
-                              hintText: 'Write a comment…',
+                              hintText: LanguageController.instance.t('post.detail.comments.placeholder'),
                               hintStyle: TextStyle(
                                 color: tokens.textMuted,
                                 fontSize: 14,
@@ -3918,7 +3918,8 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
         (theme.brightness == Brightness.dark
             ? AppSemanticColors.dark
             : AppSemanticColors.light);
-    final title = widget.mode == 'sticker' ? 'Stickers' : 'GIFs';
+    final lc = LanguageController.instance;
+    final title = widget.mode == 'sticker' ? lc.t('reels.gif.stickers') : lc.t('reels.gif.gifs');
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -3969,7 +3970,7 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                 controller: _searchCtrl,
                 style: TextStyle(color: tokens.text, fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'Search $title…',
+                  hintText: lc.t('reels.gif.search', {'title': title}),
                   hintStyle: TextStyle(color: tokens.textMuted),
                   prefixIcon: Icon(
                     Icons.search_rounded,
@@ -4010,7 +4011,7 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                           TextButton(
                             onPressed: () => _fetch(_searchCtrl.text),
                             child: Text(
-                              'Retry',
+                              lc.t('common.retry'),
                               style: TextStyle(color: tokens.primary),
                             ),
                           ),
@@ -4020,7 +4021,7 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                   : _items.isEmpty
                   ? Center(
                       child: Text(
-                        'No results',
+                        lc.t('reels.gif.noResults'),
                         style: TextStyle(color: tokens.textMuted),
                       ),
                     )

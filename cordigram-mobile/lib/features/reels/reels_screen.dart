@@ -437,9 +437,9 @@ class _ReelsScreenState extends State<ReelsScreen> {
         ? PostInteractionService.unsave(s.post.id)
         : PostInteractionService.save(s.post.id);
     if (!wasSaved) {
-      _showSnack('Saved');
+      _showSnack(LanguageController.instance.t('reels.snack.saved'));
     } else {
-      _showSnack('Removed from saved');
+      _showSnack(LanguageController.instance.t('reels.snack.removedFromSaved'));
     }
     future.catchError((_) {
       if (!mounted) return;
@@ -454,7 +454,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
           impressions: s.stats.impressions,
         );
       });
-      _showSnack('Failed to update save', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.saveError'), error: true);
     });
   }
 
@@ -484,7 +484,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
     if (index >= _reels.length) return;
     final token = AuthStorage.accessToken;
     if (token == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.signInToRepost'), error: true);
       return;
     }
 
@@ -511,7 +511,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
             await PostInteractionService.repost(targetId);
           } catch (_) {}
         }
-        _showSnack('Reposted');
+        _showSnack(LanguageController.instance.t('reels.snack.reposted'));
       } on ApiException catch (e) {
         try {
           await PostInteractionService.repost(originalId);
@@ -522,15 +522,15 @@ class _ReelsScreenState extends State<ReelsScreen> {
               await PostInteractionService.repost(targetId);
             } catch (_) {}
           }
-          _showSnack('Reposted');
+          _showSnack(LanguageController.instance.t('reels.snack.reposted'));
         } catch (_) {
           _showSnack(
-            e.message.isNotEmpty ? e.message : 'Failed to repost',
+            e.message.isNotEmpty ? e.message : LanguageController.instance.t('reels.snack.repostError'),
             error: true,
           );
         }
       } catch (_) {
-        _showSnack('Failed to repost', error: true);
+        _showSnack(LanguageController.instance.t('reels.snack.repostError'), error: true);
       }
       return;
     }
@@ -560,14 +560,14 @@ class _ReelsScreenState extends State<ReelsScreen> {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted with quote');
+      _showSnack(LanguageController.instance.t('reels.snack.repostedWithQuote'));
     } on ApiException catch (e) {
       _showSnack(
-        e.message.isNotEmpty ? e.message : 'Failed to repost with quote',
+        e.message.isNotEmpty ? e.message : LanguageController.instance.t('reels.snack.repostWithQuoteError'),
         error: true,
       );
     } catch (_) {
-      _showSnack('Failed to repost with quote', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.repostWithQuoteError'), error: true);
     }
   }
 
@@ -604,7 +604,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
     if (index < 0 || index >= _reels.length) return;
     final reel = _reels[index].post;
     if (reel.allowDownload != true || reel.media.isEmpty) {
-      _showSnack('Download is disabled for this reel', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.downloadDisabled'), error: true);
       return;
     }
 
@@ -627,9 +627,9 @@ class _ReelsScreenState extends State<ReelsScreen> {
       final file = File('${dir.path}${Platform.pathSeparator}$filename');
       await file.writeAsBytes(bytes, flush: true);
 
-      _showSnack('Downloaded: ${file.path}');
+      _showSnack(LanguageController.instance.t('reels.snack.downloaded', {'path': file.path}));
     } catch (_) {
-      _showSnack('Failed to download reel', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.downloadError'), error: true);
     }
   }
 
@@ -698,7 +698,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
             stats: updated.stats,
           );
         });
-        _showSnack('Reel updated');
+        _showSnack(LanguageController.instance.t('reels.snack.reelUpdated'));
         return;
       case PostMenuAction.editVisibility:
         final nextVisibility = await showEditVisibilitySheet(
@@ -714,7 +714,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
             post: reel.copyWith(visibility: nextVisibility),
           );
         });
-        _showSnack('Visibility updated');
+        _showSnack(LanguageController.instance.t('reels.snack.visibilityUpdated'));
         return;
       case PostMenuAction.toggleComments:
         final currentAllowed = reel.allowComments != false;
@@ -727,7 +727,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
         try {
           await PostInteractionService.setAllowComments(reel.id, nextAllowed);
           _showSnack(
-            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+            nextAllowed ? LanguageController.instance.t('reels.snack.commentsOn') : LanguageController.instance.t('reels.snack.commentsOff'),
           );
         } catch (_) {
           if (!mounted || index >= _reels.length) return;
@@ -736,7 +736,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
               post: reel.copyWith(allowComments: currentAllowed),
             );
           });
-          _showSnack('Failed to update comments', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.commentsError'), error: true);
         }
         return;
       case PostMenuAction.toggleHideLike:
@@ -749,7 +749,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
         });
         try {
           await PostInteractionService.setHideLikeCount(reel.id, nextHidden);
-          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+          _showSnack(nextHidden ? LanguageController.instance.t('reels.snack.likeHidden') : LanguageController.instance.t('reels.snack.likeVisible'));
         } catch (_) {
           if (!mounted || index >= _reels.length) return;
           setState(() {
@@ -757,13 +757,13 @@ class _ReelsScreenState extends State<ReelsScreen> {
               post: reel.copyWith(hideLikeCount: currentHidden),
             );
           });
-          _showSnack('Failed to update like visibility', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.likeError'), error: true);
         }
         return;
       case PostMenuAction.copyLink:
         final link = PostInteractionService.reelPermalink(reel.id);
         await Clipboard.setData(ClipboardData(text: link));
-        _showSnack('Link copied');
+        _showSnack(LanguageController.instance.t('reels.snack.linkCopied'));
         return;
       case PostMenuAction.muteNotifications:
         final muted = await showPostMuteOverlay(
@@ -771,23 +771,23 @@ class _ReelsScreenState extends State<ReelsScreen> {
           postId: reel.id,
           kindLabel: 'reel',
         );
-        if (muted) _showSnack('Reel notifications muted');
+        if (muted) _showSnack(LanguageController.instance.t('reels.snack.notificationsMuted'));
         return;
       case PostMenuAction.deletePost:
         final confirmed = await showPostConfirmDialog(
           context,
           title: LanguageController.instance.t('reels.deleteReel.title'),
           message: LanguageController.instance.t('common.cannotUndo'),
-          confirmLabel: 'Delete',
+          confirmLabel: LanguageController.instance.t('common.delete'),
           danger: true,
         );
         if (confirmed != true) return;
         try {
           await PostInteractionService.deletePost(reel.id);
-          _showSnack('Reel deleted');
+          _showSnack(LanguageController.instance.t('reels.snack.reelDeleted'));
           await _loadReels(refresh: true);
         } catch (_) {
-          _showSnack('Failed to delete reel', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.deleteError'), error: true);
         }
         return;
       case PostMenuAction.followToggle:
@@ -799,16 +799,16 @@ class _ReelsScreenState extends State<ReelsScreen> {
       case PostMenuAction.hidePost:
         try {
           await PostInteractionService.hide(reel.id);
-          _showSnack('Reel hidden');
+          _showSnack(LanguageController.instance.t('reels.snack.reelHidden'));
           await _loadReels(refresh: true);
         } catch (_) {
-          _showSnack('Failed to hide reel', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.hideError'), error: true);
         }
         return;
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack('Please sign in first', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.signInFirst'), error: true);
           return;
         }
         final reported = await showReportPostSheet(
@@ -827,21 +827,21 @@ class _ReelsScreenState extends State<ReelsScreen> {
           context,
           title: LanguageController.instance.t('reels.blockUserConfirm.title', {'username': username}),
           message: LanguageController.instance.t('reels.blockUserConfirm.message'),
-          confirmLabel: 'Block',
+          confirmLabel: LanguageController.instance.t('common.block'),
           danger: true,
         );
         if (confirmed != true) return;
         try {
           await PostInteractionService.blockUser(userId);
-          _showSnack('Account blocked');
+          _showSnack(LanguageController.instance.t('reels.snack.accountBlocked'));
           await _loadReels(refresh: true);
         } catch (_) {
-          _showSnack('Failed to block account', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.blockError'), error: true);
         }
         return;
       case PostMenuAction.goToAdsPost:
       case PostMenuAction.detailAds:
-        _showSnack('Ads actions are only available in Home feed', error: true);
+        _showSnack(LanguageController.instance.t('reels.snack.adsNotAvailable'), error: true);
         return;
     }
   }
@@ -920,7 +920,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'No reels yet',
+                LanguageController.instance.t('reels.empty'),
                 style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 16),
               ),
               const SizedBox(height: 16),
@@ -929,9 +929,9 @@ class _ReelsScreenState extends State<ReelsScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: scheme.primary,
                 ),
-                child: const Text(
-                  'Refresh',
-                  style: TextStyle(color: Colors.white),
+                child: Text(
+                  LanguageController.instance.t('common.refresh'),
+                  style: const TextStyle(color: Colors.white),
                 ),
               ),
             ],
@@ -1094,13 +1094,13 @@ class _ReelPageState extends State<_ReelPage> {
       entries.add((
         id: 'toggleComments',
         label: reel.allowComments == false
-            ? 'Turn on comments'
-            : 'Turn off comments',
+            ? lc.t('reels.menu.commentsOn')
+            : lc.t('reels.menu.commentsOff'),
         danger: false,
       ));
       entries.add((
         id: 'toggleHideLike',
-        label: reel.hideLikeCount == true ? 'Show like' : 'Hide like',
+        label: reel.hideLikeCount == true ? lc.t('reels.menu.showLike') : lc.t('reels.menu.hideLike'),
         danger: false,
       ));
       entries.add((id: 'muteReel', label: lc.t('reels.menu.muteReel'), danger: false));
@@ -1124,12 +1124,12 @@ class _ReelPageState extends State<_ReelPage> {
       entries.add((id: 'copyLink', label: lc.t('reels.menu.copyLink'), danger: false));
       entries.add((
         id: 'followToggle',
-        label: widget.state.following ? 'Unfollow' : 'Follow',
+        label: widget.state.following ? lc.t('reels.menu.unfollow') : lc.t('reels.menu.follow'),
         danger: false,
       ));
       entries.add((
         id: 'saveToggle',
-        label: widget.state.saved ? 'Unsave this reel' : 'Save this reel',
+        label: widget.state.saved ? lc.t('reels.menu.unsaveReel') : lc.t('reels.menu.saveReel'),
         danger: false,
       ));
       entries.add((id: 'hideReel', label: lc.t('reels.menu.hideReel'), danger: false));
@@ -1274,10 +1274,10 @@ class _ReelPageState extends State<_ReelPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'This image has been blurred due to violation of our standards.',
+                      Text(
+                        LanguageController.instance.t('post.media.blurredWarning'),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Color(0xFFE8ECF8),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1360,9 +1360,9 @@ class _ReelPageState extends State<_ReelPage> {
                       Expanded(
                         child: Row(
                           children: [
-                            const Text(
-                              'Reposted from ',
-                              style: TextStyle(
+                            Text(
+                              LanguageController.instance.t('reels.repostedFrom'),
+                              style: const TextStyle(
                                 color: Color(0xFF9FB0CC),
                                 fontSize: 12,
                                 shadows: [
@@ -1471,7 +1471,7 @@ class _ReelPageState extends State<_ReelPage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            widget.state.following ? 'Following' : 'Follow',
+                            widget.state.following ? LanguageController.instance.t('reels.following') : LanguageController.instance.t('reels.follow'),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -1618,7 +1618,7 @@ class _ReelPageState extends State<_ReelPage> {
                   icon: Icons.mode_comment_outlined,
                   color: commentsLocked ? Colors.white54 : Colors.white,
                   label: commentsLocked
-                      ? 'Off'
+                      ? LanguageController.instance.t('reels.commentsOffLabel')
                       : _formatCount(widget.state.stats.comments),
                   onTap: commentsLocked ? () {} : widget.onComment,
                 ),
@@ -2347,7 +2347,7 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Comments',
+                    LanguageController.instance.t('reels.comments.title'),
                     style: TextStyle(
                       color: tokens.text,
                       fontWeight: FontWeight.w700,
@@ -2373,7 +2373,7 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                             ),
                             SizedBox(height: 10),
                             Text(
-                              'No comments yet.',
+                              LanguageController.instance.t('reels.comments.empty'),
                               style: TextStyle(
                                 color: tokens.textMuted,
                                 fontSize: 14,
@@ -2514,13 +2514,13 @@ class _RCommentTileState extends State<_RCommentTile> {
   static String _stripTrailing(String url) =>
       url.replaceAll(RegExp(r'[),.;!?]+$'), '');
 
-  List<InlineSpan> _buildContentSpans(String text) {
+  List<InlineSpan> _buildContentSpans(String text, Color textColor) {
     for (final r in _urlRecognizers) {
       r.dispose();
     }
     _urlRecognizers.clear();
-    const baseStyle = TextStyle(
-      color: Color(0xFFCDD5E0),
+    final baseStyle = TextStyle(
+      color: textColor,
       fontSize: 14,
       height: 1.45,
     );
@@ -2623,7 +2623,7 @@ class _RCommentTileState extends State<_RCommentTile> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isPinned ? 'Comment unpinned' : 'Comment pinned'),
+          content: Text(isPinned ? LanguageController.instance.t('reels.comments.unpinned') : LanguageController.instance.t('reels.comments.pinned')),
           backgroundColor: const Color(0xFF1A2235),
           duration: const Duration(seconds: 2),
         ),
@@ -2643,16 +2643,16 @@ class _RCommentTileState extends State<_RCommentTile> {
         CommentSheetAction(
           icon: Icons.translate_rounded,
           label: _translatedText != null
-              ? 'Hide translation'
-              : 'Translate comment',
+              ? LanguageController.instance.t('reels.comments.hideTranslation')
+              : LanguageController.instance.t('reels.comments.translate'),
           onTap: _translateComment,
         ),
       if (_isPostOwner && widget.depth == 0)
         CommentSheetAction(
           icon: Icons.push_pin_rounded,
           label: widget.comment.pinnedAt != null
-              ? 'Unpin comment'
-              : 'Pin comment',
+              ? LanguageController.instance.t('reels.comments.unpin')
+              : LanguageController.instance.t('reels.comments.pin'),
           onTap: _onPinComment,
         ),
       if (_isOwnComment) ...[
@@ -2713,7 +2713,7 @@ class _RCommentTileState extends State<_RCommentTile> {
       context,
       title: LanguageController.instance.t('reels.deleteComment.title'),
       message: LanguageController.instance.t('reels.deleteComment.message'),
-      confirmLabel: 'Delete',
+      confirmLabel: LanguageController.instance.t('common.delete'),
       danger: true,
     );
     if (confirmed != true || !mounted) return;
@@ -2771,7 +2771,7 @@ class _RCommentTileState extends State<_RCommentTile> {
       context,
       title: LanguageController.instance.t('reels.blockUserDialog.title', {'username': username}),
       message: LanguageController.instance.t('reels.blockUserDialog.message', {'username': username}),
-      confirmLabel: 'Block',
+      confirmLabel: LanguageController.instance.t('common.block'),
       danger: true,
     );
     if (confirmed != true || !mounted) return;
@@ -2918,6 +2918,12 @@ class _RCommentTileState extends State<_RCommentTile> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final comment = widget.comment;
     final isPinned = comment.pinnedAt != null;
     final isReply = widget.depth > 0;
@@ -2961,8 +2967,8 @@ class _RCommentTileState extends State<_RCommentTile> {
                                   onTap: _openCommentAuthorProfile,
                                   child: Text(
                                     comment.displayUsername,
-                                    style: const TextStyle(
-                                      color: Color(0xFFE8ECF8),
+                                    style: TextStyle(
+                                      color: tokens.text,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13,
                                     ),
@@ -2984,9 +2990,9 @@ class _RCommentTileState extends State<_RCommentTile> {
                                     color: Color(0xFF7A8BB0),
                                   ),
                                   const SizedBox(width: 3),
-                                  const Text(
-                                    'Pinned',
-                                    style: TextStyle(
+                                  Text(
+                                    LanguageController.instance.t('reels.comments.pinnedBadge'),
+                                    style: const TextStyle(
                                       color: Color(0xFF7A8BB0),
                                       fontSize: 11,
                                     ),
@@ -3041,6 +3047,7 @@ class _RCommentTileState extends State<_RCommentTile> {
                                         text: TextSpan(
                                           children: _buildContentSpans(
                                             displayText,
+                                            tokens.text,
                                           ),
                                         ),
                                         maxLines: _textExpanded ? null : 4,
@@ -3060,8 +3067,8 @@ class _RCommentTileState extends State<_RCommentTile> {
                                             ),
                                             child: Text(
                                               _textExpanded
-                                                  ? 'See less'
-                                                  : 'See more',
+                                                  ? LanguageController.instance.t('post.seeLess')
+                                                  : LanguageController.instance.t('post.seeMore'),
                                               style: const TextStyle(
                                                 color: Color(0xFF4AA3E4),
                                                 fontSize: 13,
@@ -3071,11 +3078,11 @@ class _RCommentTileState extends State<_RCommentTile> {
                                           ),
                                         ),
                                       if (_translatedText != null)
-                                        const Padding(
-                                          padding: EdgeInsets.only(top: 3),
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 3),
                                           child: Text(
-                                            'Translated',
-                                            style: TextStyle(
+                                            LanguageController.instance.t('reels.comments.translated'),
+                                            style: const TextStyle(
                                               color: Color(0xFF7A8BB0),
                                               fontSize: 11,
                                               fontStyle: FontStyle.italic,
@@ -3142,9 +3149,9 @@ class _RCommentTileState extends State<_RCommentTile> {
                                     comment.id,
                                     comment.author?.username,
                                   ),
-                                  child: const Text(
-                                    'Reply',
-                                    style: TextStyle(
+                                  child: Text(
+                                    LanguageController.instance.t('reels.comments.reply'),
+                                    style: const TextStyle(
                                       color: Color(0xFF7A8BB0),
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -3179,9 +3186,8 @@ class _RCommentTileState extends State<_RCommentTile> {
                                     else
                                       Text(
                                         _expanded
-                                            ? 'Hide replies'
-                                            : 'View replies'
-                                                  '${displayReplyCount > 0 ? " ($displayReplyCount)" : ""}',
+                                            ? LanguageController.instance.t('reels.comments.hideReplies')
+                                            : '${LanguageController.instance.t('reels.comments.viewReplies')}${displayReplyCount > 0 ? " ($displayReplyCount)" : ""}',
                                         style: const TextStyle(
                                           color: Color(0xFF4AA3E4),
                                           fontSize: 12,
@@ -3250,9 +3256,9 @@ class _RCommentTileState extends State<_RCommentTile> {
                               color: Color(0xFF4AA3E4),
                             ),
                           )
-                        : const Text(
-                            'Load more replies',
-                            style: TextStyle(
+                        : Text(
+                            LanguageController.instance.t('reels.comments.loadMoreReplies'),
+                            style: const TextStyle(
                               color: Color(0xFF4AA3E4),
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -3278,9 +3284,9 @@ class _RCommentTileState extends State<_RCommentTile> {
                   ),
                   GestureDetector(
                     onTap: () => _loadReplies(nextPage: 1),
-                    child: const Text(
-                      'Retry',
-                      style: TextStyle(
+                    child: Text(
+                      LanguageController.instance.t('common.retry'),
+                      style: const TextStyle(
                         color: Color(0xFF4AA3E4),
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -3560,7 +3566,7 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Replying to @${widget.replyTarget!.username ?? 'user'}',
+                      LanguageController.instance.t('reels.comments.replyingTo', {'username': widget.replyTarget!.username ?? 'user'}),
                       style: TextStyle(color: tokens.primary, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -3608,7 +3614,7 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                           ),
                           SizedBox(width: 10),
                           Text(
-                            'Searching users…',
+                            LanguageController.instance.t('reels.comments.searchingUsers'),
                             style: TextStyle(
                               color: tokens.textMuted,
                               fontSize: 12,
@@ -3621,7 +3627,7 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                   ? Padding(
                       padding: EdgeInsets.all(12),
                       child: Text(
-                        'No users found',
+                        LanguageController.instance.t('reels.comments.noUsers'),
                         style: TextStyle(color: tokens.textMuted, fontSize: 12),
                       ),
                     )
@@ -3720,7 +3726,7 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                             minLines: 1,
                             style: TextStyle(color: tokens.text, fontSize: 14),
                             decoration: InputDecoration(
-                              hintText: 'Write a comment…',
+                              hintText: LanguageController.instance.t('reels.comments.placeholder'),
                               hintStyle: TextStyle(
                                 color: tokens.textMuted,
                                 fontSize: 14,
@@ -4055,7 +4061,8 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
         (theme.brightness == Brightness.dark
             ? AppSemanticColors.dark
             : AppSemanticColors.light);
-    final title = widget.mode == 'sticker' ? 'Stickers' : 'GIFs';
+    final lc = LanguageController.instance;
+    final title = widget.mode == 'sticker' ? lc.t('reels.gif.stickers') : lc.t('reels.gif.gifs');
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -4103,7 +4110,7 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
                 controller: _searchCtrl,
                 style: TextStyle(color: tokens.text, fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'Search $title…',
+                  hintText: lc.t('reels.gif.search', {'title': title}),
                   hintStyle: TextStyle(color: tokens.textMuted),
                   prefixIcon: Icon(
                     Icons.search_rounded,
@@ -4143,7 +4150,7 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
                           TextButton(
                             onPressed: () => _fetch(_searchCtrl.text),
                             child: Text(
-                              'Retry',
+                              lc.t('common.retry'),
                               style: TextStyle(color: tokens.primary),
                             ),
                           ),
@@ -4153,7 +4160,7 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
                   : _items.isEmpty
                   ? Center(
                       child: Text(
-                        'No results',
+                        lc.t('reels.gif.noResults'),
                         style: TextStyle(color: tokens.textMuted),
                       ),
                     )
@@ -4984,9 +4991,9 @@ class _RAuthorBadge extends StatelessWidget {
         children: [
           SvgPicture.string(_svg, width: 11, height: 11),
           const SizedBox(width: 3),
-          const Text(
-            'Author',
-            style: TextStyle(
+          Text(
+            LanguageController.instance.t('reels.linkPreview.author'),
+            style: const TextStyle(
               color: Color(0xFF38BDF8),
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -5032,7 +5039,7 @@ class _RLinkPreviewCard extends StatelessWidget {
         ? preview.title!.trim()
         : preview.siteName?.trim().isNotEmpty == true
         ? preview.siteName!.trim()
-        : preview.domain?.trim() ?? 'Open link';
+        : preview.domain?.trim() ?? LanguageController.instance.t('reels.linkPreview.openLink');
     final subtitle = preview.description?.trim().isNotEmpty == true
         ? preview.description!.trim()
         : preview.domain?.trim() ?? '';
@@ -5161,30 +5168,31 @@ class _RLinkPreviewFallback extends StatelessWidget {
 
 String _rTimeAgo(String? iso) {
   if (iso == null || iso.isEmpty) return '';
+  final lc = LanguageController.instance;
   try {
     final dt = DateTime.parse(iso).toLocal();
     final diff = DateTime.now().difference(dt);
-    if (diff.isNegative) return 'just now';
+    if (diff.isNegative) return lc.t('post.time.justNow');
     final mins = (diff.inSeconds / 60).round();
-    if (mins < 1) return 'just now';
-    if (mins < 2) return '1 minute ago';
-    if (mins < 45) return '$mins minutes ago';
-    if (mins < 90) return 'about 1 hour ago';
-    if (mins < 1440) return 'about ${(mins / 60).round()} hours ago';
-    if (mins < 2520) return '1 day ago';
-    if (mins < 43200) return '${(mins / 1440).round()} days ago';
-    if (mins < 86400) return 'about ${(mins / 43200).round()} months ago';
+    if (mins < 1) return lc.t('post.time.justNow');
+    if (mins < 2) return lc.t('post.time.minuteAgo', {'n': '1'});
+    if (mins < 45) return lc.t('post.time.minutesAgo', {'n': '$mins'});
+    if (mins < 90) return lc.t('post.time.aboutHourAgo');
+    if (mins < 1440) return lc.t('post.time.hoursAgo', {'n': '${(mins / 60).round()}'});
+    if (mins < 2520) return lc.t('post.time.dayAgo');
+    if (mins < 43200) return lc.t('post.time.daysAgo', {'n': '${(mins / 1440).round()}'});
+    if (mins < 86400) return lc.t('post.time.monthsAgo', {'n': '${(mins / 43200).round()}'});
     const int minsPerYear = 525960;
-    if (mins < minsPerYear) return '${(mins / 43200).round()} months ago';
+    if (mins < minsPerYear) return lc.t('post.time.monthsAgo', {'n': '${(mins / 43200).round()}'});
     final months = (mins / 43200).round();
-    if (months < 15) return 'about 1 year ago';
-    if (months < 21) return 'over 1 year ago';
-    if (months < 24) return 'almost 2 years ago';
+    if (months < 15) return lc.t('post.time.aboutYearAgo');
+    if (months < 21) return lc.t('post.time.overYearAgo');
+    if (months < 24) return lc.t('post.time.almostTwoYearsAgo');
     final years = months ~/ 12;
     final rem = months % 12;
-    if (rem < 3) return 'about $years years ago';
-    if (rem < 9) return 'over $years years ago';
-    return 'almost ${years + 1} years ago';
+    if (rem < 3) return lc.t('post.time.aboutYearsAgo', {'n': '$years'});
+    if (rem < 9) return lc.t('post.time.overYearsAgo', {'n': '$years'});
+    return lc.t('post.time.almostYearsAgo', {'n': '${years + 1}'});
   } catch (_) {
     return '';
   }

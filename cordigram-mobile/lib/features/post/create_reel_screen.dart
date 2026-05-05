@@ -10,6 +10,7 @@ import 'create_post_service.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -24,13 +25,14 @@ enum _PublishMode { now, schedule }
 
 extension _AudienceLabel on _Audience {
   String get label {
+    final lc = LanguageController.instance;
     switch (this) {
       case _Audience.public:
-        return 'Public';
+        return lc.t('post.create.audiencePublic');
       case _Audience.followers:
-        return 'Friends / Following';
+        return lc.t('post.create.audienceFollowers');
       case _Audience.private:
-        return 'Private';
+        return lc.t('post.create.audiencePrivate');
     }
   }
 
@@ -154,7 +156,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     final bytes = await file.length();
     if (bytes > _kReelMaxBytes) {
       _showSnack(
-        'File is too large. Reels must be 50 MB or smaller (current: ${(bytes / 1024 / 1024).toStringAsFixed(1)} MB).',
+        LanguageController.instance.t('post.createReel.fileTooLarge', {'size': (bytes / 1024 / 1024).toStringAsFixed(1)}),
       );
       return;
     }
@@ -175,7 +177,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
 
     if (durationSec != null && durationSec > _kReelMaxDurationSec) {
       _showSnack(
-        'Video is too long. Reels must be ${_kReelMaxDurationSec}s or shorter (current: ${durationSec.toStringAsFixed(1)}s).',
+        LanguageController.instance.t('post.createReel.videoTooLong', {'max': '$_kReelMaxDurationSec', 'current': durationSec.toStringAsFixed(1)}),
       );
       return;
     }
@@ -364,7 +366,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
 
   Future<void> _submit() async {
     if (_videoFile == null) {
-      setState(() => _submitError = 'Please select a video before publishing.');
+      setState(() => _submitError = LanguageController.instance.t('post.createReel.noVideoError'));
       return;
     }
 
@@ -372,8 +374,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     if (_videoDurationSec != null &&
         _videoDurationSec! > _kReelMaxDurationSec) {
       setState(
-        () => _submitError =
-            'Video exceeds ${_kReelMaxDurationSec}s. Please trim it.',
+        () => _submitError = LanguageController.instance.t('post.createReel.videoExceedsDuration', {'max': '$_kReelMaxDurationSec'}),
       );
       return;
     }
@@ -393,8 +394,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       // Post-upload duration validation
       if (finalDuration != null && finalDuration > _kReelMaxDurationSec) {
         setState(() {
-          _submitError =
-              'Video exceeds ${_kReelMaxDurationSec}s. Please trim it.';
+          _submitError = LanguageController.instance.t('post.createReel.videoExceedsDuration', {'max': '$_kReelMaxDurationSec'});
           _submitting = false;
         });
         return;
@@ -402,7 +402,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
 
       if (finalDuration == null) {
         setState(() {
-          _submitError = 'Missing video duration. Please re-upload your reel.';
+          _submitError = LanguageController.instance.t('post.createReel.missingDuration');
           _submitting = false;
         });
         return;
@@ -417,12 +417,12 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       if (_publishMode == _PublishMode.schedule) {
         final selected = _scheduledAtLocal;
         if (selected == null) {
-          throw const ApiException(
-            'Please choose a date and time for scheduling.',
+          throw ApiException(
+            LanguageController.instance.t('post.createReel.chooseDateTimeError'),
           );
         }
         if (!selected.isAfter(DateTime.now())) {
-          throw const ApiException('Scheduled time must be later than now.');
+          throw ApiException(LanguageController.instance.t('post.createReel.scheduledTimePastError'));
         }
         scheduledAtIso = selected.toUtc().toIso8601String();
       }
@@ -465,8 +465,8 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       _reset();
       _showSnack(
         wasScheduled
-            ? 'Reel scheduled successfully!'
-            : 'Reel created successfully!',
+            ? LanguageController.instance.t('post.createReel.reelScheduled')
+            : LanguageController.instance.t('post.createReel.reelCreated'),
       );
       widget.onReelCreated?.call();
     } on ApiException catch (e) {
@@ -596,13 +596,13 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
                       child: Text(
-                        'Cancel',
+                        LanguageController.instance.t('common.cancel'),
                         style: TextStyle(color: tokens.primary),
                       ),
                     ),
                     const Spacer(),
                     Text(
-                      'Select time',
+                      LanguageController.instance.t('post.create.selectTimeTitle'),
                       style: TextStyle(
                         color: tokens.text,
                         fontWeight: FontWeight.w600,
@@ -612,7 +612,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(draft),
                       child: Text(
-                        'Done',
+                        LanguageController.instance.t('common.done'),
                         style: TextStyle(color: tokens.primary),
                       ),
                     ),
@@ -658,7 +658,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       picked.minute,
     );
     if (!next.isAfter(DateTime.now())) {
-      _showSnack('Please choose a future time.');
+      _showSnack(LanguageController.instance.t('post.createReel.futureTimeError'));
       return;
     }
     setState(() => _scheduledAtLocal = next);
@@ -728,7 +728,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Video only · max 90 s · max 50 MB',
+              LanguageController.instance.t('post.createReel.constraints'),
               style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
             ),
           ),
@@ -772,7 +772,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             ),
             const SizedBox(height: 14),
             Text(
-              'Select a reel video',
+              LanguageController.instance.t('post.createReel.selectVideo'),
               style: TextStyle(
                 color: tokens.text,
                 fontSize: 16,
@@ -781,7 +781,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'MP4 / MOV / WEBM  ·  up to 90 s  ·  up to 50 MB',
+              LanguageController.instance.t('post.createReel.formats'),
               style: TextStyle(color: tokens.textMuted, fontSize: 12),
             ),
             const SizedBox(height: 20),
@@ -790,13 +790,13 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
               children: [
                 _OutlineBtn(
                   icon: Icons.video_library_outlined,
-                  label: 'Gallery',
+                  label: LanguageController.instance.t('post.createReel.gallery'),
                   onTap: _pickVideo,
                 ),
                 const SizedBox(width: 8),
                 _OutlineBtn(
                   icon: Icons.videocam_outlined,
-                  label: 'Camera',
+                  label: LanguageController.instance.t('post.create.camera'),
                   onTap: _pickVideoFromCamera,
                 ),
               ],
@@ -820,7 +820,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Video'),
+        _SectionLabel(text: LanguageController.instance.t('post.createReel.videoLabel')),
         const SizedBox(height: 8),
         Stack(
           children: [
@@ -906,7 +906,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                 color: tokens.primary,
               ),
               label: Text(
-                'Change',
+                LanguageController.instance.t('post.createReel.change'),
                 style: TextStyle(color: tokens.primary, fontSize: 13),
               ),
               style: TextButton.styleFrom(
@@ -928,7 +928,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Caption'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.caption')),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
@@ -944,7 +944,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             maxLength: 2200,
             style: TextStyle(color: tokens.text, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Write a caption…',
+              hintText: LanguageController.instance.t('post.create.captionHint'),
               hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(14),
@@ -1049,7 +1049,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Location'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.locationLabel')),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
@@ -1062,7 +1062,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             onChanged: _onLocationChanged,
             style: TextStyle(color: tokens.text, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Add a location…',
+              hintText: LanguageController.instance.t('post.create.locationHint'),
               hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
@@ -1158,7 +1158,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Hashtags'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.hashtagLabel')),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -1175,7 +1175,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                   textInputAction: TextInputAction.done,
                   style: TextStyle(color: tokens.text, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'e.g. travel, photography',
+                    hintText: LanguageController.instance.t('post.create.hashtagHint'),
                     hintStyle: TextStyle(color: tokens.textMuted),
                     border: InputBorder.none,
                     prefixText: '# ',
@@ -1235,7 +1235,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Visibility'),
+        _SectionLabel(text: LanguageController.instance.t('post.createReel.visibility')),
         const SizedBox(height: 8),
         ..._Audience.values.map(
           (a) => GestureDetector(
@@ -1302,18 +1302,18 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Publish time'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.publishTime')),
         const SizedBox(height: 8),
         _PublishModeOption(
-          title: 'Post now',
-          subtitle: 'Publish immediately after you tap finish.',
+          title: LanguageController.instance.t('post.create.postNow'),
+          subtitle: LanguageController.instance.t('post.create.postNowDescription'),
           selected: _publishMode == _PublishMode.now,
           onTap: () => setState(() => _publishMode = _PublishMode.now),
         ),
         const SizedBox(height: 8),
         _PublishModeOption(
-          title: 'Schedule',
-          subtitle: 'Post automatically at your chosen time.',
+          title: LanguageController.instance.t('post.create.schedule'),
+          subtitle: LanguageController.instance.t('post.create.scheduleDescription'),
           selected: _publishMode == _PublishMode.schedule,
           onTap: () {
             setState(() {
@@ -1338,9 +1338,9 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                   children: [
                     Expanded(
                       child: _ScheduleFieldButton(
-                        label: 'Date',
+                        label: LanguageController.instance.t('post.create.date'),
                         value: scheduled == null
-                            ? 'Select date'
+                            ? LanguageController.instance.t('post.create.selectDate')
                             : _formatScheduleDate(scheduled),
                         icon: Icons.calendar_today_outlined,
                         onTap: _pickScheduleDate,
@@ -1349,9 +1349,9 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _ScheduleFieldButton(
-                        label: 'Time',
+                        label: LanguageController.instance.t('post.create.time'),
                         value: scheduled == null
-                            ? 'Select time'
+                            ? LanguageController.instance.t('post.create.selectTime')
                             : _formatScheduleTime(scheduled),
                         icon: Icons.schedule_rounded,
                         onTap: _pickScheduleTime,
@@ -1361,7 +1361,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Timezone: local device time',
+                  LanguageController.instance.t('post.create.timezone'),
                   style: TextStyle(color: tokens.textMuted, fontSize: 12),
                 ),
               ],
@@ -1384,18 +1384,18 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       child: Column(
         children: [
           _ToggleRow(
-            label: 'Allow comments',
+            label: LanguageController.instance.t('post.create.allowComments'),
             value: _allowComments,
             onChanged: (v) => setState(() => _allowComments = v),
             isTop: true,
           ),
           _ToggleRow(
-            label: 'Allow download',
+            label: LanguageController.instance.t('post.create.allowDownload'),
             value: _allowDownload,
             onChanged: (v) => setState(() => _allowDownload = v),
           ),
           _ToggleRow(
-            label: 'Hide like count',
+            label: LanguageController.instance.t('post.create.hideLikeCount'),
             value: _hideLikeCount,
             onChanged: (v) => setState(() => _hideLikeCount = v),
             isBottom: true,
@@ -1489,8 +1489,8 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
               )
             : Text(
                 _publishMode == _PublishMode.schedule
-                    ? 'Schedule reel'
-                    : 'Publish reel',
+                    ? LanguageController.instance.t('post.createReel.scheduleReel')
+                    : LanguageController.instance.t('post.createReel.publishReel'),
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,

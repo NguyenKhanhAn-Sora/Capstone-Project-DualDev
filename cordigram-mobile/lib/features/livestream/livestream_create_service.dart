@@ -1,5 +1,6 @@
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 
 enum LivestreamLatencyMode { adaptive, balanced, low }
 
@@ -35,13 +36,14 @@ extension LivestreamVisibilityValue on LivestreamVisibility {
   }
 
   String get label {
+    final lc = LanguageController.instance;
     switch (this) {
       case LivestreamVisibility.public:
-        return 'Public';
+        return lc.t('live.create.visibility.public');
       case LivestreamVisibility.followers:
-        return 'Friends / Following';
+        return lc.t('live.create.visibility.followers');
       case LivestreamVisibility.private:
-        return 'Private';
+        return lc.t('live.create.visibility.private');
     }
   }
 }

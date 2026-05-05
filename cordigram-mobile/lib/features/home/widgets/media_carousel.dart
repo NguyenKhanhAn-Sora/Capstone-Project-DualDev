@@ -127,9 +127,9 @@ class _MediaCarouselState extends State<MediaCarousel> {
                 Icons.download_rounded,
                 color: Color(0xFF9BAECF),
               ),
-              title: const Text(
-                'Download',
-                style: TextStyle(color: Color(0xFFD0D8EE)),
+              title: Text(
+                LanguageController.instance.t('post.media.download'),
+                style: const TextStyle(color: Color(0xFFD0D8EE)),
               ),
               onTap: () => Navigator.of(ctx).pop('download'),
             ),
@@ -291,10 +291,10 @@ class _MediaCarouselState extends State<MediaCarousel> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
-                                'This image has been blurred due to violation of our standards.',
+                              Text(
+                                LanguageController.instance.t('post.media.blurredWarning'),
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: Color(0xFFE8ECF8),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -524,9 +524,9 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                 Icons.download_rounded,
                 color: Color(0xFF9BAECF),
               ),
-              title: const Text(
-                'Download',
-                style: TextStyle(color: Color(0xFFD0D8EE)),
+              title: Text(
+                LanguageController.instance.t('post.media.download'),
+                style: const TextStyle(color: Color(0xFFD0D8EE)),
               ),
               onTap: () => Navigator.of(ctx).pop('download'),
             ),
@@ -626,10 +626,10 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
-                                'This image has been blurred due to violation of our standards.',
+                              Text(
+                                LanguageController.instance.t('post.media.blurredWarning'),
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: Color(0xFFE8ECF8),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,

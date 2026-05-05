@@ -9,6 +9,7 @@ import 'create_post_service.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
@@ -16,13 +17,14 @@ enum _Audience { public, followers, private }
 
 extension _AudienceLabel on _Audience {
   String get label {
+    final lc = LanguageController.instance;
     switch (this) {
       case _Audience.public:
-        return 'Public';
+        return lc.t('post.create.audiencePublic');
       case _Audience.followers:
-        return 'Friends / Following';
+        return lc.t('post.create.audienceFollowers');
       case _Audience.private:
-        return 'Private';
+        return lc.t('post.create.audiencePrivate');
     }
   }
 
@@ -128,7 +130,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _pickImages() async {
     final remaining = _kMaxMedia - _media.length;
     if (remaining <= 0) {
-      _showSnack('Maximum $_kMaxMedia files reached.');
+      _showSnack(LanguageController.instance.t('post.create.maxFilesReached', {'n': '$_kMaxMedia'}));
       return;
     }
     final picked = await _picker.pickMultiImage(
@@ -145,7 +147,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Future<void> _pickVideo() async {
     if (_media.length >= _kMaxMedia) {
-      _showSnack('Maximum $_kMaxMedia files reached.');
+      _showSnack(LanguageController.instance.t('post.create.maxFilesReached', {'n': '$_kMaxMedia'}));
       return;
     }
     final picked = await _picker.pickVideo(source: ImageSource.gallery);
@@ -157,7 +159,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Future<void> _pickFromCamera() async {
     if (_media.length >= _kMaxMedia) {
-      _showSnack('Maximum $_kMaxMedia files reached.');
+      _showSnack(LanguageController.instance.t('post.create.maxFilesReached', {'n': '$_kMaxMedia'}));
       return;
     }
     final picked = await _picker.pickImage(
@@ -336,8 +338,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _submit() async {
     if (_media.isEmpty) {
       setState(
-        () => _submitError =
-            'Please choose at least one photo or video before publishing.',
+        () => _submitError = LanguageController.instance.t('post.create.noMediaError'),
       );
       return;
     }
@@ -383,12 +384,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       if (_publishMode == _PublishMode.schedule) {
         final selected = _scheduledAtLocal;
         if (selected == null) {
-          throw const ApiException(
-            'Please choose a date and time for scheduling.',
+          throw ApiException(
+            LanguageController.instance.t('post.create.chooseDateTimeError'),
           );
         }
         if (!selected.isAfter(DateTime.now())) {
-          throw const ApiException('Scheduled time must be later than now.');
+          throw ApiException(LanguageController.instance.t('post.create.scheduledTimePastError'));
         }
         scheduledAtIso = selected.toUtc().toIso8601String();
       }
@@ -411,8 +412,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _resetToInitialState();
       _showSnack(
         wasScheduled
-            ? 'Post scheduled successfully!'
-            : 'Post created successfully!',
+            ? LanguageController.instance.t('post.create.postScheduled')
+            : LanguageController.instance.t('post.create.postCreated'),
       );
       widget.onPostCreated?.call();
     } on ApiException catch (e) {
@@ -550,11 +551,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text(LanguageController.instance.t('common.cancel')),
                     ),
                     const Spacer(),
                     Text(
-                      'Select time',
+                      LanguageController.instance.t('post.create.selectTimeTitle'),
                       style: TextStyle(
                         color: tokens.text,
                         fontWeight: FontWeight.w600,
@@ -563,7 +564,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     const Spacer(),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(draft),
-                      child: const Text('Done'),
+                      child: Text(LanguageController.instance.t('common.done')),
                     ),
                   ],
                 ),
@@ -605,7 +606,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       picked.minute,
     );
     if (!next.isAfter(DateTime.now())) {
-      _showSnack('Please choose a future time.');
+      _showSnack(LanguageController.instance.t('post.create.futureTimeError'));
       return;
     }
     setState(() => _scheduledAtLocal = next);
@@ -687,7 +688,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Create post',
+                  LanguageController.instance.t('post.create.title'),
                   style: TextStyle(
                     color: scheme.onSurface,
                     fontSize: 18,
@@ -696,7 +697,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Share genuine moments',
+                  LanguageController.instance.t('post.create.subtitle'),
                   style: TextStyle(
                     color: scheme.onSurfaceVariant,
                     fontSize: 13,
@@ -725,7 +726,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Media'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.media')),
         const SizedBox(height: 10),
         if (_media.isEmpty) _buildDropzone() else _buildMediaGrid(),
         if (_media.isNotEmpty && _media.length < _kMaxMedia)
@@ -735,19 +736,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               children: [
                 _AddMediaButton(
                   icon: Icons.photo_library_outlined,
-                  label: 'Photos',
+                  label: LanguageController.instance.t('post.create.photos'),
                   onTap: _pickImages,
                 ),
                 const SizedBox(width: 8),
                 _AddMediaButton(
                   icon: Icons.videocam_outlined,
-                  label: 'Video',
+                  label: LanguageController.instance.t('post.create.video'),
                   onTap: _pickVideo,
                 ),
                 const SizedBox(width: 8),
                 _AddMediaButton(
                   icon: Icons.camera_alt_outlined,
-                  label: 'Camera',
+                  label: LanguageController.instance.t('post.create.camera'),
                   onTap: _pickFromCamera,
                 ),
               ],
@@ -790,7 +791,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ),
             const SizedBox(height: 14),
             Text(
-              'Add a photo or video',
+              LanguageController.instance.t('post.create.addPhotoOrVideo'),
               style: TextStyle(
                 color: tokens.text,
                 fontSize: 16,
@@ -799,7 +800,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Supports .jpg, .png, .mp4, .mov · up to 10 files',
+              LanguageController.instance.t('post.create.supportedFormats'),
               style: TextStyle(color: tokens.textMuted, fontSize: 13),
             ),
             const SizedBox(height: 18),
@@ -808,19 +809,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               children: [
                 _OutlineButton(
                   icon: Icons.photo_library_outlined,
-                  label: 'Photos',
+                  label: LanguageController.instance.t('post.create.photos'),
                   onTap: _pickImages,
                 ),
                 const SizedBox(width: 8),
                 _OutlineButton(
                   icon: Icons.videocam_outlined,
-                  label: 'Video',
+                  label: LanguageController.instance.t('post.create.video'),
                   onTap: _pickVideo,
                 ),
                 const SizedBox(width: 8),
                 _OutlineButton(
                   icon: Icons.camera_alt_outlined,
-                  label: 'Camera',
+                  label: LanguageController.instance.t('post.create.camera'),
                   onTap: _pickFromCamera,
                 ),
               ],
@@ -863,7 +864,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 color: tokens.textMuted,
               ),
               title: Text(
-                'Choose photos',
+                LanguageController.instance.t('post.create.choosePhotos'),
                 style: TextStyle(color: tokens.text),
               ),
               onTap: () {
@@ -873,7 +874,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ),
             ListTile(
               leading: Icon(Icons.videocam_outlined, color: tokens.textMuted),
-              title: Text('Choose video', style: TextStyle(color: tokens.text)),
+              title: Text(LanguageController.instance.t('post.create.chooseVideo'), style: TextStyle(color: tokens.text)),
               onTap: () {
                 Navigator.pop(context);
                 _pickVideo();
@@ -881,7 +882,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ),
             ListTile(
               leading: Icon(Icons.camera_alt_outlined, color: tokens.textMuted),
-              title: Text('Take photo', style: TextStyle(color: tokens.text)),
+              title: Text(LanguageController.instance.t('post.create.takePhoto'), style: TextStyle(color: tokens.text)),
               onTap: () {
                 Navigator.pop(context);
                 _pickFromCamera();
@@ -979,7 +980,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Caption'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.caption')),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
@@ -996,7 +997,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             maxLength: 2200,
             style: TextStyle(color: tokens.text, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Write a caption…',
+              hintText: LanguageController.instance.t('post.create.captionHint'),
               hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(14),
@@ -1111,7 +1112,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Location'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.locationLabel')),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
@@ -1124,7 +1125,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             onChanged: _onLocationChanged,
             style: TextStyle(color: tokens.text, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Add a location…',
+              hintText: LanguageController.instance.t('post.create.locationHint'),
               hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
@@ -1230,7 +1231,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Hashtags'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.hashtagLabel')),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -1247,7 +1248,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   textInputAction: TextInputAction.done,
                   style: TextStyle(color: tokens.text, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'e.g. travel, photography',
+                    hintText: LanguageController.instance.t('post.create.hashtagHint'),
                     hintStyle: TextStyle(color: tokens.textMuted),
                     border: InputBorder.none,
                     prefixText: '# ',
@@ -1310,7 +1311,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Audience'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.audience')),
         const SizedBox(height: 8),
         ..._Audience.values.map(
           (a) => GestureDetector(
@@ -1372,18 +1373,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Publish time'),
+        _SectionLabel(text: LanguageController.instance.t('post.create.publishTime')),
         const SizedBox(height: 8),
         _PublishModeOption(
-          title: 'Post now',
-          subtitle: 'Publish immediately after you tap finish.',
+          title: LanguageController.instance.t('post.create.postNow'),
+          subtitle: LanguageController.instance.t('post.create.postNowDescription'),
           selected: _publishMode == _PublishMode.now,
           onTap: () => setState(() => _publishMode = _PublishMode.now),
         ),
         const SizedBox(height: 8),
         _PublishModeOption(
-          title: 'Schedule',
-          subtitle: 'Post automatically at your chosen time.',
+          title: LanguageController.instance.t('post.create.schedule'),
+          subtitle: LanguageController.instance.t('post.create.scheduleDescription'),
           selected: _publishMode == _PublishMode.schedule,
           onTap: () {
             setState(() {
@@ -1408,9 +1409,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   children: [
                     Expanded(
                       child: _ScheduleFieldButton(
-                        label: 'Date',
+                        label: LanguageController.instance.t('post.create.date'),
                         value: scheduled == null
-                            ? 'Select date'
+                            ? LanguageController.instance.t('post.create.selectDate')
                             : _formatScheduleDate(scheduled),
                         icon: Icons.calendar_today_outlined,
                         onTap: _pickScheduleDate,
@@ -1419,9 +1420,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _ScheduleFieldButton(
-                        label: 'Time',
+                        label: LanguageController.instance.t('post.create.time'),
                         value: scheduled == null
-                            ? 'Select time'
+                            ? LanguageController.instance.t('post.create.selectTime')
                             : _formatScheduleTime(scheduled),
                         icon: Icons.schedule_rounded,
                         onTap: _pickScheduleTime,
@@ -1431,7 +1432,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Timezone: local device time',
+                  LanguageController.instance.t('post.create.timezone'),
                   style: TextStyle(color: tokens.textMuted, fontSize: 12),
                 ),
               ],
@@ -1459,18 +1460,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       child: Column(
         children: [
           _ToggleRow(
-            label: 'Allow comments',
+            label: LanguageController.instance.t('post.create.allowComments'),
             value: _allowComments,
             onChanged: (v) => setState(() => _allowComments = v),
             isTop: true,
           ),
           _ToggleRow(
-            label: 'Allow download',
+            label: LanguageController.instance.t('post.create.allowDownload'),
             value: _allowDownload,
             onChanged: (v) => setState(() => _allowDownload = v),
           ),
           _ToggleRow(
-            label: 'Hide like count',
+            label: LanguageController.instance.t('post.create.hideLikeCount'),
             value: _hideLikeCount,
             onChanged: (v) => setState(() => _hideLikeCount = v),
             isBottom: true,
@@ -1569,8 +1570,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               )
             : Text(
                 _publishMode == _PublishMode.schedule
-                    ? 'Schedule post'
-                    : 'Publish post',
+                    ? LanguageController.instance.t('post.create.schedulePost')
+                    : LanguageController.instance.t('post.create.publishPost'),
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
