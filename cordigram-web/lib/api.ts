@@ -3736,13 +3736,26 @@ export async function pinDirectMessage(
     localStorage.getItem("accessToken") ||
     localStorage.getItem("token");
 
-  return apiFetch<any>({
-    path: `/direct-messages/${messageId}/pin`,
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const headers = {
+    Authorization: `Bearer ${token}`,
+  };
+  try {
+    return await apiFetch<any>({
+      path: `/direct-messages/${messageId}/pin`,
+      method: "POST",
+      headers,
+    });
+  } catch (e: unknown) {
+    const status = (e as { status?: number })?.status;
+    if (status === 404) {
+      return apiFetch<any>({
+        path: `/direct-messages/pin/${messageId}`,
+        method: "POST",
+        headers,
+      });
+    }
+    throw e;
+  }
 }
 
 export async function reportDirectMessage(
@@ -3838,13 +3851,26 @@ export async function getPinnedMessages(
     localStorage.getItem("accessToken") ||
     localStorage.getItem("token");
 
-  return apiFetch<any[]>({
-    path: `/direct-messages/pinned/${userId}`,
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const headers = {
+    Authorization: `Bearer ${token}`,
+  };
+  try {
+    return await apiFetch<any[]>({
+      path: `/direct-messages/pinned/${userId}`,
+      method: "GET",
+      headers,
+    });
+  } catch (e: unknown) {
+    const status = (e as { status?: number })?.status;
+    if (status === 404) {
+      return apiFetch<any[]>({
+        path: `/direct-messages/pins/${userId}`,
+        method: "GET",
+        headers,
+      });
+    }
+    throw e;
+  }
 }
 
 export async function getPoll(opts: {

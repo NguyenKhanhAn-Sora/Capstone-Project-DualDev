@@ -2287,13 +2287,22 @@ export async function pinChannelMessage(
   channelId: string,
   messageId: string,
 ): Promise<Message> {
-  const response = await fetch(
+  let response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages/${messageId}/pin`,
     {
       method: "POST",
       headers: getHeaders(),
     },
   );
+  if (response.status === 404) {
+    response = await fetch(
+      `${API_BASE_URL}/channels/${channelId}/messages/pin/${messageId}`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+      },
+    );
+  }
   if (!response.ok) throw new Error("Không thể ghim tin nhắn");
   return response.json();
 }
@@ -2301,13 +2310,19 @@ export async function pinChannelMessage(
 export async function getPinnedChannelMessages(
   channelId: string,
 ): Promise<Message[]> {
-  const response = await fetch(
+  let response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages/pinned`,
     {
       method: "GET",
       headers: getHeaders(),
     },
   );
+  if (response.status === 404) {
+    response = await fetch(`${API_BASE_URL}/channels/${channelId}/messages/pins`, {
+      method: "GET",
+      headers: getHeaders(),
+    });
+  }
   if (!response.ok) throw new Error("Không tải được tin nhắn đã ghim");
   const data = await response.json();
   return Array.isArray(data) ? (data as Message[]) : [];
