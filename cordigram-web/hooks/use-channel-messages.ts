@@ -79,6 +79,31 @@ export interface JoinApplicationUpdatedEvent {
   status: "accepted" | "rejected" | "withdrawn";
 }
 
+export interface ServerUpdatedEvent {
+  serverId: string;
+  actorUserId?: string | null;
+  server?: {
+    id: string;
+    name: string;
+    description?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
+    bannerImageUrl?: string | null;
+    bannerColor?: string | null;
+    memberCount?: number;
+  };
+  updatedAt?: string;
+}
+
+export interface ServerMembershipUpdatedEvent {
+  serverId: string;
+  userId: string;
+  action: "joined" | "left";
+  actorUserId?: string | null;
+  server?: ServerUpdatedEvent["server"];
+  updatedAt?: string;
+}
+
 export interface ChannelMessageDeletedEvent {
   channelId: string;
   messageId: string;
@@ -105,6 +130,9 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     useState<UserProfileStyleUpdatedEvent | null>(null);
   const [boostEntitlementUpdated, setBoostEntitlementUpdated] =
     useState<BoostEntitlementUpdatedEvent | null>(null);
+  const [serverUpdated, setServerUpdated] = useState<ServerUpdatedEvent | null>(null);
+  const [serverMembershipUpdated, setServerMembershipUpdated] =
+    useState<ServerMembershipUpdatedEvent | null>(null);
   const [channelMessageDeleted, setChannelMessageDeleted] =
     useState<ChannelMessageDeletedEvent | null>(null);
 
@@ -199,6 +227,32 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
       }
     });
 
+    socket.on("server-updated", (data: ServerUpdatedEvent) => {
+      if (!data?.serverId) return;
+      setServerUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-server-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setServerUpdated(null), 500);
+    });
+
+    socket.on("server-membership-updated", (data: ServerMembershipUpdatedEvent) => {
+      if (!data?.serverId || !data?.userId) return;
+      setServerMembershipUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-server-membership-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setServerMembershipUpdated(null), 500);
+    });
+
     socket.on("message-deleted", (data: ChannelMessageDeletedEvent) => {
       if (!data?.messageId || !data?.channelId || !data?.deleteType) return;
       setChannelMessageDeleted({
@@ -245,6 +299,8 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     serverMemberProfileUpdated,
     userProfileStyleUpdated,
     boostEntitlementUpdated,
+    serverUpdated,
+    serverMembershipUpdated,
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,

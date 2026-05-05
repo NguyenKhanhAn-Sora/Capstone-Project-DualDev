@@ -15,6 +15,9 @@ class ChannelMessage {
     this.customStickerUrl,
     this.attachments = const [],
     this.reactions = const [],
+    this.isPinned = false,
+    this.pinnedAt,
+    this.replyTo,
   });
 
   final String id;
@@ -30,6 +33,9 @@ class ChannelMessage {
   final String? customStickerUrl;
   final List<String> attachments;
   final List<MessageReaction> reactions;
+  final bool isPinned;
+  final DateTime? pinnedAt;
+  final ChannelReplyMessage? replyTo;
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
     final senderRaw = json['sender'] ?? json['senderId'];
@@ -78,6 +84,56 @@ class ChannelMessage {
                 )
                 .toList()
           : const <MessageReaction>[],
+      isPinned: json['isPinned'] == true,
+      pinnedAt: DateTime.tryParse((json['pinnedAt'] ?? '').toString())?.toLocal(),
+      replyTo: json['replyTo'] is Map
+          ? ChannelReplyMessage.fromJson(
+              Map<String, dynamic>.from(json['replyTo']),
+            )
+          : null,
+    );
+  }
+}
+
+class ChannelReplyMessage {
+  const ChannelReplyMessage({
+    required this.id,
+    required this.content,
+    required this.senderId,
+    this.senderName,
+    this.type,
+    this.voiceUrl,
+    this.voiceDurationSec,
+  });
+
+  final String id;
+  final String content;
+  final String senderId;
+  final String? senderName;
+  final String? type;
+  final String? voiceUrl;
+  final int? voiceDurationSec;
+
+  factory ChannelReplyMessage.fromJson(Map<String, dynamic> json) {
+    final sender = json['senderId'];
+    final senderId = sender is Map
+        ? (sender['_id'] ?? sender['id'] ?? sender['userId'] ?? '').toString()
+        : (sender?.toString() ?? '');
+    final senderName = sender is Map
+        ? (sender['displayName'] ?? sender['username'] ?? sender['email'])
+              ?.toString()
+              .trim()
+        : null;
+    return ChannelReplyMessage(
+      id: (json['_id'] ?? json['id'] ?? '').toString(),
+      content: (json['content'] ?? '').toString(),
+      senderId: senderId,
+      senderName: senderName?.isEmpty == true ? null : senderName,
+      type: json['messageType']?.toString(),
+      voiceUrl: json['voiceUrl']?.toString(),
+      voiceDurationSec: json['voiceDuration'] is num
+          ? (json['voiceDuration'] as num).toInt()
+          : null,
     );
   }
 }

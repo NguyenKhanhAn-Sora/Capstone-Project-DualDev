@@ -140,6 +140,44 @@ class DirectMessagesService {
     );
   }
 
+  static Future<DmMessage?> togglePin(String messageId) async {
+    Map<String, dynamic> res;
+    try {
+      res = await ApiService.post(
+        '/direct-messages/$messageId/pin',
+        extraHeaders: _authHeaders,
+      );
+    } catch (_) {
+      // Backward-compatible fallback for deployments using a different route shape.
+      res = await ApiService.post(
+        '/direct-messages/pin/$messageId',
+        extraHeaders: _authHeaders,
+      );
+    }
+    final message = _pickMap(res, ['message', 'data']);
+    final raw = message ?? res;
+    return DmMessage.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  static Future<List<DmMessage>> getPinnedMessages(String peerUserId) async {
+    List<dynamic> list;
+    try {
+      list = await ApiService.getList(
+        '/direct-messages/pinned/$peerUserId',
+        extraHeaders: _authHeaders,
+      );
+    } catch (_) {
+      list = await ApiService.getList(
+        '/direct-messages/pins/$peerUserId',
+        extraHeaders: _authHeaders,
+      );
+    }
+    return list
+        .whereType<Map>()
+        .map((e) => DmMessage.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
   static Future<void> deleteMessage(
     String messageId, {
     String deleteType = 'for-me',

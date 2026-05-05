@@ -9,6 +9,7 @@ import 'server_detail_screen.dart';
 import 'server_list_controller.dart';
 import 'message_chat_screen.dart';
 import 'search/message_search_sheet.dart';
+import 'services/channel_messages_realtime_service.dart';
 import 'services/servers_service.dart';
 import 'voice_channel_room_screen.dart';
 import 'messages_controller.dart';
@@ -37,6 +38,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   final MessagesController _messagesController = MessagesController();
   final ServerListController _serverListController = ServerListController();
+  StreamSubscription<Map<String, dynamic>>? _serverRealtimeSub;
+  Timer? _serverRefreshDebounce;
   bool _isFolderExpanded = false;
   bool _isServerMode = false;
 
@@ -49,6 +52,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _serverListController.loadServers();
     });
+    _serverRealtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
+      _onServerRealtimeEvent,
+    );
   }
 
   @override
@@ -57,6 +63,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     _serverListController.removeListener(_onControllerChanged);
     _messagesController.disposeController();
     _messagesController.dispose();
+    _serverRealtimeSub?.cancel();
+    _serverRefreshDebounce?.cancel();
     _serverListController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -65,6 +73,22 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
   void _onControllerChanged() {
     if (!mounted) return;
     setState(() {});
+  }
+
+  void _onServerRealtimeEvent(Map<String, dynamic> payload) {
+    final event = (payload['event'] ?? '').toString();
+    if (event != 'server-updated' && event != 'server-membership-updated') {
+      return;
+    }
+    _scheduleServerListRefresh();
+  }
+
+  void _scheduleServerListRefresh() {
+    _serverRefreshDebounce?.cancel();
+    _serverRefreshDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      _serverListController.loadServers();
+    });
   }
 
   List<ServerSummary> get _filteredServers {

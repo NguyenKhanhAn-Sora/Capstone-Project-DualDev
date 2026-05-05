@@ -16,6 +16,7 @@ import 'services/direct_messages_realtime_service.dart';
 import 'services/direct_messages_service.dart';
 import 'models/dm_message.dart';
 import 'models/message_thread.dart';
+import 'pinned_messages_screen.dart';
 import 'search/message_search_sheet.dart';
 import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
@@ -1272,6 +1273,17 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.push_pin_outlined, color: Colors.white),
+                title: const Text(
+                  'Ghim tin nhắn',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  await _togglePinMessage(message);
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
                 title: const Text(
                   'Xóa tin nhắn',
@@ -1336,6 +1348,40 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     );
   }
 
+  Future<void> _togglePinMessage(DmMessage message) async {
+    try {
+      final updated = await DirectMessagesService.togglePin(message.id);
+      if (updated == null) return;
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == message.id);
+        if (idx != -1) _messages[idx] = updated;
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Bạn đã ghim tin nhắn'),
+          action: SnackBarAction(
+            label: 'Xem tất cả',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PinnedMessagesScreen.dm(
+                    peerUserId: widget.thread.id,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể ghim tin nhắn: $e')),
+      );
+    }
+  }
+
   Future<void> _showCustomReactionPicker(DmMessage message) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1381,6 +1427,37 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       default:
         return message.content;
     }
+  }
+
+  String _senderNameForBubble(DmMessage message) {
+    final name = (message.senderDisplayName ?? '').trim();
+    if (name.isNotEmpty) return name;
+    final username = (message.senderUsername ?? '').trim();
+    if (username.isNotEmpty) return username;
+    return widget.thread.name;
+  }
+
+  Widget _senderAvatarForBubble(DmMessage message) {
+    final avatarUrl = (message.senderAvatarUrl ?? '').trim();
+    final fallback = _senderNameForBubble(message);
+    if (avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 13,
+        backgroundImage: NetworkImage(avatarUrl),
+      );
+    }
+    return CircleAvatar(
+      radius: 13,
+      backgroundColor: const Color(0xFFDDDDDD),
+      child: Text(
+        fallback.isNotEmpty ? fallback.substring(0, 1).toUpperCase() : 'U',
+        style: const TextStyle(
+          color: Color(0xFF1B2A4A),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 
   String _replyPreviewText(DmReplyMessage reply) {
@@ -1653,72 +1730,98 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                               ? CrossAxisAlignment.end
                               : CrossAxisAlignment.start,
                           children: [
-                            GestureDetector(
-                              onLongPress: () => _showMessageActions(
-                                message: message,
-                                isMine: isMine,
-                              ),
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.sizeOf(context).width * 0.72,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isMine
-                                      ? const Color(0xFF2B3C66)
-                                      : const Color(0xFF1D2E52),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (message.replyTo != null)
-                                      Container(
-                                        margin: const EdgeInsets.only(bottom: 6),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0x33232f4a),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: const Color(0xFF44577F),
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              message.replyTo!.senderName ??
-                                                  message.replyTo!.senderId,
-                                              style: const TextStyle(
-                                                color: Color(0xFFB6C2DC),
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              _replyPreviewText(message.replyTo!),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                if (!isMine) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6, bottom: 6),
+                                    child: _senderAvatarForBubble(message),
+                                  ),
+                                ],
+                                Flexible(
+                                  child: GestureDetector(
+                                    onLongPress: () => _showMessageActions(
+                                      message: message,
+                                      isMine: isMine,
+                                    ),
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
                                       ),
-                                    _buildMessageContent(message),
-                                  ],
+                                      constraints: BoxConstraints(
+                                        maxWidth: MediaQuery.sizeOf(context).width * 0.72,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isMine
+                                            ? const Color(0xFF2B3C66)
+                                            : const Color(0xFF1D2E52),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (!isMine)
+                                            Padding(
+                                              padding: const EdgeInsets.only(bottom: 4),
+                                              child: Text(
+                                                _senderNameForBubble(message),
+                                                style: const TextStyle(
+                                                  color: Color(0xFFC3D4F7),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          if (message.replyTo != null)
+                                            Container(
+                                              margin: const EdgeInsets.only(bottom: 6),
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 6,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0x33232f4a),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: const Color(0xFF44577F),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    message.replyTo!.senderName ??
+                                                        message.replyTo!.senderId,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFFB6C2DC),
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    _replyPreviewText(message.replyTo!),
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      color: Colors.white70,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          _buildMessageContent(message),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                             if (message.reactions.isNotEmpty)
                               Padding(
@@ -1747,6 +1850,17 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                         ),
                                       )
                                       .toList(),
+                                ),
+                              ),
+                            if (isMine)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3, right: 2),
+                                child: Text(
+                                  message.read ? 'Đã xem' : 'Đã gửi',
+                                  style: const TextStyle(
+                                    color: Color(0xFF9FB3DA),
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                           ],

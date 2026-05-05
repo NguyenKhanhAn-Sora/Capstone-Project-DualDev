@@ -122,6 +122,11 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
   const [discoveryChecks, setDiscoveryChecks] = useState<serversApi.DiscoveryCheck[]>([]);
   const [discoveryEligible, setDiscoveryEligible] = useState(false);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [initialAccessMode, setInitialAccessMode] = useState<AccessMode>("discoverable");
+  const [initialIsAgeRestricted, setInitialIsAgeRestricted] = useState(false);
+  const [initialHasRules, setInitialHasRules] = useState(false);
+  const [initialJoinFormEnabled, setInitialJoinFormEnabled] = useState(false);
+  const [initialJoinFormQuestions, setInitialJoinFormQuestions] = useState<JoinFormQuestion[]>([]);
 
   const canEdit = useMemo(() => Boolean(canManageSettings), [canManageSettings]);
 
@@ -146,6 +151,11 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
     setHasRules(settings.hasRules); setRules(settings.rules || []);
     setJoinFormEnabled(Boolean(settings.joinApplicationForm?.enabled));
     setJoinFormQuestions(settings.joinApplicationForm?.questions || []);
+    setInitialAccessMode(settings.accessMode);
+    setInitialIsAgeRestricted(settings.isAgeRestricted);
+    setInitialHasRules(settings.hasRules);
+    setInitialJoinFormEnabled(Boolean(settings.joinApplicationForm?.enabled));
+    setInitialJoinFormQuestions(settings.joinApplicationForm?.questions || []);
   };
 
   useEffect(() => {
@@ -158,11 +168,50 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverId]);
 
-  const commitPatch = async (patch: Partial<Omit<ServerAccessSettings, "rules">>) => {
-    if (!canEdit) return; setSaving(true); setError(null);
-    try { await (serversApi as any).updateServerAccessSettings(serverId, patch); await fetchSettings(); }
-    catch (e) { setError(e instanceof Error ? e.message : t("chat.serverAccess.saveError")); }
-    finally { setSaving(false); }
+  const normalizeJoinQuestions = (list: JoinFormQuestion[]): JoinFormQuestion[] =>
+    list.map((q) => ({
+      id: String(q.id || ""),
+      title: String(q.title || "").trim(),
+      type: q.type === "paragraph" || q.type === "multiple_choice" ? q.type : "short",
+      required: q.required !== false,
+      options:
+        q.type === "multiple_choice"
+          ? (q.options ?? []).map((x) => String(x || "").trim()).filter(Boolean)
+          : [],
+    }));
+
+  const joinQuestionsEqual = (
+    a: JoinFormQuestion[],
+    b: JoinFormQuestion[],
+  ): boolean => JSON.stringify(normalizeJoinQuestions(a)) === JSON.stringify(normalizeJoinQuestions(b));
+
+  const hasUnsavedChanges =
+    accessMode !== initialAccessMode ||
+    isAgeRestricted !== initialIsAgeRestricted ||
+    hasRules !== initialHasRules ||
+    joinFormEnabled !== initialJoinFormEnabled ||
+    !joinQuestionsEqual(joinFormQuestions, initialJoinFormQuestions);
+
+  const saveAllAccessChanges = async () => {
+    if (!canEdit || !hasUnsavedChanges) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await (serversApi as any).updateServerAccessSettings(serverId, {
+        accessMode,
+        isAgeRestricted,
+        hasRules,
+      });
+      await (serversApi as any).updateJoinApplicationForm(serverId, {
+        enabled: joinFormEnabled,
+        questions: normalizeJoinQuestions(joinFormQuestions),
+      });
+      await fetchSettings();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("chat.serverAccess.saveError"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddRule = async () => {
@@ -182,16 +231,9 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
     if (!canEdit || joinFormQuestions.length > 0) return;
     const q: JoinFormQuestion = { id: uid(), title: t("chat.serverAccess.defaultQuestion"), type: "short", required: true, options: [] };
     setJoinFormQuestions([q]);
-    try { await (serversApi as any).updateJoinApplicationForm(serverId, { enabled: true, questions: [q] }); await fetchSettings(); }
-    catch (e) { setError(e instanceof Error ? e.message : t("chat.serverAccess.joinFormSaveError")); }
   };
 
-  const saveJoinForm = async (nextEnabled: boolean, nextQuestions: JoinFormQuestion[]) => {
-    if (!canEdit) return; setSaving(true); setError(null);
-    try { await (serversApi as any).updateJoinApplicationForm(serverId, { enabled: nextEnabled, questions: nextQuestions }); await fetchSettings(); }
-    catch (e) { setError(e instanceof Error ? e.message : t("chat.serverAccess.joinFormSaveError")); }
-    finally { setSaving(false); }
-  };
+  const saveJoinForm = async (_nextEnabled: boolean, _nextQuestions: JoinFormQuestion[]) => {};
 
   const startModalForType = (tp: JoinFormQuestionType, existing?: JoinFormQuestion | null) => {
     setShowTypePicker(false);
@@ -203,7 +245,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
 
   const upsertQuestion = async (q: JoinFormQuestion) => {
     const next = editingQuestion ? joinFormQuestions.map((x) => (x.id === editingQuestion.id ? q : x)) : [...joinFormQuestions, q];
-    setJoinFormQuestions(next); await saveJoinForm(true, next);
+    setJoinFormQuestions(next);
   };
 
   const addQuestionFromTemplate = async (title: string) => {
@@ -226,21 +268,31 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
       <section className={styles.sectionHeader}>
         <h3 className={styles.title}>{t("chat.serverAccess.title")}</h3>
         <p className={styles.description}>{t("chat.serverAccess.desc")}</p>
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            className={styles.btn}
+            disabled={!canEdit || saving || !hasUnsavedChanges}
+            onClick={saveAllAccessChanges}
+          >
+            {saving ? "Đang lưu..." : "Lưu thay đổi"}
+          </button>
+        </div>
       </section>
 
       <section>
         <div className={styles.cardGrid} style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-          <button type="button" className={`${styles.cardBtn} ${accessMode === "invite_only" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => commitPatch({ accessMode: "invite_only" }).then(() => setAccessMode("invite_only"))}>
+          <button type="button" className={`${styles.cardBtn} ${accessMode === "invite_only" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => setAccessMode("invite_only")}>
             <div style={{ fontSize: 24, marginBottom: 8 }}>🔒</div>
             <div className={styles.cardTitle}>{t("chat.serverAccess.inviteOnlyTitle")}</div>
             <div className={styles.cardHint}>{t("chat.serverAccess.inviteOnlyHint")}</div>
           </button>
-          <button type="button" className={`${styles.cardBtn} ${accessMode === "apply" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => commitPatch({ accessMode: "apply" }).then(() => setAccessMode("apply"))}>
+          <button type="button" className={`${styles.cardBtn} ${accessMode === "apply" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => setAccessMode("apply")}>
             <div style={{ fontSize: 24, marginBottom: 8 }}>✉️</div>
             <div className={styles.cardTitle}>{t("chat.serverAccess.applyTitle")}</div>
             <div className={styles.cardHint}>{t("chat.serverAccess.applyHint")}</div>
           </button>
-          <button type="button" className={`${styles.cardBtn} ${accessMode === "discoverable" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => commitPatch({ accessMode: "discoverable" }).then(() => setAccessMode("discoverable"))}>
+          <button type="button" className={`${styles.cardBtn} ${accessMode === "discoverable" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => setAccessMode("discoverable")}>
             <div style={{ fontSize: 24, marginBottom: 8 }}>🌐</div>
             <div className={styles.cardTitle}>{t("chat.serverAccess.discoverTitle")}</div>
             <div className={styles.cardHint}>{t("chat.serverAccess.discoverHint")}</div>
@@ -293,14 +345,14 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
               <div className={styles.toggleTitle}>{t("chat.serverAccess.ageTitle")}</div>
               <div className={styles.toggleDesc}>{t("chat.serverAccess.ageDesc")}</div>
             </div>
-            <input className={styles.toggleInput} type="checkbox" checked={isAgeRestricted} disabled={!canEdit || saving} onChange={(e) => { setIsAgeRestricted(e.target.checked); commitPatch({ isAgeRestricted: e.target.checked }); }} />
+            <input className={styles.toggleInput} type="checkbox" checked={isAgeRestricted} disabled={!canEdit || saving} onChange={(e) => { setIsAgeRestricted(e.target.checked); }} />
           </label>
           <label className={styles.toggleRow}>
             <div className={styles.toggleLabel}>
               <div className={styles.toggleTitle}>{t("chat.serverAccess.rulesToggleTitle")}</div>
               <div className={styles.toggleDesc}>{t("chat.serverAccess.rulesToggleDesc")}</div>
             </div>
-            <input className={styles.toggleInput} type="checkbox" checked={hasRules} disabled={!canEdit || saving} onChange={(e) => { setHasRules(e.target.checked); commitPatch({ hasRules: e.target.checked }); }} />
+            <input className={styles.toggleInput} type="checkbox" checked={hasRules} disabled={!canEdit || saving} onChange={(e) => { setHasRules(e.target.checked); }} />
           </label>
         </div>
       </section>
@@ -375,7 +427,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
                       <div className={styles.questionTitle}>{q.title}</div>
                       <div className={styles.questionActions}>
                         <button type="button" className={styles.linkBtn} disabled={!canEdit || saving} onClick={() => startModalForType(q.type, q)}>{t("chat.serverAccess.editQuestion")}</button>
-                        <button type="button" className={`${styles.linkBtn} ${styles.dangerLink}`} disabled={!canEdit || saving} onClick={() => { const next = joinFormQuestions.filter((x) => x.id !== q.id); setJoinFormQuestions(next); saveJoinForm(joinFormEnabled, next); }}>{t("chat.serverAccess.deleteQuestion")}</button>
+                        <button type="button" className={`${styles.linkBtn} ${styles.dangerLink}`} disabled={!canEdit || saving} onClick={() => { const next = joinFormQuestions.filter((x) => x.id !== q.id); setJoinFormQuestions(next); }}>{t("chat.serverAccess.deleteQuestion")}</button>
                       </div>
                     </div>
                     <div className={styles.questionTypeBadge}>{labelType(q.type)}</div>

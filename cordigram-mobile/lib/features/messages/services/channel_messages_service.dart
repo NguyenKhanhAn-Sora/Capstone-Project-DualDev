@@ -49,6 +49,7 @@ class ChannelMessagesService {
     String? serverStickerId,
     String? serverStickerServerId,
     List<String>? attachments,
+    String? replyTo,
   }) async {
     final res = await ApiService.post(
       '/channels/$channelId/messages',
@@ -67,6 +68,7 @@ class ChannelMessagesService {
         if (voiceDuration != null) 'voiceDuration': voiceDuration,
         if ((attachments ?? const <String>[]).isNotEmpty)
           'attachments': attachments,
+        if ((replyTo ?? '').isNotEmpty) 'replyTo': replyTo,
       },
     );
     final raw = res['message'] ?? res['data'] ?? res;
@@ -89,6 +91,62 @@ class ChannelMessagesService {
     await ApiService.post(
       '/channels/$channelId/messages/$messageId/reactions/$emoji',
       extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<ChannelMessage?> togglePin({
+    required String channelId,
+    required String messageId,
+  }) async {
+    Map<String, dynamic> res;
+    try {
+      res = await ApiService.post(
+        '/channels/$channelId/messages/$messageId/pin',
+        extraHeaders: _authHeaders,
+      );
+    } catch (_) {
+      // Backward-compatible fallback for deployments using an alternate pin route.
+      res = await ApiService.post(
+        '/channels/$channelId/messages/pin/$messageId',
+        extraHeaders: _authHeaders,
+      );
+    }
+    final raw = res['message'] ?? res['data'] ?? res;
+    if (raw is! Map) return null;
+    return ChannelMessage.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  static Future<List<ChannelMessage>> getPinnedMessages(String channelId) async {
+    List<dynamic> list;
+    try {
+      list = await ApiService.getList(
+        '/channels/$channelId/messages/pinned',
+        extraHeaders: _authHeaders,
+      );
+    } catch (_) {
+      list = await ApiService.getList(
+        '/channels/$channelId/messages/pins',
+        extraHeaders: _authHeaders,
+      );
+    }
+    return list
+        .whereType<Map>()
+        .map((e) => ChannelMessage.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  static Future<void> deleteMessage({
+    required String channelId,
+    required String messageId,
+    String deleteType = 'for-me',
+  }) async {
+    final path = deleteType == 'for-everyone'
+        ? '/channels/$channelId/messages/$messageId/delete-for-everyone'
+        : '/channels/$channelId/messages/$messageId/delete-for-me';
+    await ApiService.post(
+      path,
+      extraHeaders: _authHeaders,
+      body: const <String, dynamic>{},
     );
   }
 }
