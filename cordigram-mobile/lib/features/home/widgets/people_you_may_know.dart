@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/config/app_theme.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
+import '../../../core/services/language_controller.dart';
 
 // ── Model ─────────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ class _PeopleYouMayKnowState extends State<PeopleYouMayKnow> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load suggestions';
+        _error = LanguageController.instance.t('home.suggestions.loadError');
         _items = [];
       });
     } finally {
@@ -185,7 +186,7 @@ class _PeopleYouMayKnowState extends State<PeopleYouMayKnow> {
             child: Row(
               children: [
                 Text(
-                  'People you may know',
+                  LanguageController.instance.t('home.suggestions.title'),
                   style: TextStyle(
                     color: textPrime,
                     fontSize: 14,
@@ -300,9 +301,9 @@ class _ErrorBanner extends StatelessWidget {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Text(
-              'Retry',
-              style: TextStyle(
+            child: Text(
+              LanguageController.instance.t('common.retry'),
+              style: const TextStyle(
                 color: Color(0xFF4AA3E4),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -504,7 +505,7 @@ class _FollowButton extends StatelessWidget {
               const SizedBox(width: 3),
             ],
             Text(
-              isFollowing ? 'Following' : 'Follow',
+              isFollowing ? LanguageController.instance.t('home.suggestions.following') : LanguageController.instance.t('home.suggestions.follow'),
               style: TextStyle(
                 color: isFollowing ? tokens.textMuted : tokens.primary,
                 fontSize: 11,
