@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 
 class _ReportCategory {
   const _ReportCategory({
@@ -145,7 +146,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Failed to submit report. Please try again.';
+        _error = LanguageController.instance.t('report.submitError');
       });
     }
   }
@@ -204,7 +205,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
                     ),
                   ),
                 Text(
-                  'Report ${widget.subjectLabel}',
+                  LanguageController.instance.t('report.title.${widget.subjectLabel}'),
                   style: TextStyle(
                     color: tokens.text,
                     fontSize: 16,
@@ -242,7 +243,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "What's the issue?",
+          LanguageController.instance.t('report.whatsTheIssue'),
           style: TextStyle(
             color: tokens.text,
             fontSize: 14,
@@ -271,7 +272,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
                   border: Border.all(color: tokens.panelBorder),
                 ),
                 child: Text(
-                  g.label,
+                  LanguageController.instance.t('report.category.${g.key}'),
                   style: TextStyle(
                     color: tokens.text,
                     fontSize: 14,
@@ -292,7 +293,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          category.label,
+          LanguageController.instance.t('report.category.${category.key}'),
           style: TextStyle(
             color: tokens.text,
             fontSize: 14,
@@ -308,7 +309,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
             activeColor: tokens.primary,
             onChanged: (value) => setState(() => _selectedReason = value),
             title: Text(
-              reason.label,
+              LanguageController.instance.t('report.reason.${reason.key}'),
               style: TextStyle(color: tokens.text, fontSize: 14),
             ),
           ),
@@ -320,7 +321,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
           maxLines: 4,
           style: TextStyle(color: tokens.text, fontSize: 14),
           decoration: InputDecoration(
-            hintText: 'Additional note (optional)',
+            hintText: LanguageController.instance.t('report.additionalNote'),
             hintStyle: TextStyle(color: tokens.textMuted),
             filled: true,
             fillColor: tokens.panelMuted,
@@ -359,7 +360,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
                       color: theme.colorScheme.onPrimary,
                     ),
                   )
-                : const Text('Submit report'),
+                : Text(LanguageController.instance.t('report.submitReport')),
           ),
         ),
       ],

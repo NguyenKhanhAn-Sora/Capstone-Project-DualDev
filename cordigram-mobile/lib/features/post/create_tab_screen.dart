@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'create_post_screen.dart';
 import 'create_reel_screen.dart';
 import '../livestream/create_livestream_screen.dart';
+import '../../core/services/language_controller.dart';
 
 /// Wrapper screen shown in the Create tab.
 /// Provides a Post / Reel mode toggle at the top,
@@ -114,10 +115,10 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                   children: [
                     Text(
                       _tabCtrl.index == 0
-                          ? 'Create post'
+                          ? LanguageController.instance.t('post.createTab.createPost')
                           : _tabCtrl.index == 1
-                          ? 'Create reel'
-                          : 'Create livestream',
+                          ? LanguageController.instance.t('post.createTab.createReel')
+                          : LanguageController.instance.t('post.createTab.createLive'),
                       style: TextStyle(
                         color: scheme.onSurface,
                         fontSize: 18,
@@ -127,10 +128,10 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                     const SizedBox(height: 2),
                     Text(
                       _tabCtrl.index == 0
-                          ? 'Share genuine moments'
+                          ? LanguageController.instance.t('post.createTab.postSubtitle')
                           : _tabCtrl.index == 1
-                          ? 'Share a short reel'
-                          : 'Set up your livestream session',
+                          ? LanguageController.instance.t('post.createTab.reelSubtitle')
+                          : LanguageController.instance.t('post.createTab.liveSubtitle'),
                       style: TextStyle(
                         color: scheme.onSurfaceVariant,
                         fontSize: 13,
@@ -153,19 +154,19 @@ class _CreateTabScreenState extends State<CreateTabScreen>
             child: Row(
               children: [
                 _PillTab(
-                  label: 'Post',
+                  label: LanguageController.instance.t('post.createTab.post'),
                   icon: Icons.photo_library_outlined,
                   active: _tabCtrl.index == 0,
                   onTap: () => _safeAnimateTo(0),
                 ),
                 _PillTab(
-                  label: 'Reel',
+                  label: LanguageController.instance.t('post.createTab.reel'),
                   icon: Icons.smart_display_outlined,
                   active: _tabCtrl.index == 1,
                   onTap: () => _safeAnimateTo(1),
                 ),
                 _PillTab(
-                  label: 'Live',
+                  label: LanguageController.instance.t('post.createTab.live'),
                   icon: Icons.wifi_tethering_rounded,
                   active: _tabCtrl.index == 2,
                   onTap: () => _safeAnimateTo(2),
