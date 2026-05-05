@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/services/auth_storage.dart';
+import '../services/channel_messages_realtime_service.dart';
 import '../services/direct_messages_realtime_service.dart';
 import '../services/direct_messages_service.dart';
 import 'calls_api_service.dart';
@@ -45,11 +47,19 @@ class DmCallManager extends ChangeNotifier {
   Timer? _incomingTimer;
   Timer? _rejectedTimer;
   bool _isCallMinimized = false;
+  /// True = only the small corner chip is shown (full mini card hidden).
+  bool _miniCallTuckedToCorner = false;
   Offset _miniCallOffset = const Offset(16, 140);
   bool _activeMicEnabled = true;
   bool _activeSoundEnabled = true;
   Future<void> Function(bool enabled)? _setMicEnabledDelegate;
   Future<void> Function(bool enabled)? _setSoundEnabledDelegate;
+
+  /// Live tracks for the floating PiP while minimized (fed by [NativeCallScreen]).
+  VideoTrack? _minimizedRemoteMainTrack;
+  VideoTrack? _minimizedLocalPipTrack;
+  bool _minimizedRemoteMainIsScreenShare = false;
+  DateTime? _activeCallStartedAt;
 
   /// Cached display/username of the currently authenticated user. Fetched
   /// lazily (and after login via [onAuthChanged]) so we can pass a real
@@ -60,11 +70,16 @@ class DmCallManager extends ChangeNotifier {
   /// Navigator key used to push the native call screen from anywhere.
   GlobalKey<NavigatorState>? _navigatorKey;
 
+  /// Root navigator from [attach] — use for [push]/[popUntil] when there is no
+  /// suitable [BuildContext] under [MaterialApp.builder] (e.g. global overlays).
+  NavigatorState? get rootNavigatorState => _navigatorKey?.currentState;
+
   IncomingCallState? get incoming => _incoming;
   OutgoingCallState? get outgoing => _outgoing;
   ActiveCallState? get active => _active;
   bool get hasActiveCall => _active != null;
   bool get isCallMinimized => _isCallMinimized;
+  bool get isMiniCallTuckedToCorner => _miniCallTuckedToCorner;
   Offset get miniCallOffset => _miniCallOffset;
   bool get activeMicEnabled => _activeMicEnabled;
   bool get activeSoundEnabled => _activeSoundEnabled;
@@ -73,6 +88,28 @@ class DmCallManager extends ChangeNotifier {
 
   /// Display name for the signed-in user (for in-call self preview labels).
   String? get myDisplayName => _myName;
+
+  VideoTrack? get minimizedRemoteMainTrack => _minimizedRemoteMainTrack;
+  VideoTrack? get minimizedLocalPipTrack => _minimizedLocalPipTrack;
+  bool get minimizedRemoteMainIsScreenShare => _minimizedRemoteMainIsScreenShare;
+  DateTime? get activeCallStartedAt => _activeCallStartedAt;
+
+  void setMinimizedPipVideoTracks({
+    VideoTrack? remoteMain,
+    VideoTrack? localPip,
+    bool remoteMainIsScreenShare = false,
+  }) {
+    _minimizedRemoteMainTrack = remoteMain;
+    _minimizedLocalPipTrack = localPip;
+    _minimizedRemoteMainIsScreenShare = remoteMainIsScreenShare;
+    if (_isCallMinimized) notifyListeners();
+  }
+
+  void clearMinimizedPipVideoTracks() {
+    _minimizedRemoteMainTrack = null;
+    _minimizedLocalPipTrack = null;
+    _minimizedRemoteMainIsScreenShare = false;
+  }
 
   /// Call once at app startup (after [AuthStorage.loadAll]) with the root
   /// navigator key. Safe to call multiple times — later calls are no-ops.
@@ -122,11 +159,15 @@ class DmCallManager extends ChangeNotifier {
   Future<void> onAuthChanged() async {
     if (!_initialized) return;
     await DirectMessagesRealtimeService.disconnect();
+    await ChannelMessagesRealtimeService.disconnect();
     _cancelTimers();
     _incoming = null;
     _outgoing = null;
     _active = null;
+    _activeCallStartedAt = null;
+    clearMinimizedPipVideoTracks();
     _isCallMinimized = false;
+    _miniCallTuckedToCorner = false;
     _activeMicEnabled = true;
     _activeSoundEnabled = true;
     _setMicEnabledDelegate = null;
@@ -136,6 +177,7 @@ class DmCallManager extends ChangeNotifier {
     final token = AuthStorage.accessToken;
     if (token != null && token.isNotEmpty) {
       await DirectMessagesRealtimeService.connect();
+      await ChannelMessagesRealtimeService.connect();
       unawaited(_refreshMyName());
     }
   }
@@ -296,7 +338,10 @@ class DmCallManager extends ChangeNotifier {
     if (act == null) return;
     DirectMessagesRealtimeService.endCall(act.peerUserId);
     _active = null;
+    _activeCallStartedAt = null;
+    clearMinimizedPipVideoTracks();
     _isCallMinimized = false;
+    _miniCallTuckedToCorner = false;
     _activeMicEnabled = true;
     _activeSoundEnabled = true;
     _setMicEnabledDelegate = null;
@@ -361,6 +406,7 @@ class DmCallManager extends ChangeNotifier {
   void minimizeActiveCall() {
     if (_active == null || _isCallMinimized) return;
     _isCallMinimized = true;
+    _miniCallTuckedToCorner = false;
     notifyListeners();
   }
 
@@ -369,8 +415,30 @@ class DmCallManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Collapses the mini call card into a small corner chip ([position] snaps
+  /// the chip, e.g. bottom-right).
+  void tuckMiniCallToCorner({Offset? position}) {
+    if (_active == null || !_isCallMinimized) return;
+    if (position != null) {
+      _miniCallOffset = position;
+    }
+    _miniCallTuckedToCorner = true;
+    notifyListeners();
+  }
+
+  /// Expands from corner chip back to the full mini call card.
+  void expandMiniCallFromCorner() {
+    if (_active == null || !_isCallMinimized || !_miniCallTuckedToCorner) {
+      return;
+    }
+    _miniCallTuckedToCorner = false;
+    notifyListeners();
+  }
+
   void restoreMinimizedCall() {
     if (_active == null) return;
+    clearMinimizedPipVideoTracks();
+    _miniCallTuckedToCorner = false;
     _isCallMinimized = false;
     notifyListeners();
     final navigator = _navigatorKey?.currentState;
@@ -500,7 +568,10 @@ class DmCallManager extends ChangeNotifier {
     }
     if (_active?.peerUserId == fromUserId) {
       _active = null;
+      _activeCallStartedAt = null;
+      clearMinimizedPipVideoTracks();
       _isCallMinimized = false;
+      _miniCallTuckedToCorner = false;
       _activeMicEnabled = true;
       _activeSoundEnabled = true;
       _setMicEnabledDelegate = null;
@@ -528,7 +599,10 @@ class DmCallManager extends ChangeNotifier {
       peerAvatarUrl: peerAvatarUrl,
       video: video,
     );
+    _activeCallStartedAt = DateTime.now();
+    clearMinimizedPipVideoTracks();
     _isCallMinimized = false;
+    _miniCallTuckedToCorner = false;
     _activeMicEnabled = true;
     _activeSoundEnabled = true;
     notifyListeners();

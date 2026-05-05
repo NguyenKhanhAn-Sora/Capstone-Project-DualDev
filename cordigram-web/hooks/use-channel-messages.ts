@@ -92,6 +92,8 @@ interface UseChannelMessagesOptions {
 
 export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   const socketRef = useRef<Socket | null>(null);
+  /** Re-subscribe to the current channel room after each socket reconnect (rooms are not persisted). */
+  const lastJoinedChannelIdRef = useRef<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [newMessageChannel, setNewMessageChannel] = useState<ChannelNewMessageEvent | null>(null);
   const [reactionUpdateChannel, setReactionUpdateChannel] = useState<ChannelReactionUpdateEvent | null>(null);
@@ -119,7 +121,13 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
 
     socketRef.current = socket;
 
-    socket.on("connect", () => setIsConnected(true));
+    socket.on("connect", () => {
+      setIsConnected(true);
+      const ch = lastJoinedChannelIdRef.current;
+      if (ch && socketRef.current?.connected) {
+        socketRef.current.emit("join-channel", { channelId: ch });
+      }
+    });
     socket.on("disconnect", () => setIsConnected(false));
 
     socket.on("new-message", (data: ChannelNewMessageEvent) => {
@@ -209,12 +217,16 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   }, [token]);
 
   const joinChannel = useCallback((channelId: string) => {
+    lastJoinedChannelIdRef.current = channelId || null;
     if (socketRef.current?.connected && channelId) {
       socketRef.current.emit("join-channel", { channelId });
     }
   }, []);
 
   const leaveChannel = useCallback((channelId: string) => {
+    if (lastJoinedChannelIdRef.current === channelId) {
+      lastJoinedChannelIdRef.current = null;
+    }
     if (socketRef.current?.connected && channelId) {
       socketRef.current.emit("leave-channel", { channelId });
     }

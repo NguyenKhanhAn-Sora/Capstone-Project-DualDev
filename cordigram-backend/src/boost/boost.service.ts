@@ -21,6 +21,8 @@ export type BoostStatusResponse = {
   tier: BoostTier | null;
   active: boolean;
   expiresAt: string | null;
+  billingCycle?: BoostBillingCycle | null;
+  source?: 'purchase' | 'gift' | null;
   limits: BoostLimits;
 };
 
@@ -87,6 +89,8 @@ export class BoostService {
       tier,
       active,
       expiresAt,
+      billingCycle: ent?.billingCycle ?? null,
+      source: ent?.source ?? null,
       limits: this.computeLimits(tier),
     };
   }
