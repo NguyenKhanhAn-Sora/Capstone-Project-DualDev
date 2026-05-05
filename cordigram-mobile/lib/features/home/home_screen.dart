@@ -696,7 +696,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
     } catch (_) {
       setState(() {
-        _error = 'Failed to load feed. Please try again.';
+        _error = LanguageController.instance.t('home.feed.loadError');
         _initialLoad = false;
       });
     } finally {
@@ -795,10 +795,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       if (!wasSaved) {
         await PostInteractionService.save(postId);
-        _showSnack('Saved');
+        _showSnack(LanguageController.instance.t('home.snack.saved'));
       } else {
         await PostInteractionService.unsave(postId);
-        _showSnack('Removed from saved');
+        _showSnack(LanguageController.instance.t('home.snack.removedFromSaved'));
       }
     } catch (_) {
       // Roll back on failure
@@ -814,7 +814,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           impressions: s.stats.impressions,
         );
       });
-      _showSnack('Failed to update save', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.saveError'), error: true);
     }
   }
 
@@ -844,7 +844,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _handleQuickRepost(FeedPostState targetState) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
       return;
     }
 
@@ -861,7 +861,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted');
+      _showSnack(LanguageController.instance.t('home.snack.reposted'));
     } on ApiException catch (e) {
       // Compatibility fallback: some backends reject create-repost but support
       // interaction-style repost endpoint.
@@ -874,15 +874,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             await PostInteractionService.repost(targetId);
           } catch (_) {}
         }
-        _showSnack('Reposted');
+        _showSnack(LanguageController.instance.t('home.snack.reposted'));
       } catch (_) {
         _showSnack(
-          e.message.isNotEmpty ? e.message : 'Failed to repost',
+          e.message.isNotEmpty ? e.message : LanguageController.instance.t('home.snack.repostError'),
           error: true,
         );
       }
     } catch (_) {
-      _showSnack('Failed to repost', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.repostError'), error: true);
     }
   }
 
@@ -891,7 +891,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     RepostQuoteInput input,
   ) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
       return;
     }
 
@@ -922,20 +922,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted with quote');
+      _showSnack(LanguageController.instance.t('home.snack.repostedWithQuote'));
     } on ApiException catch (e) {
       _showSnack(
-        e.message.isNotEmpty ? e.message : 'Failed to repost with quote',
+        e.message.isNotEmpty ? e.message : LanguageController.instance.t('home.snack.repostWithQuoteError'),
         error: true,
       );
     } catch (_) {
-      _showSnack('Failed to repost with quote', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.repostWithQuoteError'), error: true);
     }
   }
 
   Future<void> _onRepost(FeedPostState state) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
       return;
     }
 
@@ -956,7 +956,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (quoteInput == null) return;
       await _handleQuoteRepost(state, quoteInput);
     } catch (_) {
-      _showSnack('Unable to open repost menu', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.repostMenuError'), error: true);
     }
   }
 
@@ -1015,7 +1015,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             stats: updated.stats,
           ),
         );
-        _showSnack('Post updated');
+        _showSnack(LanguageController.instance.t('home.snack.postUpdated'));
         return;
       case PostMenuAction.editVisibility:
         final nextVisibility = await showEditVisibilitySheet(
@@ -1028,7 +1028,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           post.id,
           state.copyWith(post: post.copyWith(visibility: nextVisibility)),
         );
-        _showSnack('Visibility updated');
+        _showSnack(LanguageController.instance.t('home.snack.visibilityUpdated'));
         return;
       case PostMenuAction.toggleComments:
         final currentAllowed = post.allowComments != false;
@@ -1040,14 +1040,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         try {
           await PostInteractionService.setAllowComments(post.id, nextAllowed);
           _showSnack(
-            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+            nextAllowed ? LanguageController.instance.t('home.snack.commentsOn') : LanguageController.instance.t('home.snack.commentsOff'),
           );
         } catch (_) {
           _replaceState(
             post.id,
             state.copyWith(post: post.copyWith(allowComments: currentAllowed)),
           );
-          _showSnack('Failed to update comments', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.commentsError'), error: true);
         }
         return;
       case PostMenuAction.toggleHideLike:
@@ -1059,13 +1059,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
         try {
           await PostInteractionService.setHideLikeCount(post.id, nextHidden);
-          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+          _showSnack(nextHidden ? LanguageController.instance.t('home.snack.likeHidden') : LanguageController.instance.t('home.snack.likeVisible'));
         } catch (_) {
           _replaceState(
             post.id,
             state.copyWith(post: post.copyWith(hideLikeCount: currentHidden)),
           );
-          _showSnack('Failed to update like visibility', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.likeError'), error: true);
         }
         return;
       case PostMenuAction.muteNotifications:
@@ -1078,8 +1078,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (muted) {
           _showSnack(
             label == 'reel'
-                ? 'Reel notifications muted'
-                : 'Post notifications muted',
+                ? LanguageController.instance.t('home.snack.reelMuted')
+                : LanguageController.instance.t('home.snack.postMuted'),
           );
         }
         return;
@@ -1092,7 +1092,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case PostMenuAction.copyLink:
         final link = PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
-        _showSnack('Link copied');
+        _showSnack(LanguageController.instance.t('home.snack.linkCopied'));
         return;
       case PostMenuAction.deletePost:
         final lc = LanguageController.instance;
@@ -1100,7 +1100,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           context,
           title: lc.t('home.deletePost.title'),
           message: lc.t('common.cannotUndo'),
-          confirmLabel: 'Delete',
+          confirmLabel: LanguageController.instance.t('common.delete'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -1109,12 +1109,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         setState(() => _states.removeWhere((s) => s.post.id == post.id));
         try {
           await PostInteractionService.deletePost(post.id);
-          _showSnack('Post deleted');
+          _showSnack(LanguageController.instance.t('home.snack.postDeleted'));
         } catch (_) {
           if (snapshot != null) {
             setState(() => _states.insert(0, snapshot));
           }
-          _showSnack('Failed to delete post', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.deleteError'), error: true);
         }
         return;
       case PostMenuAction.followToggle:
@@ -1127,12 +1127,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return;
       case PostMenuAction.hidePost:
         await _onHide(post.id);
-        _showSnack('Post hidden');
+        _showSnack(LanguageController.instance.t('home.snack.postHidden'));
         return;
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack('Please sign in first', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.signInFirst'), error: true);
           return;
         }
         final reported = await showReportPostSheet(
@@ -1140,7 +1140,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           postId: post.id,
           authHeader: {'Authorization': 'Bearer $token'},
         );
-        if (reported) _showSnack('Report submitted');
+        if (reported) _showSnack(LanguageController.instance.t('home.snack.reportSubmitted'));
         return;
       case PostMenuAction.blockAccount:
         final userId = post.authorId;
@@ -1152,7 +1152,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           context,
           title: lc2.t('home.blockUser.title', {'username': username}),
           message: lc2.t('home.blockUser.message'),
-          confirmLabel: 'Block',
+          confirmLabel: LanguageController.instance.t('common.block'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -1163,9 +1163,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           setState(() {
             _states.removeWhere((s) => s.post.authorId == userId);
           });
-          _showSnack('Account blocked');
+          _showSnack(LanguageController.instance.t('home.snack.accountBlocked'));
         } catch (_) {
-          _showSnack('Failed to block account', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.blockError'), error: true);
         }
         return;
     }
@@ -1325,20 +1325,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   String _formatLiveStartedAgo(DateTime? startedAt) {
-    if (startedAt == null) return 'just now';
+    final lc = LanguageController.instance;
+    if (startedAt == null) return lc.t('home.live.justNow');
 
     final diff = DateTime.now().difference(startedAt);
-    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 1) return lc.t('home.live.justNow');
     if (diff.inHours < 1) {
       final m = diff.inMinutes;
-      return '$m minute${m == 1 ? '' : 's'} ago';
+      return m == 1
+          ? lc.t('home.live.minuteAgo', {'n': '$m'})
+          : lc.t('home.live.minutesAgo', {'n': '$m'});
     }
     if (diff.inDays < 1) {
       final h = diff.inHours;
-      return '$h hour${h == 1 ? '' : 's'} ago';
+      return h == 1
+          ? lc.t('home.live.hourAgo', {'n': '$h'})
+          : lc.t('home.live.hoursAgo', {'n': '$h'});
     }
     final d = diff.inDays;
-    return '$d day${d == 1 ? '' : 's'} ago';
+    return d == 1
+        ? lc.t('home.live.dayAgo', {'n': '$d'})
+        : lc.t('home.live.daysAgo', {'n': '$d'});
   }
 
   Widget _buildLiveNowSection() {
@@ -1354,7 +1361,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Padding(
             padding: const EdgeInsets.only(left: 2, bottom: 10),
             child: Text(
-              'Live now',
+              LanguageController.instance.t('home.liveNow'),
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 16,
@@ -1466,7 +1473,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Went live ${_formatLiveStartedAgo(stream.startedAt)}',
+                                  LanguageController.instance.t('home.live.wentLive', {'ago': _formatLiveStartedAgo(stream.startedAt)}),
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.65),
                                     fontSize: 12,
@@ -1610,7 +1617,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final campaignId = await resolveCampaignId();
       if (!mounted) return;
       if (campaignId == null || campaignId.isEmpty) {
-        _showSnack('Cannot find ads campaign detail for this ads', error: true);
+        _showSnack(LanguageController.instance.t('home.snack.adsNotFound'), error: true);
         return;
       }
 
@@ -1622,7 +1629,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } on ApiException catch (e) {
       _showSnack(e.message, error: true);
     } catch (_) {
-      _showSnack('Failed to open ads detail', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.adsDetailError'), error: true);
     }
   }
 
@@ -1817,7 +1824,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             color: scheme.onSurfaceVariant,
             size: 27,
           ),
-          tooltip: 'Search',
+          tooltip: LanguageController.instance.t('home.tooltip.search'),
           onPressed: () => Navigator.of(
             context,
           ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
@@ -1827,7 +1834,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           icon: Icons.notifications_outlined,
           iconSize: 27,
           count: _notifUnread,
-          tooltip: 'Notifications',
+          tooltip: LanguageController.instance.t('home.tooltip.notifications'),
           onTap: _openNotifications,
         ),
         // Direct messages with badge
@@ -1835,7 +1842,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           icon: Icons.chat_bubble_outline_rounded,
           iconSize: 27,
           count: _dmUnread,
-          tooltip: 'Messages',
+          tooltip: LanguageController.instance.t('home.tooltip.messages'),
           onTap: () => Navigator.of(
             context,
           ).push(MaterialPageRoute(builder: (_) => const MessageHomeScreen())),
@@ -2028,9 +2035,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       color: Colors.white.withValues(alpha: 0.12),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      "You've seen all the posts",
-                      style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+                    Text(
+                      LanguageController.instance.t('home.feed.allSeen'),
+                      style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
                     ),
                   ],
                 ),
@@ -2530,8 +2537,8 @@ class _ProfileMenuSheet extends StatelessWidget {
                       ? Icons.light_mode_outlined
                       : Icons.dark_mode_outlined,
                   label: isDark
-                      ? 'Switch to light mode'
-                      : 'Switch to dark mode',
+                      ? LanguageController.instance.t('home.menu.switchLight')
+                      : LanguageController.instance.t('home.menu.switchDark'),
                   onTap: onToggleTheme,
                 );
               },
@@ -2584,9 +2591,9 @@ class _RepostMenuSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 12),
-              const Text(
-                'Repost',
-                style: TextStyle(
+              Text(
+                LanguageController.instance.t('home.repost.title'),
+                style: const TextStyle(
                   color: Color(0xFFE8ECF8),
                   fontWeight: FontWeight.w700,
                   fontSize: 29 / 2,
@@ -2604,18 +2611,18 @@ class _RepostMenuSheet extends StatelessWidget {
               const SizedBox(height: 12),
               Divider(height: 1, color: dividerColor),
               _RepostMenuButton(
-                text: 'Repost',
+                text: LanguageController.instance.t('home.repost.action'),
                 color: const Color(0xFF3AA6E5),
                 onTap: () => Navigator.of(context).pop(_RepostIntent.quick),
               ),
               Divider(height: 1, color: dividerColor),
               _RepostMenuButton(
-                text: 'Quote',
+                text: LanguageController.instance.t('home.repost.quote'),
                 onTap: () => Navigator.of(context).pop(_RepostIntent.quote),
               ),
               Divider(height: 1, color: dividerColor),
               _RepostMenuButton(
-                text: 'Cancel',
+                text: LanguageController.instance.t('common.cancel'),
                 onTap: () => Navigator.of(context).pop(_RepostIntent.cancel),
               ),
             ],
@@ -2733,9 +2740,9 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Quote repost',
-                style: TextStyle(
+              Text(
+                lc.t('home.quoteRepost.title'),
+                style: const TextStyle(
                   color: Color(0xFFE8ECF8),
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -2752,19 +2759,19 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                 maxLines: 5,
                 maxLength: 500,
                 style: const TextStyle(color: Color(0xFFE8ECF8)),
-                decoration: _sheetInputDecoration('Write your quote...'),
+                decoration: _sheetInputDecoration(lc.t('home.quoteRepost.contentHint')),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _hashtagsCtrl,
                 style: const TextStyle(color: Color(0xFFE8ECF8)),
-                decoration: _sheetInputDecoration('Hashtags (comma separated)'),
+                decoration: _sheetInputDecoration(lc.t('home.quoteRepost.hashtagsHint')),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _locationCtrl,
                 style: const TextStyle(color: Color(0xFFE8ECF8)),
-                decoration: _sheetInputDecoration('Location (optional)'),
+                decoration: _sheetInputDecoration(lc.t('home.quoteRepost.locationHint')),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -2780,7 +2787,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                 dropdownColor: const Color(0xFF111C37),
                 iconEnabledColor: const Color(0xFF9BAECF),
                 style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
-                decoration: _sheetInputDecoration('Visibility'),
+                decoration: _sheetInputDecoration(lc.t('home.quoteRepost.visibilityHint')),
                 onChanged: (v) {
                   if (v == null) return;
                   setState(() => _visibility = v);
@@ -2790,9 +2797,9 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
               SwitchListTile.adaptive(
                 value: _allowComments,
                 onChanged: (v) => setState(() => _allowComments = v),
-                title: const Text(
-                  'Allow comments',
-                  style: TextStyle(color: Color(0xFFE8ECF8)),
+                title: Text(
+                  lc.t('home.quoteRepost.allowComments'),
+                  style: const TextStyle(color: Color(0xFFE8ECF8)),
                 ),
                 contentPadding: EdgeInsets.zero,
                 activeColor: const Color(0xFF4AA3E4),
@@ -2800,9 +2807,9 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
               SwitchListTile.adaptive(
                 value: widget.initialAllowDownload,
                 onChanged: null,
-                title: const Text(
-                  'Allow downloads (inherits original)',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                title: Text(
+                  lc.t('home.quoteRepost.allowDownloads'),
+                  style: const TextStyle(color: Color(0xFF7A8BB0)),
                 ),
                 contentPadding: EdgeInsets.zero,
                 activeColor: const Color(0xFF4AA3E4),
@@ -2810,9 +2817,9 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
               SwitchListTile.adaptive(
                 value: _hideLikeCount,
                 onChanged: (v) => setState(() => _hideLikeCount = v),
-                title: const Text(
-                  'Hide like count',
-                  style: TextStyle(color: Color(0xFFE8ECF8)),
+                title: Text(
+                  lc.t('home.quoteRepost.hideLikeCount'),
+                  style: const TextStyle(color: Color(0xFFE8ECF8)),
                 ),
                 contentPadding: EdgeInsets.zero,
                 activeColor: const Color(0xFF4AA3E4),
@@ -2990,9 +2997,9 @@ class _ErrorState extends StatelessWidget {
                   vertical: 12,
                 ),
               ),
-              child: const Text(
-                'Try again',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              child: Text(
+                LanguageController.instance.t('common.tryAgain'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -3020,9 +3027,9 @@ class _EmptyState extends StatelessWidget {
               color: Color(0xFF4A5568),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Your feed is empty.\nFollow people to see their posts here.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            Text(
+              LanguageController.instance.t('home.feed.empty'),
+              style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -3039,9 +3046,9 @@ class _EmptyState extends StatelessWidget {
                   vertical: 12,
                 ),
               ),
-              child: const Text(
-                'Refresh',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              child: Text(
+                LanguageController.instance.t('common.refresh'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -3083,9 +3090,9 @@ class _InlineError extends StatelessWidget {
           ),
           TextButton(
             onPressed: onRetry,
-            child: const Text(
-              'Retry',
-              style: TextStyle(
+            child: Text(
+              LanguageController.instance.t('common.retry'),
+              style: const TextStyle(
                 color: Color(0xFF4AA3E4),
                 fontWeight: FontWeight.w700,
               ),

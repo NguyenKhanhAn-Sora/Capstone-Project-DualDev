@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import 'livestream_create_service.dart';
 import 'livestream_hub_screen.dart';
 import 'livestream_pending_session.dart';
@@ -105,11 +106,12 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
   }
 
   String _permissionLabel(PermissionStatus status) {
-    if (status.isGranted) return 'Granted';
-    if (status.isPermanentlyDenied) return 'Blocked';
-    if (status.isDenied) return 'Denied';
-    if (status.isRestricted) return 'Restricted';
-    return 'Unknown';
+    final lc = LanguageController.instance;
+    if (status.isGranted) return lc.t('live.create.permission.granted');
+    if (status.isPermanentlyDenied) return lc.t('live.create.permission.blocked');
+    if (status.isDenied) return lc.t('live.create.permission.denied');
+    if (status.isRestricted) return lc.t('live.create.permission.restricted');
+    return lc.t('live.create.permission.unknown');
   }
 
   Future<void> _loadPermissionStatuses() async {
@@ -151,8 +153,8 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
 
       setState(() {
         _cameraError = result.isPermanentlyDenied
-            ? 'Camera permission is blocked. Open app settings to allow camera.'
-            : 'Camera permission denied. Please allow camera access.';
+            ? LanguageController.instance.t('live.create.permission.cameraBlocked')
+            : LanguageController.instance.t('live.create.permission.cameraDenied');
       });
       return false;
     } finally {
@@ -172,8 +174,8 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
 
       setState(() {
         _error = result.isPermanentlyDenied
-            ? 'Microphone permission is blocked. Open app settings to allow microphone.'
-            : 'Microphone permission denied. Please allow microphone access.';
+            ? LanguageController.instance.t('live.create.permission.micBlocked')
+            : LanguageController.instance.t('live.create.permission.micDenied');
       });
       return false;
     } finally {
@@ -232,8 +234,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _cameraError =
-            'Unable to access camera devices. Please check permission.';
+        _cameraError = LanguageController.instance.t('live.create.permission.cameraUnavailable');
       });
     } finally {
       if (mounted) {
@@ -281,7 +282,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
       if (!mounted || initSeq != _cameraInitSeq) return;
       setState(() {
         _cameraCtrl = null;
-        _cameraError = 'Camera initialization failed. Try a different camera.';
+        _cameraError = LanguageController.instance.t('live.create.permission.cameraInitFailed');
       });
     }
   }
@@ -395,13 +396,13 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
   Future<void> _submit() async {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) {
-      setState(() => _error = 'Title is required.');
+      setState(() => _error = LanguageController.instance.t('live.create.titleRequired'));
       return;
     }
 
     if (_sourceMode == LivestreamSourceMode.camera && !_cameraReady) {
       setState(
-        () => _error = 'Please enable camera before creating livestream.',
+        () => _error = LanguageController.instance.t('live.create.cameraRequired'),
       );
       return;
     }
@@ -441,11 +442,11 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
 
       if (!mounted) return;
       setState(() {
-        _success = 'Livestream created. Redirecting to your live room...';
+        _success = LanguageController.instance.t('live.create.created');
       });
       widget.onLivestreamCreated?.call(stream);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Livestream created successfully')),
+        SnackBar(content: Text(LanguageController.instance.t('live.create.createdSuccess'))),
       );
 
       await Navigator.of(context).push(
@@ -459,7 +460,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
       setState(() => _error = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Failed to create livestream. Please try again.');
+      setState(() => _error = LanguageController.instance.t('live.create.failedCreate'));
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
@@ -576,7 +577,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
                         onPressed: _createDisabled ? null : _submit,
                         icon: const Icon(Icons.wifi_tethering_rounded),
                         label: Text(
-                          _submitting ? 'Creating...' : 'Create livestream',
+                          LanguageController.instance.t(_submitting ? 'live.create.creating' : 'live.create.createButton'),
                         ),
                       ),
                     ),
@@ -601,7 +602,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Create livestream',
+            LanguageController.instance.t('live.create.title'),
             style: TextStyle(
               color: tokens.text,
               fontSize: 18,
@@ -610,7 +611,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
           ),
           const SizedBox(height: 2),
           Text(
-            'Configure source and quality before going live',
+            LanguageController.instance.t('live.create.subtitle'),
             style: TextStyle(color: tokens.textMuted, fontSize: 13),
           ),
         ],
@@ -624,10 +625,10 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle(tokens, 'Livestream source'),
+          _sectionTitle(tokens, LanguageController.instance.t('live.create.source.title')),
           const SizedBox(height: 8),
           Text(
-            'Camera mode only. Livestream screen-share is disabled on mobile.',
+            LanguageController.instance.t('live.create.source.cameraOnly'),
             style: TextStyle(color: tokens.textMuted, fontSize: 12.5),
           ),
         ],
@@ -641,40 +642,40 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle(tokens, 'Livestream details'),
+          _sectionTitle(tokens, LanguageController.instance.t('live.create.details.title')),
           const SizedBox(height: 10),
           _inputField(
             controller: _titleCtrl,
-            label: 'Title',
-            hint: 'Write a livestream title and tag users with @username',
+            label: LanguageController.instance.t('live.create.details.titleLabel'),
+            hint: LanguageController.instance.t('live.create.details.titleHint'),
             onChanged: _onTitleChanged,
           ),
           if (_mentionOpen) _buildMentionDropdown(tokens),
           const SizedBox(height: 10),
           _inputField(
             controller: _descriptionCtrl,
-            label: 'Description (optional)',
-            hint: 'Share what this livestream is about',
+            label: LanguageController.instance.t('live.create.details.descriptionLabel'),
+            hint: LanguageController.instance.t('live.create.details.descriptionHint'),
             maxLines: 3,
           ),
           const SizedBox(height: 10),
           _inputField(
             controller: _pinnedCommentCtrl,
-            label: 'Pinned comment (optional)',
-            hint: 'Example: Ask your questions in chat',
+            label: LanguageController.instance.t('live.create.details.pinnedCommentLabel'),
+            hint: LanguageController.instance.t('live.create.details.pinnedCommentHint'),
           ),
           const SizedBox(height: 10),
           _inputField(
             controller: _locationCtrl,
-            label: 'Location (optional)',
-            hint: 'Add a location',
+            label: LanguageController.instance.t('live.create.details.locationLabel'),
+            hint: LanguageController.instance.t('live.create.details.locationHint'),
             onChanged: _onLocationChanged,
           ),
           if (_locationLoading)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
-                'Searching location...',
+                LanguageController.instance.t('live.create.details.searchingLocation'),
                 style: TextStyle(color: tokens.textMuted, fontSize: 12),
               ),
             ),
@@ -706,7 +707,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
             ),
           const SizedBox(height: 10),
           Text(
-            'Visibility',
+            LanguageController.instance.t('live.create.details.visibility'),
             style: TextStyle(
               color: tokens.text,
               fontWeight: FontWeight.w600,
@@ -779,32 +780,32 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle(tokens, 'Livestream quality & delay'),
+          _sectionTitle(tokens, LanguageController.instance.t('live.create.quality.title')),
           const SizedBox(height: 6),
           Text(
-            'For mobile sharpness, quality-first modes allow more viewer delay.',
+            LanguageController.instance.t('live.create.quality.description'),
             style: TextStyle(color: tokens.textMuted, fontSize: 12.5),
           ),
           const SizedBox(height: 10),
           _latencyOption(
             tokens,
             mode: LivestreamLatencyMode.adaptive,
-            title: 'Quality priority',
-            note: 'Best sharpness, suitable for viewer delay around 30s.',
+            title: LanguageController.instance.t('live.create.quality.qualityPriority'),
+            note: LanguageController.instance.t('live.create.quality.qualityPriorityNote'),
           ),
           const SizedBox(height: 8),
           _latencyOption(
             tokens,
             mode: LivestreamLatencyMode.balanced,
-            title: 'Balanced quality',
-            note: 'Good quality with lower delay around 15s.',
+            title: LanguageController.instance.t('live.create.quality.balanced'),
+            note: LanguageController.instance.t('live.create.quality.balancedNote'),
           ),
           const SizedBox(height: 8),
           _latencyOption(
             tokens,
             mode: LivestreamLatencyMode.low,
-            title: 'Low latency',
-            note: 'Minimum delay, quality may drop on unstable networks.',
+            title: LanguageController.instance.t('live.create.quality.lowLatency'),
+            note: LanguageController.instance.t('live.create.quality.lowLatencyNote'),
           ),
         ],
       ),
@@ -817,11 +818,11 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle(tokens, 'Permission setup'),
+          _sectionTitle(tokens, LanguageController.instance.t('live.create.permission.title')),
           const SizedBox(height: 8),
           _permissionRow(
             tokens,
-            label: 'Microphone',
+            label: LanguageController.instance.t('live.create.permission.microphone'),
             value: _permissionLabel(_microphonePermission),
             granted: _microphonePermission.isGranted,
           ),
@@ -831,16 +832,16 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
                 ? _requestMicrophonePermission
                 : null,
             child: Text(
-              _permissionBusy == 'microphone'
-                  ? 'Requesting...'
-                  : 'Allow microphone',
+              LanguageController.instance.t(_permissionBusy == 'microphone'
+                  ? 'live.create.permission.requesting'
+                  : 'live.create.permission.allowMicrophone'),
             ),
           ),
           if (_sourceMode == LivestreamSourceMode.camera) ...[
             const SizedBox(height: 12),
             _permissionRow(
               tokens,
-              label: 'Camera',
+              label: LanguageController.instance.t('live.create.permission.camera'),
               value: _permissionLabel(_cameraPermission),
               granted: _cameraPermission.isGranted,
             ),
@@ -854,7 +855,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
                         : _loadCameras,
                     icon: const Icon(Icons.camera_alt_outlined),
                     label: Text(
-                      _cameraLoading ? 'Loading camera...' : 'Enable camera',
+                      LanguageController.instance.t(_cameraLoading ? 'live.create.permission.loadingCamera' : 'live.create.permission.enableCamera'),
                     ),
                   ),
                 ),
@@ -871,7 +872,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
                 child: TextButton.icon(
                   onPressed: openAppSettings,
                   icon: const Icon(Icons.settings_outlined, size: 16),
-                  label: const Text('Open app settings'),
+                  label: Text(LanguageController.instance.t('live.create.permission.openAppSettings')),
                 ),
               ),
             ),
@@ -889,17 +890,17 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
             const SizedBox(height: 10),
             DropdownButtonFormField<CameraDescription>(
               initialValue: _selectedCamera,
-              decoration: const InputDecoration(
-                labelText: 'Camera source',
+              decoration: InputDecoration(
+                labelText: LanguageController.instance.t('live.create.permission.cameraSource'),
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
               items: _cameraDevices.map((camera) {
                 final lensLabel =
                     camera.lensDirection == CameraLensDirection.front
-                    ? 'Front camera'
+                    ? LanguageController.instance.t('live.create.permission.frontCamera')
                     : camera.lensDirection == CameraLensDirection.back
-                    ? 'Back camera'
+                    ? LanguageController.instance.t('live.create.permission.backCamera')
                     : camera.name;
                 return DropdownMenuItem<CameraDescription>(
                   value: camera,
@@ -928,7 +929,7 @@ class _CreateLivestreamScreenState extends State<CreateLivestreamScreen> {
                       ? _buildCameraPreview()
                       : Center(
                           child: Text(
-                            'Camera preview is not ready',
+                            LanguageController.instance.t('live.create.permission.cameraNotReady'),
                             style: TextStyle(color: tokens.textMuted),
                           ),
                         ),

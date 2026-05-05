@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 
 // ── Report category / reason model ───────────────────────────────────────────
 
@@ -195,7 +196,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Failed to submit report. Please try again.';
+        _error = LanguageController.instance.t('report.submitError');
       });
     }
   }
@@ -256,7 +257,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
                     ),
                   ),
                 Text(
-                  'Report Comment',
+                  LanguageController.instance.t('report.title.comment'),
                   style: TextStyle(
                     color: tokens.text,
                     fontSize: 16,
@@ -296,7 +297,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "What's the issue?",
+          LanguageController.instance.t('report.whatsTheIssue'),
           style: TextStyle(
             color: tokens.text,
             fontSize: 14,
@@ -327,7 +328,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
                   ),
                 ),
                 child: Text(
-                  g.label,
+                  LanguageController.instance.t('report.category.${g.key}'),
                   style: TextStyle(
                     color: g.accent,
                     fontSize: 13,
@@ -356,7 +357,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            cat.label,
+            LanguageController.instance.t('report.category.${cat.key}'),
             style: TextStyle(
               color: cat.accent,
               fontSize: 12,
@@ -366,7 +367,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
         ),
         const SizedBox(height: 16),
         Text(
-          'Select a reason',
+          LanguageController.instance.t('report.selectReason'),
           style: TextStyle(
             color: tokens.text,
             fontSize: 14,
@@ -397,7 +398,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
                 children: [
                   Expanded(
                     child: Text(
-                      r.label,
+                      LanguageController.instance.t('report.reason.${r.key}'),
                       style: TextStyle(
                         color: selected ? cat.accent : tokens.text,
                         fontSize: 13,
@@ -419,7 +420,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
         if (_selectedReason != null) ...[
           const SizedBox(height: 16),
           Text(
-            'Additional note (optional)',
+            LanguageController.instance.t('report.additionalNote'),
             style: TextStyle(
               color: tokens.text,
               fontSize: 14,
@@ -433,7 +434,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
             maxLength: 500,
             style: TextStyle(color: tokens.text, fontSize: 13),
             decoration: InputDecoration(
-              hintText: 'Describe the issue (optional)…',
+              hintText: LanguageController.instance.t('report.describeIssue'),
               hintStyle: TextStyle(color: tokens.textMuted),
               filled: true,
               fillColor: tokens.panelMuted,
@@ -484,7 +485,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
                       ),
                     )
                   : Text(
-                      'Submit Report',
+                      LanguageController.instance.t('report.submitReport'),
                       style: TextStyle(
                         color: theme.colorScheme.onPrimary,
                         fontWeight: FontWeight.w600,
