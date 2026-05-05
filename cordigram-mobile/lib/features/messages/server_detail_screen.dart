@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'channel_chat_screen.dart';
@@ -6,6 +8,7 @@ import 'models/server_models.dart';
 import 'models/server_permissions.dart';
 import 'server_settings_hub_screen.dart';
 import 'services/server_sidebar_prefs_store.dart';
+import 'services/channel_messages_realtime_service.dart';
 import 'services/servers_service.dart';
 import 'services/voice_channel_session_controller.dart';
 import 'voice_channel_room_screen.dart';
@@ -49,6 +52,8 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   ServerSummary? _serverOverride;
   String? _lastOpenedTextChannelId;
   bool _openedInitialChannel = false;
+  StreamSubscription<Map<String, dynamic>>? _serverRealtimeSub;
+  bool _didAutoPopByRealtime = false;
 
   ServerSummary get _effectiveServer =>
       _serverOverride ?? widget.server;
@@ -56,7 +61,68 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _serverRealtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
+      _onServerRealtimeEvent,
+    );
     _loadChannels();
+  }
+
+  @override
+  void dispose() {
+    _serverRealtimeSub?.cancel();
+    super.dispose();
+  }
+
+  void _onServerRealtimeEvent(Map<String, dynamic> payload) {
+    final sid = (payload['serverId'] ?? '').toString();
+    if (sid.isEmpty || sid != widget.server.id) return;
+    final event = (payload['event'] ?? '').toString();
+
+    if (event == 'server-updated') {
+      final rawServer = payload['server'];
+      if (rawServer is Map) {
+        final mapped = Map<String, dynamic>.from(rawServer);
+        if (mounted) {
+          setState(() {
+            _serverOverride = ServerSummary(
+              id: _effectiveServer.id,
+              name: (mapped['name'] ?? _effectiveServer.name).toString(),
+              description:
+                  mapped['description']?.toString() ?? _effectiveServer.description,
+              avatarUrl: mapped['avatarUrl']?.toString() ?? _effectiveServer.avatarUrl,
+              memberCount: mapped['memberCount'] is num
+                  ? (mapped['memberCount'] as num).toInt()
+                  : _effectiveServer.memberCount,
+              unreadCount: _effectiveServer.unreadCount,
+              ownerId: _effectiveServer.ownerId,
+              communityEnabled: _effectiveServer.communityEnabled,
+            );
+          });
+        }
+      }
+      return;
+    }
+
+    if (event != 'server-membership-updated') return;
+    final action = (payload['action'] ?? '').toString();
+    final changedUserId = (payload['userId'] ?? '').toString();
+    final myUserId = (widget.currentUserId ?? '').trim();
+
+    // Nếu chính mình rời/bị kick khỏi server đang mở -> thoát màn ngay.
+    if (myUserId.isNotEmpty &&
+        changedUserId == myUserId &&
+        action == 'left' &&
+        !_didAutoPopByRealtime &&
+        mounted) {
+      _didAutoPopByRealtime = true;
+      Navigator.of(context).pop('left');
+      return;
+    }
+
+    // Thành viên join/leave trong server hiện tại -> refresh danh sách kênh/quyền.
+    if (mounted) {
+      _loadChannels();
+    }
   }
 
   Future<void> _loadChannels() async {

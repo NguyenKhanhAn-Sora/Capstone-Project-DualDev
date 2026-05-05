@@ -290,4 +290,26 @@ export class MessagesController {
     }
     return updated;
   }
+
+  @Post(':id/pin')
+  @Post('pin/:id')
+  async pinMessage(
+    @Param('channelId') channelId: string,
+    @Param('id') messageId: string,
+    @Request() req: any,
+  ) {
+    return this.messagesService.pinMessage(channelId, messageId, req.user.userId);
+  }
+
+  @Get('pinned')
+  @Get('pins')
+  async getPinnedMessages(
+    @Param('channelId') channelId: string,
+    @Request() req: any,
+  ) {
+    return this.messagesService.getPinnedMessagesByChannelId(
+      channelId,
+      req.user.userId,
+    );
+  }
 }

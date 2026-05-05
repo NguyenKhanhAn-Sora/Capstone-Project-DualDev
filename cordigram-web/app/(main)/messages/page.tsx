@@ -43,6 +43,7 @@ import {
   verifyDeviceTrust,
   addMessageReaction,
   pinDirectMessage,
+  getPinnedMessages,
   reportDirectMessage,
   deleteDirectMessage,
   markDmConversationRead,
@@ -1687,6 +1688,14 @@ export default function MessagesPage() {
   const [showReportDialog, setShowReportDialog] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<UIMessage | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastActionLabel, setToastActionLabel] = useState<string | null>(null);
+  const [toastActionHandler, setToastActionHandler] = useState<(() => void) | null>(
+    null,
+  );
+  const [pinnedModalOpen, setPinnedModalOpen] = useState(false);
+  const [pinnedModalLoading, setPinnedModalLoading] = useState(false);
+  const [pinnedModalTitle, setPinnedModalTitle] = useState("Tin nhắn đã ghim");
+  const [pinnedModalItems, setPinnedModalItems] = useState<UIMessage[]>([]);
   const [channelProfileContext, setChannelProfileContext] =
     useState<ChannelProfileAnchorContext | null>(null);
 
@@ -4360,22 +4369,110 @@ export default function MessagesPage() {
     }
   };
 
+  const openPinnedMessagesModal = async () => {
+    try {
+      setPinnedModalLoading(true);
+      if (selectedDirectMessageFriend) {
+        const friendId = selectedDirectMessageFriend._id;
+        const raw = await getPinnedMessages(friendId, { token });
+        const mapped: UIMessage[] = (Array.isArray(raw) ? raw : []).map((msg: any) => ({
+          id: String(msg._id),
+          text: msg.content ?? "",
+          senderId: msg.senderId?._id ?? "",
+          senderEmail: msg.senderId?.email ?? "",
+          senderDisplayName: msg.senderId?.displayName || undefined,
+          senderName: msg.senderId?.username || msg.senderId?.email || "",
+          senderAvatar: msg.senderId?.avatarUrl || msg.senderId?.avatar,
+          timestamp: new Date(msg.createdAt),
+          isFromCurrentUser: (msg.senderId?._id ?? "") === currentUserId,
+          type: "direct",
+          isRead: msg.isRead || false,
+          messageType: msg.type || "text",
+          giphyId: msg.giphyId || undefined,
+          customStickerUrl: msg.customStickerUrl || undefined,
+          voiceUrl: msg.voiceUrl ?? undefined,
+          voiceDuration: msg.voiceDuration ?? undefined,
+          reactions: normalizeReactions(msg.reactions),
+          isPinned: true,
+        }));
+        setPinnedModalTitle("Tin nhắn đã ghim");
+        setPinnedModalItems(mapped);
+      } else if (selectedChannel) {
+        const raw = await serversApi.getPinnedChannelMessages(selectedChannel);
+        const mapped: UIMessage[] = raw.map((msg: serversApi.Message) => ({
+          id: msg._id,
+          text: msg.content,
+          senderId:
+            typeof msg.senderId === "string" ? msg.senderId : msg.senderId._id,
+          senderEmail:
+            typeof msg.senderId === "string" ? "" : (msg.senderId as any).email ?? "",
+          senderDisplayName:
+            typeof msg.senderId === "string"
+              ? undefined
+              : (msg.senderId as any).displayName || undefined,
+          senderName:
+            typeof msg.senderId === "string"
+              ? ""
+              : (msg.senderId as any).username || (msg.senderId as any).email || "",
+          senderAvatar:
+            typeof msg.senderId === "string"
+              ? undefined
+              : (msg.senderId as any).avatarUrl || (msg.senderId as any).avatar,
+          timestamp: new Date(msg.createdAt),
+          isFromCurrentUser:
+            (typeof msg.senderId === "string"
+              ? msg.senderId
+              : (msg.senderId as any)._id) === currentUserId,
+          type: "server",
+          messageType: ((msg.messageType || "text") as UIMessage["messageType"]),
+          giphyId: (msg as any).giphyId || undefined,
+          customStickerUrl: (msg as any).customStickerUrl || undefined,
+          voiceUrl: (msg as any).voiceUrl ?? undefined,
+          voiceDuration: (msg as any).voiceDuration ?? undefined,
+          reactions: normalizeReactions(msg.reactions),
+          isPinned: true,
+        }));
+        setPinnedModalTitle("Tin nhắn đã ghim");
+        setPinnedModalItems(mapped);
+      } else {
+        setPinnedModalItems([]);
+      }
+      setPinnedModalOpen(true);
+    } catch (error) {
+      console.error("Failed to fetch pinned messages:", error);
+      alert("Không tải được tin nhắn đã ghim");
+    } finally {
+      setPinnedModalLoading(false);
+    }
+  };
+
   // Handler for pinning messages
   const handlePinMessage = async (messageId: string) => {
     try {
-      await pinDirectMessage(messageId, { token });
-
-      // Update local state
       if (selectedDirectMessageFriend) {
+        await pinDirectMessage(messageId, { token });
         const friendId = selectedDirectMessageFriend._id;
         const currentMessages = conversations.get(friendId) || [];
         const updatedMessages = currentMessages.map((msg) =>
-          msg.id === messageId ? { ...msg, isPinned: !msg.isPinned } : msg
+          msg.id === messageId ? { ...msg, isPinned: !msg.isPinned } : msg,
         );
         setConversations(new Map(conversations.set(friendId, updatedMessages)));
+      } else if (selectedChannel) {
+        await serversApi.pinChannelMessage(selectedChannel, messageId);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, isPinned: !m.isPinned } : m)),
+        );
       }
-
-      // Socket will be notified via backend gateway
+      setToastMessage("Bạn đã ghim một tin nhắn.");
+      setToastActionLabel("Xem tất cả");
+      setToastActionHandler(() => () => {
+        void openPinnedMessagesModal();
+      });
+      setTimeout(() => {
+        setToastMessage(null);
+        setToastActionLabel(null);
+        setToastActionHandler(null);
+      }, 3500);
     } catch (error) {
       console.error("Failed to pin message:", error);
     }
@@ -6827,6 +6924,109 @@ export default function MessagesPage() {
     window.addEventListener("cordigram-join-application-updated", handler as EventListener);
     return () => window.removeEventListener("cordigram-join-application-updated", handler as EventListener);
   }, [selectedServer, currentUserId, isAdminView, adminViewServerId]);
+
+  // Realtime: join/leave/update server without full page reload.
+  useEffect(() => {
+    if (typeof window === "undefined" || !currentUserId) return;
+    const normalizeServers = (serversList: serversApi.Server[]): BackendServer[] =>
+      serversList.map((server) => {
+        const channels = server.channels as serversApi.Channel[];
+        const infoChannels = channels.filter(
+          (c) => c.type === "text" && c.category === "info" && !c.categoryId,
+        );
+        const textChannels = channels.filter(
+          (c) => c.type === "text" && c.category !== "info",
+        );
+        const voiceChannels = channels.filter((c) => c.type === "voice");
+        return {
+          ...server,
+          infoChannels,
+          textChannels,
+          voiceChannels,
+        };
+      });
+
+    const onServerUpdated = (ev: Event) => {
+      const d = (ev as CustomEvent<any>).detail;
+      if (!d?.serverId || !d?.server) return;
+      setServers((prev) =>
+        prev.map((s) =>
+          s._id === d.serverId
+            ? {
+                ...s,
+                name: d.server.name ?? s.name,
+                description: d.server.description ?? s.description,
+                avatarUrl: d.server.avatarUrl ?? s.avatarUrl,
+                bannerUrl: d.server.bannerUrl ?? s.bannerUrl,
+                bannerImageUrl: d.server.bannerImageUrl ?? s.bannerImageUrl,
+                bannerColor: d.server.bannerColor ?? s.bannerColor,
+                memberCount:
+                  typeof d.server.memberCount === "number"
+                    ? d.server.memberCount
+                    : s.memberCount,
+              }
+            : s,
+        ),
+      );
+    };
+
+    const onMembership = (ev: Event) => {
+      const d = (ev as CustomEvent<any>).detail;
+      if (!d?.serverId || !d?.userId || !d?.action) return;
+
+      if (String(d.userId) !== String(currentUserId)) {
+        if (d?.server && typeof d.server.memberCount === "number") {
+          setServers((prev) =>
+            prev.map((s) =>
+              s._id === d.serverId ? { ...s, memberCount: d.server.memberCount } : s,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (d.action === "left") {
+        setServers((prev) => prev.filter((s) => s._id !== d.serverId));
+        if (selectedServerRef.current === d.serverId) {
+          setSelectedServer(null);
+          setSelectedChannel(null);
+          setInfoChannels([]);
+          setTextChannels([]);
+          setVoiceChannels([]);
+          setAllChannels([]);
+          setServerCategories([]);
+          setMessages([]);
+          setJoinedVoiceChannelId(null);
+        }
+        return;
+      }
+
+      if (d.action === "joined") {
+        void serversApi
+          .getMyServers()
+          .then((list) => {
+            setServers(normalizeServers(list));
+          })
+          .catch(() => undefined);
+      }
+    };
+
+    window.addEventListener("cordigram-server-updated", onServerUpdated as EventListener);
+    window.addEventListener(
+      "cordigram-server-membership-updated",
+      onMembership as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "cordigram-server-updated",
+        onServerUpdated as EventListener,
+      );
+      window.removeEventListener(
+        "cordigram-server-membership-updated",
+        onMembership as EventListener,
+      );
+    };
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!selectedServer || !canManageJoinApplications) {
@@ -11958,6 +12158,67 @@ export default function MessagesPage() {
         />
       )}
 
+      {pinnedModalOpen && (
+        <div
+          onClick={() => setPinnedModalOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            zIndex: 3100,
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(620px, 92vw)",
+              maxHeight: "80vh",
+              overflow: "auto",
+              background: "#1f2228",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 14,
+              padding: 16,
+              color: "#fff",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+              <strong>{pinnedModalTitle}</strong>
+              <button
+                type="button"
+                onClick={() => setPinnedModalOpen(false)}
+                style={{ background: "transparent", color: "#cfd3da", border: 0, cursor: "pointer" }}
+              >
+                Dong
+              </button>
+            </div>
+            {pinnedModalLoading ? (
+              <div style={{ color: "#cfd3da" }}>Dang tai...</div>
+            ) : pinnedModalItems.length === 0 ? (
+              <div style={{ color: "#9aa1ad" }}>Chua co tin nhan duoc ghim.</div>
+            ) : (
+              pinnedModalItems.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    padding: "10px 12px",
+                    marginBottom: 8,
+                    borderRadius: 10,
+                    background: "#2b2f36",
+                  }}
+                >
+                  <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>
+                    {item.senderDisplayName || item.senderName || "Nguoi dung"}
+                  </div>
+                  <div style={{ whiteSpace: "pre-wrap" }}>{item.text || "(tin nhan da bi thu hoi)"}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -11977,7 +12238,23 @@ export default function MessagesPage() {
             fontWeight: 500,
           }}
         >
-          {toastMessage}
+          <span>{toastMessage}</span>
+          {toastActionLabel && toastActionHandler && (
+            <button
+              type="button"
+              onClick={toastActionHandler}
+              style={{
+                marginLeft: 10,
+                border: 0,
+                background: "transparent",
+                color: "#ff5c8d",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              {toastActionLabel}
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -24,6 +24,8 @@ class ChannelMessagesRealtimeService {
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _channelNotificationController =
       StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _serverRealtimeController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   static Stream<ChannelMessage> get messages => _messagesController.stream;
   static Stream<Map<String, dynamic>> get reactions => _reactionController.stream;
@@ -31,6 +33,8 @@ class ChannelMessagesRealtimeService {
   /// Per-user pushes from the gateway (mentions, inbox-related) without joining a channel room.
   static Stream<Map<String, dynamic>> get channelNotifications =>
       _channelNotificationController.stream;
+  static Stream<Map<String, dynamic>> get serverRealtime =>
+      _serverRealtimeController.stream;
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -82,6 +86,20 @@ class ChannelMessagesRealtimeService {
       _channelNotificationController.add(Map<String, dynamic>.from(payload));
     });
 
+    socket.on('server-updated', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'server-updated';
+      _serverRealtimeController.add(mapped);
+    });
+
+    socket.on('server-membership-updated', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'server-membership-updated';
+      _serverRealtimeController.add(mapped);
+    });
+
     socket.on('connect', (_) {
       for (final id in _joinedChannelIds) {
         _emitJoinChannel(id);
@@ -120,6 +138,8 @@ class ChannelMessagesRealtimeService {
       socket.off('reaction-updated');
       socket.off('message-deleted');
       socket.off('channel-notification');
+      socket.off('server-updated');
+      socket.off('server-membership-updated');
       socket.off('connect');
       socket.disconnect();
       socket.dispose();

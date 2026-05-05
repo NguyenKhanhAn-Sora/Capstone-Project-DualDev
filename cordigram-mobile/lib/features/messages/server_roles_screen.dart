@@ -144,9 +144,40 @@ class _ServerRolesScreenState extends State<ServerRolesScreen> {
                 : ListView(
                     padding: EdgeInsets.fromLTRB(16, 12, 16, pad.bottom + 88),
                     children: [
-                      const Text(
-                        'Dùng vai trò để phân quyền thành viên (cùng API web).',
-                        style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 13),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E1F45),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Quản lý thành viên',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Sử dụng vai trò để phân nhóm thành viên và chỉ định quyền của họ.',
+                              style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 13),
+                            ),
+                            if (widget.canManageRoles) ...[
+                              const SizedBox(height: 10),
+                              FilledButton(
+                                onPressed: _createRole,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF5865F2),
+                                ),
+                                child: const Text('Tạo vai trò'),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       ...custom.map(

@@ -15,6 +15,14 @@ class DmMessage {
     this.replyTo,
     this.attachments = const [],
     this.reactions = const [],
+    this.isPinned = false,
+    this.pinnedAt,
+    this.senderDisplayName,
+    this.senderUsername,
+    this.senderAvatarUrl,
+    this.receiverDisplayName,
+    this.receiverUsername,
+    this.receiverAvatarUrl,
   });
 
   final String id;
@@ -30,6 +38,14 @@ class DmMessage {
   final DmReplyMessage? replyTo;
   final List<String> attachments;
   final List<MessageReaction> reactions;
+  final bool isPinned;
+  final DateTime? pinnedAt;
+  final String? senderDisplayName;
+  final String? senderUsername;
+  final String? senderAvatarUrl;
+  final String? receiverDisplayName;
+  final String? receiverUsername;
+  final String? receiverAvatarUrl;
 
   bool isMine(String? viewerId) => viewerId != null && senderId == viewerId;
 
@@ -46,10 +62,36 @@ class DmMessage {
       return value?.toString() ?? '';
     }
 
+    String? pickDisplayName(dynamic value) {
+      if (value is! Map) return null;
+      final v = (value['displayName'] ?? value['username'] ?? value['email'])
+          ?.toString()
+          .trim();
+      if (v == null || v.isEmpty) return null;
+      return v;
+    }
+
+    String? pickUsername(dynamic value) {
+      if (value is! Map) return null;
+      final v = value['username']?.toString().trim();
+      if (v == null || v.isEmpty) return null;
+      return v;
+    }
+
+    String? pickAvatar(dynamic value) {
+      if (value is! Map) return null;
+      final v = (value['avatarUrl'] ?? value['avatar'])?.toString().trim();
+      if (v == null || v.isEmpty) return null;
+      return v;
+    }
+
+    final senderRaw = json['senderId'] ?? json['sender'];
+    final receiverRaw = json['receiverId'];
+
     return DmMessage(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
-      senderId: pickUserId(json['senderId'] ?? json['sender']),
-      receiverId: pickUserId(json['receiverId']),
+      senderId: pickUserId(senderRaw),
+      receiverId: pickUserId(receiverRaw),
       content: (json['content'] ?? '').toString(),
       createdAt:
           DateTime.tryParse(createdAtRaw?.toString() ?? '')?.toLocal() ??
@@ -75,6 +117,14 @@ class DmMessage {
                 )
                 .toList()
           : const <MessageReaction>[],
+      isPinned: json['isPinned'] == true,
+      pinnedAt: DateTime.tryParse((json['pinnedAt'] ?? '').toString())?.toLocal(),
+      senderDisplayName: pickDisplayName(senderRaw),
+      senderUsername: pickUsername(senderRaw),
+      senderAvatarUrl: pickAvatar(senderRaw),
+      receiverDisplayName: pickDisplayName(receiverRaw),
+      receiverUsername: pickUsername(receiverRaw),
+      receiverAvatarUrl: pickAvatar(receiverRaw),
     );
   }
 }
