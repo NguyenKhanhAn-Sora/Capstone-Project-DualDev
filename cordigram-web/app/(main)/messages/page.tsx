@@ -4501,6 +4501,13 @@ export default function MessagesPage() {
     }
   };
 
+  const handlePinnedItemJump = (messageId: string) => {
+    const jumped = scrollToMessageBubble(messageId);
+    if (jumped) {
+      setPinnedModalOpen(false);
+    }
+  };
+
   // Handler for pinning messages
   const handlePinMessage = async (messageId: string) => {
     try {
@@ -9430,6 +9437,18 @@ export default function MessagesPage() {
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
                       </svg>
                     </button>
+                    <button
+                      type="button"
+                      title="Tin nhắn đã ghim"
+                      aria-label="Tin nhắn đã ghim"
+                      onClick={() => void openPinnedMessagesModal()}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 17v5" />
+                        <path d="M5 9V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v5" />
+                        <path d="M6 9h12l-3 7H9L6 9Z" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
                 {!selectedDirectMessageFriend &&
@@ -12284,7 +12303,7 @@ export default function MessagesPage() {
                 onClick={() => setPinnedModalOpen(false)}
                 style={{ background: "transparent", color: "#cfd3da", border: 0, cursor: "pointer" }}
               >
-                Đóng
+                X
               </button>
             </div>
             {pinnedModalLoading ? (
@@ -12295,18 +12314,20 @@ export default function MessagesPage() {
               pinnedModalItems.map((item) => (
                 <div
                   key={item.id}
+                  onClick={() => handlePinnedItemJump(item.id)}
                   style={{
                     padding: "10px 12px",
                     marginBottom: 8,
                     borderRadius: 10,
                     background: "#2b2f36",
+                    cursor: "pointer",
                   }}
                 >
                   <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>
                     {item.senderDisplayName || item.senderName || "Người dùng"}
                   </div>
                   <div style={{ whiteSpace: "pre-wrap" }}>
-                    {item.text || "(tin nhắn đã bị thu hồi)"}
+                    {renderMessageContent(item)}
                   </div>
                 </div>
               ))
