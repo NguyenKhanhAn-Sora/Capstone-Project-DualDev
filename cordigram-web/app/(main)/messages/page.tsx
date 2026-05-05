@@ -1272,8 +1272,13 @@ export default function MessagesPage() {
 
   useEffect(() => {
     const fn = () => setMessagesShellTheme(getMessagesShellTheme());
+    const onChatSettings = () => setMessagesShellTheme(getMessagesShellTheme());
     window.addEventListener("cordigram-messages-shell-theme", fn);
-    return () => window.removeEventListener("cordigram-messages-shell-theme", fn);
+    window.addEventListener("cordigram-chat-settings", onChatSettings);
+    return () => {
+      window.removeEventListener("cordigram-messages-shell-theme", fn);
+      window.removeEventListener("cordigram-chat-settings", onChatSettings);
+    };
   }, []);
 
   const [servers, setServers] = useState<BackendServer[]>([]);

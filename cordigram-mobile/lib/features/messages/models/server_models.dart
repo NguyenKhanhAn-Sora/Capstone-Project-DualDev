@@ -6,6 +6,8 @@ class ServerSummary {
     this.avatarUrl,
     this.memberCount = 0,
     this.unreadCount = 0,
+    this.ownerId,
+    this.communityEnabled = false,
   });
 
   final String id;
@@ -14,8 +16,21 @@ class ServerSummary {
   final String? avatarUrl;
   final int memberCount;
   final int unreadCount;
+  final String? ownerId;
+  /// `communitySettings.enabled` từ API (GET server / danh sách server).
+  final bool communityEnabled;
 
   factory ServerSummary.fromJson(Map<String, dynamic> json) {
+    final rawOwner = json['ownerId'];
+    String? oid;
+    if (rawOwner is Map) {
+      oid = (rawOwner['_id'] ?? rawOwner['id'])?.toString();
+    } else if (rawOwner != null) {
+      oid = rawOwner.toString();
+    }
+    final cs = json['communitySettings'];
+    final communityOn =
+        cs is Map ? cs['enabled'] == true : json['communityEnabled'] == true;
     return ServerSummary(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
@@ -27,6 +42,8 @@ class ServerSummary {
       unreadCount: json['unreadCount'] is num
           ? (json['unreadCount'] as num).toInt()
           : 0,
+      ownerId: oid,
+      communityEnabled: communityOn,
     );
   }
 }
@@ -66,6 +83,7 @@ class ServerChannel {
     this.position = 0,
     this.isPrivate = false,
     this.unreadCount = 0,
+    this.isDefault = false,
   });
 
   final String id;
@@ -78,9 +96,11 @@ class ServerChannel {
   final int position;
   final bool isPrivate;
   final int unreadCount;
+  final bool isDefault;
 
-  bool get isText => type == 'text';
-  bool get isVoice => type == 'voice';
+  bool get isText => type.trim().toLowerCase() == 'text';
+
+  bool get isVoice => type.trim().toLowerCase() == 'voice';
 
   factory ServerChannel.fromJson(Map<String, dynamic> json) {
     return ServerChannel(
@@ -96,6 +116,7 @@ class ServerChannel {
       unreadCount: json['unreadCount'] is num
           ? (json['unreadCount'] as num).toInt()
           : 0,
+      isDefault: json['isDefault'] == true,
     );
   }
 }

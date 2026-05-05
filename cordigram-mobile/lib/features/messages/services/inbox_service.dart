@@ -1,5 +1,6 @@
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
+import '../models/inbox_models.dart';
 
 class InboxService {
   InboxService._();
@@ -8,29 +9,72 @@ class InboxService {
     'Authorization': 'Bearer ${AuthStorage.accessToken ?? ''}',
   };
 
-  static Future<int> getUnreadInboxCount() async {
-    final unread = await ApiService.get(
-      '/inbox/unread',
-      extraHeaders: _authHeaders,
-    );
-    final mentions = await ApiService.get(
-      '/inbox/mentions',
-      extraHeaders: _authHeaders,
-    );
-    final forYou = await ApiService.get(
-      '/inbox/for-you',
-      extraHeaders: _authHeaders,
-    );
+  /// Accepts `{ items }`, `{ data: [] }`, or `{ data: { items } }` from proxies / older BE.
+  static List<Map<String, dynamic>> _itemMaps(Map<String, dynamic> res) {
+    dynamic raw = res['items'];
+    if (raw is! List) {
+      final data = res['data'];
+      if (data is List) {
+        raw = data;
+      } else if (data is Map) {
+        final inner = Map<String, dynamic>.from(data);
+        raw = inner['items'] ?? inner['results'];
+      }
+    }
+    if (raw is! List) return const [];
+    final out = <Map<String, dynamic>>[];
+    for (final e in raw) {
+      if (e is Map) {
+        out.add(Map<String, dynamic>.from(e));
+      }
+    }
+    return out;
+  }
 
-    final unreadItems = (unread['items'] as List?) ?? const <dynamic>[];
-    final mentionItems = (mentions['items'] as List?) ?? const <dynamic>[];
-    final forYouItems = (forYou['items'] as List?) ?? const <dynamic>[];
-    final unseenForYou = forYouItems.where((e) {
-      if (e is! Map) return false;
-      final seen = e['seen'];
-      return seen != true;
+  static Future<List<InboxForYouItem>> fetchForYou() async {
+    final res = await ApiService.get('/inbox/for-you', extraHeaders: _authHeaders);
+    return _itemMaps(res)
+        .map(InboxForYouItem.fromJson)
+        .toList();
+  }
+
+  static Future<List<InboxUnreadItem>> fetchUnread() async {
+    final res = await ApiService.get('/inbox/unread', extraHeaders: _authHeaders);
+    return _itemMaps(res)
+        .map(InboxUnreadItem.fromJson)
+        .toList();
+  }
+
+  static Future<List<InboxMentionItem>> fetchMentions() async {
+    final res = await ApiService.get('/inbox/mentions', extraHeaders: _authHeaders);
+    return _itemMaps(res)
+        .map(InboxMentionItem.fromJson)
+        .toList();
+  }
+
+  static Future<void> markSeen({
+    required String sourceType,
+    required String sourceId,
+  }) async {
+    await ApiService.post(
+      '/inbox/seen',
+      extraHeaders: _authHeaders,
+      body: {'sourceType': sourceType, 'sourceId': sourceId},
+    );
+  }
+
+  static Future<int> getUnreadInboxCount() async {
+    final unread = await fetchUnread();
+    final mentions = await fetchMentions();
+    final forYou = await fetchForYou();
+
+    final unseenForYou = forYou.where((e) {
+      if (e is InboxEventItem) return e.seen != true;
+      if (e is InboxServerInviteItem) return e.seen != true;
+      if (e is InboxServerNotificationItem) return e.seen != true;
+      return false;
     }).length;
 
-    return unreadItems.length + mentionItems.length + unseenForYou;
+    return unread.length + mentions.length + unseenForYou;
   }
 }

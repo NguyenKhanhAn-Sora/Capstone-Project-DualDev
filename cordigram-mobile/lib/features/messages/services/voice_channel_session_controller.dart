@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart';
@@ -30,6 +31,18 @@ class VoiceChannelSessionController extends ChangeNotifier {
   bool _screenShareBusy = false;
   List<Participant> _participants = const [];
 
+  /// True after the user leaves [VoiceChannelRoomScreen] via back (session
+  /// stays connected). Drives the global Messenger-style PiP.
+  bool _voiceUiMinimized = false;
+  bool _voiceTuckedToCorner = false;
+  Offset _voicePipOffset = const Offset(16, 260);
+  DateTime? _voiceJoinedAt;
+
+  /// Last join targets so the PiP can reopen the room screen.
+  ServerSummary? _joinedServer;
+  ServerChannel? _joinedChannel;
+  String _joinedParticipantName = '';
+
   bool get connecting => _connecting;
   bool get active => _room != null;
   String? get error => _error;
@@ -42,6 +55,47 @@ class VoiceChannelSessionController extends ChangeNotifier {
   bool get cameraEnabled => _cameraEnabled;
   bool get screenShareEnabled => _screenShareEnabled;
   List<Participant> get participants => List.unmodifiable(_participants);
+
+  bool get isVoiceUiMinimized => _voiceUiMinimized;
+  bool get isVoiceTuckedToCorner => _voiceTuckedToCorner;
+  Offset get voicePipOffset => _voicePipOffset;
+  DateTime? get voiceJoinedAt => _voiceJoinedAt;
+  ServerSummary? get joinedServerSummary => _joinedServer;
+  ServerChannel? get joinedChannelSnapshot => _joinedChannel;
+  String get joinedParticipantName => _joinedParticipantName;
+
+  void markVoiceMinimized() {
+    if (_room == null) return;
+    _voiceUiMinimized = true;
+    _voiceTuckedToCorner = false;
+    notifyListeners();
+  }
+
+  void clearVoiceMinimized() {
+    _voiceUiMinimized = false;
+    _voiceTuckedToCorner = false;
+    notifyListeners();
+  }
+
+  void updateVoicePipOffset(Offset offset) {
+    _voicePipOffset = offset;
+    notifyListeners();
+  }
+
+  void tuckVoicePipToCorner({Offset? position}) {
+    if (_room == null || !_voiceUiMinimized) return;
+    if (position != null) {
+      _voicePipOffset = position;
+    }
+    _voiceTuckedToCorner = true;
+    notifyListeners();
+  }
+
+  void expandVoicePipFromCorner() {
+    if (!_voiceUiMinimized || !_voiceTuckedToCorner) return;
+    _voiceTuckedToCorner = false;
+    notifyListeners();
+  }
 
   bool isInChannel(String serverId, String channelId) =>
       _serverId == serverId && _channelId == channelId && _room != null;
@@ -69,6 +123,11 @@ class VoiceChannelSessionController extends ChangeNotifier {
     _channelId = channel.id;
     _serverName = server.name;
     _channelName = channel.name;
+    _joinedServer = server;
+    _joinedChannel = channel;
+    _joinedParticipantName = participantName.trim();
+    _voiceUiMinimized = false;
+    _voiceTuckedToCorner = false;
     notifyListeners();
     try {
       final creds = await VoiceLivekitService.getTokenBundle(
@@ -102,10 +161,18 @@ class VoiceChannelSessionController extends ChangeNotifier {
       _soundEnabled = true;
       _cameraEnabled = false;
       _screenShareEnabled = false;
+      _voiceJoinedAt = DateTime.now();
       _refreshParticipants();
     } catch (e) {
       _error = 'Không vào được voice channel: $e';
       await _disposeRoomResources();
+      _voiceJoinedAt = null;
+      _joinedServer = null;
+      _joinedChannel = null;
+      _joinedParticipantName = '';
+      _voiceUiMinimized = false;
+      _voiceTuckedToCorner = false;
+      _clearSessionMetadata();
     } finally {
       _connecting = false;
       notifyListeners();
@@ -114,6 +181,12 @@ class VoiceChannelSessionController extends ChangeNotifier {
 
   Future<void> leave() async {
     _error = null;
+    _voiceUiMinimized = false;
+    _voiceTuckedToCorner = false;
+    _voiceJoinedAt = null;
+    _joinedServer = null;
+    _joinedChannel = null;
+    _joinedParticipantName = '';
     _clearSessionMetadata();
     await _disposeRoomResources(disconnect: true);
     notifyListeners();
@@ -256,6 +329,12 @@ class VoiceChannelSessionController extends ChangeNotifier {
     _soundEnabled = true;
     _cameraEnabled = false;
     _screenShareEnabled = false;
+    _voiceUiMinimized = false;
+    _voiceTuckedToCorner = false;
+    _voiceJoinedAt = null;
+    _joinedServer = null;
+    _joinedChannel = null;
+    _joinedParticipantName = '';
     _clearSessionMetadata();
   }
 

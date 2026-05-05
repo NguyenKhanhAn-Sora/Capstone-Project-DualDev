@@ -7,6 +7,7 @@ import 'models/message_reaction.dart';
 import 'models/message_thread.dart';
 import 'models/presence_state.dart';
 import 'models/voice_control_state.dart';
+import 'services/channel_messages_realtime_service.dart';
 import 'services/direct_messages_realtime_service.dart';
 import 'services/direct_messages_service.dart';
 import 'services/inbox_service.dart';
@@ -25,6 +26,7 @@ class MessagesController extends ChangeNotifier {
   StreamSubscription<PresenceState>? _presenceSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
+  StreamSubscription<Map<String, dynamic>>? _channelInboxSub;
   Timer? _inboxPollTimer;
 
   bool _loadingThreads = false;
@@ -57,6 +59,10 @@ class MessagesController extends ChangeNotifier {
   Future<void> init() async {
     _myUserId = DirectMessagesService.currentUserId;
     await DirectMessagesRealtimeService.connect();
+    await ChannelMessagesRealtimeService.connect();
+    _channelInboxSub = ChannelMessagesRealtimeService.channelNotifications.listen(
+      (_) => refreshInboxCount(),
+    );
     _newMessageSub = DirectMessagesRealtimeService.newMessages.listen(
       _onNewMessage,
     );
@@ -95,8 +101,11 @@ class MessagesController extends ChangeNotifier {
     await _presenceSub?.cancel();
     await _reactionSub?.cancel();
     await _deletedSub?.cancel();
+    await _channelInboxSub?.cancel();
     _inboxPollTimer?.cancel();
-    await DirectMessagesRealtimeService.disconnect();
+    // Do not disconnect the shared DM socket here. [DmCallManager] needs it
+    // app-wide for incoming calls while the user is on Home / social tabs.
+    // Teardown happens on logout via [DmCallManager.onAuthChanged].
   }
 
   void _startInboxPolling() {

@@ -28,6 +28,7 @@ class _VoiceChannelRoomScreenState extends State<VoiceChannelRoomScreen> {
   @override
   void initState() {
     super.initState();
+    _session.clearVoiceMinimized();
     _session.addListener(_onSessionChanged);
     _ensureJoined();
   }
@@ -52,16 +53,29 @@ class _VoiceChannelRoomScreenState extends State<VoiceChannelRoomScreen> {
     );
   }
 
+  Future<void> _minimizeToPip() async {
+    _session.markVoiceMinimized();
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(true);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _minimizeToPip();
+      },
+      child: Scaffold(
       backgroundColor: _pageColor,
       appBar: AppBar(
         backgroundColor: _pageColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(true),
+          icon: const Icon(Icons.open_in_full_rounded, color: Colors.white),
+          tooltip: 'Thu nhỏ',
+          onPressed: _minimizeToPip,
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,10 +192,12 @@ class _VoiceChannelRoomScreenState extends State<VoiceChannelRoomScreen> {
                             onTap: _session.toggleCamera,
                           ),
                           _RoundControlButton(
-                            icon: Icons.call_end_rounded,
+                            icon: Icons.logout_rounded,
                             color: const Color(0xFFED4245),
+                            tooltip: 'Rời phòng',
                             onTap: () async {
-                              final navigator = Navigator.of(context);
+                              final navigator =
+                                  Navigator.of(context, rootNavigator: true);
                               await _session.leave();
                               if (mounted) navigator.pop();
                             },
@@ -193,6 +209,7 @@ class _VoiceChannelRoomScreenState extends State<VoiceChannelRoomScreen> {
                 ),
               ],
             ),
+      ),
     );
   }
 }
@@ -207,7 +224,7 @@ class _VoiceParticipantGrid extends StatelessWidget {
     if (participants.isEmpty) {
       return const Center(
         child: Text(
-          'Đang chờ người tham gia...',
+          'Đang chờ thành viên khác...',
           style: TextStyle(color: Color(0xFFB6C2DC)),
         ),
       );
@@ -331,15 +348,17 @@ class _RoundControlButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.tooltip,
   });
 
   final IconData icon;
   final Color color;
   final Future<void> Function() onTap;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final child = Material(
       color: color,
       shape: const CircleBorder(),
       child: InkWell(
@@ -352,5 +371,7 @@ class _RoundControlButton extends StatelessWidget {
         ),
       ),
     );
+    if (tooltip == null || tooltip!.isEmpty) return child;
+    return Tooltip(message: tooltip!, child: child);
   }
 }

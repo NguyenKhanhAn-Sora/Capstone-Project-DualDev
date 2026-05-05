@@ -18,9 +18,7 @@ import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
 import 'services/server_media_service.dart';
-import 'services/voice_channel_session_controller.dart';
-import 'voice_channel_room_screen.dart';
-
+import 'search/message_search_sheet.dart';
 class ChannelChatScreen extends StatefulWidget {
   const ChannelChatScreen({
     super.key,
@@ -49,6 +47,53 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final Map<String, String> _serverEmojiMap = {};
+  final Map<String, GlobalKey> _channelMessageKeys = {};
+  String? _highlightChannelMessageId;
+
+  GlobalKey _keyForChannelMessage(String id) =>
+      _channelMessageKeys.putIfAbsent(id, () => GlobalKey());
+
+  Future<void> _scrollToChannelMessageId(String messageId) async {
+    if (!mounted) return;
+    setState(() => _highlightChannelMessageId = messageId);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
+    final ctx = _channelMessageKeys[messageId]?.currentContext;
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        alignment: 0.25,
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tin nhắn không có trong đoạn đang tải'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted && _highlightChannelMessageId == messageId) {
+      setState(() => _highlightChannelMessageId = null);
+    }
+  }
+
+  Future<void> _openChannelMessageSearch() async {
+    await MessageSearchSheet.present(
+      context,
+      child: MessageSearchSheet.serverChannel(
+        serverId: widget.server.id,
+        serverName: widget.server.name,
+        channelId: widget.channel.id,
+        channelName: widget.channel.name,
+        onPickMessage: (messageId, _) {
+          _scrollToChannelMessageId(messageId);
+        },
+      ),
+    );
+  }
 
   List<ChannelMessage> _messages = const [];
   bool _loading = true;
@@ -60,45 +105,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
 
-  VoiceChannelSessionController get _voiceSession =>
-      VoiceChannelSessionController.instance;
-
-  bool get _hasMinimizedVoiceInThisServer =>
-      _voiceSession.active && _voiceSession.serverId == widget.server.id;
-
-  Future<void> _openVoiceRoomFromMiniBar() async {
-    if (!_hasMinimizedVoiceInThisServer) return;
-    final channelId = (_voiceSession.channelId ?? '').trim();
-    final channelName = (_voiceSession.channelName ?? '').trim();
-    if (channelId.isEmpty || channelName.isEmpty) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VoiceChannelRoomScreen(
-          server: widget.server,
-          channel: ServerChannel(
-            id: channelId,
-            serverId: widget.server.id,
-            name: channelName,
-            type: 'voice',
-          ),
-          participantName: (widget.participantName ?? '').trim().isNotEmpty
-              ? widget.participantName!.trim()
-              : 'Người dùng',
-        ),
-      ),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
-    _voiceSession.addListener(_onVoiceSessionChanged);
     _bootstrap();
   }
 
   @override
   void dispose() {
-    _voiceSession.removeListener(_onVoiceSessionChanged);
     _newMessageSub?.cancel();
     _reactionSub?.cancel();
     _deletedSub?.cancel();
@@ -106,11 +120,6 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onVoiceSessionChanged() {
-    if (!mounted) return;
-    setState(() {});
   }
 
   Future<void> _bootstrap() async {
@@ -1029,6 +1038,13 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         backgroundColor: _pageColor,
         elevation: 0,
         titleSpacing: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Tìm tin nhắn',
+            onPressed: _openChannelMessageSearch,
+            icon: const Icon(Icons.search_rounded, color: Colors.white),
+          ),
+        ],
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1053,50 +1069,6 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       ),
       body: Column(
         children: [
-          if (_hasMinimizedVoiceInThisServer)
-            Container(
-              margin: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0E2247),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2A3F69)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.call_rounded,
-                    color: Color(0xFF7FB6FF),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Đang ở kênh thoại ${_voiceSession.channelName ?? ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFFC9D7F5),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _openVoiceRoomFromMiniBar,
-                    child: const Text('Mở lại'),
-                  ),
-                  const SizedBox(width: 4),
-                  TextButton(
-                    onPressed: () => _voiceSession.leave(),
-                    child: const Text(
-                      'Rời phòng',
-                      style: TextStyle(color: Color(0xFFFF9CAB)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           const Divider(height: 1, color: _lineColor),
           Expanded(
             child: _loading
@@ -1130,10 +1102,27 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
                       final mine = _isMine(msg);
-                      return Align(
+                      final hi = _highlightChannelMessageId == msg.id;
+                      return KeyedSubtree(
+                        key: _keyForChannelMessage(msg.id),
+                        child: Align(
                         alignment: mine
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: hi
+                              ? BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x664A90E2),
+                                      blurRadius: 12,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                )
+                              : null,
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 9),
                           padding: const EdgeInsets.symmetric(
@@ -1203,6 +1192,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               ],
                             ],
                           ),
+                        ),
+                        ),
                         ),
                       );
                     },
