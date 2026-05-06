@@ -26,7 +26,8 @@ class LivestreamHubScreen extends StatefulWidget {
   State<LivestreamHubScreen> createState() => _LivestreamHubScreenState();
 }
 
-class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
+class _LivestreamHubScreenState extends State<LivestreamHubScreen>
+    with WidgetsBindingObserver {
   final _commentCtrl = TextEditingController();
   final _commentScrollCtrl = ScrollController();
 
@@ -52,6 +53,14 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
   bool _hostMediaStarted = false;
   bool _switchingCamera = false;
   bool _isFrontCamera = true;
+  // Set to true when the host's stream has been ended (via button, back, or app pause)
+  // so that dispose() does not send a duplicate end request.
+  bool _hostStreamEnded = false;
+  // Set to true when a viewer's stream is disconnected by the host remotely.
+  bool _streamEndedRemotely = false;
+  // Set to true when the viewer/host leaves voluntarily so RoomDisconnectedEvent
+  // does not mistakenly treat it as a remote end.
+  bool _leftVoluntarily = false;
   // Tracks the host's current camera facing for viewer-side mirror correction.
   // Front camera streams are mirrored at hardware level; viewers must scaleX(-1)
   // to restore natural orientation. Back camera streams are not mirrored.
@@ -85,17 +94,52 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _bootstrap();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // If host exits the screen without explicitly ending the live, end it now.
+    if (_isHostSession && !_hostStreamEnded) {
+      final streamId = _activeStream?.id;
+      if (streamId != null && streamId.isNotEmpty) {
+        _hostStreamEnded = true;
+        unawaited(LivestreamCreateService.endLivestream(streamId));
+      }
+    }
     _commentCtrl.dispose();
     _commentScrollCtrl.dispose();
     _listTimer?.cancel();
     _streamRefreshTimer?.cancel();
     unawaited(_disposeRoom());
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused &&
+        _isHostSession &&
+        !_hostStreamEnded) {
+      final stream = _activeStream;
+      if (stream != null) {
+        _hostStreamEnded = true;
+        unawaited(_endHostStreamAndNavigateHome(stream.id));
+      }
+    }
+  }
+
+  Future<void> _endHostStreamAndNavigateHome(String streamId) async {
+    try {
+      await LivestreamCreateService.endLivestream(streamId);
+    } catch (_) {}
+    await _disposeRoom();
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (_) => false,
+    );
   }
 
   Future<void> _bootstrap() async {
@@ -295,6 +339,9 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
         setState(() {
           _roomConnected = false;
           _stageTrack = null;
+          if (!_isHostSession && !_leftVoluntarily) {
+            _streamEndedRemotely = true;
+          }
         });
       })
       ..on<ParticipantEvent>((_) {
@@ -1009,6 +1056,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
 
     if (confirmed != true) return false;
 
+    _hostStreamEnded = true;
     try {
       await LivestreamCreateService.endLivestream(stream.id);
       if (!mounted) return false;
@@ -1047,6 +1095,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
   }
 
   Future<void> _leaveStream() async {
+    _leftVoluntarily = true;
     if (_hostDirectMode) {
       await _disposeRoom();
       if (!mounted) return;
@@ -1295,7 +1344,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
   Widget _buildActiveLivestreamScreen(LivestreamItem stream) {
     final viewerCount = max(stream.viewerCount - 1, 0);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         bottom: false,
@@ -1511,10 +1560,76 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen> {
                   ),
                 ),
               ),
+            if (!_isHostSession && _streamEndedRemotely)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.88),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.videocam_off_rounded,
+                        color: Colors.white54,
+                        size: 64,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Livestream has ended',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'The host has ended this livestream.',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 28),
+                      FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(context, rootNavigator: true)
+                              .pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (_) => const HomeScreen(),
+                            ),
+                            (_) => false,
+                          );
+                        },
+                        icon: const Icon(Icons.home_rounded),
+                        label: const Text('Back to home'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
+
+    if (_isHostSession) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          if (_hostStreamEnded) {
+            Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (_) => false,
+            );
+            return;
+          }
+          _hostStreamEnded = true;
+          unawaited(_endHostStreamAndNavigateHome(stream.id));
+        },
+        child: scaffold,
+      );
+    }
+
+    return scaffold;
   }
 
   Widget _buildStage() {

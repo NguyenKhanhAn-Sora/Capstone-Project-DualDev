@@ -86,15 +86,7 @@
         }
       }
     },
-    "personalInfo": {
-      "displayName": "显示名称",
-      "username": "用户名",
-      "birthdate": "生日",
-      "gender": "性别",
-      "location": "位置",
-      "workplace": "工作单位",
-      "bio": "个人简介"
-    },
+    "personalInfo": "个人信息",
     "profile": {
       "profilePage": "个人主页",
       "aboutThisUser": "关于此用户",
@@ -114,7 +106,45 @@
     },
     "notifications": {
       "pushNotifications": "推送通知",
-      "muteNotifications": "静音通知"
+      "muteNotifications": "静音通知",
+      "title": "通知",
+      "description": "控制接收通知提醒的时间。",
+      "pushHint": "静音时，新通知仍会保存，但不会实时提醒您。",
+      "chooseHowLong": "选择暂停账号提醒的时长。",
+      "chooseHowLongCategory": "选择暂停 {label} 提醒的时长。",
+      "muteButton": "静音",
+      "editButton": "编辑",
+      "categories": {
+        "follow": "关注",
+        "followDesc": "有人关注您时。",
+        "comment": "评论",
+        "commentDesc": "有人评论您的帖子或短视频时。",
+        "like": "点赞",
+        "likeDesc": "有人点赞您的帖子、短视频或评论时。",
+        "mentions": "提及与标签",
+        "mentionsDesc": "有人提及或标签您时。",
+        "system": "系统通知",
+        "systemDesc": "重要公告和系统更新。"
+      },
+      "muteOptions": {
+        "5m": "5分钟",
+        "10m": "10分钟",
+        "15m": "15分钟",
+        "30m": "30分钟",
+        "1h": "1小时",
+        "1d": "1天",
+        "until": "直到我重新开启",
+        "custom": "选择日期和时间"
+      },
+      "status": {
+        "enabled": "已启用",
+        "mutedIndefinitely": "已静音，直到您重新开启",
+        "mutedLessThanMinute": "已静音不到一分钟",
+        "mutedMinutes": "已静音 {n} 分钟",
+        "mutedHours": "已静音 {n} 小时",
+        "mutedDays": "已静音 {n} 天",
+        "muted": "已静音"
+      }
     },
     "changeEmail": "更改邮箱",
     "editProfile": "编辑资料",
@@ -383,6 +413,7 @@
         "unableToLoadPreview": "无法加载预览图片",
         "videoPreviewAvailable": "此违规内容有视频预览。"
       }
+<<<<<<< HEAD
     },
     "notifications": {
       "pushNotifications": "推送通知",
@@ -425,6 +456,8 @@
         "mutedDays": "已静音 {n} 天",
         "muted": "已静音"
       }
+=======
+>>>>>>> mobile-complete-stage
     }
   },
   "auth": {
@@ -986,18 +1019,75 @@
     "done": "完成"
   },
   "search": {
-    "clearAll": "全部清除",
+    "title": "搜索",
+    "hint": "搜索用户、#话题、帖子、视频",
+    "failed": "搜索失败",
+    "unableToClearHistory": "无法清除历史记录",
+    "unableToRemoveHistory": "无法删除历史记录项",
+    "unableToLoadMoreHashtags": "无法加载更多话题",
+    "unableToLoadMorePosts": "无法加载更多帖子",
+    "unableToLoadMoreReels": "无法加载更多视频",
+    "noCaption": "（无标题）",
+    "clearAll": "清除全部",
     "loadMore": "加载更多",
+    "hashtagPostCount": "{count} 个帖子",
+    "tab": {
+      "all": "全部",
+      "people": "用户",
+      "hashtags": "话题",
+      "reels": "视频",
+      "posts": "帖子"
+    },
+    "section": {
+      "people": "用户",
+      "hashtags": "话题",
+      "reels": "视频",
+      "posts": "帖子"
+    },
+    "history": {
+      "recent": "最近",
+      "noRecent": "暂无最近搜索"
+    },
+    "signInToRepost": "请登录后转发",
+    "reposted": "已转发",
+    "failedRepost": "转发失败",
+    "repostedWithQuote": "已引用转发",
+    "failedRepostWithQuote": "引用转发失败",
+    "unableToOpenRepostMenu": "无法打开转发菜单",
+    "postUpdated": "帖子已更新",
+    "visibilityUpdated": "可见性已更新",
+    "commentsOn": "已开启评论",
+    "commentsOff": "已关闭评论",
+    "failedUpdateComments": "更新评论设置失败",
+    "likeCountHidden": "已隐藏点赞数",
+    "likeCountVisible": "已显示点赞数",
+    "failedUpdateLikeVisibility": "更新点赞显示设置失败",
+    "adsNotAvailable": "广告详情可在主页动态中查看",
+    "postHidden": "已隐藏帖子",
+    "linkCopied": "已复制链接",
+    "reelNotifMuted": "已静音视频通知",
+    "postNotifMuted": "已静音帖子通知",
     "deletePost": {
       "title": "删除帖子",
-      "message": "此操作无法撤销。"
-    }
+      "message": "此操作无法撤销。",
+      "confirm": "删除"
+    },
+    "postDeleted": "已删除帖子",
+    "failedDeletePost": "删除帖子失败",
+    "signInFirst": "请先登录",
+    "reportSubmitted": "已提交举报",
+    "accountBlocked": "已屏蔽账号",
+    "failedBlockAccount": "屏蔽账号失败"
   },
   "explore": {
     "viewImage": "查看图片",
     "refresh": "刷新",
-    "tryAgain": "重试",
-    "retry": "重试"
+    "tryAgain": "再试一次",
+    "retry": "重试",
+    "unableToLoad": "无法加载探索内容",
+    "blurredViolation": "此图片因违反我们的标准已被模糊处理。",
+    "noPostsYet": "暂无探索内容",
+    "seenAll": "您已查看所有探索帖子"
   },
   "hashtag": {
     "viewImage": "查看图片",
@@ -1015,7 +1105,28 @@
   "following": {
     "viewImage": "查看图片",
     "retry": "重试",
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "failedLoad": "加载关注动态失败。",
+    "signInToRepost": "请登录后转发",
+    "reposted": "已转发",
+    "repostedWithQuote": "已引用转发",
+    "failedRepost": "转发失败",
+    "failedRepostWithQuote": "引用转发失败",
+    "postHidden": "已隐藏帖子",
+    "linkCopied": "已复制链接",
+    "reelNotifMuted": "已静音视频通知",
+    "postNotifMuted": "已静音帖子通知",
+    "reportSubmitted": "已提交举报",
+    "accountBlocked": "已屏蔽账号",
+    "failedBlockAccount": "屏蔽账号失败",
+    "postDeleted": "已删除帖子",
+    "failedDeletePost": "删除帖子失败",
+    "actionNotAvailable": "此功能在关注页面暂不可用",
+    "blurredSensitive": "此图片因包含敏感内容已被模糊处理。",
+    "reelLabel": "视频",
+    "emptyTitle": "暂无关注动态",
+    "emptySubtitle": "关注更多创作者以填充此动态。",
+    "unableToOpenRepostMenu": "无法打开转发菜单"
   },
   "livestream": {
     "createdSuccessfully": "直播创建成功",
@@ -1302,5 +1413,30 @@
         "unknown": "未知"
       }
     }
+<<<<<<< HEAD
+=======
+  },
+  "reportProblem": {
+    "title": "报告问题",
+    "headerTitle": "告诉我们发生了什么",
+    "headerSubtitle": "描述问题并附上截图或短视频。",
+    "descriptionLabel": "描述",
+    "descriptionHint": "解释发生了什么，在哪里发生，以及重现步骤。",
+    "attachmentsLabel": "附件",
+    "attachmentsHint": "最多5个文件 · 图片或视频",
+    "addFiles": "添加图片或视频",
+    "cooldown": "您可以在{seconds}秒后发送下一条报告。",
+    "clear": "清除",
+    "send": "发送报告",
+    "successTitle": "报告已发送",
+    "successSubtitle": "感谢您。我们的团队将尽快审核。",
+    "sendAnother": "发送另一条报告",
+    "backToHome": "返回首页",
+    "errorDescribeRequired": "请描述问题。",
+    "errorSignInRequired": "您需要登录才能报告问题。",
+    "errorCannotSend": "现在无法发送报告。",
+    "errorWaitBefore": "请等待后再发送下一条报告。",
+    "errorRetry": "现在无法发送报告。请重试。"
+>>>>>>> mobile-complete-stage
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'core/config/app_config.dart';
 import 'core/config/app_theme.dart';
+import 'core/services/app_shortcut_service.dart';
 import 'core/services/auth_storage.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/session_bootstrap.dart';
@@ -49,6 +50,9 @@ void main() async {
   // Attach the global call manager so incoming DM calls ring anywhere in
   // the app — not only while the user is inside the matching chat screen.
   await DmCallManager.instance.attach(appNavigatorKey);
+  // Load theme and language BEFORE runApp so the first frame never shows raw keys.
+  await ThemeController.instance.load();
+  await LanguageController.instance.load();
   runApp(const MyApp());
 }
 
@@ -69,8 +73,22 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    ThemeController.instance.load();
-    LanguageController.instance.load();
+    // Controllers are already loaded before runApp — just wire up listeners.
+    AppShortcutService.initialize(
+      navigatorKey: appNavigatorKey,
+      language: LanguageController.instance.language,
+    );
+    LanguageController.instance.addListener(_onLanguageChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageController.instance.removeListener(_onLanguageChanged);
+    super.dispose();
+  }
+
+  void _onLanguageChanged() {
+    AppShortcutService.updateLanguage(LanguageController.instance.language);
   }
 
   @override

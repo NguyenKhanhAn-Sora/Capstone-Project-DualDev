@@ -9,6 +9,7 @@ import '../../core/config/app_config.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 
 // ── Attachment model ─────────────────────────────────────────────────────────
 
@@ -102,13 +103,13 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
     final description = _descController.text.trim();
     if (description.isEmpty) {
-      setState(() => _error = 'Please describe the problem.');
+      setState(() => _error = LanguageController.instance.t('reportProblem.errorDescribeRequired'));
       return;
     }
 
     final token = AuthStorage.accessToken;
     if (token == null) {
-      setState(() => _error = 'You need to sign in to report a problem.');
+      setState(() => _error = LanguageController.instance.t('reportProblem.errorSignInRequired'));
       return;
     }
 
@@ -142,7 +143,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           _error = null;
         });
       } else {
-        String message = 'Cannot send report now.';
+        String message = LanguageController.instance.t('reportProblem.errorCannotSend');
         int? retryAfterMs;
         try {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -155,7 +156,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         if (retryAfterMs != null && retryAfterMs > 0) {
           _startCooldown(retryAfterMs);
           setState(() {
-            _error = 'Please wait before sending another report.';
+            _error = LanguageController.instance.t('reportProblem.errorWaitBefore');
             _submitting = false;
           });
         } else {
@@ -170,7 +171,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
         _startCooldown(e.retryAfterSec! * 1000);
         setState(() {
-          _error = 'Please wait before sending another report.';
+          _error = LanguageController.instance.t('reportProblem.errorWaitBefore');
           _submitting = false;
         });
       } else {
@@ -182,7 +183,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Cannot send report now. Please try again.';
+        _error = LanguageController.instance.t('reportProblem.errorRetry');
         _submitting = false;
       });
     }
@@ -240,7 +241,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Report a Problem',
+          LanguageController.instance.t('reportProblem.title'),
           style: TextStyle(
             color: scheme.onSurface,
             fontWeight: FontWeight.w600,
@@ -275,7 +276,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Report sent',
+              LanguageController.instance.t('reportProblem.successTitle'),
               style: TextStyle(
                 color: tokens.text,
                 fontSize: 20,
@@ -284,7 +285,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Thank you. Our team will review it soon.',
+              LanguageController.instance.t('reportProblem.successSubtitle'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: tokens.textMuted,
@@ -305,9 +306,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  'Send another report',
-                  style: TextStyle(fontSize: 14),
+                child: Text(
+                  LanguageController.instance.t('reportProblem.sendAnother'),
+                  style: const TextStyle(fontSize: 14),
                 ),
               ),
             ),
@@ -320,9 +321,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                   foregroundColor: tokens.textMuted,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                child: const Text(
-                  'Back to home',
-                  style: TextStyle(fontSize: 14),
+                child: Text(
+                  LanguageController.instance.t('reportProblem.backToHome'),
+                  style: const TextStyle(fontSize: 14),
                 ),
               ),
             ),
@@ -375,7 +376,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Tell us what went wrong',
+                        LanguageController.instance.t('reportProblem.headerTitle'),
                         style: TextStyle(
                           color: tokens.text,
                           fontSize: 15,
@@ -384,7 +385,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Describe the issue and attach screenshots or a short video.',
+                        LanguageController.instance.t('reportProblem.headerSubtitle'),
                         style: TextStyle(
                           color: tokens.textMuted,
                           fontSize: 12,
@@ -401,7 +402,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           const SizedBox(height: 20),
 
           // ── Description label ────────────────────────────────────────────
-          const _FieldLabel(text: 'Description'),
+          _FieldLabel(text: LanguageController.instance.t('reportProblem.descriptionLabel')),
           const SizedBox(height: 8),
           Stack(
             children: [
@@ -419,8 +420,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 onChanged: (_) => setState(() {}),
                 style: TextStyle(color: tokens.text, fontSize: 14, height: 1.5),
                 decoration: InputDecoration(
-                  hintText:
-                      'Explain what happened, where it happened, and any steps to reproduce.',
+                  hintText: LanguageController.instance.t('reportProblem.descriptionHint'),
                   hintStyle: TextStyle(
                     color: tokens.textMuted,
                     fontSize: 14,
@@ -465,7 +465,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           // ── Attachments ──────────────────────────────────────────────────
           Row(
             children: [
-              const _FieldLabel(text: 'Attachments'),
+              _FieldLabel(text: LanguageController.instance.t('reportProblem.attachmentsLabel')),
               const Spacer(),
               Text(
                 '${_files.length} / $_maxFiles',
@@ -475,7 +475,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Up to 5 files · images or videos',
+            LanguageController.instance.t('reportProblem.attachmentsHint'),
             style: TextStyle(color: tokens.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 10),
@@ -520,7 +520,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Add images or videos',
+                      LanguageController.instance.t('reportProblem.addFiles'),
                       style: TextStyle(
                         color: scheme.primary,
                         fontSize: 14,
@@ -579,7 +579,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                   Icon(Icons.timer_outlined, color: scheme.primary, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'You can send the next report in ${_cooldownSec}s.',
+                    LanguageController.instance.t('reportProblem.cooldown', {'seconds': '$_cooldownSec'}),
                     style: TextStyle(color: tokens.textMuted, fontSize: 13),
                   ),
                 ],
@@ -600,7 +600,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text('Clear', style: TextStyle(fontSize: 14)),
+                  child: Text(LanguageController.instance.t('reportProblem.clear'), style: const TextStyle(fontSize: 14)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -630,9 +630,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          'Send report',
-                          style: TextStyle(
+                      : Text(
+                          LanguageController.instance.t('reportProblem.send'),
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),

@@ -86,15 +86,7 @@
         }
       }
     },
-    "personalInfo": {
-      "displayName": "Tên hiển thị",
-      "username": "Tên người dùng",
-      "birthdate": "Ngày sinh",
-      "gender": "Giới tính",
-      "location": "Vị trí",
-      "workplace": "Nơi làm việc",
-      "bio": "Tiểu sử"
-    },
+    "personalInfo": "Thông tin cá nhân",
     "profile": {
       "profilePage": "Trang cá nhân",
       "aboutThisUser": "Về người dùng này",
@@ -983,18 +975,75 @@
     "done": "Xong"
   },
   "search": {
+    "title": "Tìm kiếm",
+    "hint": "Tìm người, #hashtag, bài viết, reel",
+    "failed": "Tìm kiếm thất bại",
+    "unableToClearHistory": "Không thể xóa lịch sử",
+    "unableToRemoveHistory": "Không thể xóa mục lịch sử",
+    "unableToLoadMoreHashtags": "Không thể tải thêm hashtag",
+    "unableToLoadMorePosts": "Không thể tải thêm bài viết",
+    "unableToLoadMoreReels": "Không thể tải thêm reel",
+    "noCaption": "(không có chú thích)",
     "clearAll": "Xóa tất cả",
     "loadMore": "Tải thêm",
+    "hashtagPostCount": "{count} bài viết",
+    "tab": {
+      "all": "Tất cả",
+      "people": "Người dùng",
+      "hashtags": "Hashtag",
+      "reels": "Reels",
+      "posts": "Bài viết"
+    },
+    "section": {
+      "people": "Người dùng",
+      "hashtags": "Hashtag",
+      "reels": "Reels",
+      "posts": "Bài viết"
+    },
+    "history": {
+      "recent": "Gần đây",
+      "noRecent": "Không có tìm kiếm gần đây"
+    },
+    "signInToRepost": "Vui lòng đăng nhập để chia sẻ lại",
+    "reposted": "Đã chia sẻ lại",
+    "failedRepost": "Chia sẻ lại thất bại",
+    "repostedWithQuote": "Đã chia sẻ lại có trích dẫn",
+    "failedRepostWithQuote": "Chia sẻ lại có trích dẫn thất bại",
+    "unableToOpenRepostMenu": "Không thể mở menu chia sẻ lại",
+    "postUpdated": "Đã cập nhật bài viết",
+    "visibilityUpdated": "Đã cập nhật hiển thị",
+    "commentsOn": "Đã bật bình luận",
+    "commentsOff": "Đã tắt bình luận",
+    "failedUpdateComments": "Cập nhật bình luận thất bại",
+    "likeCountHidden": "Đã ẩn số lượt thích",
+    "likeCountVisible": "Đã hiện số lượt thích",
+    "failedUpdateLikeVisibility": "Cập nhật hiển thị lượt thích thất bại",
+    "adsNotAvailable": "Chi tiết quảng cáo có sẵn từ bảng tin chính",
+    "postHidden": "Đã ẩn bài viết",
+    "linkCopied": "Đã sao chép liên kết",
+    "reelNotifMuted": "Đã tắt thông báo reel",
+    "postNotifMuted": "Đã tắt thông báo bài viết",
     "deletePost": {
       "title": "Xóa bài viết",
-      "message": "Hành động này không thể hoàn tác."
-    }
+      "message": "Hành động này không thể hoàn tác.",
+      "confirm": "Xóa"
+    },
+    "postDeleted": "Đã xóa bài viết",
+    "failedDeletePost": "Xóa bài viết thất bại",
+    "signInFirst": "Vui lòng đăng nhập trước",
+    "reportSubmitted": "Đã gửi báo cáo",
+    "accountBlocked": "Đã chặn tài khoản",
+    "failedBlockAccount": "Chặn tài khoản thất bại"
   },
   "explore": {
     "viewImage": "Xem ảnh",
     "refresh": "Làm mới",
     "tryAgain": "Thử lại",
-    "retry": "Thử lại"
+    "retry": "Thử lại",
+    "unableToLoad": "Không thể tải nội dung khám phá",
+    "blurredViolation": "Hình ảnh này đã bị làm mờ do vi phạm tiêu chuẩn của chúng tôi.",
+    "noPostsYet": "Chưa có bài viết nào",
+    "seenAll": "Bạn đã xem tất cả bài viết khám phá"
   },
   "hashtag": {
     "viewImage": "Xem ảnh",
@@ -1012,7 +1061,28 @@
   "following": {
     "viewImage": "Xem ảnh",
     "retry": "Thử lại",
-    "refresh": "Làm mới"
+    "refresh": "Làm mới",
+    "failedLoad": "Tải bảng tin không thành công.",
+    "signInToRepost": "Vui lòng đăng nhập để chia sẻ lại",
+    "reposted": "Đã chia sẻ lại",
+    "repostedWithQuote": "Đã chia sẻ lại có trích dẫn",
+    "failedRepost": "Chia sẻ lại thất bại",
+    "failedRepostWithQuote": "Chia sẻ lại có trích dẫn thất bại",
+    "postHidden": "Đã ẩn bài viết",
+    "linkCopied": "Đã sao chép liên kết",
+    "reelNotifMuted": "Đã tắt thông báo reel",
+    "postNotifMuted": "Đã tắt thông báo bài viết",
+    "reportSubmitted": "Đã gửi báo cáo",
+    "accountBlocked": "Đã chặn tài khoản",
+    "failedBlockAccount": "Chặn tài khoản thất bại",
+    "postDeleted": "Đã xóa bài viết",
+    "failedDeletePost": "Xóa bài viết thất bại",
+    "actionNotAvailable": "Hành động này chưa có sẵn trong Following",
+    "blurredSensitive": "Hình ảnh này đã bị làm mờ do nội dung nhạy cảm.",
+    "reelLabel": "Reel",
+    "emptyTitle": "Chưa có bài viết nào từ người bạn theo dõi",
+    "emptySubtitle": "Theo dõi thêm người sáng tạo để lấp đầy bảng tin.",
+    "unableToOpenRepostMenu": "Không thể mở menu chia sẻ lại"
   },
   "livestream": {
     "createdSuccessfully": "Tạo livestream thành công",
@@ -1299,5 +1369,30 @@
         "unknown": "Không xác định"
       }
     }
+<<<<<<< HEAD
+=======
+  },
+  "reportProblem": {
+    "title": "Báo cáo vấn đề",
+    "headerTitle": "Cho chúng tôi biết điều gì đã xảy ra",
+    "headerSubtitle": "Mô tả vấn đề và đính kèm ảnh chụp màn hình hoặc video ngắn.",
+    "descriptionLabel": "Mô tả",
+    "descriptionHint": "Giải thích điều đã xảy ra, nơi xảy ra và các bước để tái hiện.",
+    "attachmentsLabel": "Tệp đính kèm",
+    "attachmentsHint": "Tối đa 5 tệp · hình ảnh hoặc video",
+    "addFiles": "Thêm hình ảnh hoặc video",
+    "cooldown": "Bạn có thể gửi báo cáo tiếp theo sau {seconds}s.",
+    "clear": "Xóa",
+    "send": "Gửi báo cáo",
+    "successTitle": "Đã gửi báo cáo",
+    "successSubtitle": "Cảm ơn bạn. Đội ngũ của chúng tôi sẽ xem xét sớm.",
+    "sendAnother": "Gửi báo cáo khác",
+    "backToHome": "Về trang chủ",
+    "errorDescribeRequired": "Vui lòng mô tả vấn đề.",
+    "errorSignInRequired": "Bạn cần đăng nhập để báo cáo vấn đề.",
+    "errorCannotSend": "Không thể gửi báo cáo lúc này.",
+    "errorWaitBefore": "Vui lòng chờ trước khi gửi báo cáo tiếp theo.",
+    "errorRetry": "Không thể gửi báo cáo lúc này. Vui lòng thử lại."
+>>>>>>> mobile-complete-stage
   }
 }

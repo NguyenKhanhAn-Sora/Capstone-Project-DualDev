@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../hashtag/hashtag_screen.dart';
 import '../hashtag/services/hashtag_feed_service.dart';
 import '../home/models/feed_post.dart';
@@ -134,7 +135,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted) return;
       setState(() => _history = []);
     } catch (_) {
-      _showSnack('Unable to clear history', error: true);
+      _showSnack(LanguageController.instance.t('search.unableToClearHistory'), error: true);
     }
   }
 
@@ -144,7 +145,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted) return;
       setState(() => _history.removeWhere((h) => h.id == id));
     } catch (_) {
-      _showSnack('Unable to remove history item', error: true);
+      _showSnack(LanguageController.instance.t('search.unableToRemoveHistory'), error: true);
     }
   }
 
@@ -257,7 +258,7 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Search failed';
+        _error = LanguageController.instance.t('search.failed');
       });
     } finally {
       if (!mounted) return;
@@ -386,7 +387,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _hashtagsHasMore = res.hasMore;
       });
     } catch (_) {
-      _showSnack('Unable to load more hashtags', error: true);
+      _showSnack(LanguageController.instance.t('search.unableToLoadMoreHashtags'), error: true);
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -412,7 +413,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _postsHasMore = res.hasMore;
       });
     } catch (_) {
-      _showSnack('Unable to load more posts', error: true);
+      _showSnack(LanguageController.instance.t('search.unableToLoadMorePosts'), error: true);
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -440,7 +441,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _reelsHasMore = res.hasMore;
       });
     } catch (_) {
-      _showSnack('Unable to load more reels', error: true);
+      _showSnack(LanguageController.instance.t('search.unableToLoadMoreReels'), error: true);
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -624,7 +625,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _handleQuickRepost(FeedPostState targetState) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('search.signInToRepost'), error: true);
       return;
     }
 
@@ -641,9 +642,9 @@ class _SearchScreenState extends State<SearchScreen> {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted');
+      _showSnack(LanguageController.instance.t('search.reposted'));
     } catch (_) {
-      _showSnack('Failed to repost', error: true);
+      _showSnack(LanguageController.instance.t('search.failedRepost'), error: true);
     }
   }
 
@@ -678,9 +679,9 @@ class _SearchScreenState extends State<SearchScreen> {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted with quote');
+      _showSnack(LanguageController.instance.t('search.repostedWithQuote'));
     } catch (_) {
-      _showSnack('Failed to repost with quote', error: true);
+      _showSnack(LanguageController.instance.t('search.failedRepostWithQuote'), error: true);
     }
   }
 
@@ -702,7 +703,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (quoteInput == null) return;
       await _handleQuoteRepost(state, quoteInput);
     } catch (_) {
-      _showSnack('Unable to open repost menu', error: true);
+      _showSnack(LanguageController.instance.t('search.unableToOpenRepostMenu'), error: true);
     }
   }
 
@@ -741,7 +742,7 @@ class _SearchScreenState extends State<SearchScreen> {
             stats: updated.stats,
           ),
         );
-        _showSnack('Post updated');
+        _showSnack(LanguageController.instance.t('search.postUpdated'));
         return;
       case PostMenuAction.editVisibility:
         final nextVisibility = await showEditVisibilitySheet(
@@ -754,7 +755,7 @@ class _SearchScreenState extends State<SearchScreen> {
           post.id,
           state.copyWith(post: post.copyWith(visibility: nextVisibility)),
         );
-        _showSnack('Visibility updated');
+        _showSnack(LanguageController.instance.t('search.visibilityUpdated'));
         return;
       case PostMenuAction.toggleComments:
         final currentAllowed = post.allowComments != false;
@@ -766,14 +767,14 @@ class _SearchScreenState extends State<SearchScreen> {
         try {
           await PostInteractionService.setAllowComments(post.id, nextAllowed);
           _showSnack(
-            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+            nextAllowed ? LanguageController.instance.t('search.commentsOn') : LanguageController.instance.t('search.commentsOff'),
           );
         } catch (_) {
           _replaceState(
             post.id,
             state.copyWith(post: post.copyWith(allowComments: currentAllowed)),
           );
-          _showSnack('Failed to update comments', error: true);
+          _showSnack(LanguageController.instance.t('search.failedUpdateComments'), error: true);
         }
         return;
       case PostMenuAction.toggleHideLike:
@@ -785,20 +786,20 @@ class _SearchScreenState extends State<SearchScreen> {
         );
         try {
           await PostInteractionService.setHideLikeCount(post.id, nextHidden);
-          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+          _showSnack(nextHidden ? LanguageController.instance.t('search.likeCountHidden') : LanguageController.instance.t('search.likeCountVisible'));
         } catch (_) {
           _replaceState(
             post.id,
             state.copyWith(post: post.copyWith(hideLikeCount: currentHidden)),
           );
-          _showSnack('Failed to update like visibility', error: true);
+          _showSnack(LanguageController.instance.t('search.failedUpdateLikeVisibility'), error: true);
         }
         return;
       case PostMenuAction.goToAdsPost:
         _openPost(state);
         return;
       case PostMenuAction.detailAds:
-        _showSnack('Ads detail is available from Home feed', error: true);
+        _showSnack(LanguageController.instance.t('search.adsNotAvailable'), error: true);
         return;
       case PostMenuAction.followToggle:
         return;
@@ -807,14 +808,14 @@ class _SearchScreenState extends State<SearchScreen> {
         return;
       case PostMenuAction.hidePost:
         await _onHide(state);
-        _showSnack('Post hidden');
+        _showSnack(LanguageController.instance.t('search.postHidden'));
         return;
       case PostMenuAction.copyLink:
         final link = post.kind.toLowerCase() == 'reel'
             ? PostInteractionService.reelPermalink(post.id)
             : PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
-        _showSnack('Link copied');
+        _showSnack(LanguageController.instance.t('search.linkCopied'));
         return;
       case PostMenuAction.muteNotifications:
         final label = post.kind.toLowerCase() == 'reel' ? 'reel' : 'post';
@@ -826,17 +827,17 @@ class _SearchScreenState extends State<SearchScreen> {
         if (muted) {
           _showSnack(
             label == 'reel'
-                ? 'Reel notifications muted'
-                : 'Post notifications muted',
+                ? LanguageController.instance.t('search.reelNotifMuted')
+                : LanguageController.instance.t('search.postNotifMuted'),
           );
         }
         return;
       case PostMenuAction.deletePost:
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Delete post',
-          message: 'This action cannot be undone.',
-          confirmLabel: 'Delete',
+          title: LanguageController.instance.t('search.deletePost.title'),
+          message: LanguageController.instance.t('search.deletePost.message'),
+          confirmLabel: LanguageController.instance.t('search.deletePost.confirm'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -844,17 +845,17 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() => _posts.removeWhere((s) => s.post.id == post.id));
         try {
           await PostInteractionService.deletePost(post.id);
-          _showSnack('Post deleted');
+          _showSnack(LanguageController.instance.t('search.postDeleted'));
         } catch (_) {
           if (!mounted) return;
           if (snapshot != null) setState(() => _posts.insert(0, snapshot));
-          _showSnack('Failed to delete post', error: true);
+          _showSnack(LanguageController.instance.t('search.failedDeletePost'), error: true);
         }
         return;
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack('Please sign in first', error: true);
+          _showSnack(LanguageController.instance.t('search.signInFirst'), error: true);
           return;
         }
         final reported = await showReportPostSheet(
@@ -862,7 +863,7 @@ class _SearchScreenState extends State<SearchScreen> {
           postId: post.id,
           authHeader: {'Authorization': 'Bearer $token'},
         );
-        if (reported) _showSnack('Report submitted');
+        if (reported) _showSnack(LanguageController.instance.t('search.reportSubmitted'));
         return;
       case PostMenuAction.blockAccount:
         final userId = post.authorId;
@@ -875,9 +876,9 @@ class _SearchScreenState extends State<SearchScreen> {
             _reels.removeWhere((s) => s.authorId == userId);
             _people.removeWhere((s) => s.userId == userId);
           });
-          _showSnack('Account blocked');
+          _showSnack(LanguageController.instance.t('search.accountBlocked'));
         } catch (_) {
-          _showSnack('Failed to block account', error: true);
+          _showSnack(LanguageController.instance.t('search.failedBlockAccount'), error: true);
         }
         return;
     }
@@ -922,11 +923,11 @@ class _SearchScreenState extends State<SearchScreen> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _tabBtn('All', _SearchTab.all),
-          _tabBtn('People', _SearchTab.people),
-          _tabBtn('Hashtags', _SearchTab.hashtags),
-          _tabBtn('Reels', _SearchTab.reels),
-          _tabBtn('Posts', _SearchTab.posts),
+          _tabBtn(LanguageController.instance.t('search.tab.all'), _SearchTab.all),
+          _tabBtn(LanguageController.instance.t('search.tab.people'), _SearchTab.people),
+          _tabBtn(LanguageController.instance.t('search.tab.hashtags'), _SearchTab.hashtags),
+          _tabBtn(LanguageController.instance.t('search.tab.reels'), _SearchTab.reels),
+          _tabBtn(LanguageController.instance.t('search.tab.posts'), _SearchTab.posts),
         ],
       ),
     );
@@ -969,7 +970,7 @@ class _SearchScreenState extends State<SearchScreen> {
       return Padding(
         padding: const EdgeInsets.only(top: 20),
         child: Text(
-          'No recent searches',
+          LanguageController.instance.t('search.history.noRecent'),
           style: TextStyle(color: scheme.onSurfaceVariant),
         ),
       );
@@ -980,7 +981,7 @@ class _SearchScreenState extends State<SearchScreen> {
         Row(
           children: [
             Text(
-              'Recent',
+              LanguageController.instance.t('search.history.recent'),
               style: TextStyle(
                 color: scheme.onSurface,
                 fontSize: 16,
@@ -990,7 +991,7 @@ class _SearchScreenState extends State<SearchScreen> {
             const Spacer(),
             TextButton(
               onPressed: _clearHistory,
-              child: const Text('Clear all'),
+              child: Text(LanguageController.instance.t('search.clearAll')),
             ),
           ],
         ),
@@ -1016,7 +1017,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   : null,
             ),
             title: Text(
-              item.label.isEmpty ? '(no caption)' : item.label,
+              item.label.isEmpty ? LanguageController.instance.t('search.noCaption') : item.label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: scheme.onSurface),
@@ -1051,7 +1052,7 @@ class _SearchScreenState extends State<SearchScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
-            'People',
+            LanguageController.instance.t('search.section.people'),
             style: TextStyle(
               color: scheme.onSurface,
               fontSize: 16,
@@ -1101,7 +1102,7 @@ class _SearchScreenState extends State<SearchScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
-            'Hashtags',
+            LanguageController.instance.t('search.section.hashtags'),
             style: TextStyle(
               color: scheme.onSurface,
               fontSize: 16,
@@ -1127,7 +1128,7 @@ class _SearchScreenState extends State<SearchScreen> {
               style: TextStyle(color: scheme.onSurface),
             ),
             subtitle: Text(
-              '${t.usageCount} posts',
+              LanguageController.instance.t('search.hashtagPostCount', {'count': '${t.usageCount}'}),
               style: TextStyle(color: scheme.onSurfaceVariant),
             ),
           ),
@@ -1149,7 +1150,7 @@ class _SearchScreenState extends State<SearchScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
-            'Reels',
+            LanguageController.instance.t('search.section.reels'),
             style: TextStyle(
               color: scheme.onSurface,
               fontSize: 16,

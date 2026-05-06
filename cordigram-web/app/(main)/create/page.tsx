@@ -8,15 +8,12 @@ import LivestreamCreatePanel from "@/components/livestream/LivestreamCreatePanel
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
 import {
-  createPost,
-  createReel,
   fetchCurrentProfile,
-  resolveApiErrorMessage,
   searchProfiles,
-  uploadPostMedia,
-  type CreatePostRequest,
   type ProfileSearchItem,
 } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { usePostUpload } from "@/context/post-upload-context";
 
 function LocationIcon() {
   return (
@@ -246,6 +243,8 @@ const initialForm: FormState = {
 
 export default function CreatePostPage() {
   const canRender = useRequireAuth();
+  const router = useRouter();
+  const { startUpload } = usePostUpload();
   const [mode, setMode] = useState<"post" | "reel" | "livestream">("post");
   const [step, setStep] = useState<Step>("select");
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
@@ -258,9 +257,7 @@ export default function CreatePostPage() {
   );
   const [hashtagDraft, setHashtagDraft] = useState("");
   const [mentionDraft, setMentionDraft] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
-  const [submitSuccess, setSubmitSuccess] = useState<string>("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
   const [locationInput, setLocationInput] = useState(initialForm.location);
@@ -446,7 +443,6 @@ export default function CreatePostPage() {
   };
 
   const addFiles = async (fileList: FileList | File[] | null | undefined) => {
-    setSubmitSuccess("");
     setSubmitError("");
     if (!fileList) return;
     const incoming = Array.from(fileList);
@@ -625,7 +621,6 @@ export default function CreatePostPage() {
     setActiveMentionRange(null);
     setStep("select");
     setSubmitError("");
-    setSubmitSuccess("");
   };
 
   const removeMedia = (index: number) => {
@@ -642,10 +637,9 @@ export default function CreatePostPage() {
     setAudienceOpen(false);
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError("");
-    setSubmitSuccess("");
 
     if (!mediaItems.length) {
       setSubmitError(
@@ -697,109 +691,30 @@ export default function CreatePostPage() {
         ? new Date(form.scheduledAt).toISOString()
         : undefined;
 
-    const basePayload = {
-      content: form.caption || undefined,
-      hashtags: normalizedHashtags,
-      mentions: normalizedMentions,
-      location: form.location.trim() || undefined,
-      visibility: form.audience as "public" | "followers" | "private",
-      allowComments: form.allowComments,
-      allowDownload: form.allowDownload,
-      hideLikeCount: form.hideLikeCount,
-      scheduledAt: scheduledAtIso,
-    };
+    startUpload({
+      mode: mode as "post" | "reel",
+      mediaItems: mediaItems.map((item) => ({
+        file: item.file,
+        kind: item.kind,
+        duration: item.duration,
+      })),
+      payload: {
+        content: form.caption || undefined,
+        hashtags: normalizedHashtags,
+        mentions: normalizedMentions,
+        location: form.location.trim() || undefined,
+        visibility: form.audience as "public" | "followers" | "private",
+        allowComments: form.allowComments,
+        allowDownload: form.allowDownload,
+        hideLikeCount: form.hideLikeCount,
+        scheduledAt: scheduledAtIso,
+      },
+      token,
+      publishMode: form.publishMode,
+    });
 
-    try {
-      setSubmitting(true);
-      const uploadedPayload: NonNullable<CreatePostRequest["media"]> = [];
-
-      for (const item of mediaItems) {
-        const upload = await uploadPostMedia({ token, file: item.file });
-        const uploadedUrl = upload.secureUrl || upload.url;
-
-        const uploadDurationRaw =
-          typeof upload.duration === "number"
-            ? upload.duration
-            : typeof upload.duration === "string"
-              ? Number(upload.duration)
-              : null;
-
-        const finalDuration =
-          typeof uploadDurationRaw === "number" &&
-          Number.isFinite(uploadDurationRaw)
-            ? uploadDurationRaw
-            : item.duration;
-
-        if (
-          mode === "reel" &&
-          (finalDuration === null || finalDuration > REEL_MAX_DURATION_SECONDS)
-        ) {
-          setSubmitError(
-            finalDuration === null
-              ? "Missing video duration. Please re-upload your reel."
-              : `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`,
-          );
-          setSubmitting(false);
-          return;
-        }
-
-        uploadedPayload.push({
-          type: item.kind,
-          url: uploadedUrl,
-          metadata: {
-            publicId: upload.publicId,
-            folder: upload.folder,
-            bytes: upload.bytes,
-            resourceType: upload.resourceType,
-            format: upload.format,
-            width: upload.width,
-            height: upload.height,
-            duration:
-              typeof finalDuration === "number"
-                ? Math.round(finalDuration * 100) / 100
-                : finalDuration,
-            moderationDecision: upload.moderationDecision,
-            moderationProvider: upload.moderationProvider,
-            moderationReasons: upload.moderationReasons,
-            moderationScores: upload.moderationScores,
-            originalUrl: upload.originalUrl,
-            originalSecureUrl: upload.originalSecureUrl,
-          },
-        });
-      }
-
-      if (mode === "reel") {
-        const durationVal = uploadedPayload[0]?.metadata?.duration;
-        await createReel({
-          token,
-          payload: {
-            ...basePayload,
-            media: uploadedPayload as Array<{
-              type: "video";
-              url: string;
-              metadata?: Record<string, unknown> | null;
-            }>,
-            durationSeconds:
-              typeof durationVal === "number" ? durationVal : undefined,
-          },
-        });
-        resetSelection();
-        setSubmitSuccess("Reel created successfully.");
-      } else {
-        await createPost({
-          token,
-          payload: { ...basePayload, media: uploadedPayload },
-        });
-        resetSelection();
-        setSubmitSuccess("Post created successfully.");
-      }
-    } catch (err) {
-      setSubmitError(
-        resolveApiErrorMessage(err, "Could not publish. Please try again."),
-      );
-    } finally {
-      setSubmitting(false);
-    }
+    resetSelection();
+    router.push("/");
   };
 
   const requestCurrentLocation = () => {
@@ -1928,25 +1843,21 @@ export default function CreatePostPage() {
                 type="button"
                 className={styles.secondaryButton}
                 onClick={resetSelection}
-                disabled={submitting}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 className={styles.primaryButton}
-                disabled={!mediaItems.length || submitting}
+                disabled={!mediaItems.length}
               >
-                {submitting ? "Publishing..." : "Finish"}
+                Finish
               </button>
             </div>
 
-            {(submitError || submitSuccess) && (
-              <p
-                className={submitError ? styles.error : styles.successMessage}
-                role={submitError ? "alert" : "status"}
-              >
-                {submitError || submitSuccess}
+            {submitError && (
+              <p className={styles.error} role="alert">
+                {submitError}
               </p>
             )}
           </div>
