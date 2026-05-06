@@ -148,18 +148,6 @@ export function PostUploadProvider({ children }: { children: ReactNode }) {
               token: input.token,
               file: item.file,
               signal: abortController.signal,
-              // XHR progress: used only when it's AHEAD of the simulation
-              // (happens on slow connections where browser→server is the bottleneck)
-              onProgress: (ratio) => {
-                if (cancelledRef.current) return;
-                const xhrP = fileStart + ratio * fileSlice;
-                if (xhrP > simProgressRef.current) {
-                  simProgressRef.current = xhrP;
-                  setUpload((prev) =>
-                    prev ? { ...prev, progress: Math.round(xhrP) } : null,
-                  );
-                }
-              },
             });
           } finally {
             // Always stop the simulation when the upload settles (success or error)
@@ -278,16 +266,13 @@ export function PostUploadProvider({ children }: { children: ReactNode }) {
         }
 
         hideTimerRef.current = setTimeout(() => setUpload(null), 2500);
-      } catch {
+      } catch (err) {
         if (!cancelledRef.current) {
+          const message =
+            (err as { message?: string } | null)?.message ||
+            "Could not publish. Please try again.";
           setUpload((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: "error",
-                  error: "Could not publish. Please try again.",
-                }
-              : null,
+            prev ? { ...prev, status: "error", error: message } : null,
           );
           hideTimerRef.current = setTimeout(() => setUpload(null), 4000);
         }
