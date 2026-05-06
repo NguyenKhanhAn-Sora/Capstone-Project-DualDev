@@ -60,6 +60,8 @@ import {
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 import LivestreamHub from "@/components/livestream/LivestreamHub";
 import styles from "./home-feed.module.css";
+import { usePostUpload } from "@/context/post-upload-context";
+import PostUploadBanner from "@/ui/post-upload-banner/post-upload-banner";
 
 type LocalFlags = {
   liked?: boolean;
@@ -772,6 +774,27 @@ export default function HomePage({
     if (typeof window === "undefined") return null;
     return localStorage.getItem("accessToken");
   }, []);
+
+  const { newPost, clearNewPost } = usePostUpload();
+
+  useEffect(() => {
+    if (!newPost) return;
+    setItems((prev) => {
+      if (prev.some((p) => p.item.id === newPost.id)) return prev;
+      return [
+        {
+          item: newPost,
+          flags: {
+            liked: Boolean(newPost.liked || newPost.flags?.liked),
+            saved: Boolean(newPost.saved || newPost.flags?.saved),
+            following: Boolean(newPost.following),
+          },
+        },
+        ...prev,
+      ];
+    });
+    clearNewPost();
+  }, [newPost, clearNewPost]);
 
   useEffect(() => {
     if (!token) {
@@ -1641,6 +1664,7 @@ export default function HomePage({
   return (
     <div className={embedded ? undefined : styles.page}>
       <div className={embedded ? styles.embedded : styles.centerColumn}>
+        <PostUploadBanner />
         {headerSlot}
         {visibleItems.map(({ item, flags }, index) => (
           <Fragment key={item.id}>

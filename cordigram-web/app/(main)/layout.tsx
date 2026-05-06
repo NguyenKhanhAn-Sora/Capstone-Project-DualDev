@@ -4,6 +4,7 @@ import Sidebar from "@/ui/Sidebar/sidebar";
 import { usePathname } from "next/navigation";
 import { AuthGuard } from "../../component/auth-guard";
 import GlobalDmIncomingCalls from "@/components/GlobalDmIncomingCalls";
+import { PostUploadProvider } from "@/context/post-upload-context";
 
 export default function MainLayout({
   children,
@@ -16,7 +17,7 @@ export default function MainLayout({
   const isMessagesPage = pathname?.startsWith("/messages");
 
   return (
-    <>
+    <PostUploadProvider>
       <GlobalDmIncomingCalls />
       {isMessagesPage ? (
         <>{children}</>
@@ -31,6 +32,6 @@ export default function MainLayout({
           </div>
         </AuthGuard>
       )}
-    </>
+    </PostUploadProvider>
   );
 }
