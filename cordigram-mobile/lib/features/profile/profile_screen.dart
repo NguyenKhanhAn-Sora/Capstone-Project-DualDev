@@ -15,6 +15,8 @@ import 'profile_item_viewer_screen.dart';
 import 'models/profile_detail.dart';
 import 'profile_edit_sheet.dart';
 import 'services/profile_service.dart';
+import '../livestream/livestream_create_service.dart';
+import '../livestream/livestream_hub_screen.dart';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -241,6 +243,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _bioExpanded = false;
   bool _avatarLoading = false;
   bool _isOwnerProfile = false;
+  LivestreamItem? _activeLivestream;
 
   // ── Tab state ──────────────────────────────────────────────────────────────
   late TabController _tabController;
@@ -396,6 +399,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       _prefetchTab('reels');
       _prefetchTab('repost');
       if (isOwner) _prefetchTab('saved');
+      if (!isOwner) _checkIfUserIsLive(data.userId);
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString().toLowerCase();
@@ -447,6 +451,17 @@ class _ProfileScreenState extends State<ProfileScreen>
         });
       }
     }
+  }
+
+  Future<void> _checkIfUserIsLive(String userId) async {
+    try {
+      final res = await LivestreamCreateService.listLiveLivestreams();
+      if (!mounted) return;
+      final found = res.items.where(
+        (s) => s.hostUserId == userId && s.isLive,
+      );
+      setState(() => _activeLivestream = found.isNotEmpty ? found.first : null);
+    } catch (_) {}
   }
 
   // ── Tab fetching ───────────────────────────────────────────────────────────
@@ -1474,6 +1489,20 @@ class _ProfileScreenState extends State<ProfileScreen>
                   '@${p.username}',
                   style: TextStyle(color: _textSecondary, fontSize: 14),
                 ),
+                if (_activeLivestream != null) ...[
+                  const SizedBox(height: 8),
+                  _LiveNowBadge(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => LivestreamHubScreen(
+                            initialStreamId: _activeLivestream!.id,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -3053,6 +3082,92 @@ class _GridTileState extends State<_GridTile> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _LiveNowBadge extends StatefulWidget {
+  const _LiveNowBadge({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  State<_LiveNowBadge> createState() => _LiveNowBadgeState();
+}
+
+class _LiveNowBadgeState extends State<_LiveNowBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.55, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+              blurRadius: 8,
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBuilder(
+              animation: _pulse,
+              builder: (_, __) => Opacity(
+                opacity: _pulse.value,
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+            const Text(
+              'LIVE NOW',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

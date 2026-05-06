@@ -32,6 +32,10 @@ import {
   uploadProfileAvatar,
   type FollowListItem,
 } from "@/lib/api";
+import {
+  listLiveLivestreams,
+  type LivestreamItem,
+} from "@/lib/livestream-api";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
   emitCurrentProfileUpdated,
@@ -333,6 +337,7 @@ export default function ProfileLayout({
   const [avatarSubmitting, setAvatarSubmitting] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeStream, setActiveStream] = useState<LivestreamItem | null>(null);
   const selectedReportGroup = useMemo(
     () => USER_REPORT_GROUPS.find((g) => g.key === reportCategory),
     [reportCategory],
@@ -456,6 +461,21 @@ export default function ProfileLayout({
         }
       })
       .finally(() => setLoading(false));
+  }, [canRender, profileId]);
+
+  useEffect(() => {
+    setActiveStream(null);
+    if (!profileId || !canRender) return;
+    const currentViewerId = getUserIdFromToken(getStoredAccessToken());
+    if (currentViewerId === profileId) return;
+    listLiveLivestreams()
+      .then((res) => {
+        const found = res.items.find(
+          (s) => s.hostUserId === profileId && s.status === "live",
+        );
+        setActiveStream(found ?? null);
+      })
+      .catch(() => {});
   }, [canRender, profileId]);
 
   useEffect(() => {
@@ -1361,6 +1381,15 @@ export default function ProfileLayout({
                       />
                     </h1>
                     <div className={styles.username}>@{profile.username}</div>
+                    {activeStream && (
+                      <Link
+                        href={`/livestream/${activeStream.id}`}
+                        className={styles.liveBtn}
+                      >
+                        <span className={styles.liveDot} />
+                        Live now
+                      </Link>
+                    )}
                   </div>
                   <div className={styles.statsRow}>
                     <StatCard

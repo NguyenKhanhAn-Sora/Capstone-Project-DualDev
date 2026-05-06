@@ -329,9 +329,6 @@ function StreamStage({
     (p) => !p.identity.startsWith("preview-") && !p.identity.includes("-host-"),
   ).length;
   const [isFullscreen, setIsFullscreen] = useState(false);
-  // Mobile hosts publish front-camera streams mirrored at the hardware level.
-  // Track which camera is active so we can apply scaleX(-1) only for front cam.
-  const [hostIsFrontCamera, setHostIsFrontCamera] = useState(true);
   const tracks = useTracks(
     [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false },
@@ -357,21 +354,6 @@ function StreamStage({
   const layout = cameraLayout || DEFAULT_HOST_CAMERA_LAYOUT;
   const hasScreen = Boolean(hostScreenTrack?.publication) && preferredMode !== "camera-only";
   const hasCamera = Boolean(hostCameraTrack?.publication);
-
-  useEffect(() => {
-    const onData = (payload: Uint8Array) => {
-      try {
-        const parsed = JSON.parse(new TextDecoder().decode(payload)) as { type?: string; isFrontCamera?: boolean };
-        if (parsed.type === "camera_flip" && typeof parsed.isFrontCamera === "boolean") {
-          setHostIsFrontCamera(parsed.isFrontCamera);
-        }
-      } catch {
-        // Ignore unrelated data packets.
-      }
-    };
-    room.on(RoomEvent.DataReceived, onData);
-    return () => { room.off(RoomEvent.DataReceived, onData); };
-  }, [room]);
 
   useEffect(() => {
     const publication: any = stageTrack?.publication;
@@ -424,14 +406,14 @@ function StreamStage({
           ) : hostCameraTrack ? (
             <VideoTrack
               trackRef={hostCameraTrack as any}
-              className={`${hubStyles.video} ${hostIsFrontCamera ? hubStyles.videoMirrored : ""}`}
+              className={hubStyles.video}
             />
           ) : null}
 
           {hasScreen && hasCamera && hostCameraTrack ? (
             <VideoTrack
               trackRef={hostCameraTrack as any}
-              className={`${hubStyles.stageCameraOverlay} ${getCameraPositionClass(layout.cameraPosition)} ${getCameraSizeClass(layout.cameraSize)} ${hostIsFrontCamera ? hubStyles.videoMirrored : ""}`}
+              className={`${hubStyles.stageCameraOverlay} ${getCameraPositionClass(layout.cameraPosition)} ${getCameraSizeClass(layout.cameraSize)}`}
             />
           ) : null}
 
@@ -640,8 +622,6 @@ function IvsPlaybackStage({
 }
 
 function FeedCardStage() {
-  const room = useRoomContext();
-  const [hostIsFrontCamera, setHostIsFrontCamera] = useState(true);
   const screenTracks = useTracks(
     [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false },
@@ -657,21 +637,6 @@ function FeedCardStage() {
     (track.participant.identity || "").includes("-host-"),
   );
 
-  useEffect(() => {
-    const onData = (payload: Uint8Array) => {
-      try {
-        const parsed = JSON.parse(new TextDecoder().decode(payload)) as { type?: string; isFrontCamera?: boolean };
-        if (parsed.type === "camera_flip" && typeof parsed.isFrontCamera === "boolean") {
-          setHostIsFrontCamera(parsed.isFrontCamera);
-        }
-      } catch {
-        // Ignore unrelated data packets.
-      }
-    };
-    room.on(RoomEvent.DataReceived, onData);
-    return () => { room.off(RoomEvent.DataReceived, onData); };
-  }, [room]);
-
   if (!hostTrack?.publication && !hostCameraTrack?.publication) {
     return <div className={hubStyles.feedPreviewEmpty}>Waiting for live video...</div>;
   }
@@ -683,13 +648,13 @@ function FeedCardStage() {
       ) : hostCameraTrack?.publication ? (
         <VideoTrack
           trackRef={hostCameraTrack as any}
-          className={`${hubStyles.feedPreviewVideo} ${hostIsFrontCamera ? hubStyles.videoMirrored : ""}`}
+          className={hubStyles.feedPreviewVideo}
         />
       ) : null}
       {hostTrack?.publication && hostCameraTrack?.publication ? (
         <VideoTrack
           trackRef={hostCameraTrack as any}
-          className={`${hubStyles.feedPreviewCameraOverlay} ${hubStyles.feedPreviewCameraBottomRight} ${hostIsFrontCamera ? hubStyles.videoMirrored : ""}`}
+          className={`${hubStyles.feedPreviewCameraOverlay} ${hubStyles.feedPreviewCameraBottomRight}`}
         />
       ) : null}
     </div>
