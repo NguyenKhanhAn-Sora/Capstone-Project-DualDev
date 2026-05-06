@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/feed_service.dart';
 import '../home/services/post_interaction_service.dart';
@@ -119,7 +120,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load following feed.';
+        _error = LanguageController.instance.t('following.failedLoad');
         _initialLoad = false;
       });
     } finally {
@@ -228,7 +229,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
 
   Future<void> _handleQuickRepost(FeedPostState targetState) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('following.signInToRepost'), error: true);
       return;
     }
 
@@ -245,7 +246,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted');
+      _showSnack(LanguageController.instance.t('following.reposted'));
     } on ApiException catch (e) {
       try {
         await PostInteractionService.repost(originalId);
@@ -256,15 +257,15 @@ class _FollowingScreenState extends State<FollowingScreen> {
             await PostInteractionService.repost(targetId);
           } catch (_) {}
         }
-        _showSnack('Reposted');
+        _showSnack(LanguageController.instance.t('following.reposted'));
       } catch (_) {
         _showSnack(
-          e.message.isNotEmpty ? e.message : 'Failed to repost',
+          e.message.isNotEmpty ? e.message : LanguageController.instance.t('following.failedRepost'),
           error: true,
         );
       }
     } catch (_) {
-      _showSnack('Failed to repost', error: true);
+      _showSnack(LanguageController.instance.t('following.failedRepost'), error: true);
     }
   }
 
@@ -273,7 +274,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
     RepostQuoteInput input,
   ) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('following.signInToRepost'), error: true);
       return;
     }
 
@@ -304,20 +305,20 @@ class _FollowingScreenState extends State<FollowingScreen> {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted with quote');
+      _showSnack(LanguageController.instance.t('following.repostedWithQuote'));
     } on ApiException catch (e) {
       _showSnack(
-        e.message.isNotEmpty ? e.message : 'Failed to repost with quote',
+        e.message.isNotEmpty ? e.message : LanguageController.instance.t('following.failedRepostWithQuote'),
         error: true,
       );
     } catch (_) {
-      _showSnack('Failed to repost with quote', error: true);
+      _showSnack(LanguageController.instance.t('following.failedRepostWithQuote'), error: true);
     }
   }
 
   Future<void> _onRepost(FeedPostState state) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('following.signInToRepost'), error: true);
       return;
     }
 
@@ -338,7 +339,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
       if (quoteInput == null) return;
       await _handleQuoteRepost(state, quoteInput);
     } catch (_) {
-      _showSnack('Unable to open repost menu', error: true);
+      _showSnack(LanguageController.instance.t('following.unableToOpenRepostMenu'), error: true);
     }
   }
 
@@ -368,14 +369,14 @@ class _FollowingScreenState extends State<FollowingScreen> {
         return;
       case PostMenuAction.hidePost:
         await _onHide(state);
-        _showSnack('Post hidden');
+        _showSnack(LanguageController.instance.t('following.postHidden'));
         return;
       case PostMenuAction.copyLink:
         final link = post.kind.toLowerCase() == 'reel'
             ? PostInteractionService.reelPermalink(post.id)
             : PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
-        _showSnack('Link copied');
+        _showSnack(LanguageController.instance.t('following.linkCopied'));
         return;
       case PostMenuAction.muteNotifications:
         final label = post.kind.toLowerCase() == 'reel' ? 'reel' : 'post';
@@ -387,8 +388,8 @@ class _FollowingScreenState extends State<FollowingScreen> {
         if (muted) {
           _showSnack(
             label == 'reel'
-                ? 'Reel notifications muted'
-                : 'Post notifications muted',
+                ? LanguageController.instance.t('following.reelNotifMuted')
+                : LanguageController.instance.t('following.postNotifMuted'),
           );
         }
         return;
@@ -403,7 +404,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
           postId: post.id,
           authHeader: {'Authorization': 'Bearer $token'},
         );
-        if (reported) _showSnack('Report submitted');
+        if (reported) _showSnack(LanguageController.instance.t('following.reportSubmitted'));
         return;
       case PostMenuAction.blockAccount:
         final userId = post.authorId;
@@ -414,9 +415,9 @@ class _FollowingScreenState extends State<FollowingScreen> {
           setState(() {
             _items.removeWhere((s) => s.post.authorId == userId);
           });
-          _showSnack('Account blocked');
+          _showSnack(LanguageController.instance.t('following.accountBlocked'));
         } catch (_) {
-          _showSnack('Failed to block account', error: true);
+          _showSnack(LanguageController.instance.t('following.failedBlockAccount'), error: true);
         }
         return;
       case PostMenuAction.deletePost:
@@ -424,11 +425,11 @@ class _FollowingScreenState extends State<FollowingScreen> {
         setState(() => _items.removeWhere((s) => s.post.id == post.id));
         try {
           await PostInteractionService.deletePost(post.id);
-          _showSnack('Post deleted');
+          _showSnack(LanguageController.instance.t('following.postDeleted'));
         } catch (_) {
           if (!mounted) return;
           setState(() => _items.insert(0, snapshot));
-          _showSnack('Failed to delete post', error: true);
+          _showSnack(LanguageController.instance.t('following.failedDeletePost'), error: true);
         }
         return;
       case PostMenuAction.editPost:
@@ -437,7 +438,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
       case PostMenuAction.toggleHideLike:
       case PostMenuAction.goToAdsPost:
       case PostMenuAction.detailAds:
-        _showSnack('This action is not available in Following yet');
+        _showSnack(LanguageController.instance.t('following.actionNotAvailable'));
         return;
     }
   }
@@ -648,18 +649,18 @@ class _ReelFeedCard extends StatelessWidget {
                             color: Colors.black.withValues(alpha: 0.45),
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.play_arrow_rounded,
                                 color: Colors.white,
                                 size: 14,
                               ),
-                              SizedBox(width: 2),
+                              const SizedBox(width: 2),
                               Text(
-                                'Reel',
-                                style: TextStyle(
+                                LanguageController.instance.t('following.reelLabel'),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -678,10 +679,10 @@ class _ReelFeedCard extends StatelessWidget {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text(
-                                  'This image has been blurred due to sensitive content.',
+                                Text(
+                                  LanguageController.instance.t('following.blurredSensitive'),
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -696,7 +697,7 @@ class _ReelFeedCard extends StatelessWidget {
                                       alpha: 0.18,
                                     ),
                                   ),
-                                  child: const Text('View image'),
+                                  child: Text(LanguageController.instance.t('following.viewImage')),
                                 ),
                               ],
                             ),
@@ -805,7 +806,7 @@ class _FollowingErrorState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            ElevatedButton(onPressed: onRetry, child: Text(LanguageController.instance.t('following.retry'))),
           ],
         ),
       ),
@@ -828,22 +829,22 @@ class _FollowingEmptyState extends StatelessWidget {
           children: [
             const Icon(Icons.people_outline, color: Colors.white54, size: 42),
             const SizedBox(height: 10),
-            const Text(
-              'No following posts yet',
-              style: TextStyle(
+            Text(
+              LanguageController.instance.t('following.emptyTitle'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Follow more creators to fill this feed.',
+            Text(
+              LanguageController.instance.t('following.emptySubtitle'),
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70),
+              style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 14),
-            ElevatedButton(onPressed: onRefresh, child: const Text('Refresh')),
+            ElevatedButton(onPressed: onRefresh, child: Text(LanguageController.instance.t('following.refresh'))),
           ],
         ),
       ),

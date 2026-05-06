@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:cordigram_mobile/core/services/api_service.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/services/language_controller.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../home/models/feed_post.dart';
@@ -98,7 +100,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       setState(() => _error = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Unable to load explore');
+      setState(() => _error = LanguageController.instance.t('explore.unableToLoad'));
     } finally {
       if (!mounted) return;
       setState(() {
@@ -342,10 +344,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
-                              'This image has been blurred due to violation of our standards.',
+                            Text(
+                              LanguageController.instance.t('explore.blurredViolation'),
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Color(0xFFE8ECF8),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -374,7 +376,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              child: const Text('View image'),
+                              child: Text(LanguageController.instance.t('explore.viewImage')),
                             ),
                           ],
                         ),
@@ -425,13 +427,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'No explore posts yet',
+                      LanguageController.instance.t('explore.noPostsYet'),
                       style: TextStyle(color: scheme.onSurface, fontSize: 15),
                     ),
                     const SizedBox(height: 6),
                     TextButton(
                       onPressed: () => _loadPage(refresh: true),
-                      child: const Text('Refresh'),
+                      child: Text(LanguageController.instance.t('explore.refresh')),
                     ),
                   ],
                 ),
@@ -513,13 +515,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
           if (!_hasMore && _items.isNotEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Center(
                   child: Text(
-                    "You've seen all explore posts",
-                    style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 12),
+                    LanguageController.instance.t('explore.seenAll'),
+                    style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 12),
                   ),
                 ),
               ),
@@ -557,7 +559,7 @@ class _ExploreErrorState extends StatelessWidget {
               style: const TextStyle(color: Color(0xFFE8ECF8)),
             ),
             const SizedBox(height: 12),
-            ElevatedButton(onPressed: onRetry, child: const Text('Try again')),
+            ElevatedButton(onPressed: onRetry, child: Text(LanguageController.instance.t('explore.tryAgain'))),
           ],
         ),
       ),
@@ -593,7 +595,7 @@ class _ExploreInlineError extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          TextButton(onPressed: onRetry, child: const Text('Retry')),
+          TextButton(onPressed: onRetry, child: Text(LanguageController.instance.t('explore.retry'))),
         ],
       ),
     );
