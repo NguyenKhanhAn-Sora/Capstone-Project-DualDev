@@ -86,15 +86,7 @@
         }
       }
     },
-    "personalInfo": {
-      "displayName": "表示名",
-      "username": "ユーザー名",
-      "birthdate": "生年月日",
-      "gender": "性別",
-      "location": "場所",
-      "workplace": "職場",
-      "bio": "自己紹介"
-    },
+    "personalInfo": "個人情報",
     "profile": {
       "profilePage": "プロフィールページ",
       "aboutThisUser": "このユーザーについて",
@@ -122,7 +114,6 @@
     "accountEmail": "アカウントメール",
     "manageSignInEmail": "サインイン用メールと確認手順を管理します。",
     "currentEmail": "現在のメール",
-    "personalInfo": "個人情報",
     "profileVisibility": "プロフィールの公開設定",
     "controlWhoCanView": "プロフィール、自己紹介セクション、フォロワーリストを見られる人を管理します。",
     "profilePageDesc": "プロフィールページとタブを見られる人。",
@@ -982,18 +973,75 @@
     "done": "完了"
   },
   "search": {
+    "title": "検索",
+    "hint": "人物、#ハッシュタグ、投稿、リールを検索",
+    "failed": "検索に失敗しました",
+    "unableToClearHistory": "履歴を削除できません",
+    "unableToRemoveHistory": "履歴アイテムを削除できません",
+    "unableToLoadMoreHashtags": "ハッシュタグをさらに読み込めません",
+    "unableToLoadMorePosts": "投稿をさらに読み込めません",
+    "unableToLoadMoreReels": "リールをさらに読み込めません",
+    "noCaption": "(キャプションなし)",
     "clearAll": "すべてクリア",
-    "loadMore": "もっと読み込む",
+    "loadMore": "もっと見る",
+    "hashtagPostCount": "{count} 件の投稿",
+    "tab": {
+      "all": "すべて",
+      "people": "ユーザー",
+      "hashtags": "ハッシュタグ",
+      "reels": "リール",
+      "posts": "投稿"
+    },
+    "section": {
+      "people": "ユーザー",
+      "hashtags": "ハッシュタグ",
+      "reels": "リール",
+      "posts": "投稿"
+    },
+    "history": {
+      "recent": "最近",
+      "noRecent": "最近の検索なし"
+    },
+    "signInToRepost": "リポストするにはサインインしてください",
+    "reposted": "リポストしました",
+    "failedRepost": "リポストに失敗しました",
+    "repostedWithQuote": "引用してリポストしました",
+    "failedRepostWithQuote": "引用リポストに失敗しました",
+    "unableToOpenRepostMenu": "リポストメニューを開けません",
+    "postUpdated": "投稿を更新しました",
+    "visibilityUpdated": "公開設定を更新しました",
+    "commentsOn": "コメントをオンにしました",
+    "commentsOff": "コメントをオフにしました",
+    "failedUpdateComments": "コメント設定の更新に失敗しました",
+    "likeCountHidden": "いいね数を非表示にしました",
+    "likeCountVisible": "いいね数を表示しました",
+    "failedUpdateLikeVisibility": "いいね表示設定の更新に失敗しました",
+    "adsNotAvailable": "広告詳細はホームフィードから利用できます",
+    "postHidden": "投稿を非表示にしました",
+    "linkCopied": "リンクをコピーしました",
+    "reelNotifMuted": "リールの通知をミュートしました",
+    "postNotifMuted": "投稿の通知をミュートしました",
     "deletePost": {
       "title": "投稿を削除",
-      "message": "この操作は元に戻せません。"
-    }
+      "message": "この操作は取り消せません。",
+      "confirm": "削除"
+    },
+    "postDeleted": "投稿を削除しました",
+    "failedDeletePost": "投稿の削除に失敗しました",
+    "signInFirst": "まずサインインしてください",
+    "reportSubmitted": "レポートを送信しました",
+    "accountBlocked": "アカウントをブロックしました",
+    "failedBlockAccount": "アカウントのブロックに失敗しました"
   },
   "explore": {
     "viewImage": "画像を見る",
     "refresh": "更新",
     "tryAgain": "再試行",
-    "retry": "再試行"
+    "retry": "リトライ",
+    "unableToLoad": "探索を読み込めません",
+    "blurredViolation": "この画像は当社の基準に違反しているためぼかされています。",
+    "noPostsYet": "探索投稿はまだありません",
+    "seenAll": "探索の投稿をすべて見ました"
   },
   "hashtag": {
     "viewImage": "画像を見る",
@@ -1010,8 +1058,29 @@
   },
   "following": {
     "viewImage": "画像を見る",
-    "retry": "再試行",
-    "refresh": "更新"
+    "retry": "リトライ",
+    "refresh": "更新",
+    "failedLoad": "フォロー中のフィードの読み込みに失敗しました。",
+    "signInToRepost": "リポストするにはサインインしてください",
+    "reposted": "リポストしました",
+    "repostedWithQuote": "引用してリポストしました",
+    "failedRepost": "リポストに失敗しました",
+    "failedRepostWithQuote": "引用リポストに失敗しました",
+    "postHidden": "投稿を非表示にしました",
+    "linkCopied": "リンクをコピーしました",
+    "reelNotifMuted": "リールの通知をミュートしました",
+    "postNotifMuted": "投稿の通知をミュートしました",
+    "reportSubmitted": "レポートを送信しました",
+    "accountBlocked": "アカウントをブロックしました",
+    "failedBlockAccount": "アカウントのブロックに失敗しました",
+    "postDeleted": "投稿を削除しました",
+    "failedDeletePost": "投稿の削除に失敗しました",
+    "actionNotAvailable": "このアクションはFollowingではまだ利用できません",
+    "blurredSensitive": "この画像はセンシティブなコンテンツのためぼかされています。",
+    "reelLabel": "リール",
+    "emptyTitle": "フォロー中の投稿はまだありません",
+    "emptySubtitle": "もっとクリエイターをフォローしてフィードを埋めましょう。",
+    "unableToOpenRepostMenu": "リポストメニューを開けません"
   },
   "livestream": {
     "createdSuccessfully": "ライブストリームを作成しました",
@@ -1298,5 +1367,27 @@
         "unknown": "不明"
       }
     }
+  },
+  "reportProblem": {
+    "title": "問題を報告",
+    "headerTitle": "何が問題だったか教えてください",
+    "headerSubtitle": "問題を説明し、スクリーンショットや短い動画を添付してください。",
+    "descriptionLabel": "説明",
+    "descriptionHint": "何が起きたか、どこで起きたか、再現手順を説明してください。",
+    "attachmentsLabel": "添付ファイル",
+    "attachmentsHint": "最大5ファイル · 画像または動画",
+    "addFiles": "画像または動画を追加",
+    "cooldown": "次のレポートは{seconds}秒後に送信できます。",
+    "clear": "クリア",
+    "send": "レポートを送信",
+    "successTitle": "レポートを送信しました",
+    "successSubtitle": "ありがとうございます。チームが確認します。",
+    "sendAnother": "別のレポートを送信",
+    "backToHome": "ホームに戻る",
+    "errorDescribeRequired": "問題を説明してください。",
+    "errorSignInRequired": "問題を報告するにはサインインが必要です。",
+    "errorCannotSend": "今すぐレポートを送信できません。",
+    "errorWaitBefore": "次のレポートを送信する前にお待ちください。",
+    "errorRetry": "今すぐレポートを送信できません。再試行してください。"
   }
 }

@@ -86,15 +86,7 @@
         }
       }
     },
-    "personalInfo": {
-      "displayName": "Display name",
-      "username": "Username",
-      "birthdate": "Birthdate",
-      "gender": "Gender",
-      "location": "Location",
-      "workplace": "Workplace",
-      "bio": "Bio"
-    },
+    "personalInfo": "Personal info",
     "profile": {
       "profilePage": "Profile page",
       "aboutThisUser": "About this user",
@@ -122,7 +114,6 @@
     "accountEmail": "Account email",
     "manageSignInEmail": "Manage your sign-in email and verification steps.",
     "currentEmail": "Current email",
-    "personalInfo": "Personal info",
     "profileVisibility": "Profile visibility",
     "controlWhoCanView": "Control who can view your profile, About section, and follower lists.",
     "profilePageDesc": "Who can view your profile page and tabs.",
@@ -982,18 +973,75 @@
     "done": "Done"
   },
   "search": {
+    "title": "Search",
+    "hint": "Search people, #hashtags, posts, reels",
+    "failed": "Search failed",
+    "unableToClearHistory": "Unable to clear history",
+    "unableToRemoveHistory": "Unable to remove history item",
+    "unableToLoadMoreHashtags": "Unable to load more hashtags",
+    "unableToLoadMorePosts": "Unable to load more posts",
+    "unableToLoadMoreReels": "Unable to load more reels",
+    "noCaption": "(no caption)",
     "clearAll": "Clear all",
     "loadMore": "Load more",
+    "hashtagPostCount": "{count} posts",
+    "tab": {
+      "all": "All",
+      "people": "People",
+      "hashtags": "Hashtags",
+      "reels": "Reels",
+      "posts": "Posts"
+    },
+    "section": {
+      "people": "People",
+      "hashtags": "Hashtags",
+      "reels": "Reels",
+      "posts": "Posts"
+    },
+    "history": {
+      "recent": "Recent",
+      "noRecent": "No recent searches"
+    },
+    "signInToRepost": "Please sign in to repost",
+    "reposted": "Reposted",
+    "failedRepost": "Failed to repost",
+    "repostedWithQuote": "Reposted with quote",
+    "failedRepostWithQuote": "Failed to repost with quote",
+    "unableToOpenRepostMenu": "Unable to open repost menu",
+    "postUpdated": "Post updated",
+    "visibilityUpdated": "Visibility updated",
+    "commentsOn": "Comments turned on",
+    "commentsOff": "Comments turned off",
+    "failedUpdateComments": "Failed to update comments",
+    "likeCountHidden": "Like count hidden",
+    "likeCountVisible": "Like count visible",
+    "failedUpdateLikeVisibility": "Failed to update like visibility",
+    "adsNotAvailable": "Ads detail is available from Home feed",
+    "postHidden": "Post hidden",
+    "linkCopied": "Link copied",
+    "reelNotifMuted": "Reel notifications muted",
+    "postNotifMuted": "Post notifications muted",
     "deletePost": {
       "title": "Delete post",
-      "message": "This action cannot be undone."
-    }
+      "message": "This action cannot be undone.",
+      "confirm": "Delete"
+    },
+    "postDeleted": "Post deleted",
+    "failedDeletePost": "Failed to delete post",
+    "signInFirst": "Please sign in first",
+    "reportSubmitted": "Report submitted",
+    "accountBlocked": "Account blocked",
+    "failedBlockAccount": "Failed to block account"
   },
   "explore": {
     "viewImage": "View image",
     "refresh": "Refresh",
     "tryAgain": "Try again",
-    "retry": "Retry"
+    "retry": "Retry",
+    "unableToLoad": "Unable to load explore",
+    "blurredViolation": "This image has been blurred due to violation of our standards.",
+    "noPostsYet": "No explore posts yet",
+    "seenAll": "You've seen all explore posts"
   },
   "hashtag": {
     "viewImage": "View image",
@@ -1011,7 +1059,28 @@
   "following": {
     "viewImage": "View image",
     "retry": "Retry",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "failedLoad": "Failed to load following feed.",
+    "signInToRepost": "Please sign in to repost",
+    "reposted": "Reposted",
+    "repostedWithQuote": "Reposted with quote",
+    "failedRepost": "Failed to repost",
+    "failedRepostWithQuote": "Failed to repost with quote",
+    "postHidden": "Post hidden",
+    "linkCopied": "Link copied",
+    "reelNotifMuted": "Reel notifications muted",
+    "postNotifMuted": "Post notifications muted",
+    "reportSubmitted": "Report submitted",
+    "accountBlocked": "Account blocked",
+    "failedBlockAccount": "Failed to block account",
+    "postDeleted": "Post deleted",
+    "failedDeletePost": "Failed to delete post",
+    "actionNotAvailable": "This action is not available in Following yet",
+    "blurredSensitive": "This image has been blurred due to sensitive content.",
+    "reelLabel": "Reel",
+    "emptyTitle": "No following posts yet",
+    "emptySubtitle": "Follow more creators to fill this feed.",
+    "unableToOpenRepostMenu": "Unable to open repost menu"
   },
   "livestream": {
     "createdSuccessfully": "Livestream created successfully",
@@ -1298,5 +1367,27 @@
         "unknown": "Unknown"
       }
     }
+  },
+  "reportProblem": {
+    "title": "Report a Problem",
+    "headerTitle": "Tell us what went wrong",
+    "headerSubtitle": "Describe the issue and attach screenshots or a short video.",
+    "descriptionLabel": "Description",
+    "descriptionHint": "Explain what happened, where it happened, and any steps to reproduce.",
+    "attachmentsLabel": "Attachments",
+    "attachmentsHint": "Up to 5 files · images or videos",
+    "addFiles": "Add images or videos",
+    "cooldown": "You can send the next report in {seconds}s.",
+    "clear": "Clear",
+    "send": "Send report",
+    "successTitle": "Report sent",
+    "successSubtitle": "Thank you. Our team will review it soon.",
+    "sendAnother": "Send another report",
+    "backToHome": "Back to home",
+    "errorDescribeRequired": "Please describe the problem.",
+    "errorSignInRequired": "You need to sign in to report a problem.",
+    "errorCannotSend": "Cannot send report now.",
+    "errorWaitBefore": "Please wait before sending another report.",
+    "errorRetry": "Cannot send report now. Please try again."
   }
 }
