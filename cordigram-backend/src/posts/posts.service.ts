@@ -2601,9 +2601,6 @@ export class PostsService {
       (id) => new Types.ObjectId(id),
     );
 
-    const now = new Date();
-    const freshnessWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
     // Fixed candidate pool size (stable across pages).
     const candidateLimit = 1000;
 
@@ -2618,7 +2615,6 @@ export class PostsService {
         moderationState: 'normal',
         deletedAt: null,
         publishedAt: { $ne: null },
-        createdAt: { $gte: freshnessWindow },
         _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
       })
       .sort({
