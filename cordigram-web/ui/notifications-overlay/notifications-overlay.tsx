@@ -8,6 +8,7 @@ import {
   deleteNotification,
   fetchNotifications,
   logoutLoginDevice,
+  markAllNotificationsRead,
   markNotificationRead,
   markNotificationUnread,
   updatePostNotificationMute,
@@ -127,6 +128,51 @@ function IconDots() {
       <circle cx="5" cy="12" r="1.8" />
       <circle cx="12" cy="12" r="1.8" />
       <circle cx="19" cy="12" r="1.8" />
+    </svg>
+  );
+}
+
+function IconChevronDown() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function IconCheckMark() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M5 12l5 5L19 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function IconTune() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M4 6h16M4 12h10M4 18h7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/>
+      <circle cx="20" cy="12" r="2.2" stroke="currentColor" strokeWidth="1.9"/>
+      <circle cx="14" cy="18" r="2.2" stroke="currentColor" strokeWidth="1.9"/>
+      <circle cx="17" cy="6" r="2.2" stroke="currentColor" strokeWidth="1.9"/>
+    </svg>
+  );
+}
+
+function IconCheckDouble() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M2 12.5l4.5 4.5L16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M9 12.5l4 4L22 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
+    </svg>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/>
     </svg>
   );
 }
@@ -620,6 +666,16 @@ export default function NotificationsOverlay(props: {
   const [muteCustomTime, setMuteCustomTime] = useState("");
   const [muteSaving, setMuteSaving] = useState(false);
   const [muteError, setMuteError] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [manageMenuOpen, setManageMenuOpen] = useState(false);
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [markAllConfirmOpen, setMarkAllConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [deletingBulk, setDeletingBulk] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const manageMenuRef = useRef<HTMLDivElement>(null);
 
   const activeTab = useMemo(
     () => TABS.find((tab) => tab.key === active) ?? TABS[0],
@@ -660,6 +716,17 @@ export default function NotificationsOverlay(props: {
     setEntered(false);
     const raf = window.requestAnimationFrame(() => setEntered(true));
     return () => window.cancelAnimationFrame(raf);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setDeleteMode(false);
+      setSelectedIds(new Set());
+      setDropdownOpen(false);
+      setManageMenuOpen(false);
+      setMarkAllConfirmOpen(false);
+      setDeleteConfirmOpen(false);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -774,6 +841,24 @@ export default function NotificationsOverlay(props: {
   }, [openMenuId]);
 
   useEffect(() => {
+    if (!dropdownOpen) return;
+    const handle = (e: MouseEvent) => {
+      if (!dropdownRef.current?.contains(e.target as Node)) setDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [dropdownOpen]);
+
+  useEffect(() => {
+    if (!manageMenuOpen) return;
+    const handle = (e: MouseEvent) => {
+      if (!manageMenuRef.current?.contains(e.target as Node)) setManageMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [manageMenuOpen]);
+
+  useEffect(() => {
     if (!loginAlertItem) {
       setNotMeOpen(false);
       setNotMeError(null);
@@ -787,6 +872,51 @@ export default function NotificationsOverlay(props: {
     }
     setToastMessage(message);
     toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
+  };
+
+  const toggleSelectId = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleMarkAllRead = async () => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    setMarkingAllRead(true);
+    try {
+      await markAllNotificationsRead({ token });
+      const now = new Date().toISOString();
+      setItems((prev) => prev.map((item) => ({ ...item, readAt: item.readAt ?? now })));
+      setMarkAllConfirmOpen(false);
+      showToast("All notifications marked as read");
+    } catch {
+      showToast("Failed to mark all as read");
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    setDeletingBulk(true);
+    const ids = Array.from(selectedIds);
+    try {
+      await Promise.all(
+        ids.map((id) => deleteNotification({ token, notificationId: id }).catch(() => undefined))
+      );
+      setItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
+      setSelectedIds(new Set());
+      setDeleteMode(false);
+      setDeleteConfirmOpen(false);
+      showToast(`${ids.length} notification${ids.length !== 1 ? "s" : ""} deleted`);
+    } finally {
+      setDeletingBulk(false);
+    }
   };
 
   const handleItemClick = (item: NotificationItem) => {
@@ -1064,20 +1194,116 @@ export default function NotificationsOverlay(props: {
           </button>
         </div>
 
-        <div className={styles.tabs}>
-          {TABS.map((tab) => (
+        <div className={styles.toolbar}>
+          <div className={styles.filterDropdownWrap} ref={dropdownRef}>
             <button
-              key={tab.key}
               type="button"
-              className={`${styles.tab} ${
-                tab.key === active ? styles.tabActive : ""
-              }`}
-              onClick={() => setActive(tab.key)}
+              className={styles.filterTrigger}
+              onClick={() => setDropdownOpen((prev) => !prev)}
+              aria-haspopup="listbox"
+              aria-expanded={dropdownOpen}
             >
-              {tab.label}
+              <span className={styles.filterTriggerLabel}>{activeTab.label}</span>
+              <span className={`${styles.filterChevron} ${dropdownOpen ? styles.filterChevronOpen : ""}`}>
+                <IconChevronDown />
+              </span>
             </button>
-          ))}
+            {dropdownOpen && (
+              <div className={styles.filterMenu} role="listbox">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="option"
+                    aria-selected={tab.key === active}
+                    className={`${styles.filterMenuItem} ${tab.key === active ? styles.filterMenuItemActive : ""}`}
+                    onClick={() => {
+                      setActive(tab.key);
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    <span className={styles.filterMenuItemCheck}>
+                      {tab.key === active ? <IconCheckMark /> : null}
+                    </span>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {deleteMode ? (
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={() => {
+                setDeleteMode(false);
+                setSelectedIds(new Set());
+              }}
+            >
+              Cancel
+            </button>
+          ) : (
+            <div className={styles.manageWrap} ref={manageMenuRef}>
+              <button
+                type="button"
+                className={`${styles.manageBtn} ${manageMenuOpen ? styles.manageBtnActive : ""}`}
+                onClick={() => setManageMenuOpen((prev) => !prev)}
+                title="Manage notifications"
+                aria-haspopup="true"
+                aria-expanded={manageMenuOpen}
+              >
+                <IconTune />
+              </button>
+              {manageMenuOpen && (
+                <div className={styles.manageMenu} role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.manageMenuItem}
+                    onClick={() => {
+                      setManageMenuOpen(false);
+                      setMarkAllConfirmOpen(true);
+                    }}
+                  >
+                    <IconCheckDouble />
+                    Mark all as read
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`${styles.manageMenuItem} ${styles.manageMenuItemDanger}`}
+                    onClick={() => {
+                      setManageMenuOpen(false);
+                      setDeleteMode(true);
+                      setSelectedIds(new Set());
+                    }}
+                  >
+                    <IconTrash />
+                    Delete notifications
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        {deleteMode && (
+          <div className={styles.deleteModeBar}>
+            <span className={styles.deleteModeCount}>
+              {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Tap to select"}
+            </span>
+            {selectedIds.size > 0 && (
+              <button
+                type="button"
+                className={styles.deleteModeDeleteBtn}
+                onClick={() => setDeleteConfirmOpen(true)}
+              >
+                Delete ({selectedIds.size})
+              </button>
+            )}
+          </div>
+        )}
 
         <div className={styles.body}>
           {loading ? (
@@ -1105,8 +1331,16 @@ export default function NotificationsOverlay(props: {
                   key={item.id}
                   className={`${styles.listItem} ${
                     item.readAt ? "" : styles.listItemUnread
-                  } ${openMenuId === item.id ? styles.listItemMenuOpen : ""}`}
-                  onClick={() => handleItemClick(item)}
+                  } ${openMenuId === item.id ? styles.listItemMenuOpen : ""} ${
+                    deleteMode && selectedIds.has(item.id) ? styles.listItemSelected : ""
+                  }`}
+                  onClick={() => {
+                    if (deleteMode) {
+                      toggleSelectId(item.id);
+                      return;
+                    }
+                    handleItemClick(item);
+                  }}
                   role={
                     item.postId || item.type === "follow" ? "button" : undefined
                   }
@@ -1149,83 +1383,177 @@ export default function NotificationsOverlay(props: {
                       {formatRelativeTime(item.activityAt || item.createdAt)}
                     </span>
                   </div>
-                  <div
-                    className={styles.itemActions}
-                    data-notification-menu-root={item.id}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setOpenMenuId((prev) =>
-                        prev === item.id ? null : item.id,
-                      );
-                    }}
-                    onMouseDown={(event) => event.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      className={`${styles.itemMenuButton} ${
-                        openMenuId === item.id
-                          ? styles.itemMenuButtonVisible
-                          : ""
-                      }`}
-                      aria-haspopup="true"
-                      aria-expanded={openMenuId === item.id}
+                  {deleteMode ? (
+                    <div className={styles.checkboxWrap} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className={styles.checkboxInput}
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => toggleSelectId(item.id)}
+                        aria-label="Select notification"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className={styles.itemActions}
+                      data-notification-menu-root={item.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setOpenMenuId((prev) => prev === item.id ? null : item.id);
+                      }}
+                      onMouseDown={(event) => event.stopPropagation()}
                     >
-                      <IconDots />
-                    </button>
-                    {!item.readAt ? (
-                      <span className={styles.itemDot} aria-hidden="true" />
-                    ) : null}
-                    {openMenuId === item.id ? (
-                      <div className={styles.itemMenu} role="menu">
-                        <button
-                          type="button"
-                          className={styles.itemMenuItem}
-                          role="menuitem"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleToggleRead(item);
-                          }}
-                        >
-                          {item.readAt ? "Mark as unread" : "Mark as read"}
-                        </button>
-                        {canMuteItem(item) ? (
+                      <button
+                        type="button"
+                        className={`${styles.itemMenuButton} ${openMenuId === item.id ? styles.itemMenuButtonVisible : ""}`}
+                        aria-haspopup="true"
+                        aria-expanded={openMenuId === item.id}
+                      >
+                        <IconDots />
+                      </button>
+                      {!item.readAt ? (
+                        <span className={styles.itemDot} aria-hidden="true" />
+                      ) : null}
+                      {openMenuId === item.id ? (
+                        <div className={styles.itemMenu} role="menu">
                           <button
                             type="button"
                             className={styles.itemMenuItem}
                             role="menuitem"
                             onClick={(event) => {
                               event.stopPropagation();
-                              openMuteModal(item);
-                              setOpenMenuId(null);
+                              handleToggleRead(item);
                             }}
                           >
-                            {item.postKind === "reel"
-                              ? "Mute this reel"
-                              : "Mute this post"}
+                            {item.readAt ? "Mark as unread" : "Mark as read"}
                           </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className={`${styles.itemMenuItem} ${
-                            styles.itemMenuDanger
-                          }`}
-                          role="menuitem"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDeleteNotification(item);
-                          }}
-                        >
-                          Delete notification
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
+                          {canMuteItem(item) ? (
+                            <button
+                              type="button"
+                              className={styles.itemMenuItem}
+                              role="menuitem"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openMuteModal(item);
+                                setOpenMenuId(null);
+                              }}
+                            >
+                              {item.postKind === "reel" ? "Mute this reel" : "Mute this post"}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className={`${styles.itemMenuItem} ${styles.itemMenuDanger}`}
+                            role="menuitem"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteNotification(item);
+                            }}
+                          >
+                            Delete notification
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </div>
       </aside>
+      {markAllConfirmOpen && (
+        <div
+          className={styles.confirmBackdrop}
+          role="dialog"
+          aria-modal="true"
+          onClick={() => { if (!markingAllRead) setMarkAllConfirmOpen(false); }}
+        >
+          <div className={styles.confirmCard} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.confirmHeader}>
+              <h3 className={styles.confirmTitle}>Mark all as read</h3>
+              <button
+                type="button"
+                className={styles.confirmClose}
+                onClick={() => setMarkAllConfirmOpen(false)}
+                disabled={markingAllRead}
+                aria-label="Close"
+              >
+                <IconClose />
+              </button>
+            </div>
+            <p className={styles.confirmBody}>
+              Mark {items.filter((i) => !i.readAt).length} unread notification
+              {items.filter((i) => !i.readAt).length !== 1 ? "s" : ""} as read?
+            </p>
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={styles.confirmSecondary}
+                onClick={() => setMarkAllConfirmOpen(false)}
+                disabled={markingAllRead}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.confirmPrimary}
+                onClick={() => void handleMarkAllRead()}
+                disabled={markingAllRead}
+              >
+                {markingAllRead ? "Marking..." : "Mark all as read"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmOpen && (
+        <div
+          className={styles.confirmBackdrop}
+          role="dialog"
+          aria-modal="true"
+          onClick={() => { if (!deletingBulk) setDeleteConfirmOpen(false); }}
+        >
+          <div className={styles.confirmCard} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.confirmHeader}>
+              <h3 className={styles.confirmTitle}>Delete notifications</h3>
+              <button
+                type="button"
+                className={styles.confirmClose}
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deletingBulk}
+                aria-label="Close"
+              >
+                <IconClose />
+              </button>
+            </div>
+            <p className={styles.confirmBody}>
+              Delete {selectedIds.size} selected notification
+              {selectedIds.size !== 1 ? "s" : ""}? This action cannot be undone.
+            </p>
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={styles.confirmSecondary}
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deletingBulk}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.confirmDanger}
+                onClick={() => void handleBulkDelete()}
+                disabled={deletingBulk}
+              >
+                {deletingBulk ? "Deleting..." : `Delete ${selectedIds.size}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loginAlertItem ? (
         <div className={styles.detailBackdrop}>
           <div
