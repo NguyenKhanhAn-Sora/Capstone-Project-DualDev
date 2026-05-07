@@ -775,6 +775,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   bool _shouldShowInHomeFeed(FeedPost post) {
+    // Repost của reel không hiển thị ở home (chỉ hiện ở trang Reels)
+    if (post.repostOf != null && post.repostSourceKind == 'reel') return false;
     if (!_isAdsPost(post)) return true;
     // Only render active ads in Home.
     return post.sponsored == true;

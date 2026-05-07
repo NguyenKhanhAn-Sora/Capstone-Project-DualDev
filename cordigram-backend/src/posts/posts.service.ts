@@ -891,6 +891,7 @@ export class PostsService {
     repostSourcePost?: {
       content?: string;
       media?: Post['media'];
+      kind?: string;
     } | null,
   ) {
     return {
@@ -956,6 +957,7 @@ export class PostsService {
         : undefined,
       repostSourceContent: repostSourcePost?.content ?? null,
       repostSourceMedia: repostSourcePost?.media ?? null,
+      repostSourceKind: repostSourcePost?.kind ?? null,
       primaryVideoDurationMs: doc.primaryVideoDurationMs ?? null,
       flags: {
         liked: userFlags?.liked ?? false,
@@ -2107,7 +2109,7 @@ export class PostsService {
     >();
     let repostSourcePostMap = new Map<
       string,
-      { content?: string; media?: Post['media'] }
+      { content?: string; media?: Post['media']; kind?: string }
     >();
 
     if (repostSourceIds.length) {
@@ -2117,7 +2119,7 @@ export class PostsService {
           deletedAt: null,
           moderationState: 'normal',
         })
-        .select('authorId content media')
+        .select('authorId content media kind')
         .lean();
 
       repostSourcePostMap = new Map(
@@ -2130,11 +2132,12 @@ export class PostsService {
               {
                 content: (src as { content?: string }).content ?? '',
                 media: (src as { media?: Post['media'] }).media ?? [],
+                kind: (src as { kind?: string }).kind ?? 'post',
               },
-            ] as [string, { content?: string; media?: Post['media'] }];
+            ] as [string, { content?: string; media?: Post['media']; kind?: string }];
           })
           .filter(Boolean) as Array<
-          [string, { content?: string; media?: Post['media'] }]
+          [string, { content?: string; media?: Post['media']; kind?: string }]
         >,
       );
 
@@ -2389,7 +2392,7 @@ export class PostsService {
     >();
     let repostSourcePostMap = new Map<
       string,
-      { content?: string; media?: Post['media'] }
+      { content?: string; media?: Post['media']; kind?: string }
     >();
 
     if (repostSourceIds.length) {
@@ -2399,7 +2402,7 @@ export class PostsService {
           deletedAt: null,
           moderationState: 'normal',
         })
-        .select('authorId content media')
+        .select('authorId content media kind')
         .lean();
 
       repostSourcePostMap = new Map(
@@ -2412,11 +2415,12 @@ export class PostsService {
               {
                 content: (src as { content?: string }).content ?? '',
                 media: (src as { media?: Post['media'] }).media ?? [],
+                kind: (src as { kind?: string }).kind ?? 'post',
               },
-            ] as [string, { content?: string; media?: Post['media'] }];
+            ] as [string, { content?: string; media?: Post['media']; kind?: string }];
           })
           .filter(Boolean) as Array<
-          [string, { content?: string; media?: Post['media'] }]
+          [string, { content?: string; media?: Post['media']; kind?: string }]
         >,
       );
 
