@@ -13,6 +13,25 @@ import 'services/notification_service.dart';
 
 enum _NotificationTab { all, like, comment, mentions, follow, system }
 
+extension _NotificationTabLabel on _NotificationTab {
+  String get label {
+    switch (this) {
+      case _NotificationTab.all:
+        return 'All activity';
+      case _NotificationTab.like:
+        return 'Likes';
+      case _NotificationTab.comment:
+        return 'Comments';
+      case _NotificationTab.mentions:
+        return 'Mentions';
+      case _NotificationTab.follow:
+        return 'Followers';
+      case _NotificationTab.system:
+        return 'System';
+    }
+  }
+}
+
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
 
@@ -36,6 +55,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
   StreamSubscription<NotificationRealtimeEvent>? _notificationRtSub;
   StreamSubscription<NotificationStateEvent>? _notificationStateSub;
   StreamSubscription<NotificationDeletedEvent>? _notificationDeletedSub;
+
+  bool _deleteMode = false;
+  final Set<String> _selectedIds = {};
 
   static const Set<String> _realtimeNotificationTypes = {
     'post_like',
@@ -123,6 +145,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _items = _items
             .where((entry) => entry.id != event.id)
             .toList(growable: false);
+        _selectedIds.remove(event.id);
       });
     });
   }
@@ -240,6 +263,17 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Future<void> _onItemTap(AppNotificationItem item) async {
+    if (_deleteMode) {
+      setState(() {
+        if (_selectedIds.contains(item.id)) {
+          _selectedIds.remove(item.id);
+        } else {
+          _selectedIds.add(item.id);
+        }
+      });
+      return;
+    }
+
     if (item.type == 'system_notice' || item.type == 'report') {
       return;
     }
@@ -414,42 +448,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  Widget _buildTab({required _NotificationTab tab, required String label}) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final active = _activeTab == tab;
-    return GestureDetector(
-      onTap: () => setState(() => _activeTab = tab),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: active
-                ? scheme.primary.withValues(alpha: isDark ? 0.62 : 0.4)
-                : scheme.outline,
-          ),
-          color: active
-              ? (isDark
-                    ? scheme.primary.withValues(alpha: 0.24)
-                    : scheme.primaryContainer)
-              : Colors.transparent,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active
-                ? (isDark ? _tokens.primarySoft : scheme.onPrimaryContainer)
-                : scheme.onSurfaceVariant,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
     final scheme = Theme.of(context).colorScheme;
@@ -473,7 +471,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
   bool _canMuteItem(AppNotificationItem item) {
     if (item.postId == null || _isMutedForItem(item)) return false;
     if (item.postKind != 'post' && item.postKind != 'reel') return false;
-    // Show mute unless backend explicitly marks this item as not the owner's.
     return item.isOwnPost != false;
   }
 
@@ -643,6 +640,424 @@ class _NotificationScreenState extends State<NotificationScreen> {
       if (!mounted) return;
       setState(() => _items = prev);
       _showSnack('Unable to delete notification.', error: true);
+    }
+  }
+
+  // ── Filter sheet ────────────────────────────────────────────────────────────
+
+  void _showFilterSheet() {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          top: false,
+          minimum: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'Filter notifications',
+                  style: TextStyle(
+                    color: scheme.onSurface,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final tab in _NotificationTab.values)
+                ListTile(
+                  dense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                  leading: Icon(
+                    _tabIcon(tab),
+                    size: 20,
+                    color: _activeTab == tab
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  title: Text(
+                    tab.label,
+                    style: TextStyle(
+                      color: _activeTab == tab
+                          ? (isDark
+                                ? _tokens.primarySoft
+                                : scheme.primary)
+                          : scheme.onSurface,
+                      fontWeight: _activeTab == tab
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                  trailing: _activeTab == tab
+                      ? Icon(Icons.check_rounded, color: scheme.primary, size: 20)
+                      : null,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  tileColor: _activeTab == tab
+                      ? scheme.primary.withValues(
+                          alpha: isDark ? 0.18 : 0.08,
+                        )
+                      : null,
+                  onTap: () {
+                    setState(() => _activeTab = tab);
+                    Navigator.pop(context);
+                  },
+                ),
+              const SizedBox(height: 4),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  IconData _tabIcon(_NotificationTab tab) {
+    switch (tab) {
+      case _NotificationTab.all:
+        return Icons.notifications_rounded;
+      case _NotificationTab.like:
+        return Icons.favorite_rounded;
+      case _NotificationTab.comment:
+        return Icons.chat_bubble_rounded;
+      case _NotificationTab.mentions:
+        return Icons.alternate_email_rounded;
+      case _NotificationTab.follow:
+        return Icons.person_add_alt_1_rounded;
+      case _NotificationTab.system:
+        return Icons.campaign_rounded;
+    }
+  }
+
+  // ── Manage sheet ────────────────────────────────────────────────────────────
+
+  void _showManageSheet() {
+    final scheme = Theme.of(context).colorScheme;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          top: false,
+          minimum: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(
+                  Icons.done_all_rounded,
+                  color: scheme.onSurfaceVariant,
+                ),
+                title: Text(
+                  'Mark all as read',
+                  style: TextStyle(color: scheme.onSurface),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmMarkAllRead();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_outline_rounded, color: scheme.error),
+                title: Text(
+                  'Delete notifications',
+                  style: TextStyle(color: scheme.error),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _deleteMode = true;
+                    _selectedIds.clear();
+                  });
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Mark all as read ────────────────────────────────────────────────────────
+
+  void _confirmMarkAllRead() {
+    final unreadCount = _items.where((n) => n.isUnread).length;
+    if (unreadCount == 0) {
+      _showSnack('All notifications are already read.');
+      return;
+    }
+    final scheme = Theme.of(context).colorScheme;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (dialogCtx) {
+        bool saving = false;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: scheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: scheme.outline.withValues(alpha: 0.7)),
+              ),
+              title: Text(
+                'Mark all as read',
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              content: Text(
+                'Mark $unreadCount unread notification${unreadCount != 1 ? "s" : ""} as read?',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving
+                      ? null
+                      : () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setDialogState(() => saving = true);
+                          try {
+                            await NotificationService.markAllRead();
+                            if (mounted) {
+                              final nowIso =
+                                  DateTime.now().toUtc().toIso8601String();
+                              setState(() {
+                                _items = _items
+                                    .map(
+                                      (entry) => entry.isUnread
+                                          ? entry.copyWith(readAt: nowIso)
+                                          : entry,
+                                    )
+                                    .toList(growable: false);
+                              });
+                              _showSnack('All notifications marked as read');
+                            }
+                            if (ctx.mounted) Navigator.pop(dialogCtx);
+                          } catch (_) {
+                            setDialogState(() => saving = false);
+                            if (mounted) {
+                              _showSnack(
+                                'Failed to mark all as read',
+                                error: true,
+                              );
+                            }
+                            if (ctx.mounted) Navigator.pop(dialogCtx);
+                          }
+                        },
+                  child: Text(saving ? 'Marking...' : 'Mark all as read'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Bulk delete ─────────────────────────────────────────────────────────────
+
+  void _confirmBulkDelete() {
+    final count = _selectedIds.length;
+    if (count == 0) return;
+    final scheme = Theme.of(context).colorScheme;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (dialogCtx) {
+        bool deleting = false;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: scheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: scheme.outline.withValues(alpha: 0.7)),
+              ),
+              title: Text(
+                'Delete notifications',
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              content: Text(
+                'Delete $count selected notification${count != 1 ? "s" : ""}? This cannot be undone.',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: deleting
+                      ? null
+                      : () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.error,
+                    foregroundColor: scheme.onError,
+                  ),
+                  onPressed: deleting
+                      ? null
+                      : () async {
+                          setDialogState(() => deleting = true);
+                          final ids = Set<String>.from(_selectedIds);
+                          try {
+                            await Future.wait(
+                              ids.map(
+                                (id) => NotificationService.deleteNotification(
+                                  id,
+                                ).catchError((_) {}),
+                              ),
+                            );
+                            if (mounted) {
+                              setState(() {
+                                _items = _items
+                                    .where((n) => !ids.contains(n.id))
+                                    .toList(growable: false);
+                                _selectedIds.clear();
+                                _deleteMode = false;
+                              });
+                              _showSnack(
+                                '$count notification${count != 1 ? "s" : ""} deleted',
+                              );
+                            }
+                            if (ctx.mounted) Navigator.pop(dialogCtx);
+                          } catch (_) {
+                            setDialogState(() => deleting = false);
+                            if (mounted) {
+                              _showSnack('Failed to delete', error: true);
+                            }
+                            if (ctx.mounted) Navigator.pop(dialogCtx);
+                          }
+                        },
+                  child: Text(deleting ? 'Deleting...' : 'Delete $count'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Per-item menu ───────────────────────────────────────────────────────────
+
+  Future<void> _openItemMenu(AppNotificationItem item) async {
+    final scheme = Theme.of(context).colorScheme;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Icon(
+                item.isUnread
+                    ? Icons.mark_email_read_outlined
+                    : Icons.mark_email_unread_outlined,
+                color: scheme.onSurfaceVariant,
+              ),
+              title: Text(
+                item.isUnread ? 'Mark as read' : 'Mark as unread',
+                style: TextStyle(color: scheme.onSurface),
+              ),
+              onTap: () => Navigator.pop(context, 'toggle-read'),
+            ),
+            if (_canMuteItem(item))
+              ListTile(
+                leading: Icon(
+                  Icons.notifications_off_outlined,
+                  color: scheme.onSurfaceVariant,
+                ),
+                title: Text(
+                  item.postKind == 'reel' ? 'Mute this reel' : 'Mute this post',
+                  style: TextStyle(color: scheme.onSurface),
+                ),
+                onTap: () => Navigator.pop(context, 'mute'),
+              ),
+            ListTile(
+              leading: Icon(Icons.delete_outline_rounded, color: scheme.error),
+              title: Text(
+                'Delete notification',
+                style: TextStyle(color: scheme.error),
+              ),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+    if (action == 'toggle-read') {
+      await _toggleRead(item);
+      return;
+    }
+    if (action == 'delete') {
+      await _deleteItem(item);
+      return;
+    }
+    if (action == 'mute') {
+      await _openMuteOverlay(item);
     }
   }
 
@@ -984,8 +1399,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                       });
                                     }
 
-                                    if (ctx.mounted)
+                                    if (ctx.mounted) {
                                       Navigator.of(dialogCtx).pop();
+                                    }
                                   } catch (e) {
                                     setModalState(() {
                                       saving = false;
@@ -1009,90 +1425,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Future<void> _openItemMenu(AppNotificationItem item) async {
-    final scheme = Theme.of(context).colorScheme;
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: scheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (_) => SafeArea(
-        top: false,
-        minimum: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: Icon(
-                item.isUnread
-                    ? Icons.mark_email_read_outlined
-                    : Icons.mark_email_unread_outlined,
-                color: scheme.onSurfaceVariant,
-              ),
-              title: Text(
-                item.isUnread ? 'Mark as read' : 'Mark as unread',
-                style: TextStyle(color: scheme.onSurface),
-              ),
-              onTap: () => Navigator.pop(context, 'toggle-read'),
-            ),
-            if (_canMuteItem(item))
-              ListTile(
-                leading: Icon(
-                  Icons.notifications_off_outlined,
-                  color: scheme.onSurfaceVariant,
-                ),
-                title: Text(
-                  item.postKind == 'reel' ? 'Mute this reel' : 'Mute this post',
-                  style: TextStyle(color: scheme.onSurface),
-                ),
-                onTap: () => Navigator.pop(context, 'mute'),
-              ),
-            ListTile(
-              leading: Icon(Icons.delete_outline_rounded, color: scheme.error),
-              title: Text(
-                'Delete notification',
-                style: TextStyle(color: scheme.error),
-              ),
-              onTap: () => Navigator.pop(context, 'delete'),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-
-    if (!mounted || action == null) return;
-    if (action == 'toggle-read') {
-      await _toggleRead(item);
-      return;
-    }
-    if (action == 'delete') {
-      await _deleteItem(item);
-      return;
-    }
-    if (action == 'mute') {
-      await _openMuteOverlay(item);
-    }
-  }
+  // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final refreshIconColor = theme.brightness == Brightness.dark
-        ? scheme.onSurfaceVariant
-        : scheme.primary;
     final tokens = _tokens;
     final isDark = theme.brightness == Brightness.dark;
     final items = _filtered;
@@ -1103,43 +1441,156 @@ class _NotificationScreenState extends State<NotificationScreen> {
         backgroundColor: scheme.surface,
         elevation: 0,
         iconTheme: IconThemeData(color: scheme.onSurface),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Notifications',
-              style: TextStyle(
-                color: scheme.onSurface,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+        title: _deleteMode
+            ? Text(
+                _selectedIds.isEmpty
+                    ? 'Select notifications'
+                    : '${_selectedIds.length} selected',
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Notifications',
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: _load,
-            icon: Icon(Icons.refresh_rounded, color: refreshIconColor),
-          ),
-        ],
+        actions: _deleteMode
+            ? [
+                if (_selectedIds.isNotEmpty)
+                  TextButton(
+                    onPressed: _confirmBulkDelete,
+                    child: Text(
+                      'Delete (${_selectedIds.length})',
+                      style: TextStyle(
+                        color: scheme.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                TextButton(
+                  onPressed: () => setState(() {
+                    _deleteMode = false;
+                    _selectedIds.clear();
+                  }),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+              ]
+            : [
+                IconButton(
+                  onPressed: _showManageSheet,
+                  icon: Icon(
+                    Icons.tune_rounded,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  tooltip: 'Manage notifications',
+                ),
+                IconButton(
+                  onPressed: _load,
+                  icon: Icon(
+                    Icons.refresh_rounded,
+                    color: isDark ? scheme.onSurfaceVariant : scheme.primary,
+                  ),
+                ),
+              ],
       ),
       body: Column(
         children: [
+          // ── Filter toolbar ──────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildTab(tab: _NotificationTab.all, label: 'All activity'),
-                _buildTab(tab: _NotificationTab.like, label: 'Likes'),
-                _buildTab(tab: _NotificationTab.comment, label: 'Comments'),
-                _buildTab(tab: _NotificationTab.mentions, label: 'Mentions'),
-                _buildTab(tab: _NotificationTab.follow, label: 'Followers'),
-                _buildTab(tab: _NotificationTab.system, label: 'System'),
-              ],
+            child: GestureDetector(
+              onTap: _deleteMode ? null : _showFilterSheet,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: scheme.outline.withValues(alpha: 0.9),
+                  ),
+                  color: isDark
+                      ? scheme.surface
+                      : scheme.surfaceContainerLowest,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _tabIcon(_activeTab),
+                      size: 16,
+                      color: scheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _activeTab.label,
+                        style: TextStyle(
+                          color: scheme.onSurface,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
+
+          // ── Delete mode bar ─────────────────────────────────────────────────
+          if (_deleteMode)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              decoration: BoxDecoration(
+                color: scheme.error.withValues(alpha: isDark ? 0.12 : 0.07),
+                border: Border(
+                  bottom: BorderSide(
+                    color: scheme.error.withValues(alpha: isDark ? 0.22 : 0.15),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_box_outline_blank_rounded,
+                    size: 16,
+                    color: scheme.error.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _selectedIds.isEmpty
+                        ? 'Tap a notification to select it'
+                        : '${_selectedIds.length} notification${_selectedIds.length != 1 ? "s" : ""} selected',
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           Expanded(
             child: _loading
                 ? Center(
@@ -1191,7 +1642,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     ),
                   )
                 : RefreshIndicator(
-                    onRefresh: _load,
+                    onRefresh: _deleteMode ? () async {} : _load,
                     color: scheme.primary,
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(12, 6, 12, 18),
@@ -1199,7 +1650,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (_, i) {
                         final item = items[i];
-                        final baseColor = item.isUnread
+                        final isSelected = _selectedIds.contains(item.id);
+                        final baseColor = isSelected
+                            ? scheme.primary.withValues(
+                                alpha: isDark ? 0.2 : 0.1,
+                              )
+                            : item.isUnread
                             ? (isDark
                                   ? const Color(0xFF142847)
                                   : scheme.primary.withValues(alpha: 0.1))
@@ -1209,23 +1665,29 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () => _onItemTap(item),
-                          onLongPressStart: (_) {
-                            if (!mounted) return;
-                            setState(() => _pressedItemId = item.id);
-                          },
-                          onLongPressCancel: () {
-                            if (!mounted) return;
-                            if (_pressedItemId == item.id) {
-                              setState(() => _pressedItemId = null);
-                            }
-                          },
-                          onLongPress: () async {
-                            await _openItemMenu(item);
-                            if (!mounted) return;
-                            if (_pressedItemId == item.id) {
-                              setState(() => _pressedItemId = null);
-                            }
-                          },
+                          onLongPressStart: _deleteMode
+                              ? null
+                              : (_) {
+                                  if (!mounted) return;
+                                  setState(() => _pressedItemId = item.id);
+                                },
+                          onLongPressCancel: _deleteMode
+                              ? null
+                              : () {
+                                  if (!mounted) return;
+                                  if (_pressedItemId == item.id) {
+                                    setState(() => _pressedItemId = null);
+                                  }
+                                },
+                          onLongPress: _deleteMode
+                              ? null
+                              : () async {
+                                  await _openItemMenu(item);
+                                  if (!mounted) return;
+                                  if (_pressedItemId == item.id) {
+                                    setState(() => _pressedItemId = null);
+                                  }
+                                },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -1240,7 +1702,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                   : baseColor,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: item.isUnread
+                                color: isSelected
+                                    ? scheme.primary.withValues(
+                                        alpha: isDark ? 0.55 : 0.35,
+                                      )
+                                    : item.isUnread
                                     ? scheme.primary.withValues(
                                         alpha: isDark ? 0.65 : 0.4,
                                       )
@@ -1294,23 +1760,57 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                     ],
                                   ),
                                 ),
-                                SizedBox(
-                                  width: 16,
-                                  height: 44,
-                                  child: item.isUnread
-                                      ? Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Container(
-                                            width: 10,
-                                            height: 10,
-                                            decoration: BoxDecoration(
-                                              color: scheme.primary,
-                                              shape: BoxShape.circle,
+                                if (_deleteMode)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: SizedBox(
+                                      width: 22,
+                                      height: 44,
+                                      child: Center(
+                                        child: Container(
+                                          width: 22,
+                                          height: 22,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: isSelected
+                                                ? scheme.primary
+                                                : Colors.transparent,
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? scheme.primary
+                                                  : scheme.outline,
+                                              width: 2,
                                             ),
                                           ),
-                                        )
-                                      : null,
-                                ),
+                                          child: isSelected
+                                              ? Icon(
+                                                  Icons.check_rounded,
+                                                  color: scheme.onPrimary,
+                                                  size: 14,
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  SizedBox(
+                                    width: 16,
+                                    height: 44,
+                                    child: item.isUnread
+                                        ? Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Container(
+                                              width: 10,
+                                              height: 10,
+                                              decoration: BoxDecoration(
+                                                color: scheme.primary,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          )
+                                        : null,
+                                  ),
                               ],
                             ),
                           ),

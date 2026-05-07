@@ -1368,8 +1368,6 @@
         "unknown": "Unknown"
       }
     }
-<<<<<<< HEAD
-=======
   },
   "reportProblem": {
     "title": "Report a Problem",
@@ -1392,6 +1390,5 @@
     "errorCannotSend": "Cannot send report now.",
     "errorWaitBefore": "Please wait before sending another report.",
     "errorRetry": "Cannot send report now. Please try again."
->>>>>>> mobile-complete-stage
   }
 }

@@ -413,7 +413,6 @@
         "unableToLoadPreview": "无法加载预览图片",
         "videoPreviewAvailable": "此违规内容有视频预览。"
       }
-<<<<<<< HEAD
     },
     "notifications": {
       "pushNotifications": "推送通知",
@@ -456,8 +455,6 @@
         "mutedDays": "已静音 {n} 天",
         "muted": "已静音"
       }
-=======
->>>>>>> mobile-complete-stage
     }
   },
   "auth": {
@@ -1413,8 +1410,6 @@
         "unknown": "未知"
       }
     }
-<<<<<<< HEAD
-=======
   },
   "reportProblem": {
     "title": "报告问题",
@@ -1437,6 +1432,5 @@
     "errorCannotSend": "现在无法发送报告。",
     "errorWaitBefore": "请等待后再发送下一条报告。",
     "errorRetry": "现在无法发送报告。请重试。"
->>>>>>> mobile-complete-stage
   }
 }

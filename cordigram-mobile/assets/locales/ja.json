@@ -1368,8 +1368,6 @@
         "unknown": "不明"
       }
     }
-<<<<<<< HEAD
-=======
   },
   "reportProblem": {
     "title": "問題を報告",
@@ -1392,6 +1390,5 @@
     "errorCannotSend": "今すぐレポートを送信できません。",
     "errorWaitBefore": "次のレポートを送信する前にお待ちください。",
     "errorRetry": "今すぐレポートを送信できません。再試行してください。"
->>>>>>> mobile-complete-stage
   }
 }

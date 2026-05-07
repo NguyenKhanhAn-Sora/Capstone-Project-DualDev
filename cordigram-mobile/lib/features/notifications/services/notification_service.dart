@@ -43,6 +43,16 @@ class NotificationService {
     );
   }
 
+  static Future<void> markAllRead() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+
+    await ApiService.post(
+      '/notifications/read-all',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   static Future<void> deleteNotification(String notificationId) async {
     final token = AuthStorage.accessToken;
     if (token == null) throw const ApiException('Not authenticated');
