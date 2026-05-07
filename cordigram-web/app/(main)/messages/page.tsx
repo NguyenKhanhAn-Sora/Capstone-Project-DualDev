@@ -1073,56 +1073,109 @@ const MessageItem = memo(
           />
         ))}
 
-        {/* Message Actions Menu */}
-        {showActionsMenu && !message.isDeletedForEveryone && (
-          <MessageActionsMenu
-            onRemove={
-              // Legacy "Gỡ" action — still used by channel/server messages
-              // (their delete flow hasn't been migrated to split delete).
-              onDelete && message.isFromCurrentUser
-                ? () => {
-                    onDelete?.(message.id);
+        {/* Message Actions Menu — render via portal to avoid clipping/stack issues */}
+        {showActionsMenu &&
+          !message.isDeletedForEveryone &&
+          (scrollContainerRef && fixedReactionPosition ? (
+            createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  zIndex: 10007,
+                  top: fixedReactionPosition.top + 50,
+                  left: Math.min(
+                    fixedReactionPosition.left,
+                    Math.max(8, window.innerWidth - 8 - 220),
+                  ),
+                }}
+              >
+                <MessageActionsMenu
+                  onRemove={
+                    onDelete && message.isFromCurrentUser
+                      ? () => {
+                          onDelete?.(message.id);
+                        }
+                      : undefined
                   }
-                : undefined
-            }
-            onDeleteForMe={
-              // Direct action — no confirmation dialog, executes immediately.
-              onDeleteForMe
-                ? () => {
-                    onDeleteForMe(message.id);
+                  onDeleteForMe={
+                    onDeleteForMe
+                      ? () => {
+                          onDeleteForMe(message.id);
+                        }
+                      : undefined
                   }
-                : undefined
-            }
-            onDeleteForEveryone={
-              // Only shown for the sender; the menu also enforces this.
-              onDeleteForEveryone && message.isFromCurrentUser
-                ? () => {
-                    onDeleteForEveryone(message.id);
+                  onDeleteForEveryone={
+                    onDeleteForEveryone && message.isFromCurrentUser
+                      ? () => {
+                          onDeleteForEveryone(message.id);
+                        }
+                      : undefined
                   }
-                : undefined
-            }
-            onPin={() => {
-              onPin?.(message.id);
-              setShowActionsMenu(false);
-            }}
-            onReport={
-              !message.isFromCurrentUser
-                ? () => {
-                    onReport?.(message.id);
+                  onPin={() => {
+                    onPin?.(message.id);
                     setShowActionsMenu(false);
+                  }}
+                  onReport={
+                    !message.isFromCurrentUser
+                      ? () => {
+                          onReport?.(message.id);
+                          setShowActionsMenu(false);
+                        }
+                      : undefined
                   }
-                : undefined
-            }
-            onClose={() => setShowActionsMenu(false)}
-            position={{
-              top: 50,
-              right: alignAsSent ? 10 : undefined,
-              left: alignAsSent ? undefined : 50,
-            }}
-            isOwnMessage={message.isFromCurrentUser}
-            isPinned={message.isPinned || false}
-          />
-        )}
+                  onClose={() => setShowActionsMenu(false)}
+                  position={{ top: 0, left: 0 }}
+                  isOwnMessage={message.isFromCurrentUser}
+                  isPinned={message.isPinned || false}
+                />
+              </div>,
+              document.body,
+            )
+          ) : (
+            <MessageActionsMenu
+              onRemove={
+                onDelete && message.isFromCurrentUser
+                  ? () => {
+                      onDelete?.(message.id);
+                    }
+                  : undefined
+              }
+              onDeleteForMe={
+                onDeleteForMe
+                  ? () => {
+                      onDeleteForMe(message.id);
+                    }
+                  : undefined
+              }
+              onDeleteForEveryone={
+                onDeleteForEveryone && message.isFromCurrentUser
+                  ? () => {
+                      onDeleteForEveryone(message.id);
+                    }
+                  : undefined
+              }
+              onPin={() => {
+                onPin?.(message.id);
+                setShowActionsMenu(false);
+              }}
+              onReport={
+                !message.isFromCurrentUser
+                  ? () => {
+                      onReport?.(message.id);
+                      setShowActionsMenu(false);
+                    }
+                  : undefined
+              }
+              onClose={() => setShowActionsMenu(false)}
+              position={{
+                top: 50,
+                right: alignAsSent ? 10 : undefined,
+                left: alignAsSent ? undefined : 50,
+              }}
+              isOwnMessage={message.isFromCurrentUser}
+              isPinned={message.isPinned || false}
+            />
+          ))}
       </div>
     );
   },
@@ -1696,6 +1749,8 @@ export default function MessagesPage() {
   const [pinnedModalLoading, setPinnedModalLoading] = useState(false);
   const [pinnedModalTitle, setPinnedModalTitle] = useState("Tin nhắn đã ghim");
   const [pinnedModalItems, setPinnedModalItems] = useState<UIMessage[]>([]);
+  const [pinInlineNoticeOpen, setPinInlineNoticeOpen] = useState(false);
+  const pinInlineNoticeTimerRef = useRef<number | null>(null);
   const [channelProfileContext, setChannelProfileContext] =
     useState<ChannelProfileAnchorContext | null>(null);
 
@@ -4446,6 +4501,13 @@ export default function MessagesPage() {
     }
   };
 
+  const handlePinnedItemJump = (messageId: string) => {
+    const jumped = scrollToMessageBubble(messageId);
+    if (jumped) {
+      setPinnedModalOpen(false);
+    }
+  };
+
   // Handler for pinning messages
   const handlePinMessage = async (messageId: string) => {
     try {
@@ -4463,20 +4525,25 @@ export default function MessagesPage() {
           prev.map((m) => (m.id === messageId ? { ...m, isPinned: !m.isPinned } : m)),
         );
       }
-      setToastMessage("Bạn đã ghim một tin nhắn.");
-      setToastActionLabel("Xem tất cả");
-      setToastActionHandler(() => () => {
-        void openPinnedMessagesModal();
-      });
-      setTimeout(() => {
-        setToastMessage(null);
-        setToastActionLabel(null);
-        setToastActionHandler(null);
-      }, 3500);
+      if (pinInlineNoticeTimerRef.current) {
+        window.clearTimeout(pinInlineNoticeTimerRef.current);
+      }
+      setPinInlineNoticeOpen(true);
+      pinInlineNoticeTimerRef.current = window.setTimeout(() => {
+        setPinInlineNoticeOpen(false);
+      }, 5000);
     } catch (error) {
       console.error("Failed to pin message:", error);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (pinInlineNoticeTimerRef.current) {
+        window.clearTimeout(pinInlineNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   // Handler for reporting messages
   const handleReportMessage = async (
@@ -9370,6 +9437,18 @@ export default function MessagesPage() {
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
                       </svg>
                     </button>
+                    <button
+                      type="button"
+                      title="Tin nhắn đã ghim"
+                      aria-label="Tin nhắn đã ghim"
+                      onClick={() => void openPinnedMessagesModal()}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 17v5" />
+                        <path d="M5 9V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v5" />
+                        <path d="M6 9h12l-3 7H9L6 9Z" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
                 {!selectedDirectMessageFriend &&
@@ -9789,6 +9868,40 @@ export default function MessagesPage() {
                     })
                       )}
                     </>
+                  )}
+
+                  {pinInlineNoticeOpen && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        marginBottom: 8,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        background: "rgba(88, 101, 242, 0.14)",
+                        border: "1px solid rgba(88, 101, 242, 0.35)",
+                        color: "var(--color-text)",
+                        fontSize: 14,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
+                    >
+                      <span>Bạn đã ghim một tin nhắn.</span>
+                      <button
+                        type="button"
+                        onClick={() => void openPinnedMessagesModal()}
+                        style={{
+                          border: 0,
+                          background: "transparent",
+                          color: "#ff5c8d",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Xem tất cả
+                      </button>
+                    </div>
                   )}
 
                   {/* ✅ Typing Indicator */}
@@ -12190,28 +12303,32 @@ export default function MessagesPage() {
                 onClick={() => setPinnedModalOpen(false)}
                 style={{ background: "transparent", color: "#cfd3da", border: 0, cursor: "pointer" }}
               >
-                Dong
+                X
               </button>
             </div>
             {pinnedModalLoading ? (
-              <div style={{ color: "#cfd3da" }}>Dang tai...</div>
+              <div style={{ color: "#cfd3da" }}>Đang tải...</div>
             ) : pinnedModalItems.length === 0 ? (
-              <div style={{ color: "#9aa1ad" }}>Chua co tin nhan duoc ghim.</div>
+              <div style={{ color: "#9aa1ad" }}>Chưa có tin nhắn được ghim.</div>
             ) : (
               pinnedModalItems.map((item) => (
                 <div
                   key={item.id}
+                  onClick={() => handlePinnedItemJump(item.id)}
                   style={{
                     padding: "10px 12px",
                     marginBottom: 8,
                     borderRadius: 10,
                     background: "#2b2f36",
+                    cursor: "pointer",
                   }}
                 >
                   <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>
-                    {item.senderDisplayName || item.senderName || "Nguoi dung"}
+                    {item.senderDisplayName || item.senderName || "Người dùng"}
                   </div>
-                  <div style={{ whiteSpace: "pre-wrap" }}>{item.text || "(tin nhan da bi thu hoi)"}</div>
+                  <div style={{ whiteSpace: "pre-wrap" }}>
+                    {renderMessageContent(item)}
+                  </div>
                 </div>
               ))
             )}

@@ -5,11 +5,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'create_post_service.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/services/post_upload_controller.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
@@ -97,9 +97,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final List<String> _hashtags = [];
   DateTime? _scheduledAtLocal;
 
-  bool _submitting = false;
   String? _submitError;
-  String? _submitSuccess;
 
   // location search
   List<_LocationSuggestion> _locationSuggestions = [];
@@ -335,66 +333,39 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
-  Future<void> _submit() async {
+  void _submit() {
     if (_media.isEmpty) {
       setState(
         () => _submitError = LanguageController.instance.t('post.create.noMediaError'),
       );
       return;
     }
-    setState(() {
-      _submitting = true;
-      _submitError = null;
-      _submitSuccess = null;
-    });
 
-    try {
-      // Upload all media sequentially
-      final uploadedMedia = <Map<String, dynamic>>[];
-      for (final item in _media) {
-        final result = await CreatePostService.uploadMedia(item.file);
-        uploadedMedia.add({
-          'type': item.isVideo ? 'video' : 'image',
-          'url': result.url,
-          'metadata': {
-            'publicId': result.publicId,
-            if (result.resourceType != null)
-              'resourceType': result.resourceType,
-            if (result.format != null) 'format': result.format,
-            if (result.width != null) 'width': result.width,
-            if (result.height != null) 'height': result.height,
-            if (result.bytes != null) 'bytes': result.bytes,
-            if (result.duration != null) 'duration': result.duration,
-            if (result.folder != null) 'folder': result.folder,
-            if (result.moderationDecision != null)
-              'moderationDecision': result.moderationDecision,
-            if (result.moderationProvider != null)
-              'moderationProvider': result.moderationProvider,
-          },
-        });
+    final mentionMatches = RegExp(
+      r'@([a-zA-Z0-9_.]{1,30})',
+    ).allMatches(_captionCtrl.text);
+    final mentions = mentionMatches.map((m) => m.group(1)!).toSet().toList();
+
+    String? scheduledAtIso;
+    if (_publishMode == _PublishMode.schedule) {
+      final selected = _scheduledAtLocal;
+      if (selected == null) {
+        setState(() => _submitError = LanguageController.instance.t('post.create.chooseDateTimeError'));
+        return;
       }
-
-      // Extract @mentions from caption
-      final mentionMatches = RegExp(
-        r'@([a-zA-Z0-9_.]{1,30})',
-      ).allMatches(_captionCtrl.text);
-      final mentions = mentionMatches.map((m) => m.group(1)!).toSet().toList();
-
-      String? scheduledAtIso;
-      if (_publishMode == _PublishMode.schedule) {
-        final selected = _scheduledAtLocal;
-        if (selected == null) {
-          throw ApiException(
-            LanguageController.instance.t('post.create.chooseDateTimeError'),
-          );
-        }
-        if (!selected.isAfter(DateTime.now())) {
-          throw ApiException(LanguageController.instance.t('post.create.scheduledTimePastError'));
-        }
-        scheduledAtIso = selected.toUtc().toIso8601String();
+      if (!selected.isAfter(DateTime.now())) {
+        setState(() => _submitError = LanguageController.instance.t('post.create.scheduledTimePastError'));
+        return;
       }
+      scheduledAtIso = selected.toUtc().toIso8601String();
+    }
 
-      await CreatePostService.createPost(
+    PostUploadController.instance.startUpload(
+      mode: UploadMode.post,
+      mediaItems: _media
+          .map((item) => UploadMediaItem(file: item.file, isVideo: item.isVideo))
+          .toList(),
+      payload: PostUploadPayload(
         caption: _captionCtrl.text,
         location: _locationCtrl.text,
         audience: _audience.value,
@@ -403,32 +374,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         hideLikeCount: _hideLikeCount,
         hashtags: List<String>.from(_hashtags),
         mentions: mentions,
-        media: uploadedMedia,
         scheduledAt: scheduledAtIso,
-      );
+      ),
+      publishMode: _publishMode == _PublishMode.now
+          ? PublishMode.now
+          : PublishMode.schedule,
+    );
 
-      if (!mounted) return;
-      final wasScheduled = _publishMode == _PublishMode.schedule;
-      _resetToInitialState();
-      _showSnack(
-        wasScheduled
-            ? LanguageController.instance.t('post.create.postScheduled')
-            : LanguageController.instance.t('post.create.postCreated'),
-      );
-      widget.onPostCreated?.call();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _submitError = e.message;
-        _submitting = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _submitError = e.toString();
-        _submitting = false;
-      });
-    }
+    _resetToInitialState();
+    widget.onPostCreated?.call();
   }
 
   void _resetToInitialState() {
@@ -444,9 +398,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _hashtagCtrl.clear();
 
     setState(() {
-      _submitting = false;
       _submitError = null;
-      _submitSuccess = null;
       _media.clear();
       _hashtags.clear();
       _audience = _Audience.public;
@@ -651,8 +603,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       const SizedBox(height: 24),
                       if (_submitError != null)
                         _buildErrorBanner(_submitError!),
-                      if (_submitSuccess != null)
-                        _buildSuccessBanner(_submitSuccess!),
                       const SizedBox(height: 8),
                       _buildSubmitButton(),
                     ],
@@ -706,15 +656,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ],
             ),
           ),
-          if (_submitting)
-            SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: scheme.primary,
-              ),
-            ),
         ],
       ),
     );
@@ -1511,34 +1452,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  Widget _buildSuccessBanner(String msg) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF052E16),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF14532D)),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.check_circle_outline_rounded,
-            color: Color(0xFF4ADE80),
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              msg,
-              style: const TextStyle(color: Color(0xFF4ADE80), fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSubmitButton() {
     final theme = Theme.of(context);
     final tokens =
@@ -1549,34 +1462,24 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: _submitting ? null : _submit,
+        onPressed: _submit,
         style: ElevatedButton.styleFrom(
           backgroundColor: tokens.primary,
-          disabledBackgroundColor: tokens.primary.withValues(alpha: 0.45),
           foregroundColor: theme.colorScheme.onPrimary,
           padding: const EdgeInsets.symmetric(vertical: 15),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: _submitting
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: theme.colorScheme.onPrimary,
-                ),
-              )
-            : Text(
-                _publishMode == _PublishMode.schedule
-                    ? LanguageController.instance.t('post.create.schedulePost')
-                    : LanguageController.instance.t('post.create.publishPost'),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+        child: Text(
+          _publishMode == _PublishMode.schedule
+              ? LanguageController.instance.t('post.create.schedulePost')
+              : LanguageController.instance.t('post.create.publishPost'),
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }

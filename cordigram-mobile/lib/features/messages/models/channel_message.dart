@@ -18,6 +18,7 @@ class ChannelMessage {
     this.isPinned = false,
     this.pinnedAt,
     this.replyTo,
+    this.senderAvatarUrl,
   });
 
   final String id;
@@ -36,6 +37,7 @@ class ChannelMessage {
   final bool isPinned;
   final DateTime? pinnedAt;
   final ChannelReplyMessage? replyTo;
+  final String? senderAvatarUrl;
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
     final senderRaw = json['sender'] ?? json['senderId'];
@@ -52,6 +54,11 @@ class ChannelMessage {
       senderId: (sender['_id'] ?? json['senderId'] ?? '').toString(),
       senderName: (sender['displayName'] ?? sender['username'] ?? '')
           .toString(),
+      senderAvatarUrl: (() {
+        final v = (sender['avatarUrl'] ?? sender['avatar'])?.toString().trim();
+        if (v == null || v.isEmpty) return null;
+        return v;
+      })(),
       content: (json['content'] ?? '').toString(),
       type: (json['messageType'] ?? json['type'] ?? 'text').toString(),
       voiceUrl: (() {

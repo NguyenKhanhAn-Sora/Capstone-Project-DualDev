@@ -30,7 +30,6 @@ function normalizeApiBaseUrl(raw: string | undefined | null): string {
   if (/^:\d+/.test(trimmed)) return `https://api.cordigram.com`;
 
   if (/^https?:\/\/:\d+/.test(trimmed)) {
-    const port = trimmed.match(/^https?:\/\/:(\d+)/)?.[1];
     return `https://api.cordigram.com`;
   }
   
@@ -2352,67 +2351,47 @@ export type CreateReportProblemResponse = {
 export async function uploadPostMedia(opts: {
   token: string;
   file: File;
-  onProgress?: (ratio: number) => void;
   signal?: AbortSignal;
 }): Promise<UploadPostMediaResponse> {
-  const { token, file, onProgress, signal } = opts;
+  const { token, file, signal } = opts;
   const url = `${apiBaseUrl}/posts/upload`;
   const form = new FormData();
   form.append("file", file);
 
-  return new Promise<UploadPostMediaResponse>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    if (signal) {
-      if (signal.aborted) {
-        reject({ status: 0, message: "Upload cancelled", data: null } satisfies ApiError);
-        return;
-      }
-      signal.addEventListener("abort", () => xhr.abort(), { once: true });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+      signal,
+    });
+  } catch (err) {
+    if (signal?.aborted) {
+      throw {
+        status: 0,
+        message: "Upload cancelled",
+        data: null,
+      } satisfies ApiError;
     }
+    throw {
+      status: 0,
+      message: resolveApiErrorMessage(err, "Upload failed"),
+      data: null,
+    } satisfies ApiError;
+  }
 
-    if (onProgress) {
-      xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) onProgress(e.loaded / e.total);
-      });
-    }
+  if (!res.ok) {
+    const { payload, rawText } = await readErrorPayload(res);
+    const fallback = buildFriendlyStatusMessage(res.status, "Upload failed");
+    throw {
+      status: res.status,
+      message: extractPayloadMessage(payload) || rawText.trim() || fallback,
+      data: payload,
+    } satisfies ApiError;
+  }
 
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText) as UploadPostMediaResponse);
-        } catch {
-          reject({
-            status: xhr.status,
-            message: "Invalid response from server",
-            data: null,
-          } satisfies ApiError);
-        }
-        return;
-      }
-      let payload: unknown = null;
-      const rawText = xhr.responseText || "";
-      try { payload = JSON.parse(rawText); } catch { /* ignore */ }
-      const fallback = buildFriendlyStatusMessage(xhr.status, "Upload failed");
-      reject({
-        status: xhr.status,
-        message: extractPayloadMessage(payload as Record<string, unknown> | null) || rawText.trim() || fallback,
-        data: payload,
-      } satisfies ApiError);
-    });
-
-    xhr.addEventListener("error", () => {
-      reject({ status: 0, message: "Upload failed", data: null } satisfies ApiError);
-    });
-
-    xhr.addEventListener("abort", () => {
-      reject({ status: 0, message: "Upload cancelled", data: null } satisfies ApiError);
-    });
-
-    xhr.open("POST", url);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.send(form);
-  });
+  return (await res.json()) as UploadPostMediaResponse;
 }
 
 export async function uploadCommentMedia(opts: {

@@ -40,7 +40,9 @@ import 'services/feed_service.dart';
 import 'services/post_interaction_service.dart';
 import 'widgets/post_card.dart';
 import 'widgets/people_you_may_know.dart';
+import 'widgets/upload_progress_banner.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/services/post_upload_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -126,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       reverseCurve: Curves.easeInCubic,
     );
     _tabController.addListener(_onTabChanged);
+    PostUploadController.instance.addListener(_onUploadStateChanged);
     _loadFeed();
     _loadLiveStreams();
     _fetchProfile();
@@ -183,8 +186,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _onUploadStateChanged() {
+    if (!mounted) return;
+    final ctrl = PostUploadController.instance;
+
+    // Auto-switch to Home tab when upload starts
+    if (ctrl.status == UploadStatus.uploading && _tabController.index != 0) {
+      _tabController.animateTo(0);
+      _showTopNav();
+    }
+
+    // Inject new post at top of feed when done
+    if (ctrl.status == UploadStatus.done) {
+      final postId = ctrl.newPostId;
+      if (postId != null) {
+        ctrl.clearNewPost();
+        unawaited(_injectNewPost(postId));
+      }
+    }
+  }
+
+  Future<void> _injectNewPost(String postId) async {
+    try {
+      final token = AuthStorage.accessToken;
+      if (token == null) return;
+      final raw = await ApiService.get(
+        '/posts/$postId',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      if (!mounted) return;
+      final post = FeedPost.fromJson(raw);
+      setState(() {
+        // Skip if already in feed (e.g. from a concurrent poll)
+        if (_states.any((s) => s.post.id == post.id)) return;
+        _states.insert(0, FeedPostState(post: post));
+      });
+    } catch (_) {
+      // Silent: post appears on next feed refresh
+    }
+  }
+
   @override
   void dispose() {
+    PostUploadController.instance.removeListener(_onUploadStateChanged);
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _topNavAnimController.dispose();
@@ -1914,7 +1958,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       controller: _tabController,
       physics: const NeverScrollableScrollPhysics(),
       children: [
-        _buildFeedTab(),
+        Column(
+          children: [
+            const UploadProgressBanner(),
+            Expanded(child: _buildFeedTab()),
+          ],
+        ),
         const FollowingScreen(),
         const ExploreScreen(),
         const ReelsScreen(),
