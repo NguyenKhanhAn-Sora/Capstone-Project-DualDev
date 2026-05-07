@@ -2601,6 +2601,8 @@ export class PostsService {
       (id) => new Types.ObjectId(id),
     );
 
+    const now = new Date();
+
     // Fixed candidate pool size (stable across pages).
     const candidateLimit = 1000;
 
