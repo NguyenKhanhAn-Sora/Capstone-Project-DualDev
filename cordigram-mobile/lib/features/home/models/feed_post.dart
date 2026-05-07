@@ -168,6 +168,7 @@ class FeedPost {
     this.repostOfAuthor,
     this.repostSourceContent,
     this.repostSourceMedia,
+    this.repostSourceKind,
     this.primaryVideoDurationMs,
   });
 
@@ -203,6 +204,7 @@ class FeedPost {
   final FeedAuthor? repostOfAuthor;
   final String? repostSourceContent;
   final List<FeedMedia>? repostSourceMedia;
+  final String? repostSourceKind;
   final int? primaryVideoDurationMs;
 
   FeedPost copyWith({
@@ -238,6 +240,7 @@ class FeedPost {
     FeedAuthor? repostOfAuthor,
     String? repostSourceContent,
     List<FeedMedia>? repostSourceMedia,
+    String? repostSourceKind,
     int? primaryVideoDurationMs,
   }) {
     return FeedPost(
@@ -277,6 +280,7 @@ class FeedPost {
       repostOfAuthor: repostOfAuthor ?? this.repostOfAuthor,
       repostSourceContent: repostSourceContent ?? this.repostSourceContent,
       repostSourceMedia: repostSourceMedia ?? this.repostSourceMedia,
+      repostSourceKind: repostSourceKind ?? this.repostSourceKind,
       primaryVideoDurationMs:
           primaryVideoDurationMs ?? this.primaryVideoDurationMs,
     );
@@ -413,6 +417,7 @@ class FeedPost {
       repostOfAuthor: repostOfAuthor,
       repostSourceContent: json['repostSourceContent'] as String?,
       repostSourceMedia: repostSourceMedia,
+      repostSourceKind: json['repostSourceKind'] as String?,
       primaryVideoDurationMs: (json['primaryVideoDurationMs'] as num?)?.toInt(),
     );
   }
