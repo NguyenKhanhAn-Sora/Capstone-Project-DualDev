@@ -421,9 +421,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       event,
     ) {
       if (!mounted) return;
-      setState(() {
-        _notifUnread = event.unreadCount;
-      });
+      // Do not update badge from notification:state events.
+      // The badge uses seenAt-based counting (notifications after last opened),
+      // but the server's unreadCount here is ALL unread in DB (readAt IS NULL).
+      // Applying it would cause the badge to jump to the wrong value after the
+      // user marks a notification read while the badge is already at 0.
     });
 
     _notificationDeletedSub?.cancel();
@@ -431,13 +433,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       event,
     ) {
       if (!mounted) return;
+      // Use a delta decrement instead of server's unreadCount, which counts
+      // ALL unread in DB rather than the seenAt-based count shown in the badge.
       setState(() {
-        _notifUnread = event.unreadCount;
+        _notifUnread = (_notifUnread - 1).clamp(0, 999);
       });
     });
   }
 
   void _applyRealtimeNotification(NotificationRealtimeEvent event) {
+    // Guard: skip notifications the server re-broadcasts after markRead.
+    // When markRead is called the server updates activityAt and re-emits
+    // notification:new with readAt already set — those must never add to
+    // the badge because the user explicitly read them.
+    if (event.notification.readAt != null) return;
+
     final activityAt =
         DateTime.tryParse(event.notification.activityAt)?.toUtc() ??
         DateTime.tryParse(event.notification.createdAt)?.toUtc();
@@ -535,6 +545,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (items is List) {
         for (final raw in items) {
           if (raw is! Map<String, dynamic>) continue;
+          // Skip already-read notifications: if activityAt was updated by markRead
+          // and readAt is set, this entry should not contribute to the badge.
+          if (raw['readAt'] != null) continue;
           final activityAt =
               (raw['activityAt'] as String?) ?? (raw['createdAt'] as String?);
           final activity = activityAt == null

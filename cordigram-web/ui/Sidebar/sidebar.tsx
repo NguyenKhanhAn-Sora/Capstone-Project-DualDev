@@ -252,9 +252,12 @@ export default function Sidebar() {
             id: payload.id,
             readAt: payload.readAt ?? null,
           });
-          setUnreadCount(
-            typeof payload?.unreadCount === "number" ? payload.unreadCount : 0,
-          );
+          // Do not update unreadCount here. The badge uses seenAt-based counting
+          // (notifications after last opened), but the server's unreadCount in
+          // notification:state is ALL unread in DB (readAt IS NULL). Applying it
+          // causes the badge to jump to a stale DB-wide count after the user
+          // clicks a notification while the badge is already 0.
+          // Read events are handled optimistically via NOTIFICATION_READ_EVENT.
         },
       );
 
@@ -263,9 +266,9 @@ export default function Sidebar() {
         (payload: { id?: string; unreadCount?: number }) => {
           if (!payload?.id) return;
           emitNotificationDeleted({ id: payload.id });
-          setUnreadCount(
-            typeof payload?.unreadCount === "number" ? payload.unreadCount : 0,
-          );
+          // Use delta decrement instead of server's unreadCount, which counts
+          // ALL unread in DB rather than the seenAt-based count shown in badge.
+          setUnreadCount((prev) => Math.max(0, prev - 1));
         },
       );
 
