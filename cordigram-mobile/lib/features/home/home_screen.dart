@@ -40,7 +40,9 @@ import 'services/feed_service.dart';
 import 'services/post_interaction_service.dart';
 import 'widgets/post_card.dart';
 import 'widgets/people_you_may_know.dart';
+import 'widgets/upload_progress_banner.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/services/post_upload_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -126,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       reverseCurve: Curves.easeInCubic,
     );
     _tabController.addListener(_onTabChanged);
+    PostUploadController.instance.addListener(_onUploadStateChanged);
     _loadFeed();
     _loadLiveStreams();
     _fetchProfile();
@@ -183,8 +186,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _onUploadStateChanged() {
+    if (!mounted) return;
+    final ctrl = PostUploadController.instance;
+
+    // Auto-switch to Home tab when upload starts
+    if (ctrl.status == UploadStatus.uploading && _tabController.index != 0) {
+      _tabController.animateTo(0);
+      _showTopNav();
+    }
+
+    // Inject new post at top of feed when done
+    if (ctrl.status == UploadStatus.done) {
+      final postId = ctrl.newPostId;
+      if (postId != null) {
+        ctrl.clearNewPost();
+        unawaited(_injectNewPost(postId));
+      }
+    }
+  }
+
+  Future<void> _injectNewPost(String postId) async {
+    try {
+      final token = AuthStorage.accessToken;
+      if (token == null) return;
+      final raw = await ApiService.get(
+        '/posts/$postId',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      if (!mounted) return;
+      final post = FeedPost.fromJson(raw);
+      setState(() {
+        // Skip if already in feed (e.g. from a concurrent poll)
+        if (_states.any((s) => s.post.id == post.id)) return;
+        _states.insert(0, FeedPostState(post: post));
+      });
+    } catch (_) {
+      // Silent: post appears on next feed refresh
+    }
+  }
+
   @override
   void dispose() {
+    PostUploadController.instance.removeListener(_onUploadStateChanged);
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _topNavAnimController.dispose();
@@ -377,9 +421,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       event,
     ) {
       if (!mounted) return;
-      setState(() {
-        _notifUnread = event.unreadCount;
-      });
+      // Do not update badge from notification:state events.
+      // The badge uses seenAt-based counting (notifications after last opened),
+      // but the server's unreadCount here is ALL unread in DB (readAt IS NULL).
+      // Applying it would cause the badge to jump to the wrong value after the
+      // user marks a notification read while the badge is already at 0.
     });
 
     _notificationDeletedSub?.cancel();
@@ -387,13 +433,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       event,
     ) {
       if (!mounted) return;
+      // Use a delta decrement instead of server's unreadCount, which counts
+      // ALL unread in DB rather than the seenAt-based count shown in the badge.
       setState(() {
-        _notifUnread = event.unreadCount;
+        _notifUnread = (_notifUnread - 1).clamp(0, 999);
       });
     });
   }
 
   void _applyRealtimeNotification(NotificationRealtimeEvent event) {
+    // Guard: skip notifications the server re-broadcasts after markRead.
+    // When markRead is called the server updates activityAt and re-emits
+    // notification:new with readAt already set — those must never add to
+    // the badge because the user explicitly read them.
+    if (event.notification.readAt != null) return;
+
     final activityAt =
         DateTime.tryParse(event.notification.activityAt)?.toUtc() ??
         DateTime.tryParse(event.notification.createdAt)?.toUtc();
@@ -491,6 +545,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (items is List) {
         for (final raw in items) {
           if (raw is! Map<String, dynamic>) continue;
+          // Skip already-read notifications: if activityAt was updated by markRead
+          // and readAt is set, this entry should not contribute to the badge.
+          if (raw['readAt'] != null) continue;
           final activityAt =
               (raw['activityAt'] as String?) ?? (raw['createdAt'] as String?);
           final activity = activityAt == null
@@ -1914,7 +1971,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       controller: _tabController,
       physics: const NeverScrollableScrollPhysics(),
       children: [
-        _buildFeedTab(),
+        Column(
+          children: [
+            const UploadProgressBanner(),
+            Expanded(child: _buildFeedTab()),
+          ],
+        ),
         const FollowingScreen(),
         const ExploreScreen(),
         const ReelsScreen(),

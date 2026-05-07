@@ -165,7 +165,8 @@ class CreatePostService {
   }
 
   /// Create a post with already-uploaded media URLs.
-  static Future<void> createPost({
+  /// Returns the ID of the newly created post.
+  static Future<String?> createPost({
     required String caption,
     required String location,
     required String audience,
@@ -193,11 +194,13 @@ class CreatePostService {
       if (scheduledAt != null) 'scheduledAt': scheduledAt,
     };
 
-    await ApiService.post(
+    final res = await ApiService.post(
       '/posts',
       body: body,
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
+
+    return res['id'] as String?;
   }
 
   static String _mimeFromPath(String path) {

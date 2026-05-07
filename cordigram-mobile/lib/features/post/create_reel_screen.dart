@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
-import 'create_post_service.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/services/post_upload_controller.dart';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -99,9 +99,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   DateTime? _scheduledAtLocal;
 
   // submit
-  bool _submitting = false;
   String? _submitError;
-  String? _submitSuccess;
 
   // location search
   List<_LocationSuggestion> _locationSugs = [];
@@ -194,7 +192,6 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       _videoBytes = bytes;
       _previewCtrl = ctrl;
       _submitError = null;
-      _submitSuccess = null;
     });
   }
 
@@ -364,89 +361,49 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
-  Future<void> _submit() async {
+  void _submit() {
     if (_videoFile == null) {
       setState(() => _submitError = LanguageController.instance.t('post.createReel.noVideoError'));
       return;
     }
 
-    // Final duration guard
-    if (_videoDurationSec != null &&
-        _videoDurationSec! > _kReelMaxDurationSec) {
-      setState(
-        () => _submitError = LanguageController.instance.t('post.createReel.videoExceedsDuration', {'max': '$_kReelMaxDurationSec'}),
-      );
+    if (_videoDurationSec != null && _videoDurationSec! > _kReelMaxDurationSec) {
+      setState(() => _submitError = LanguageController.instance.t(
+        'post.createReel.videoExceedsDuration',
+        {'max': '$_kReelMaxDurationSec'},
+      ));
       return;
     }
 
-    setState(() {
-      _submitting = true;
-      _submitError = null;
-      _submitSuccess = null;
-    });
+    final mentionMatches = RegExp(
+      r'@([a-zA-Z0-9_.]{1,30})',
+    ).allMatches(_captionCtrl.text);
+    final mentions = mentionMatches.map((m) => m.group(1)!).toSet().toList();
 
-    try {
-      final upload = await CreatePostService.uploadMedia(_videoFile!);
-
-      // Prefer duration from upload; fall back to local measurement
-      double? finalDuration = upload.duration ?? _videoDurationSec;
-
-      // Post-upload duration validation
-      if (finalDuration != null && finalDuration > _kReelMaxDurationSec) {
-        setState(() {
-          _submitError = LanguageController.instance.t('post.createReel.videoExceedsDuration', {'max': '$_kReelMaxDurationSec'});
-          _submitting = false;
-        });
+    String? scheduledAtIso;
+    if (_publishMode == _PublishMode.schedule) {
+      final selected = _scheduledAtLocal;
+      if (selected == null) {
+        setState(() => _submitError = LanguageController.instance.t('post.createReel.chooseDateTimeError'));
         return;
       }
-
-      if (finalDuration == null) {
-        setState(() {
-          _submitError = LanguageController.instance.t('post.createReel.missingDuration');
-          _submitting = false;
-        });
+      if (!selected.isAfter(DateTime.now())) {
+        setState(() => _submitError = LanguageController.instance.t('post.createReel.scheduledTimePastError'));
         return;
       }
+      scheduledAtIso = selected.toUtc().toIso8601String();
+    }
 
-      final mentionMatches = RegExp(
-        r'@([a-zA-Z0-9_.]{1,30})',
-      ).allMatches(_captionCtrl.text);
-      final mentions = mentionMatches.map((m) => m.group(1)!).toSet().toList();
-
-      String? scheduledAtIso;
-      if (_publishMode == _PublishMode.schedule) {
-        final selected = _scheduledAtLocal;
-        if (selected == null) {
-          throw ApiException(
-            LanguageController.instance.t('post.createReel.chooseDateTimeError'),
-          );
-        }
-        if (!selected.isAfter(DateTime.now())) {
-          throw ApiException(LanguageController.instance.t('post.createReel.scheduledTimePastError'));
-        }
-        scheduledAtIso = selected.toUtc().toIso8601String();
-      }
-
-      final mediaPayload = <String, dynamic>{
-        'type': 'video',
-        'url': upload.url,
-        'metadata': {
-          'publicId': upload.publicId,
-          if (upload.resourceType != null) 'resourceType': upload.resourceType,
-          if (upload.format != null) 'format': upload.format,
-          if (upload.width != null) 'width': upload.width,
-          if (upload.height != null) 'height': upload.height,
-          if (upload.bytes != null) 'bytes': upload.bytes,
-          'duration': (finalDuration * 100).round() / 100,
-          if (upload.folder != null) 'folder': upload.folder,
-          if (upload.moderationDecision != null)
-            'moderationDecision': upload.moderationDecision,
-          if (upload.moderationProvider != null)
-            'moderationProvider': upload.moderationProvider,
-        },
-      };
-
-      await CreatePostService.createReel(
+    PostUploadController.instance.startUpload(
+      mode: UploadMode.reel,
+      mediaItems: [
+        UploadMediaItem(
+          file: _videoFile!,
+          isVideo: true,
+          durationSec: _videoDurationSec,
+        ),
+      ],
+      payload: PostUploadPayload(
         caption: _captionCtrl.text,
         location: _locationCtrl.text,
         audience: _audience.value,
@@ -455,33 +412,15 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
         hideLikeCount: _hideLikeCount,
         hashtags: List<String>.from(_hashtags),
         mentions: mentions,
-        media: mediaPayload,
-        durationSeconds: finalDuration,
         scheduledAt: scheduledAtIso,
-      );
+      ),
+      publishMode: _publishMode == _PublishMode.now
+          ? PublishMode.now
+          : PublishMode.schedule,
+    );
 
-      if (!mounted) return;
-      final wasScheduled = _publishMode == _PublishMode.schedule;
-      _reset();
-      _showSnack(
-        wasScheduled
-            ? LanguageController.instance.t('post.createReel.reelScheduled')
-            : LanguageController.instance.t('post.createReel.reelCreated'),
-      );
-      widget.onReelCreated?.call();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _submitError = e.message;
-        _submitting = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _submitError = e.toString();
-        _submitting = false;
-      });
-    }
+    _reset();
+    widget.onReelCreated?.call();
   }
 
   void _reset() {
@@ -507,9 +446,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       _mentionSugs = [];
       _mentionOpen = false;
       _mentionLoading = false;
-      _submitting = false;
       _submitError = null;
-      _submitSuccess = null;
     });
   }
 
@@ -699,8 +636,6 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                 _buildToggles(),
                 const SizedBox(height: 24),
                 if (_submitError != null) _buildErrorBanner(_submitError!),
-                if (_submitSuccess != null)
-                  _buildSuccessBanner(_submitSuccess!),
                 const SizedBox(height: 8),
                 _buildSubmitButton(),
               ],
@@ -1435,59 +1370,21 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     );
   }
 
-  Widget _buildSuccessBanner(String msg) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF052E16),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF14532D)),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.check_circle_outline_rounded,
-            color: Color(0xFF4ADE80),
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              msg,
-              style: const TextStyle(color: Color(0xFF4ADE80), fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSubmitButton() {
     final tokens = _tokens;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: _submitting ? null : _submit,
+        onPressed: _submit,
         style: ElevatedButton.styleFrom(
           backgroundColor: tokens.primary,
-          disabledBackgroundColor: tokens.primary.withValues(alpha: 0.45),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 15),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: _submitting
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Text(
+        child: Text(
                 _publishMode == _PublishMode.schedule
                     ? LanguageController.instance.t('post.createReel.scheduleReel')
                     : LanguageController.instance.t('post.createReel.publishReel'),

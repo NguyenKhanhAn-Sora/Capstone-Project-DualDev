@@ -1035,14 +1035,16 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           content: const Text('Bạn đã ghim tin nhắn'),
           action: SnackBarAction(
             label: 'Xem tất cả',
-            onPressed: () {
-              Navigator.of(context).push(
+            onPressed: () async {
+              final pickedId = await Navigator.of(context).push<String>(
                 MaterialPageRoute(
                   builder: (_) => PinnedMessagesScreen.channel(
                     channelId: widget.channel.id,
                   ),
                 ),
               );
+              if (!mounted || pickedId == null || pickedId.isEmpty) return;
+              await _scrollToChannelMessageId(pickedId);
             },
           ),
         ),
