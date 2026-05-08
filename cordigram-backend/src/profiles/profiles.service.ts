@@ -35,6 +35,7 @@ export class ProfilesService {
   }
 
   private readonly DEFAULT_AVATAR_URL =
+    process.env.DEFAULT_AVATAR_URL?.trim() ||
     'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
 
   private readonly DEFAULT_VISIBILITY: ProfileVisibility = {

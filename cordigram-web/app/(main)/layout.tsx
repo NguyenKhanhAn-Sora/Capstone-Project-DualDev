@@ -2,9 +2,9 @@
 
 import Sidebar from "@/ui/Sidebar/sidebar";
 import { usePathname } from "next/navigation";
-import { AuthGuard } from "../../component/auth-guard";
 import GlobalDmIncomingCalls from "@/components/GlobalDmIncomingCalls";
 import { PostUploadProvider } from "@/context/post-upload-context";
+import { GuestAuthProvider } from "@/context/guest-auth-context";
 
 export default function MainLayout({
   children,
@@ -18,11 +18,11 @@ export default function MainLayout({
 
   return (
     <PostUploadProvider>
-      <GlobalDmIncomingCalls />
-      {isMessagesPage ? (
-        <>{children}</>
-      ) : (
-        <AuthGuard>
+      <GuestAuthProvider>
+        <GlobalDmIncomingCalls />
+        {isMessagesPage ? (
+          <>{children}</>
+        ) : (
           <div className="app-shell flex">
             <Sidebar />
             <div className="page flex-1" data-scroll-root>
@@ -30,8 +30,8 @@ export default function MainLayout({
             </div>
             {modal}
           </div>
-        </AuthGuard>
-      )}
+        )}
+      </GuestAuthProvider>
     </PostUploadProvider>
   );
 }

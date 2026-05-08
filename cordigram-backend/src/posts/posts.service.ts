@@ -1771,15 +1771,11 @@ export class PostsService {
   }
 
   async getFeed(
-    userId: string,
+    userId: string | null | undefined,
     limit = 20,
     kinds: PostKind[] = ['post', 'reel'],
     page = 1,
   ) {
-    if (!userId) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
     const allowedKinds = kinds.length ? kinds : ['post', 'reel'];
     const followerVisibleModerationFilter = {
       $in: ['normal', 'restricted', null] as const,
@@ -1791,6 +1787,37 @@ export class PostsService {
     const sliceStart = (safePage - 1) * safeLimit;
     const sliceEnd = sliceStart + safeLimit;
     const candidateLimit = Math.min(safeLimit * 2 * safePage, 500);
+
+    // Guest (no userId): skip all personalization, return popular public posts only
+    if (!userId) {
+      const guestCandidates = await this.postModel
+        .find({
+          kind: { $in: allowedKinds },
+          status: 'published',
+          visibility: 'public',
+          moderationState: publicDiscoveryModerationFilter,
+          deletedAt: null,
+          publishedAt: { $ne: null },
+        })
+        .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
+        .limit(candidateLimit)
+        .lean();
+
+      const guestSlice = guestCandidates.slice(sliceStart, sliceEnd);
+      const authorIds = [...new Set(guestSlice.map((p) => p.authorId?.toString()).filter(Boolean))];
+      const profiles = await this.getProfilesWithCreatorVerification(
+        authorIds.map((id) => new Types.ObjectId(id)),
+      );
+      const profileMap = new Map(profiles.map((p) => [p.userId?.toString(), p]));
+
+      return Promise.all(
+        guestSlice.map((raw) => {
+          const profile = profileMap.get(raw.authorId?.toString()) ?? null;
+          return this.toResponse(this.postModel.hydrate(raw) as Post, profile, {});
+        }),
+      );
+    }
+
     const userObjectId = this.asObjectId(userId, 'userId');
 
     const hidden = await this.postInteractionModel
@@ -2521,7 +2548,7 @@ export class PostsService {
     });
   }
 
-  async getReelsFeed(userId: string, limit = 20, page = 1) {
+  async getReelsFeed(userId: string | null | undefined, limit = 20, page = 1) {
     return this.getFeed(userId, limit, ['reel'], page);
   }
 
@@ -2565,20 +2592,47 @@ export class PostsService {
   }
 
   async getExploreFeed(
-    userId: string,
+    userId: string | null | undefined,
     limit = 30,
     page = 1,
     kinds: PostKind[] = ['post', 'reel'],
   ) {
-    if (!userId) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
     const allowedKinds = kinds.length ? kinds : ['post', 'reel'];
     const safeLimit = Math.min(Math.max(limit, 1), 60);
     const safePage = Math.min(Math.max(page || 1, 1), 50);
     const sliceStart = (safePage - 1) * safeLimit;
     const sliceEnd = sliceStart + safeLimit;
+
+    if (!userId) {
+      const guestDocs = await this.postModel
+        .find({
+          kind: { $in: allowedKinds },
+          status: 'published',
+          visibility: 'public',
+          moderationState: 'normal',
+          deletedAt: null,
+          publishedAt: { $ne: null },
+        })
+        .sort({
+          'stats.views': -1,
+          'stats.hearts': -1,
+          'stats.comments': -1,
+          createdAt: -1,
+        })
+        .limit(sliceEnd)
+        .lean();
+      const guestSlice = guestDocs.slice(sliceStart, sliceEnd);
+      if (!guestSlice.length) return [] as ReturnType<typeof this.toResponse>[];
+      const authorIds = Array.from(
+        new Set(guestSlice.map((p) => p.authorId?.toString()).filter(Boolean)),
+      ).map((id) => new Types.ObjectId(id as string));
+      const profiles = await this.getProfilesWithCreatorVerification(authorIds);
+      const profileMap = this.mapProfilesByUserId(profiles);
+      return guestSlice.map((raw) => {
+        const profile = profileMap.get(raw.authorId?.toString() ?? '') ?? null;
+        return this.toResponse(this.postModel.hydrate(raw) as Post, profile, {});
+      });
+    }
 
     const userObjectId = this.asObjectId(userId, 'userId');
 
@@ -2939,7 +2993,7 @@ export class PostsService {
   }
 
   async getPostsByHashtag(params: {
-    viewerId: string;
+    viewerId: string | null | undefined;
     tag: string;
     limit?: number;
     page?: number;
@@ -2968,37 +3022,44 @@ export class PostsService {
         }
       : { hashtags: { $regex: hashtagRegex } };
 
-    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+    const viewerObjectId =
+      viewerId && Types.ObjectId.isValid(viewerId)
+        ? new Types.ObjectId(viewerId)
+        : null;
 
-    const hidden = await this.postInteractionModel
-      .find({ userId: viewerObjectId, type: { $in: ['hide', 'report'] } })
-      .select('postId')
-      .lean();
+    const hidden = viewerObjectId
+      ? await this.postInteractionModel
+          .find({ userId: viewerObjectId, type: { $in: ['hide', 'report'] } })
+          .select('postId')
+          .lean()
+      : [];
     const hiddenIds = new Set(
       hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
     );
 
-    const followees = await this.followModel
-      .find({ followerId: viewerObjectId })
-      .select('followeeId')
-      .lean();
+    const followees = viewerObjectId
+      ? await this.followModel
+          .find({ followerId: viewerObjectId })
+          .select('followeeId')
+          .lean()
+      : [];
     const followeeIds = followees.map((f) => f.followeeId.toString());
     const followeeSet = new Set(followeeIds);
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
-    const visibilityMatch = {
-      $or: [
-        { authorId: viewerObjectId },
-        { visibility: 'public' },
-        {
-          visibility: 'followers',
-          authorId: { $in: followeeObjectIds },
-        },
-      ],
-    };
+    const visibilityMatch = viewerObjectId
+      ? {
+          $or: [
+            { authorId: viewerObjectId },
+            { visibility: 'public' },
+            { visibility: 'followers', authorId: { $in: followeeObjectIds } },
+          ],
+        }
+      : { $or: [{ visibility: 'public' }] };
 
-    const { blockedIds, blockedByIds } =
-      await this.blocksService.getBlockLists(viewerObjectId);
+    const { blockedIds, blockedByIds } = viewerObjectId
+      ? await this.blocksService.getBlockLists(viewerObjectId)
+      : { blockedIds: [], blockedByIds: [] };
     const excludedAuthorIds = Array.from(
       new Set([...blockedIds, ...blockedByIds]),
       (id) => new Types.ObjectId(id),
@@ -3116,7 +3177,7 @@ export class PostsService {
   }
 
   async getReelsByHashtag(params: {
-    viewerId: string;
+    viewerId: string | null | undefined;
     tag: string;
     limit?: number;
     page?: number;
@@ -3145,37 +3206,44 @@ export class PostsService {
         }
       : { hashtags: { $regex: hashtagRegex } };
 
-    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+    const viewerObjectId =
+      viewerId && Types.ObjectId.isValid(viewerId)
+        ? new Types.ObjectId(viewerId)
+        : null;
 
-    const hidden = await this.postInteractionModel
-      .find({ userId: viewerObjectId, type: { $in: ['hide', 'report'] } })
-      .select('postId')
-      .lean();
+    const hidden = viewerObjectId
+      ? await this.postInteractionModel
+          .find({ userId: viewerObjectId, type: { $in: ['hide', 'report'] } })
+          .select('postId')
+          .lean()
+      : [];
     const hiddenIds = new Set(
       hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
     );
 
-    const followees = await this.followModel
-      .find({ followerId: viewerObjectId })
-      .select('followeeId')
-      .lean();
+    const followees = viewerObjectId
+      ? await this.followModel
+          .find({ followerId: viewerObjectId })
+          .select('followeeId')
+          .lean()
+      : [];
     const followeeIds = followees.map((f) => f.followeeId.toString());
     const followeeSet = new Set(followeeIds);
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
-    const visibilityMatch = {
-      $or: [
-        { authorId: viewerObjectId },
-        { visibility: 'public' },
-        {
-          visibility: 'followers',
-          authorId: { $in: followeeObjectIds },
-        },
-      ],
-    };
+    const visibilityMatch = viewerObjectId
+      ? {
+          $or: [
+            { authorId: viewerObjectId },
+            { visibility: 'public' },
+            { visibility: 'followers', authorId: { $in: followeeObjectIds } },
+          ],
+        }
+      : { $or: [{ visibility: 'public' }] };
 
-    const { blockedIds, blockedByIds } =
-      await this.blocksService.getBlockLists(viewerObjectId);
+    const { blockedIds, blockedByIds } = viewerObjectId
+      ? await this.blocksService.getBlockLists(viewerObjectId)
+      : { blockedIds: [], blockedByIds: [] };
     const excludedAuthorIds = Array.from(
       new Set([...blockedIds, ...blockedByIds]),
       (id) => new Types.ObjectId(id),
@@ -3293,14 +3361,17 @@ export class PostsService {
   }
 
   async getUserPosts(params: {
-    viewerId: string;
+    viewerId: string | null | undefined;
     targetUserId: string;
     limit?: number;
   }) {
     const { viewerId, targetUserId } = params;
     const limit = Math.min(Math.max(params.limit ?? 24, 1), 60);
 
-    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+    const viewerObjectId =
+      viewerId && Types.ObjectId.isValid(viewerId)
+        ? new Types.ObjectId(viewerId)
+        : null;
     const targetObjectId = this.asObjectId(targetUserId, 'targetUserId');
 
     const targetUser = await this.userModel
@@ -3312,16 +3383,16 @@ export class PostsService {
       return [] as ReturnType<typeof this.toResponse>[];
     }
 
-    if (viewerObjectId.toString() !== targetObjectId.toString()) {
+    if (viewerObjectId && viewerObjectId.toString() !== targetObjectId.toString()) {
       await this.blocksService.assertNotBlocked(viewerObjectId, targetObjectId);
     }
 
-    const isOwner = viewerObjectId.equals(targetObjectId);
+    const isOwner = viewerObjectId ? viewerObjectId.equals(targetObjectId) : false;
     let allowedVisibilities: Visibility[] = ['public'];
 
     if (isOwner) {
       allowedVisibilities = ['public', 'followers', 'private'];
-    } else {
+    } else if (viewerObjectId) {
       const follows = await this.followModel
         .findOne({ followerId: viewerObjectId, followeeId: targetObjectId })
         .select('_id')
@@ -3351,14 +3422,17 @@ export class PostsService {
   }
 
   async getUserReels(params: {
-    viewerId: string;
+    viewerId: string | null | undefined;
     targetUserId: string;
     limit?: number;
   }) {
     const { viewerId, targetUserId } = params;
     const limit = Math.min(Math.max(params.limit ?? 24, 1), 60);
 
-    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+    const viewerObjectId =
+      viewerId && Types.ObjectId.isValid(viewerId)
+        ? new Types.ObjectId(viewerId)
+        : null;
     const targetObjectId = this.asObjectId(targetUserId, 'targetUserId');
 
     const targetUser = await this.userModel
@@ -3370,16 +3444,16 @@ export class PostsService {
       return [] as ReturnType<typeof this.toResponse>[];
     }
 
-    if (viewerObjectId.toString() !== targetObjectId.toString()) {
+    if (viewerObjectId && viewerObjectId.toString() !== targetObjectId.toString()) {
       await this.blocksService.assertNotBlocked(viewerObjectId, targetObjectId);
     }
 
-    const isOwner = viewerObjectId.equals(targetObjectId);
+    const isOwner = viewerObjectId ? viewerObjectId.equals(targetObjectId) : false;
     let allowedVisibilities: Visibility[] = ['public'];
 
     if (isOwner) {
       allowedVisibilities = ['public', 'followers', 'private'];
-    } else {
+    } else if (viewerObjectId) {
       const follows = await this.followModel
         .findOne({ followerId: viewerObjectId, followeeId: targetObjectId })
         .select('_id')
@@ -3692,14 +3766,14 @@ export class PostsService {
   }
 
   async getById(
-    userId: string,
+    userId: string | null | undefined,
     postId: string,
     opts?: { allowedKinds?: PostKind[] },
   ) {
-    const { userObjectId, postObjectId } = await this.resolveIds(
-      userId,
-      postId,
-    );
+    const postObjectId = this.asObjectId(postId, 'postId');
+    const userObjectId = userId && Types.ObjectId.isValid(userId)
+      ? new Types.ObjectId(userId)
+      : null;
 
     const post = await this.postModel
       .findOne({
@@ -3729,7 +3803,7 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
 
-    const isAuthor = post.authorId?.toString?.() === userId;
+    const isAuthor = userId && post.authorId?.toString?.() === userId;
 
     if (!isAuthor && post.status !== 'published') {
       throw new ForbiddenException('Post is not published');
@@ -3740,6 +3814,9 @@ export class PostsService {
     }
 
     if (!isAuthor && post.visibility === 'followers') {
+      if (!userObjectId) {
+        throw new ForbiddenException('Post is available to followers only');
+      }
       const follows = await this.followModel
         .findOne({ followerId: userObjectId, followeeId: post.authorId })
         .select('_id')
@@ -3749,40 +3826,40 @@ export class PostsService {
       }
     }
 
-    await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+    if (userObjectId) {
+      await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+    }
 
     const profiles = await this.getProfilesWithCreatorVerification([
       post.authorId,
     ]);
     const profile = profiles[0] ?? null;
 
-    const interactions = await this.postInteractionModel
-      .find({
-        userId: userObjectId,
-        postId: postObjectId,
-        type: { $in: ['like', 'save', 'repost'] },
-      })
-      .select('type')
-      .lean();
+    const flags: { liked?: boolean; saved?: boolean; following?: boolean; reposted?: boolean } = {};
 
-    const flags = interactions.reduce<{
-      liked?: boolean;
-      saved?: boolean;
-      following?: boolean;
-      reposted?: boolean;
-    }>((acc, item) => {
-      if (item.type === 'like') acc.liked = true;
-      if (item.type === 'save') acc.saved = true;
-      if (item.type === 'repost') acc.reposted = true;
-      return acc;
-    }, {});
-
-    if (!isAuthor) {
-      const isFollowing = await this.followModel
-        .findOne({ followerId: userObjectId, followeeId: post.authorId })
-        .select('_id')
+    if (userObjectId) {
+      const interactions = await this.postInteractionModel
+        .find({
+          userId: userObjectId,
+          postId: postObjectId,
+          type: { $in: ['like', 'save', 'repost'] },
+        })
+        .select('type')
         .lean();
-      flags.following = Boolean(isFollowing);
+
+      interactions.forEach((item) => {
+        if (item.type === 'like') flags.liked = true;
+        if (item.type === 'save') flags.saved = true;
+        if (item.type === 'repost') flags.reposted = true;
+      });
+
+      if (!isAuthor) {
+        const isFollowing = await this.followModel
+          .findOne({ followerId: userObjectId, followeeId: post.authorId })
+          .select('_id')
+          .lean();
+        flags.following = Boolean(isFollowing);
+      }
     }
 
     return this.toResponse(
@@ -3792,7 +3869,7 @@ export class PostsService {
     );
   }
 
-  async getReelById(userId: string, postId: string) {
+  async getReelById(userId: string | null | undefined, postId: string) {
     return this.getById(userId, postId, { allowedKinds: ['reel'] });
   }
 

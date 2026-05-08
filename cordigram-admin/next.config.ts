@@ -9,11 +9,11 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SOCIAL_URL:
       process.env.NEXT_PUBLIC_SOCIAL_URL ??
       process.env.SOCIAL_URL ??
-      "https://api.cordigram.com",
+      "https://www.cordigram.com",
     NEXT_PUBLIC_APP_URL:
       process.env.NEXT_PUBLIC_APP_URL ??
       process.env.APP_URL ??
-      "https://api.cordigram.com",
+      "https://admin.cordigram.com",
   },
 };
 

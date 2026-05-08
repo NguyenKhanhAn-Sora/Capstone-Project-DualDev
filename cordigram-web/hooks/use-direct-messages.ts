@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import io, { Socket } from "socket.io-client";
+import { apiBaseUrl } from "@/lib/api";
 
 interface UseDirectMessagesOptions {
   userId: string;
@@ -163,7 +164,7 @@ export const useDirectMessages = ({
     }
 
     const socket = io(
-      `${process.env.NEXT_PUBLIC_API_BASE || "https://api.cordigram.com"}/direct-messages`,
+      `${apiBaseUrl}/direct-messages`,
       {
         auth: {
           token,

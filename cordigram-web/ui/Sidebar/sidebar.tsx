@@ -28,12 +28,14 @@ import {
   type NotificationReadDetail,
 } from "@/lib/events";
 import { useTheme } from "@/component/theme-provider";
+import { useLanguage, SUPPORTED_LANGUAGE_CODES, type LanguageCode } from "@/component/language-provider";
 import SearchOverlay from "@/ui/search-overlay/search-overlay";
 import NotificationsOverlay from "@/ui/notifications-overlay/notifications-overlay";
-import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
+import { clearStoredAccessToken, getStoredAccessToken, isAccessTokenValid } from "@/lib/auth";
 import { useTranslations } from "next-intl";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LANG_LABELS: Record<string, string> = { vi: "Tiếng Việt", en: "English", ja: "日本語", zh: "中文" };
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
     aria-hidden
@@ -53,26 +55,30 @@ const EyeIcon = ({ open }: { open: boolean }) => (
 );
 
 const navItems = [
-  { key: "home", href: "/", icon: IconHome, hasAvatar: false },
-  { key: "search", href: "/search", icon: IconSearch, hasAvatar: false },
-  { key: "message", href: "/messages", icon: IconMessage, hasAvatar: false },
+  { key: "home", href: "/", icon: IconHome, hasAvatar: false, guestVisible: true },
+  { key: "search", href: "/search", icon: IconSearch, hasAvatar: false, guestVisible: true },
+  { key: "message", href: "/messages", icon: IconMessage, hasAvatar: false, guestVisible: false },
   {
     key: "following",
     href: "/following",
     icon: IconFollowing,
     hasAvatar: false,
+    guestVisible: false,
   },
-  { key: "explore", href: "/explore", icon: IconCompass, hasAvatar: false },
-  { key: "notification", href: "/notifications", icon: IconBell, hasAvatar: false },
-  { key: "ads", href: "/ads", icon: IconAds, hasAvatar: false },
-  { key: "create", href: "/create", icon: IconPlus, hasAvatar: false },
-  { key: "reels", href: "/reels", icon: IconReel, hasAvatar: false },
+  { key: "explore", href: "/explore", icon: IconCompass, hasAvatar: false, guestVisible: true },
+  { key: "notification", href: "/notifications", icon: IconBell, hasAvatar: false, guestVisible: false },
+  { key: "ads", href: "/ads", icon: IconAds, hasAvatar: false, guestVisible: false },
+  { key: "create", href: "/create", icon: IconPlus, hasAvatar: false, guestVisible: false },
+  { key: "reels", href: "/reels", icon: IconReel, hasAvatar: false, guestVisible: true },
 ];
 
 export default function Sidebar() {
   const router = useRouter();
   const t = useTranslations("sidebar");
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
+  const [isGuest, setIsGuest] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -88,6 +94,9 @@ export default function Sidebar() {
   const socketRef = useRef<Socket | null>(null);
   const dmSocketRef = useRef<Socket | null>(null);
   const { theme, toggleTheme } = useTheme();
+  const { language, setLanguage } = useLanguage();
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement | null>(null);
   const clearSessionAndGoHome = useCallback(
     (event?: React.MouseEvent<HTMLAnchorElement>) => {
       event?.preventDefault();
@@ -118,16 +127,25 @@ export default function Sidebar() {
           ? localStorage.getItem("accessToken")
           : null;
 
-      if (!token) {
-        if (active) setProfile(null);
+      if (!token || !isAccessTokenValid(token)) {
+        if (active) {
+          setProfile(null);
+          setIsGuest(true);
+        }
         return;
       }
 
       try {
         const result = await fetchCurrentProfile({ token });
-        if (active) setProfile(result);
+        if (active) {
+          setProfile(result);
+          setIsGuest(false);
+        }
       } catch (_err) {
-        if (active) setProfile(null);
+        if (active) {
+          setProfile(null);
+          setIsGuest(true);
+        }
       }
     };
 
@@ -205,6 +223,17 @@ export default function Sidebar() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!langOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [langOpen]);
 
   const connectNotifications = useCallback(
     (token: string) => {
@@ -446,7 +475,7 @@ export default function Sidebar() {
         </Link>
 
         <nav className={styles.nav}>
-          {navItems.map(({ key, href, icon: Icon, hasAvatar }) =>
+          {navItems.filter(({ guestVisible }) => !isGuest || guestVisible).map(({ key, href, icon: Icon, hasAvatar }) =>
             key === "search" ? (
               <button
                 key={key}
@@ -520,7 +549,52 @@ export default function Sidebar() {
           )}
         </nav>
 
-        {profile ? (
+        {isGuest ? (
+          <div className={styles.guestCard}>
+            <div className={styles.guestTools}>
+              <button
+                type="button"
+                className={styles.guestToolBtn}
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+              >
+                <IconTheme />
+                {mounted ? (theme === "dark" ? "Light" : "Dark") : "Theme"}
+              </button>
+              <div ref={langRef} className={styles.guestToolBtn} style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center", background: "transparent", border: "none", color: "inherit", cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                  onClick={() => setLangOpen((v) => !v)}
+                  aria-expanded={langOpen}
+                >
+                  <IconLanguage />
+                  {mounted ? LANG_LABELS[language] : "Lang"}
+                </button>
+                {langOpen && (
+                  <div className={styles.guestLangMenu}>
+                    {SUPPORTED_LANGUAGE_CODES.map((code) => (
+                      <button
+                        key={code}
+                        type="button"
+                        className={`${styles.guestLangOption} ${language === code ? styles.guestLangOptionActive : ""}`}
+                        onClick={() => { setLanguage(code); setLangOpen(false); }}
+                      >
+                        {LANG_LABELS[code]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <Link href="/login" className={styles.guestLoginBtn}>
+              Log in
+            </Link>
+            <Link href="/signup" className={styles.guestSignupBtn}>
+              Sign up
+            </Link>
+          </div>
+        ) : profile ? (
           <div
             className={styles.userCard}
             onClick={() => setMenuOpen((prev) => !prev)}
@@ -1112,6 +1186,15 @@ function IconLogout() {
       <path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4" />
       <path d="M16 16l4-4-4-4" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M11 12h9" />
+    </svg>
+  );
+}
+
+function IconLanguage() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z" />
     </svg>
   );
 }

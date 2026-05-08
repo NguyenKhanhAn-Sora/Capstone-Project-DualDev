@@ -4,13 +4,15 @@ import {
   type CordigramUploadContext,
 } from "./cordigram-upload-context";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "https://api.cordigram.com";
+export { apiBaseUrl as API_BASE_URL } from "./api";
 
 function getToken(): string {
   return (
     localStorage.getItem("accessToken") || localStorage.getItem("token") || ""
   );
 }
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "https://api.cordigram.com";
 
 export function getHeaders() {
   return {

@@ -67,6 +67,7 @@ import {
   INTERACTION_MUTED_FALLBACK_MESSAGE,
 } from "@/lib/interaction-mute";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
+import { useGuestAuth } from "@/context/guest-auth-context";
 
 function upsertById(list: CommentItem[], incoming: CommentItem): CommentItem[] {
   const idx = list.findIndex((c) => c.id === incoming.id);
@@ -452,6 +453,7 @@ const IconClose = ({ size = 18 }: IconProps) => (
 export default function PostView({ postId, asModal }: PostViewProps) {
   const router = useRouter();
   const { language } = useLanguage();
+  const { showLoginOverlay } = useGuestAuth();
   const searchParams = useSearchParams();
   const fromProfile = searchParams?.get("fromProfile") === "1";
   const profileNavProfileId = (searchParams?.get("profileId") || "").trim();
@@ -1674,7 +1676,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const handleQuickRepost = useCallback(
     async (target: RepostTarget) => {
-      if (!token) { showToast("Please sign in to repost"); return; }
+      if (!token) { showLoginOverlay(); return; }
       try {
         const originalId = (post?.repostOf as string | undefined) || target.postId;
         await createPost({ token, payload: { repostOf: originalId } });
@@ -1695,7 +1697,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const handleShareQuote = useCallback(
     async (target: RepostTarget, input: QuoteInput) => {
-      if (!token) { showToast("Please sign in to repost"); return; }
+      if (!token) { showLoginOverlay(); return; }
       try {
         const originalId = (post?.repostOf as string | undefined) || target.postId;
         const note = input.content.trim();
@@ -1974,7 +1976,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   );
 
   useEffect(() => {
-    if (!token) return;
     setLoadingPost(true);
     setPostError("");
     fetchPostDetail({ token, postId })
@@ -2259,7 +2260,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const loadComments = useCallback(
     async (nextPage: number) => {
-      if (!token) return;
       setCommentsLoading(true);
       setCommentsError("");
       try {
@@ -2280,9 +2280,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   );
 
   useEffect(() => {
-    if (!token) return;
     loadComments(1);
-  }, [token, loadComments]);
+  }, [loadComments]);
 
   const mergeLatestComments = useCallback(
     (latest: CommentItem[]) => {
@@ -2588,7 +2587,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const loadReplies = useCallback(
     async (parentId: string, nextPage = 1) => {
-      if (!token) return;
       setReplyState((prev) => ({
         ...prev,
         [parentId]: {
@@ -2778,7 +2776,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   };
 
   const handleSubmit = async () => {
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     if (commentsLocked) return;
     if (submitting || commentMediaUploading) return;
     const content = commentText.trim();
@@ -3117,7 +3115,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   };
 
   const openReportModal = () => {
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
     setReportClosing(false);
     setReportOpen(true);
@@ -3585,7 +3583,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const toggleCommentLike = useCallback(
     async (comment: CommentItem) => {
-      if (!token) return;
+      if (!token) { showLoginOverlay(); return; }
       const targetId = comment.id;
       const nextLiked = !comment.liked;
       const delta = nextLiked ? 1 : -1;
@@ -3984,6 +3982,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               >
                 <span>{comment.likesCount ?? 0}</span>
               </button>
+              {token ? (
               <div className={styles.commentMoreWrap} data-comment-menu="true">
                 <button
                   className={styles.commentMoreBtn}
@@ -3998,6 +3997,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   <IconMoreHorizontal size={16} />
                 </button>
               </div>
+              ) : null}
               {openCommentMenuId === comment.id ? (
                 <div
                   className={styles.commentMenuOverlay}
@@ -4560,7 +4560,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, [replyTarget, commentsLocked]);
 
   const toggleLike = async () => {
-    if (!token || !post) return;
+    if (!token) { showLoginOverlay(); return; }
+    if (!post) return;
     const nextLiked = !liked;
     try {
       if (nextLiked) {
@@ -4595,7 +4596,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   };
 
   const toggleSave = async () => {
-    if (!token || !post) return;
+    if (!token) { showLoginOverlay(); return; }
+    if (!post) return;
     const nextSaved = !saved;
     setSaved(nextSaved);
     setPost((prev) =>
@@ -4688,7 +4690,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const followToggledRef = useRef(false);
 
   const toggleFollowAuthor = async () => {
-    if (!token || !post?.authorId) return;
+    if (!token) { showLoginOverlay(); return; }
+    if (!post?.authorId) return;
     const next = !followingAuthor;
     followToggledRef.current = true;
     setFollowingAuthor(next);

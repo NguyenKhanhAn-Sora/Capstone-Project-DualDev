@@ -4,15 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAccessTokenStatus, isAccessTokenValid } from "@/lib/auth";
 
-export function useRequireAuth(opts?: { skip?: boolean }): boolean {
+export function useRequireAuth(opts?: {
+  skip?: boolean;
+  /** When true, guests (no valid token) can still render the page.
+   *  The hook returns true immediately instead of redirecting to /login. */
+  guestAllowed?: boolean;
+}): boolean {
   const skip = opts?.skip ?? false;
+  const guestAllowed = opts?.guestAllowed ?? false;
   const router = useRouter();
   const [canRender, setCanRender] = useState(false);
   const lastTokenRef = useRef<string | null>(null);
   const skipRestoreKey = "skipSessionRestore";
 
   useEffect(() => {
-    if (skip) {
+    if (skip || guestAllowed) {
       setCanRender(true);
       return;
     }
@@ -70,7 +76,7 @@ export function useRequireAuth(opts?: { skip?: boolean }): boolean {
       window.removeEventListener("focus", check);
       clearInterval(interval);
     };
-  }, [router, skip]);
+  }, [router, skip, guestAllowed]);
   return canRender;
 }
 

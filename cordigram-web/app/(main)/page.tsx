@@ -50,6 +50,7 @@ import { TimeSelect } from "@/ui/time-select/time-select";
 import PeopleYouMayKnow from "@/ui/people-you-may-know/people-you-may-know";
 import { formatRelativeTime } from "@/lib/relative-time";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useGuestAuth } from "@/context/guest-auth-context";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
 import { useTranslations } from "next-intl";
 import { useLanguage } from "@/component/language-provider";
@@ -476,7 +477,8 @@ export default function HomePage({
   hideLoadMore?: boolean;
   cardClassName?: string;
 } = {}) {
-  const canRender = useRequireAuth();
+  const canRender = useRequireAuth({ guestAllowed: true });
+  const { showLoginOverlay } = useGuestAuth();
   const t = useTranslations("home");
   const tCommon = useTranslations("common");
   const pathname = usePathname();
@@ -999,10 +1001,6 @@ export default function HomePage({
 
   const load = useCallback(
     async (nextPage: number) => {
-      if (!token) {
-        setError(t("feed.signInToView"));
-        return;
-      }
       setLoading(true);
       setError("");
       try {
@@ -1157,7 +1155,7 @@ export default function HomePage({
   }, [canRender, isSearchMode, tryHydrateFromCache]);
 
   const onLike = async (postId: string, liked: boolean) => {
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     try {
       if (liked) {
         await likePost({ token, postId });
@@ -1196,7 +1194,7 @@ export default function HomePage({
   };
 
   const onSave = async (postId: string, saved: boolean) => {
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     setItems((prev) =>
       prev.map((p) =>
         p.item.id === postId
@@ -1254,10 +1252,7 @@ export default function HomePage({
     originalAllowDownload: boolean,
     anchor?: DOMRect | null,
   ) => {
-    if (!token) {
-      showToast(t("toast.signInToRepost"));
-      return;
-    }
+    if (!token) { showLoginOverlay(); return; }
     setRepostTarget({ postId, label, kind, originalAllowDownload });
   };
 
@@ -1285,10 +1280,7 @@ export default function HomePage({
 
   const handleQuickRepost = useCallback(
     async (target: RepostTarget) => {
-      if (!token) {
-        showToast(t("toast.signInToRepost"));
-        return;
-      }
+      if (!token) { showLoginOverlay(); return; }
       try {
         const originalId = resolveOriginalPostId(target.postId);
         const targetId = target.postId;
@@ -1317,10 +1309,7 @@ export default function HomePage({
 
   const handleShareQuote = useCallback(
     async (target: RepostTarget, input: QuoteInput) => {
-      if (!token) {
-        showToast(t("toast.signInToRepost"));
-        return;
-      }
+      if (!token) { showLoginOverlay(); return; }
       try {
         const originalId = resolveOriginalPostId(target.postId);
         const targetId = target.postId;
@@ -1583,7 +1572,8 @@ export default function HomePage({
   };
 
   const onFollow = async (authorId: string, nextFollow: boolean) => {
-    if (!token || !authorId) return;
+    if (!token) { showLoginOverlay(); return; }
+    if (!authorId) return;
     setItems((prev) =>
       prev.map((p) =>
         p.item.authorId === authorId
@@ -1702,7 +1692,7 @@ export default function HomePage({
               onRemoteUpdate={onRemoteUpdate}
               onPersistFeedCache={persistFeedCache}
             />
-            {index + 1 === livestreamInsertIndex ? (
+            {token && index + 1 === livestreamInsertIndex ? (
               <LivestreamHub viewerId={viewerId} />
             ) : null}
           </Fragment>

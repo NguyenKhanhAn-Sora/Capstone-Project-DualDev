@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "https://api.cordigram.com";
+import { apiBaseUrl as API_BASE_URL } from "./api";
 
 function getHeaders(): Record<string, string> {
   const token = localStorage.getItem("accessToken") || localStorage.getItem("token") || "";

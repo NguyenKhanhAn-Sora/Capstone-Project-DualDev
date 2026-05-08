@@ -471,6 +471,117 @@
   font-size: 14px;
 }
 
+.guestCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+  margin-top: auto;
+}
+
+.guestLoginBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--color-primary, #7895ff);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.guestLoginBtn:hover {
+  opacity: 0.88;
+}
+
+.guestSignupBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.guestSignupBtn:hover {
+  background: var(--color-surface-hover, rgba(255,255,255,0.06));
+}
+
+.guestTools {
+  display: flex;
+  gap: 8px;
+}
+
+.guestToolBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+  white-space: nowrap;
+}
+
+.guestToolBtn:hover {
+  background: var(--color-surface-hover, rgba(255,255,255,0.06));
+}
+
+.guestLangMenu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(15, 22, 41, 0.18);
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+}
+
+.guestLangOption {
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.guestLangOption:hover {
+  background: var(--color-surface-muted);
+}
+
+.guestLangOptionActive {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
 @media (max-width: 720px) {
   .switchCard {
     max-width: 540px;

@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 export const DEFAULT_MESSAGING_AVATAR_URL =
+  process.env.DEFAULT_AVATAR_URL?.trim() ||
   'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
 
 /**

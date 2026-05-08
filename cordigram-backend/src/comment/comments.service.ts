@@ -424,14 +424,14 @@ export class CommentsService {
   }
 
   async list(
-    userId: string,
+    userId: string | null | undefined,
     postId: string,
     options?: { page?: number; limit?: number; parentId?: string },
   ) {
-    if (!userId) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-    const userObjectId = this.asObjectId(userId, 'userId');
+    const userObjectId =
+      userId && Types.ObjectId.isValid(userId)
+        ? new Types.ObjectId(userId)
+        : null;
     const postObjectId = this.asObjectId(postId, 'postId');
 
     const post = await this.postModel
@@ -447,10 +447,13 @@ export class CommentsService {
       throw new NotFoundException('Post not found');
     }
 
-    await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+    if (userObjectId) {
+      await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+    }
 
-    const { blockedIds, blockedByIds } =
-      await this.blocksService.getBlockLists(userObjectId);
+    const { blockedIds, blockedByIds } = userObjectId
+      ? await this.blocksService.getBlockLists(userObjectId)
+      : { blockedIds: [], blockedByIds: [] };
     const excludedAuthorIds = Array.from(
       new Set<string>([...blockedIds, ...blockedByIds]),
     )
@@ -545,16 +548,18 @@ export class CommentsService {
           likesCountMap.set(row._id.toString(), row.count);
         });
 
-        const likedDocs = await this.commentLikeModel
-          .find({ commentId: { $in: parentIds }, userId: userObjectId })
-          .select('commentId')
-          .lean()
-          .exec();
+        if (userObjectId) {
+          const likedDocs = await this.commentLikeModel
+            .find({ commentId: { $in: parentIds }, userId: userObjectId })
+            .select('commentId')
+            .lean()
+            .exec();
 
-        likedDocs.forEach((doc) => {
-          const id = doc.commentId?.toString?.();
-          if (id) likedSet.add(id);
-        });
+          likedDocs.forEach((doc) => {
+            const id = doc.commentId?.toString?.();
+            if (id) likedSet.add(id);
+          });
+        }
       }
     }
 
@@ -597,12 +602,11 @@ export class CommentsService {
     };
   }
 
-  async getById(userId: string, postId: string, commentId: string) {
-    if (!userId) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
-    const userObjectId = this.asObjectId(userId, 'userId');
+  async getById(userId: string | null | undefined, postId: string, commentId: string) {
+    const userObjectId =
+      userId && Types.ObjectId.isValid(userId)
+        ? new Types.ObjectId(userId)
+        : null;
     const postObjectId = this.asObjectId(postId, 'postId');
     const commentObjectId = this.asObjectId(commentId, 'commentId');
 
@@ -619,10 +623,13 @@ export class CommentsService {
       throw new NotFoundException('Post not found');
     }
 
-    await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+    if (userObjectId) {
+      await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+    }
 
-    const { blockedIds, blockedByIds } =
-      await this.blocksService.getBlockLists(userObjectId);
+    const { blockedIds, blockedByIds } = userObjectId
+      ? await this.blocksService.getBlockLists(userObjectId)
+      : { blockedIds: [], blockedByIds: [] };
     const excludedAuthorIds = new Set<string>([...blockedIds, ...blockedByIds]);
 
     const comment = await this.commentModel
@@ -655,10 +662,12 @@ export class CommentsService {
           moderationState: { $in: ['normal', null] },
         }),
         this.commentLikeModel.countDocuments({ commentId: commentObjectId }),
-        this.commentLikeModel.exists({
-          commentId: commentObjectId,
-          userId: userObjectId,
-        }),
+        userObjectId
+          ? this.commentLikeModel.exists({
+              commentId: commentObjectId,
+              userId: userObjectId,
+            })
+          : Promise.resolve(null),
         this.getCreatorVerifiedMap(
           comment.authorId ? [comment.authorId] : ([] as Types.ObjectId[]),
         ),

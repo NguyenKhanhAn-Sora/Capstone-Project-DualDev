@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import type { Request } from 'express';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
@@ -41,7 +42,7 @@ import { UpdatePushTokenDto } from './dto/update-push-token.dto';
 import { type SupportedLanguage } from './language.constants';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(OptionalJwtAuthGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -677,10 +678,7 @@ export class UsersController {
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
-    const userId = req.user?.userId;
-    if (!userId) {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const userId = req.user?.userId ?? null;
     return this.usersService.listFollowers({
       viewerId: userId,
       userId: targetUserId,
@@ -696,10 +694,7 @@ export class UsersController {
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
-    const userId = req.user?.userId;
-    if (!userId) {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const userId = req.user?.userId ?? null;
     return this.usersService.listFollowing({
       viewerId: userId,
       userId: targetUserId,
