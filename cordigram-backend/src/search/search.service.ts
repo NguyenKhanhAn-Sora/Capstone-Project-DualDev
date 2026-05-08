@@ -197,14 +197,17 @@ export class SearchService {
   }
 
   async searchPosts(params: {
-    viewerId: string;
+    viewerId: string | null | undefined;
     q: string;
     limit?: number;
     page?: number;
     kinds?: Array<'post' | 'reel'>;
     sort?: 'trending';
   }) {
-    const viewerObjectId = this.asObjectId(params.viewerId, 'viewerId');
+    const viewerObjectId =
+      params.viewerId && Types.ObjectId.isValid(params.viewerId)
+        ? new Types.ObjectId(params.viewerId)
+        : null;
     const raw = (params.q ?? '').trim();
     const term = raw.replace(/^\s+|\s+$/g, '');
     if (!term) throw new BadRequestException('Invalid query');
@@ -213,25 +216,30 @@ export class SearchService {
     const page = Math.min(Math.max(Number(params.page) || 1, 1), 50);
     const skip = (page - 1) * limit;
 
-    const hidden = await this.postInteractionModel
-      .find({ userId: viewerObjectId, type: { $in: ['hide', 'report'] } })
-      .select('postId')
-      .lean();
+    const hidden = viewerObjectId
+      ? await this.postInteractionModel
+          .find({ userId: viewerObjectId, type: { $in: ['hide', 'report'] } })
+          .select('postId')
+          .lean()
+      : [];
     const hiddenObjectIds = hidden
       .map((h) => h.postId)
       .filter(Boolean)
       .map((id) => new Types.ObjectId(id));
 
-    const followees = await this.followModel
-      .find({ followerId: viewerObjectId })
-      .select('followeeId')
-      .lean();
+    const followees = viewerObjectId
+      ? await this.followModel
+          .find({ followerId: viewerObjectId })
+          .select('followeeId')
+          .lean()
+      : [];
     const followeeIds = followees.map((f) => f.followeeId.toString());
     const followeeSet = new Set(followeeIds);
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
-    const { blockedIds, blockedByIds } =
-      await this.blocksService.getBlockLists(viewerObjectId);
+    const { blockedIds, blockedByIds } = viewerObjectId
+      ? await this.blocksService.getBlockLists(viewerObjectId)
+      : { blockedIds: [], blockedByIds: [] };
     const excludedAuthorIds = Array.from(
       new Set([...blockedIds, ...blockedByIds]),
       (id) => new Types.ObjectId(id),
@@ -245,11 +253,13 @@ export class SearchService {
       publishedAt: { $ne: null },
       authorId: { $nin: excludedAuthorIds },
       _id: { $nin: hiddenObjectIds },
-      $or: [
-        { authorId: viewerObjectId },
-        { visibility: 'public' },
-        { visibility: 'followers', authorId: { $in: followeeObjectIds } },
-      ],
+      $or: viewerObjectId
+        ? [
+            { authorId: viewerObjectId },
+            { visibility: 'public' },
+            { visibility: 'followers', authorId: { $in: followeeObjectIds } },
+          ]
+        : [{ visibility: 'public' }],
     };
 
     if (params.kinds?.length) {

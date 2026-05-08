@@ -34,7 +34,7 @@ type IncomingCallState = {
 export default function GlobalDmIncomingCalls() {
   const pathname = usePathname() ?? "";
   const isMessagesRoute = pathname.startsWith("/messages");
-  const authOk = useRequireAuth({ skip: isMessagesRoute });
+  const authOk = useRequireAuth({ skip: isMessagesRoute, guestAllowed: true });
 
   const [token, setToken] = useState<string>("");
   const [userId, setUserId] = useState<string>("");

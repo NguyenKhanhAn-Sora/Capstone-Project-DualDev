@@ -27,6 +27,29 @@ export class ConfigService {
     return this.require('FRONTEND_URL');
   }
 
+  get adminUrl(): string {
+    return this.require('ADMIN_URL');
+  }
+
+  get corsExtraOrigins(): string[] {
+    const value = process.env.CORS_EXTRA_ORIGINS?.trim() ?? '';
+    return value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  }
+
+  get defaultAvatarUrl(): string {
+    return (
+      process.env.DEFAULT_AVATAR_URL?.trim() ||
+      'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg'
+    );
+  }
+
+  get logoUrl(): string {
+    return (
+      process.env.LOGO_URL?.trim() ||
+      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png'
+    );
+  }
+
   get mongoUri(): string {
     return this.require('MONGO_URI');
   }

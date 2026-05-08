@@ -254,8 +254,7 @@ export class MailService {
       .filter(Boolean)
       .join('\n');
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
 
     const row = (label: string, value?: string | null) => {
       if (!value?.trim()) return '';
@@ -476,8 +475,7 @@ export class MailService {
     const subject = 'Mã đăng nhập Cordigram';
     const text = `Mã của bạn: ${code}\nHiệu lực: ${expiresMinutes} phút.`;
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>
@@ -537,8 +535,7 @@ export class MailService {
     const subject = 'Đặt lại mật khẩu Cordigram';
     const text = `Mã đặt lại mật khẩu của bạn: ${code}\nHiệu lực: ${expiresMinutes} phút.`;
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>
@@ -597,8 +594,7 @@ export class MailService {
     const subject = 'Xác nhận đổi email Cordigram';
     const text = `Mã xác nhận đổi email: ${code}\nHiệu lực: ${expiresMinutes} phút.`;
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>
@@ -662,8 +658,7 @@ export class MailService {
     const subject = 'Confirm your Cordigram password change';
     const text = `Your password change code: ${code}\nValid for ${expiresMinutes} minutes.`;
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>
@@ -727,8 +722,7 @@ export class MailService {
     const subject = 'Confirm your Cordigram passkey setup';
     const text = `Your passkey setup code: ${code}\nValid for ${expiresMinutes} minutes.`;
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>
@@ -789,8 +783,7 @@ export class MailService {
     const subject = 'Confirm your Cordigram two-factor verification';
     const text = `Your two-factor verification code: ${code}\nValid for ${expiresMinutes} minutes.`;
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>
@@ -866,8 +859,7 @@ export class MailService {
       .filter(Boolean)
       .join('\n');
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>
@@ -969,8 +961,7 @@ export class MailService {
       'If you believe this was applied in error, please contact support at cordigram@gmail.com.',
     ].join('\n');
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>
@@ -1062,8 +1053,7 @@ export class MailService {
       'Keep following community guidelines to continue improving your moderation standing.',
     ].join('\n');
 
-    const logoUrl =
-      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const logoUrl = this.config.logoUrl;
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>

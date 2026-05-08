@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://api.cordigram.com";
+import { apiBaseUrl as API_BASE } from "./api";
 
 export type LivestreamLatencyMode = "adaptive" | "balanced" | "low";
 

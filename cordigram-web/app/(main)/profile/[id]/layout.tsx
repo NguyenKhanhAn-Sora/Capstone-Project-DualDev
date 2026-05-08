@@ -12,6 +12,7 @@ import {
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import styles from "../profile.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useGuestAuth } from "@/context/guest-auth-context";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
 import ProfileEditOverlay from "@/ui/profile-edit-overlay/profile-edit-overlay";
 import FollowersOverlay, {
@@ -274,7 +275,8 @@ export default function ProfileLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const canRender = useRequireAuth();
+  const canRender = useRequireAuth({ guestAllowed: true });
+  const { showLoginOverlay } = useGuestAuth();
   const params = useParams<{ id?: string }>();
   const pathname = usePathname();
   const router = useRouter();
@@ -411,11 +413,6 @@ export default function ProfileLayout({
       return;
     }
     const token = getStoredAccessToken();
-    if (!token) {
-      setError("Session expired. Please sign in again.");
-      setLoading(false);
-      return;
-    }
     setBlockedView(false);
     setBlockedMessage(
       "The link may be broken or the profile may have been removed.",
@@ -425,7 +422,7 @@ export default function ProfileLayout({
 
     setLoading(true);
     setError("");
-    fetchProfileDetail({ token, id: profileId })
+    fetchProfileDetail({ token: token ?? undefined, id: profileId })
       .then((data) => setProfile(data))
       .catch((err: unknown) => {
         const maybeStatus =
@@ -504,12 +501,10 @@ export default function ProfileLayout({
     async (key: ProfileTabKey) => {
       const token = getStoredAccessToken();
       const ownerId = profile?.userId;
-      if (!token || !ownerId) return;
-      if (
-        key === "saved" &&
-        !(profile && viewerId && profile.userId === viewerId)
-      ) {
-        return;
+      if (!ownerId) return;
+      // "saved" tab requires auth and only accessible to the profile owner
+      if (key === "saved") {
+        if (!token || !(profile && viewerId && profile.userId === viewerId)) return;
       }
 
       const currentSnapshot = tabsRef.current[key];
@@ -600,7 +595,7 @@ export default function ProfileLayout({
           return;
         }
         if (key === "saved") {
-          const data = await fetchSavedItems({ token, limit: 60 });
+          const data = await fetchSavedItems({ token: token!, limit: 60 });
           const sorted = (data || [])
             .slice()
             .sort(
@@ -700,7 +695,7 @@ export default function ProfileLayout({
   useEffect(() => {
     const token = getStoredAccessToken();
     const ownerId = profile?.userId;
-    if (!token || !ownerId) return;
+    if (!ownerId) return;
     setAuthoredCount(null);
     Promise.all([
       fetchUserPosts({ token, userId: ownerId, limit: 200 }),
@@ -820,7 +815,7 @@ export default function ProfileLayout({
     if (!profile || followLoading) return;
     const token = getStoredAccessToken();
     if (!token) {
-      setError("Session expired. Please sign in again.");
+      showLoginOverlay();
       return;
     }
 
@@ -883,6 +878,8 @@ export default function ProfileLayout({
 
   const handleOpenDirectMessage = () => {
     if (!profile) return;
+    const _token = getStoredAccessToken();
+    if (!_token) { showLoginOverlay(); return; }
     const params = new URLSearchParams({
       dm: profile.userId,
       dmName: profile.displayName || "",
@@ -974,7 +971,7 @@ export default function ProfileLayout({
     }
     const token = getStoredAccessToken();
     if (!token) {
-      setError("Session expired. Please sign in again.");
+      showLoginOverlay();
       setMenuOpen(false);
       return;
     }
@@ -1489,31 +1486,33 @@ export default function ProfileLayout({
                         >
                           Message
                         </button>
-                        <div className={styles.menuWrapper} ref={menuRef}>
-                          <button
-                            className={`${styles.secondaryButton} ${styles.menuButton}`}
-                            type="button"
-                            onClick={() => setMenuOpen((open) => !open)}
-                          >
-                            <span className={styles.buttonIcon} aria-hidden>
-                              <IconDots />
-                            </span>
-                          </button>
-                          {menuOpen ? (
-                            <div className={styles.menuPanel}>
-                              {menuItems.map((item) => (
-                                <button
-                                  key={item.key}
-                                  type="button"
-                                  className={styles.menuItem}
-                                  onClick={() => handleMenuSelect(item.key)}
-                                >
-                                  {item.label}
-                                </button>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
+                        {viewerId ? (
+                          <div className={styles.menuWrapper} ref={menuRef}>
+                            <button
+                              className={`${styles.secondaryButton} ${styles.menuButton}`}
+                              type="button"
+                              onClick={() => setMenuOpen((open) => !open)}
+                            >
+                              <span className={styles.buttonIcon} aria-hidden>
+                                <IconDots />
+                              </span>
+                            </button>
+                            {menuOpen ? (
+                              <div className={styles.menuPanel}>
+                                {menuItems.map((item) => (
+                                  <button
+                                    key={item.key}
+                                    type="button"
+                                    className={styles.menuItem}
+                                    onClick={() => handleMenuSelect(item.key)}
+                                  >
+                                    {item.label}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </>
                     )}
                   </div>

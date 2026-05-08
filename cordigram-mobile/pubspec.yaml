@@ -96,7 +96,7 @@ flutter:
   assets:
     - assets/images/cordigram-logo.png
     - assets/locales/
-    # Optional local env values are loaded at runtime if present.
+    - assets/env/.env
 
   # To add assets to your application, add an assets section, like this:
   # assets:

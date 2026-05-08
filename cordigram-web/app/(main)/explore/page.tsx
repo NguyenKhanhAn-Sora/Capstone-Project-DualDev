@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FeedItem } from "@/lib/api";
 import { fetchExploreFeed, recordExploreImpression } from "@/lib/api";
+import { useGuestAuth } from "@/context/guest-auth-context";
 import {
   filterFeedItemsByBlockedAuthors,
   refreshBlockedUserIds,
@@ -70,6 +71,7 @@ const makeSessionId = () => {
 
 export default function ExplorePage() {
   const router = useRouter();
+  const { showLoginOverlay } = useGuestAuth();
 
   const [token, setToken] = useState<string | null>(null);
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -99,7 +101,6 @@ export default function ExplorePage() {
 
   const loadPage = useCallback(
     async (nextPage: number) => {
-      if (!token) return;
       setLoading(true);
       setError("");
       try {
@@ -141,9 +142,8 @@ export default function ExplorePage() {
   );
 
   useEffect(() => {
-    if (!token) return;
     void loadPage(1);
-  }, [loadPage, token]);
+  }, [loadPage]);
 
   const handleLoadMore = useCallback(() => {
     if (loading || !hasMore) return;
@@ -171,7 +171,7 @@ export default function ExplorePage() {
 
   // Impression tracking (true viewport impressions, de-duped per session).
   useEffect(() => {
-    if (!token) return;
+    if (!token) return; // impressions only tracked for logged-in users
     if (typeof IntersectionObserver === "undefined") return;
 
     const tiles = Array.from(

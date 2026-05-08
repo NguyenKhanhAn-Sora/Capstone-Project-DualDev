@@ -27,16 +27,16 @@ function normalizeApiBaseUrl(raw: string | undefined | null): string {
   if (!s) return DEFAULT_BASE_URL;
   const trimmed = s.replace(/\/$/, "");
 
-  if (/^:\d+/.test(trimmed)) return `https://api.cordigram.com`;
+  if (/^:\d+/.test(trimmed)) return DEFAULT_BASE_URL;
 
   if (/^https?:\/\/:\d+/.test(trimmed)) {
-    return `https://api.cordigram.com`;
+    return DEFAULT_BASE_URL;
   }
   
   return trimmed;
 }
 
-const apiBaseUrl = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE);
+export const apiBaseUrl = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE);
 
 function extractPayloadMessage(payload: ApiErrorPayload | null): string | null {
   if (!payload) return null;
@@ -177,9 +177,15 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
   if (res.status === 401 && typeof window !== "undefined") {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const isLoginRequest = normalizedPath.startsWith("/auth/login");
-    if (!isLoginRequest) {
+    // Only treat as session expiry when the request was authenticated (had a token).
+    // Anonymous guest requests that get 401 are expected — don't show the login overlay.
+    const hadAuthHeader = Boolean(
+      (mergedHeaders as Record<string, string>)["Authorization"] ||
+        (mergedHeaders as Record<string, string>)["authorization"],
+    );
+    if (!isLoginRequest && hadAuthHeader) {
       window.localStorage.removeItem("accessToken");
-      window.location.href = "/login";
+      window.dispatchEvent(new CustomEvent("cordigram:session-expired"));
     }
   }
 
@@ -508,7 +514,7 @@ export async function createReel(opts: {
 }
 
 export async function fetchFeed(opts: {
-  token: string;
+  token?: string | null;
   limit?: number;
   scope?: "all" | "following";
   kinds?: Array<"post" | "reel">;
@@ -522,14 +528,12 @@ export async function fetchFeed(opts: {
   return apiFetch<FeedItem[]>({
     path: `/posts/feed?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
 export async function fetchUserPosts(opts: {
-  token: string;
+  token?: string | null;
   userId: string;
   limit?: number;
 }): Promise<FeedItem[]> {
@@ -540,9 +544,7 @@ export async function fetchUserPosts(opts: {
   return apiFetch<FeedItem[]>({
     path: `/posts/user/${userId}?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
@@ -587,7 +589,7 @@ export async function fetchReelsByHashtag(opts: {
 }
 
 export async function fetchUserReels(opts: {
-  token: string;
+  token?: string | null;
   userId: string;
   limit?: number;
 }): Promise<FeedItem[]> {
@@ -598,9 +600,7 @@ export async function fetchUserReels(opts: {
   return apiFetch<FeedItem[]>({
     path: `/reels/user/${userId}?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
@@ -639,7 +639,7 @@ export async function fetchSavedReels(opts: {
 }
 
 export async function fetchReelsFeed(opts: {
-  token: string;
+  token?: string | null;
   limit?: number;
   authorId?: string;
   includeOwned?: boolean;
@@ -655,14 +655,12 @@ export async function fetchReelsFeed(opts: {
   return apiFetch<FeedItem[]>({
     path: `/reels/feed?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
 export async function fetchExploreFeed(opts: {
-  token: string;
+  token?: string | null;
   limit?: number;
   page?: number;
   kinds?: Array<"post" | "reel">;
@@ -676,9 +674,7 @@ export async function fetchExploreFeed(opts: {
   return apiFetch<FeedItem[]>({
     path: `/explore?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
@@ -706,35 +702,31 @@ export async function recordExploreImpression(opts: {
 }
 
 export async function fetchPostDetail(opts: {
-  token: string;
+  token?: string | null;
   postId: string;
 }): Promise<FeedItem> {
   const { token, postId } = opts;
   return apiFetch<FeedItem>({
     path: `/posts/${postId}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
 export async function fetchReelDetail(opts: {
-  token: string;
+  token?: string | null;
   reelId: string;
 }): Promise<FeedItem> {
   const { token, reelId } = opts;
   return apiFetch<FeedItem>({
     path: `/reels/${reelId}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
 export async function fetchComments(opts: {
-  token: string;
+  token?: string | null;
   postId: string;
   page?: number;
   limit?: number;
@@ -751,9 +743,7 @@ export async function fetchComments(opts: {
   return apiFetch<CommentListResponse>({
     path: `/posts/${postId}/comments${query ? `?${query}` : ""}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
@@ -1511,7 +1501,7 @@ export async function fetchPeopleSuggestions(opts: {
 }
 
 export async function fetchFollowers(opts: {
-  token: string;
+  token?: string | null;
   userId: string;
   limit?: number;
   cursor?: string;
@@ -1524,14 +1514,12 @@ export async function fetchFollowers(opts: {
   return apiFetch<FollowListResponse>({
     path: `/users/${userId}/followers${suffix}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 }
 
 export async function fetchFollowing(opts: {
-  token: string;
+  token?: string | null;
   userId: string;
   limit?: number;
   cursor?: string;
@@ -1544,9 +1532,7 @@ export async function fetchFollowing(opts: {
   return apiFetch<FollowListResponse>({
     path: `/users/${userId}/following${suffix}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 }
 
@@ -2627,7 +2613,7 @@ export async function deleteMentionMute(opts: {
 }
 
 export async function searchProfiles(opts: {
-  token: string;
+  token?: string | null;
   query: string;
   limit?: number;
 }): Promise<{ items: ProfileSearchItem[]; count: number }> {
@@ -2639,23 +2625,19 @@ export async function searchProfiles(opts: {
   return apiFetch<{ items: ProfileSearchItem[]; count: number }>({
     path: `/profiles/search?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
 export async function fetchProfileDetail(opts: {
-  token: string;
+  token?: string | null;
   id: string;
 }): Promise<ProfileDetailResponse> {
   const { token, id } = opts;
   return apiFetch<ProfileDetailResponse>({
     path: `/profiles/${encodeURIComponent(id)}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
@@ -2821,7 +2803,7 @@ export type HashtagSuggestItem = {
 };
 
 export async function suggestHashtags(opts: {
-  token: string;
+  token?: string | null;
   query: string;
   limit?: number;
   signal?: AbortSignal;
@@ -2834,15 +2816,13 @@ export async function suggestHashtags(opts: {
   return apiFetch<{ items: HashtagSuggestItem[]; count: number }>({
     path: `/hashtags/suggest?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     signal,
   });
 }
 
 export async function searchHashtags(opts: {
-  token: string;
+  token?: string | null;
   query: string;
   limit?: number;
   page?: number;
@@ -2861,9 +2841,7 @@ export async function searchHashtags(opts: {
   }>({
     path: `/hashtags/search?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     signal,
   });
 }
@@ -2908,7 +2886,7 @@ export async function searchSuggest(opts: {
 }
 
 export async function searchPosts(opts: {
-  token: string;
+  token?: string | null;
   query: string;
   limit?: number;
   page?: number;
@@ -2937,9 +2915,7 @@ export async function searchPosts(opts: {
   }>({
     path: `/search/posts?${params.toString()}`,
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     signal,
   });
 }

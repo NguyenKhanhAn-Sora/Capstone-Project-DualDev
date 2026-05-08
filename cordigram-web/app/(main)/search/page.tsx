@@ -103,10 +103,6 @@ export default function SearchAllPage() {
 
   useEffect(() => {
     const token = getStoredAccessToken();
-    if (!token) {
-      setError("Session expired.");
-      return;
-    }
 
     if (!normalized) {
       setPeople([]);

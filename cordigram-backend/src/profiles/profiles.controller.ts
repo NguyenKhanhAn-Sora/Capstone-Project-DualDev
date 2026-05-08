@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { ProfilesService } from './profiles.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import type { Request } from 'express';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -318,7 +319,7 @@ export class ProfilesController {
     });
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('search')
   async searchProfiles(
     @Req() req: Request & { user?: AuthenticatedUser },
@@ -326,9 +327,6 @@ export class ProfilesController {
     @Query('limit') limit?: string,
   ) {
     const user = req.user;
-    if (!user) {
-      throw new UnauthorizedException('Unauthorized');
-    }
 
     if (!q || !q.trim()) {
       throw new BadRequestException('q is required');
@@ -337,7 +335,7 @@ export class ProfilesController {
     const results = await this.profilesService.searchProfiles({
       query: q,
       limit: limit ? Number(limit) : 8,
-      excludeUserId: user.userId,
+      excludeUserId: user?.userId,
     });
 
     return {
@@ -346,22 +344,19 @@ export class ProfilesController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':usernameOrId')
   async getProfileById(
     @Param('usernameOrId') usernameOrId: string,
     @Req() req: Request & { user?: AuthenticatedUser },
   ) {
     const user = req.user;
-    if (!user) {
-      throw new UnauthorizedException('Unauthorized');
-    }
 
-    const previewViewerId = this.resolveAdminPreviewViewerId(req, usernameOrId);
+    const previewViewerId = user ? this.resolveAdminPreviewViewerId(req, usernameOrId) : null;
 
     return this.profilesService.getProfileDetails({
       usernameOrId,
-      viewerId: previewViewerId ?? user.userId,
+      viewerId: previewViewerId ?? user?.userId,
     });
   }
 

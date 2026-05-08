@@ -67,10 +67,6 @@ export default function SearchHashtagsPage() {
 
   useEffect(() => {
     const token = getStoredAccessToken();
-    if (!token) {
-      setError("Session expired.");
-      return;
-    }
 
     if (!normalized) {
       setItems([]);

@@ -11,14 +11,15 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/jwt.strategy';
 import { PostsService } from '../posts/posts.service';
 
 @Controller('explore')
-@UseGuards(JwtAuthGuard)
 export class ExploreController {
   constructor(private readonly postsService: PostsService) {}
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
   async list(
     @Req() req: Request,
@@ -27,9 +28,6 @@ export class ExploreController {
     @Query('kinds') kinds?: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
-    if (!user) {
-      throw new UnauthorizedException();
-    }
 
     const parsedLimit = limit ? Number(limit) : undefined;
     const parsedPage = page ? Number(page) : undefined;
@@ -42,13 +40,14 @@ export class ExploreController {
       : undefined;
 
     return (this.postsService as unknown as any).getExploreFeed(
-      user.userId,
+      user?.userId ?? null,
       parsedLimit ?? 30,
       parsedPage ?? 1,
       (parsedKinds as any) ?? undefined,
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('impression')
   async impression(
     @Req() req: Request,

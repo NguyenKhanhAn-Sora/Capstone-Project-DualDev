@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/jwt.strategy';
 import { CreateReelDto } from './dto/create-reel.dto';
 import { PostsService } from './posts.service';
@@ -18,7 +19,6 @@ import { ConfigService } from '../config/config.service';
 import { JwtService } from '@nestjs/jwt';
 
 @Controller('reels')
-@UseGuards(JwtAuthGuard)
 export class ReelsController {
   private readonly jwt = new JwtService();
 
@@ -65,6 +65,7 @@ export class ReelsController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Req() req: Request, @Body() dto: CreateReelDto) {
     const user = req.user as AuthenticatedUser | undefined;
@@ -74,6 +75,7 @@ export class ReelsController {
     return this.postsService.createReel(user.userId, dto);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('feed')
   async feed(
     @Req() req: Request,
@@ -82,11 +84,9 @@ export class ReelsController {
     @Query('scope') scope?: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
-    if (!user) {
-      throw new UnauthorizedException();
-    }
     const parsedLimit = limit ? Number(limit) : undefined;
     if (scope === 'following') {
+      if (!user) throw new UnauthorizedException();
       return this.postsService.getFollowingFeed(
         user.userId,
         parsedLimit ?? 20,
@@ -95,12 +95,13 @@ export class ReelsController {
       );
     }
     return this.postsService.getReelsFeed(
-      user.userId,
+      user?.userId ?? null,
       parsedLimit ?? 20,
       page ? Number(page) : undefined,
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('saved')
   async saved(@Req() req: Request, @Query('limit') limit?: string) {
     const user = req.user as AuthenticatedUser | undefined;
@@ -111,6 +112,7 @@ export class ReelsController {
     return this.postsService.getSavedReels(user.userId, parsedLimit ?? 24);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('user/:id')
   async listByUser(
     @Req() req: Request,
@@ -118,27 +120,23 @@ export class ReelsController {
     @Query('limit') limit?: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
-    if (!user) {
-      throw new UnauthorizedException();
-    }
     const parsedLimit = limit ? Number(limit) : undefined;
-    const previewViewerId = this.resolveAdminPreviewViewerId(req, user, id);
+    const previewViewerId = user ? this.resolveAdminPreviewViewerId(req, user, id) : null;
     return this.postsService.getUserReels({
-      viewerId: previewViewerId ?? user.userId,
+      viewerId: previewViewerId ?? user?.userId ?? null,
       targetUserId: id,
       limit: parsedLimit,
     });
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   async getOne(@Req() req: Request, @Param('id') reelId: string) {
     const user = req.user as AuthenticatedUser | undefined;
-    if (!user) {
-      throw new UnauthorizedException();
-    }
-    return this.postsService.getReelById(user.userId, reelId);
+    return this.postsService.getReelById(user?.userId ?? null, reelId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/view')
   async view(
     @Req() req: Request,
