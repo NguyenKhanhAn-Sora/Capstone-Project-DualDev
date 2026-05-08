@@ -562,6 +562,72 @@ function BlurredImage({ blurredUrl, canReveal, className, onError }: {
   );
 }
 
+function LazyInViewVideo({
+  src,
+  className,
+  preload = "metadata",
+  controls = true,
+  playsInline = true,
+  onError,
+}: {
+  src: string;
+  className?: string;
+  preload?: "none" | "metadata" | "auto";
+  controls?: boolean;
+  playsInline?: boolean;
+  onError?: React.ReactEventHandler<HTMLVideoElement>;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el || shouldLoad) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { root: null, rootMargin: "220px 0px", threshold: 0.01 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shouldLoad]);
+
+  return (
+    <div ref={hostRef}>
+      {shouldLoad ? (
+        <video
+          src={src}
+          controls={controls}
+          className={className}
+          preload={preload}
+          playsInline={playsInline}
+          onError={onError}
+        >
+          Your browser does not support video playback.
+        </video>
+      ) : (
+        <div
+          className={className}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--color-text-muted)",
+            fontSize: 12,
+            background: "color-mix(in srgb, var(--color-surface-muted) 75%, black)",
+          }}
+        >
+          Video sẽ tải khi cuộn tới
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Custom comparison function for memo - only re-render if message content or read status changed
 function areMessagesEqual(
   prevProps: {
@@ -1561,7 +1627,7 @@ export default function MessagesPage() {
         return;
       }
       if (!token) {
-        alert("Bạn cần đăng nhập để thanh toán.");
+        showNoticePopup("Bạn cần đăng nhập để thanh toán.");
         return;
       }
       try {
@@ -1585,10 +1651,10 @@ export default function MessagesPage() {
           window.location.href = session.url;
           return;
         }
-        alert("Không thể mở trang thanh toán.");
+        showNoticePopup("Không thể mở trang thanh toán.");
       } catch (e: unknown) {
         const err = e as { message?: string };
-        alert(err?.message || "Thanh toán thất bại.");
+        showNoticePopup(err?.message || "Thanh toán thất bại.");
       } finally {
         setBoostCheckoutBusy(false);
       }
@@ -1745,14 +1811,23 @@ export default function MessagesPage() {
   const [toastActionHandler, setToastActionHandler] = useState<(() => void) | null>(
     null,
   );
+  const [noticePopupMessage, setNoticePopupMessage] = useState<string | null>(
+    null,
+  );
   const [pinnedModalOpen, setPinnedModalOpen] = useState(false);
   const [pinnedModalLoading, setPinnedModalLoading] = useState(false);
   const [pinnedModalTitle, setPinnedModalTitle] = useState("Tin nhắn đã ghim");
   const [pinnedModalItems, setPinnedModalItems] = useState<UIMessage[]>([]);
   const [pinInlineNoticeOpen, setPinInlineNoticeOpen] = useState(false);
+  const [pinInlineNoticeMessage, setPinInlineNoticeMessage] = useState(
+    "Bạn đã ghim một tin nhắn.",
+  );
   const pinInlineNoticeTimerRef = useRef<number | null>(null);
   const [channelProfileContext, setChannelProfileContext] =
     useState<ChannelProfileAnchorContext | null>(null);
+  const showNoticePopup = useCallback((message: string) => {
+    setNoticePopupMessage(message);
+  }, []);
 
   // Call states
   const [isInCall, setIsInCall] = useState(false);
@@ -4495,7 +4570,7 @@ export default function MessagesPage() {
       setPinnedModalOpen(true);
     } catch (error) {
       console.error("Failed to fetch pinned messages:", error);
-      alert("Không tải được tin nhắn đã ghim");
+      showNoticePopup("Không tải được tin nhắn đã ghim");
     } finally {
       setPinnedModalLoading(false);
     }
@@ -4511,29 +4586,64 @@ export default function MessagesPage() {
   // Handler for pinning messages
   const handlePinMessage = async (messageId: string) => {
     try {
+      let isPinnedNext: boolean | null = null;
       if (selectedDirectMessageFriend) {
-        await pinDirectMessage(messageId, { token });
+        const updatedFromServer = await pinDirectMessage(messageId, { token });
+        const serverPinned =
+          typeof updatedFromServer?.isPinned === "boolean"
+            ? Boolean(updatedFromServer.isPinned)
+            : null;
         const friendId = selectedDirectMessageFriend._id;
         const currentMessages = conversations.get(friendId) || [];
         const updatedMessages = currentMessages.map((msg) =>
-          msg.id === messageId ? { ...msg, isPinned: !msg.isPinned } : msg,
+          msg.id === messageId
+            ? {
+                ...msg,
+                isPinned: serverPinned ?? !Boolean(msg.isPinned),
+              }
+            : msg,
         );
         setConversations(new Map(conversations.set(friendId, updatedMessages)));
+        isPinnedNext =
+          serverPinned ??
+          updatedMessages.find((msg) => msg.id === messageId)?.isPinned ??
+          null;
       } else if (selectedChannel) {
-        await serversApi.pinChannelMessage(selectedChannel, messageId);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === messageId ? { ...m, isPinned: !m.isPinned } : m)),
+        const updatedFromServer = await serversApi.pinChannelMessage(
+          selectedChannel,
+          messageId,
         );
+        const serverPinned =
+          typeof (updatedFromServer as any)?.isPinned === "boolean"
+            ? Boolean((updatedFromServer as any).isPinned)
+            : null;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  isPinned: serverPinned ?? !Boolean(m.isPinned),
+                }
+              : m,
+          ),
+        );
+        isPinnedNext = serverPinned;
       }
       if (pinInlineNoticeTimerRef.current) {
         window.clearTimeout(pinInlineNoticeTimerRef.current);
       }
+      setPinInlineNoticeMessage(
+        isPinnedNext === false
+          ? "Bạn đã bỏ ghim một tin nhắn."
+          : "Bạn đã ghim một tin nhắn.",
+      );
       setPinInlineNoticeOpen(true);
       pinInlineNoticeTimerRef.current = window.setTimeout(() => {
         setPinInlineNoticeOpen(false);
       }, 5000);
     } catch (error) {
       console.error("Failed to pin message:", error);
+      showNoticePopup("Không thể ghim tin nhắn");
     }
   };
 
@@ -4553,13 +4663,13 @@ export default function MessagesPage() {
   ) => {
     try {
       await reportDirectMessage(messageId, reason, description, { token });
-      alert(t("chat.messagesPage.reportDone"));
+      showNoticePopup(t("chat.messagesPage.reportDone"));
       setShowReportDialog(null);
 
       // Socket will be notified via backend gateway
     } catch (error: any) {
       console.error("Failed to report message:", error);
-      alert(error?.message || "Không thể báo cáo tin nhắn");
+      showNoticePopup(error?.message || "Không thể báo cáo tin nhắn");
     }
   };
 
@@ -4643,7 +4753,9 @@ export default function MessagesPage() {
       } else {
         const chId = selectedChannelRef.current;
         if (!chId) {
-          alert(t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn");
+          showNoticePopup(
+            t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn",
+          );
           return;
         }
         await serversApi.deleteChannelMessage(chId, messageId, deleteType);
@@ -4658,7 +4770,7 @@ export default function MessagesPage() {
       setTimeout(() => setToastMessage(null), 3000);
     } catch (error) {
       console.error("Failed to delete message:", error);
-      alert(t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn");
+      showNoticePopup(t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn");
     }
   };
 
@@ -4883,7 +4995,9 @@ export default function MessagesPage() {
       setApplyJoinOpen(false);
       setApplyJoinServerId(null);
       setApplyJoinForm(null);
-      alert("Đơn đăng ký đã được gửi thành công. Vui lòng chờ chủ máy chủ hoặc quản trị viên duyệt đơn.");
+      showNoticePopup(
+        "Đơn đăng ký đã được gửi thành công. Vui lòng chờ chủ máy chủ hoặc quản trị viên duyệt đơn.",
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tham gia được máy chủ");
     } finally {
@@ -6085,6 +6199,20 @@ export default function MessagesPage() {
 
   const renderMessageContent = useCallback(
     (message: UIMessage) => {
+      const boostVideoOptimizationEnabled = Boolean(boostStatus?.active);
+      const optimizeHeavyVideoUrl = (rawUrl: string) => {
+        const url = rawUrl.trim();
+        if (!boostVideoOptimizationEnabled || !url) return url;
+        if (!url.includes("/res.cloudinary.com/")) return url;
+        if (url.includes("/upload/q_auto:eco,f_auto,vc_auto,w_960/")) return url;
+        if (url.includes("/upload/")) {
+          return url.replace(
+            "/upload/",
+            "/upload/q_auto:eco,f_auto,vc_auto,w_960/",
+          );
+        }
+        return url;
+      };
       const {
         text,
         messageType,
@@ -6388,22 +6516,21 @@ export default function MessagesPage() {
       }
 
       if (videoMatch) {
-        const videoUrl = videoMatch[1];
+        const videoUrl = optimizeHeavyVideoUrl(videoMatch[1]);
         return (
           <div className={styles.mediaMessage}>
-            <video
+            <LazyInViewVideo
               src={videoUrl}
-              controls
               className={styles.messageVideo}
+              preload={boostVideoOptimizationEnabled ? "none" : "metadata"}
+              playsInline
               onError={(e) => {
                 e.currentTarget.style.display = "none";
                 e.currentTarget.nextElementSibling?.classList.remove(
                   styles.hidden,
                 );
               }}
-            >
-              Your browser does not support video playback.
-            </video>
+            />
             <span
               className={styles.hidden}
               style={{ fontSize: "12px", color: "var(--color-text-muted)" }}
@@ -6511,19 +6638,19 @@ export default function MessagesPage() {
         </span>
       );
     },
-    [token, wavingIds, selectedChannel, handleWaveSticker, serverEmojiRenderMap],
+    [
+      token,
+      wavingIds,
+      selectedChannel,
+      handleWaveSticker,
+      serverEmojiRenderMap,
+      boostStatus?.active,
+    ],
   );
 
-  // Handle file upload
-  const handleFileUpload = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.multiple = true;
-    input.accept = "image/*,video/*";
-    input.onchange = async (e: any) => {
-      const files: File[] = Array.from(e.target.files || []);
+  const handleMediaFilesSelected = useCallback(
+    async (files: File[]) => {
       if (files.length === 0) return;
-
       setShowPlusMenu(false);
 
       try {
@@ -6535,7 +6662,6 @@ export default function MessagesPage() {
           return;
         }
 
-        // Validate video duration (max 3 minutes = 180 seconds)
         for (const file of files) {
           if (file.type.startsWith("video/")) {
             const duration = await getVideoDuration(file);
@@ -6546,14 +6672,11 @@ export default function MessagesPage() {
           }
         }
 
-        // ✅ FIX: Create optimistic loading messages for each file
         const loadingMessages: UIMessage[] = [];
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const isImage = file.type.startsWith("image/");
-          const isVideo = file.type.startsWith("video/");
           const tempId = `temp-upload-${Date.now()}-${i}`;
-
           const loadingMessage: UIMessage = {
             id: tempId,
             text: isImage ? `📤 Uploading image...` : `📤 Uploading video...`,
@@ -6566,10 +6689,8 @@ export default function MessagesPage() {
             isFromCurrentUser: true,
             type: selectedDirectMessageFriend ? "direct" : "server",
           };
-
           loadingMessages.push(loadingMessage);
 
-          // Add to UI immediately
           if (selectedDirectMessageFriend) {
             setMessages((prev) => [...prev, loadingMessage]);
             setConversations((prev) => {
@@ -6586,7 +6707,6 @@ export default function MessagesPage() {
           }
         }
 
-        // Auto-scroll (instant for media uploads)
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             if (messagesContainerRef.current) {
@@ -6596,40 +6716,32 @@ export default function MessagesPage() {
           });
         });
 
-        // ✅ FIX: Upload files in background
-        let uploadResults;
-        if (files.length === 1) {
-          const result = await uploadMedia({
-            token,
-            file: files[0],
-            cordigramUploadContext: "messages",
-          });
-          uploadResults = [result];
-        } else {
-          uploadResults = await uploadMediaBatch({
-            token,
-            files,
-            cordigramUploadContext: "messages",
-          });
-        }
+        const uploadResults =
+          files.length === 1
+            ? [
+                await uploadMedia({
+                  token,
+                  file: files[0],
+                  cordigramUploadContext: "messages",
+                }),
+              ]
+            : await uploadMediaBatch({
+                token,
+                files,
+                cordigramUploadContext: "messages",
+              });
 
-        // ✅ FIX: Send each media and update UI
         for (let i = 0; i < uploadResults.length; i++) {
           const media = uploadResults[i];
           const loadingMsgId = loadingMessages[i].id;
           const isImage = media.resourceType === "image";
           const isVideo = media.resourceType === "video";
+          const mediaMessage = isImage
+            ? `📷 [Image]: ${media.url}`
+            : isVideo
+              ? `🎬 [Video]: ${media.url}`
+              : media.url;
 
-          let mediaMessage: string;
-          if (isImage) {
-            mediaMessage = `📷 [Image]: ${media.url}`;
-          } else if (isVideo) {
-            mediaMessage = `🎬 [Video]: ${media.url}`;
-          } else {
-            mediaMessage = media.url;
-          }
-
-          // Create final message
           const finalMessage: UIMessage = {
             id: `temp-${Date.now()}-${i}`,
             text: mediaMessage,
@@ -6643,7 +6755,6 @@ export default function MessagesPage() {
             type: selectedDirectMessageFriend ? "direct" : "server",
           };
 
-          // Replace loading message with actual content
           if (selectedDirectMessageFriend) {
             setMessages((prev) =>
               prev.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
@@ -6657,8 +6768,6 @@ export default function MessagesPage() {
               );
               return newMap;
             });
-
-            // Send via WebSocket
             emitSendMessage(selectedDirectMessageFriend._id, mediaMessage, [
               media.url,
             ]);
@@ -6666,16 +6775,36 @@ export default function MessagesPage() {
             setMessages((prev) =>
               prev.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
             );
-
-            // Send via API for channel message
             await serversApi.createMessage(selectedChannel, mediaMessage);
           }
         }
-
       } catch (error: any) {
         console.error("❌ Failed to upload files:", error);
         setError(error?.message || "Không tải lên được tệp");
       }
+    },
+    [
+      maxUploadBytes,
+      currentUserId,
+      currentUserProfile?.displayName,
+      currentUserProfile?.username,
+      currentUserProfile?.avatar,
+      selectedDirectMessageFriend,
+      selectedChannel,
+      token,
+      emitSendMessage,
+    ],
+  );
+
+  // Handle file upload
+  const handleFileUpload = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = "image/*,video/*";
+    input.onchange = async (e: any) => {
+      const files: File[] = Array.from(e.target.files || []);
+      await handleMediaFilesSelected(files);
     };
     input.click();
   };
@@ -8500,7 +8629,11 @@ export default function MessagesPage() {
                         setSelectedServer(null);
                         setSelectedChannel(null);
                       } catch (e) {
-                        alert(e instanceof Error ? e.message : t("chat.applyPending.withdrawError"));
+                        showNoticePopup(
+                          e instanceof Error
+                            ? e.message
+                            : t("chat.applyPending.withdrawError"),
+                        );
                       }
                     }}
                     style={{
@@ -8530,7 +8663,11 @@ export default function MessagesPage() {
                     setShowExploreView(false);
                     setSelectedServer(serverId);
                   } catch (e) {
-                    alert(e instanceof Error ? e.message : t("chat.applyPending.joinError"));
+                    showNoticePopup(
+                      e instanceof Error
+                        ? e.message
+                        : t("chat.applyPending.joinError"),
+                    );
                   }
                 }}
               />
@@ -9887,7 +10024,7 @@ export default function MessagesPage() {
                         gap: 12,
                       }}
                     >
-                      <span>Bạn đã ghim một tin nhắn.</span>
+                      <span>{pinInlineNoticeMessage}</span>
                       <button
                         type="button"
                         onClick={() => void openPinnedMessagesModal()}
@@ -10250,6 +10387,25 @@ export default function MessagesPage() {
                               selectedDirectMessageFriend
                                 ? handleSendDirectMessage()
                                 : handleSendMessage();
+                            }
+                          }}
+                          onPaste={(e) => {
+                            const items = Array.from(
+                              e.clipboardData?.items || [],
+                            );
+                            const mediaFiles = items
+                              .filter(
+                                (item) =>
+                                  item.kind === "file" &&
+                                  (item.type.startsWith("image/") ||
+                                    item.type.startsWith("video/")),
+                              )
+                              .map((item) => item.getAsFile())
+                              .filter((file): file is File => Boolean(file));
+
+                            if (mediaFiles.length > 0) {
+                              e.preventDefault();
+                              void handleMediaFilesSelected(mediaFiles);
                             }
                           }}
                         />
@@ -11064,6 +11220,7 @@ export default function MessagesPage() {
         )}
         dmPartnerId={selectedDirectMessageFriend?._id}
         dmPartnerName={selectedDirectMessageFriend?.displayName || selectedDirectMessageFriend?.username}
+        currentUserId={currentUserId}
         onResultClick={({ messageId, channelId, dmUserId }) => {
           setShowMessageSearch(false);
           setMessageSearchDmConversationOnly(false);
@@ -11307,7 +11464,9 @@ export default function MessagesPage() {
               setServerContextMenu(null);
             } catch (err) {
               console.error(err);
-              alert((err as Error)?.message ?? "Không thể rời máy chủ");
+              showNoticePopup(
+                (err as Error)?.message ?? "Không thể rời máy chủ",
+              );
             }
           }}
           notificationLevel={
@@ -12269,6 +12428,53 @@ export default function MessagesPage() {
           }
           onClose={() => setShowReportDialog(null)}
         />
+      )}
+
+      {noticePopupMessage && (
+        <div
+          onClick={() => setNoticePopupMessage(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 3200,
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(440px, 92vw)",
+              background: "#1f2228",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 14,
+              padding: "16px 14px",
+              color: "#fff",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div style={{ fontSize: 15, lineHeight: 1.5 }}>{noticePopupMessage}</div>
+            <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setNoticePopupMessage(null)}
+                style={{
+                  border: "none",
+                  borderRadius: 8,
+                  background: "#5865f2",
+                  color: "#fff",
+                  fontWeight: 700,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pinnedModalOpen && (

@@ -2304,7 +2304,9 @@ export async function pinChannelMessage(
     );
   }
   if (!response.ok) throw new Error("Không thể ghim tin nhắn");
-  return response.json();
+  const data = await response.json().catch(() => ({}));
+  const raw = (data as any)?.message ?? (data as any)?.data ?? data;
+  return raw as Message;
 }
 
 export async function getPinnedChannelMessages(

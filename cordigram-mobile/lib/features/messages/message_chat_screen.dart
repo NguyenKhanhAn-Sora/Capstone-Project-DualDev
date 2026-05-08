@@ -108,6 +108,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     _inputController.addListener(_onInputChanged);
     _loadConversation();
     _loadLanguage();
+    unawaited(MessagesMediaService.refreshBoostStatus());
     widget.controller.markConversationRead(widget.thread.id);
   }
 
@@ -1564,7 +1565,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     }
 
     if (text.startsWith('📷 [Image]:') || text.startsWith('🎬 [Video]:')) {
-      final mediaUrl = text.substring(text.indexOf(':') + 1).trim();
+      final mediaUrl = MessagesMediaService.optimizeHeavyVideoUrl(
+        text.substring(text.indexOf(':') + 1).trim(),
+      );
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: Image.network(
@@ -1572,6 +1575,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
           width: 220,
           height: 160,
           fit: BoxFit.cover,
+          filterQuality: FilterQuality.low,
+          cacheWidth: 660,
+          cacheHeight: 480,
           errorBuilder: (_, __, ___) =>
               Text(text, style: const TextStyle(color: Colors.white)),
         ),
