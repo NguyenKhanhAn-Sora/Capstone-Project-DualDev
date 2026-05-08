@@ -5,6 +5,8 @@ import '../../../core/services/auth_storage.dart';
 /// `x-cordigram-upload-context: messages` (see `cordigram-web/lib/cordigram-upload-context.ts`).
 class MessagesMediaService {
   MessagesMediaService._();
+  static bool _boostStatusLoaded = false;
+  static bool _boostActive = false;
 
   static const _messagesUploadHeader = {
     'x-cordigram-upload-context': 'messages',
@@ -66,6 +68,41 @@ class MessagesMediaService {
       contentType: contentType,
       extraHeaders: {..._authHeaders, ..._messagesUploadHeader},
     );
+  }
+
+  static bool get isBoostMediaOptimizationEnabled => _boostActive;
+
+  static Future<void> refreshBoostStatus() async {
+    if (_boostStatusLoaded) return;
+    _boostStatusLoaded = true;
+    try {
+      final json = await ApiService.get(
+        '/users/boost-status',
+        extraHeaders: _authHeaders,
+      );
+      final active = json['active'] == true;
+      final accountBoost = json['accountBoost'] == true;
+      final unlocked = json['unlocked'] == true;
+      final tier = (json['tier'] ?? '').toString().trim().toLowerCase();
+      _boostActive =
+          active || accountBoost || unlocked || tier == 'basic' || tier == 'boost';
+    } catch (_) {
+      _boostActive = false;
+    }
+  }
+
+  static String optimizeHeavyVideoUrl(String rawUrl) {
+    final url = rawUrl.trim();
+    if (!_boostActive || url.isEmpty) return url;
+    if (!url.contains('/res.cloudinary.com/')) return url;
+    if (url.contains('/upload/q_auto:eco,f_auto,vc_auto,w_960/')) return url;
+    if (url.contains('/upload/')) {
+      return url.replaceFirst(
+        '/upload/',
+        '/upload/q_auto:eco,f_auto,vc_auto,w_960/',
+      );
+    }
+    return url;
   }
 
   /// Max size aligned with web UX (25MB).
