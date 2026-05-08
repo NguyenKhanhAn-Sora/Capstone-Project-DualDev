@@ -1545,25 +1545,9 @@ export class MessagesService {
       throw new ForbiddenException('Cannot pin a deleted message');
     }
 
-    const channel = await this.channelModel
-      .findById(channelId)
-      .select('serverId')
-      .lean()
-      .exec();
+    const channel = await this.channelModel.findById(channelId).select('_id').lean().exec();
     if (!channel) {
       throw new NotFoundException('Channel not found');
-    }
-
-    const isMine = message.senderId.toString() === userId;
-    if (!isMine) {
-      const canPin = await this.rolesService.hasPermission(
-        channel.serverId.toString(),
-        userId,
-        'pinMessages',
-      );
-      if (!canPin) {
-        throw new ForbiddenException('Bạn không có quyền ghim tin nhắn');
-      }
     }
 
     message.isPinned = !message.isPinned;

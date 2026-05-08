@@ -4617,17 +4617,21 @@ export default function MessagesPage() {
           typeof (updatedFromServer as any)?.isPinned === "boolean"
             ? Boolean((updatedFromServer as any).isPinned)
             : null;
-        setMessages((prev) =>
-          prev.map((m) =>
+        let nextPinnedLocal: boolean | null = null;
+        setMessages((prev) => {
+          const next = prev.map((m) =>
             m.id === messageId
               ? {
                   ...m,
                   isPinned: serverPinned ?? !Boolean(m.isPinned),
                 }
               : m,
-          ),
-        );
-        isPinnedNext = serverPinned;
+          );
+          nextPinnedLocal =
+            next.find((m) => m.id === messageId)?.isPinned ?? null;
+          return next;
+        });
+        isPinnedNext = serverPinned ?? nextPinnedLocal;
       }
       if (pinInlineNoticeTimerRef.current) {
         window.clearTimeout(pinInlineNoticeTimerRef.current);
