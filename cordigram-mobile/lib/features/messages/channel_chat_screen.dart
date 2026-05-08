@@ -110,6 +110,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(MessagesMediaService.refreshBoostStatus());
     _bootstrap();
   }
 
@@ -1162,7 +1163,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       );
     }
     if (message.attachments.isNotEmpty) {
-      final mediaUrl = message.attachments.first;
+      final mediaUrl = MessagesMediaService.optimizeHeavyVideoUrl(
+        message.attachments.first,
+      );
       final lower = mediaUrl.toLowerCase();
       final looksLikeImage = lower.contains('.png') ||
           lower.contains('.jpg') ||
@@ -1179,6 +1182,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             width: 220,
             height: 160,
             fit: BoxFit.cover,
+            filterQuality: FilterQuality.low,
+            cacheWidth: 660,
+            cacheHeight: 480,
             errorBuilder: (_, __, ___) =>
                 Text(text, style: const TextStyle(color: Colors.white)),
           ),
@@ -1221,10 +1227,20 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       );
     }
     if (text.startsWith('📷 [Image]:') || text.startsWith('🎬 [Video]:')) {
-      final mediaUrl = text.substring(text.indexOf(':') + 1).trim();
+      final mediaUrl = MessagesMediaService.optimizeHeavyVideoUrl(
+        text.substring(text.indexOf(':') + 1).trim(),
+      );
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(mediaUrl, width: 220, height: 160, fit: BoxFit.cover),
+        child: Image.network(
+          mediaUrl,
+          width: 220,
+          height: 160,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.low,
+          cacheWidth: 660,
+          cacheHeight: 480,
+        ),
       );
     }
     if (text.startsWith('🎤 [Voice]:')) {

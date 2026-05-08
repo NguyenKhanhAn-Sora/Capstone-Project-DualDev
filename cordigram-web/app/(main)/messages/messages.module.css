@@ -82,6 +82,7 @@
   border-radius: 50%;
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text) 10%, transparent);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -93,6 +94,7 @@
 .exploreBtn:hover {
   transform: scale(1.05);
   background: var(--color-surface);
+  border-color: var(--color-primary);
 }
 
 .exploreBtnActive {
@@ -259,7 +261,7 @@
   height: 48px;
   border-radius: 50%;
   background: transparent;
-  border: none;
+  border: 1px solid var(--color-border);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -272,6 +274,7 @@
 .navBtn:hover {
   background: var(--color-surface-muted);
   color: var(--color-text);
+  border-color: var(--color-primary);
 }
 
 .sidebarFooter {
@@ -3344,4 +3347,191 @@
 .adminReturnBtn:hover {
   filter: brightness(1.15);
   transform: translateY(-1px);
+}
+
+/* =========================================================
+   Responsive tuning for laptop/desktop screen classes
+   Keeps 3-column Messages layout stable across PC sizes.
+   ========================================================= */
+
+/* Ultra-wide desktop */
+@media (min-width: 1800px) {
+  .conversationsList {
+    width: 380px;
+  }
+
+  .activeNowSidebar {
+    width: 320px;
+  }
+
+  .messageGroup {
+    max-width: 66%;
+  }
+
+  .messageVideo {
+    max-width: 520px;
+    max-height: 360px;
+  }
+}
+
+/* Standard desktop / large laptop */
+@media (min-width: 1366px) and (max-width: 1799px) {
+  .conversationsList {
+    width: clamp(300px, 24vw, 360px);
+  }
+
+  .activeNowSidebar {
+    width: clamp(260px, 20vw, 300px);
+  }
+}
+
+/* Laptop HD and compact desktop */
+@media (min-width: 1100px) and (max-width: 1365px) {
+  .leftSidebar {
+    width: 72px;
+    padding: 12px 0;
+    gap: 22px;
+  }
+
+  .createBtn,
+  .socialHomeBtn,
+  .exploreBtn,
+  .navBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .logoImage {
+    width: 50px;
+    height: 50px;
+  }
+
+  .conversationsList {
+    width: clamp(260px, 22vw, 300px);
+  }
+
+  .activeNowSidebar {
+    width: clamp(230px, 19vw, 270px);
+  }
+
+  .chatHeader {
+    padding: 12px;
+  }
+
+  .messagesContainer {
+    padding: 12px 10px 56px;
+  }
+
+  .messageGroup {
+    max-width: 76%;
+  }
+
+  .messageImage {
+    max-width: 260px;
+    max-height: 340px;
+  }
+
+  .messageVideo {
+    max-width: 340px;
+    max-height: 250px;
+  }
+}
+
+/* Small laptop (netbook class) */
+@media (min-width: 900px) and (max-width: 1099px) {
+  .leftSidebar {
+    width: 64px;
+    padding: 10px 0;
+    gap: 16px;
+  }
+
+  .createBtn,
+  .socialHomeBtn,
+  .exploreBtn,
+  .navBtn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .logoImage {
+    width: 44px;
+    height: 44px;
+  }
+
+  .conversationsList {
+    width: 240px;
+  }
+
+  .activeNowSidebar {
+    width: 220px;
+  }
+
+  .chatHeader {
+    padding: 10px 12px;
+  }
+
+  .chatHeaderTitle {
+    font-size: 14px;
+  }
+
+  .chatHeaderActions > button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .messagesContainer {
+    padding: 10px 8px 52px;
+    gap: 6px;
+  }
+
+  .messageGroup {
+    max-width: 82%;
+  }
+
+  .messageAvatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .messageBubble {
+    font-size: 13.5px;
+    padding: 7px 10px;
+  }
+
+  .messageImage {
+    max-width: 220px;
+    max-height: 300px;
+  }
+
+  .messageVideo {
+    max-width: 300px;
+    max-height: 220px;
+  }
+
+  .inputArea {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  .messageInput {
+    padding: 9px 12px;
+  }
+
+  .mediaButtons {
+    gap: 2px;
+  }
+
+  .mediaButton,
+  .plusButton,
+  .attachButton,
+  .sendButton,
+  .voiceButton {
+    width: 30px;
+    height: 30px;
+  }
+
+  .emojiPickerContent,
+  .gifPicker {
+    width: 290px;
+  }
 }
