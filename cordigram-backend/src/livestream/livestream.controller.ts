@@ -41,6 +41,7 @@ export class LivestreamController {
     return this.livestreamService.joinToken(streamId, user, {
       asHost: dto.asHost,
       participantName: dto.participantName,
+      isPreview: dto.isPreview,
     });
   }
 

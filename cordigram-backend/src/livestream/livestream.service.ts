@@ -214,26 +214,23 @@ export class LivestreamService {
       .limit(MAX_CONCURRENT_LIVESTREAMS)
       .exec();
 
-    const rooms = await this.livekitService.listRoomsByPrefix('live-');
-    const roomParticipantMap = new Map<string, number>();
-    rooms.forEach((room) => {
-      roomParticipantMap.set(room.name, room.numParticipants ?? 0);
-    });
-
-    const hostIdentityMap = await this.getHostIdentityMap(streams);
+    const [participantCounts, hostIdentityMap] = await Promise.all([
+      Promise.all(
+        streams.map((stream) =>
+          this.livekitService.getParticipantCount(stream.roomName),
+        ),
+      ),
+      this.getHostIdentityMap(streams),
+    ]);
 
     return {
       maxConcurrentLivestreams: MAX_CONCURRENT_LIVESTREAMS,
       maxViewersPerRoom: MAX_VIEWERS_PER_ROOM,
       activeCount: streams.length,
-      items: streams.map((stream) => {
+      items: streams.map((stream, i) => {
         const hostId = stream.hostUserId?.toString?.() ?? '';
         const hostIdentity = hostIdentityMap.get(hostId);
-        return this.toResponse(
-          stream,
-          roomParticipantMap.get(stream.roomName) ?? 0,
-          hostIdentity,
-        );
+        return this.toResponse(stream, participantCounts[i], hostIdentity);
       }),
     };
   }
@@ -344,10 +341,11 @@ export class LivestreamService {
   async joinToken(
     streamId: string,
     user: { userId: string },
-    opts: { asHost?: boolean; participantName?: string },
+    opts: { asHost?: boolean; participantName?: string; isPreview?: boolean },
   ) {
     const stream = await this.getLiveStreamOrThrow(streamId);
     const asHost = Boolean(opts.asHost);
+    const isPreview = Boolean(opts.isPreview);
     const isHost = stream.hostUserId.toString() === user.userId;
 
     if (asHost && !isHost) {
@@ -358,14 +356,16 @@ export class LivestreamService {
       stream.roomName,
     );
 
-    if (!asHost && participants >= MAX_VIEWERS_PER_ROOM + 1) {
+    if (!asHost && !isPreview && participants >= MAX_VIEWERS_PER_ROOM + 1) {
       throw new BadRequestException(
         'This livestream has reached the 30-viewer limit',
       );
     }
 
     const role = asHost ? 'host' : 'viewer';
-    const identity = `${user.userId}-${role}-${Date.now().toString(36)}`;
+    const identity = isPreview
+      ? `preview-${user.userId}-${Date.now().toString(36)}`
+      : `${user.userId}-${role}-${Date.now().toString(36)}`;
     const participantName =
       opts.participantName?.trim() || (asHost ? stream.hostName : 'Viewer');
 

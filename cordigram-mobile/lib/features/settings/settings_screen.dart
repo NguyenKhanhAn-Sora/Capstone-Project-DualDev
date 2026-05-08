@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 import '../../core/services/theme_controller.dart';
 import '../post/post_detail_screen.dart';
 import '../profile/models/profile_detail.dart';
@@ -512,54 +513,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const List<Map<String, String>> _notificationCategories = [
     {
       'key': 'follow',
-      'label': 'Follows',
-      'description': 'When someone follows you.',
+      'labelKey': 'settings.notifications.categories.follow',
+      'descKey': 'settings.notifications.categories.followDesc',
     },
     {
       'key': 'comment',
-      'label': 'Comments',
-      'description': 'When someone comments on your posts or reels.',
+      'labelKey': 'settings.notifications.categories.comment',
+      'descKey': 'settings.notifications.categories.commentDesc',
     },
     {
       'key': 'like',
-      'label': 'Likes',
-      'description': 'When someone likes your posts, reels, or comments.',
+      'labelKey': 'settings.notifications.categories.like',
+      'descKey': 'settings.notifications.categories.likeDesc',
     },
     {
       'key': 'mentions',
-      'label': 'Mentions & tags',
-      'description': 'When someone mentions or tags you.',
+      'labelKey': 'settings.notifications.categories.mentions',
+      'descKey': 'settings.notifications.categories.mentionsDesc',
     },
     {
       'key': 'system',
-      'label': 'System notifications',
-      'description': 'Important announcements and system updates.',
+      'labelKey': 'settings.notifications.categories.system',
+      'descKey': 'settings.notifications.categories.systemDesc',
     },
   ];
 
   static const List<Map<String, dynamic>> _notificationMuteOptions = [
-    {'key': '5m', 'label': '5 minutes', 'ms': 5 * 60 * 1000},
-    {'key': '10m', 'label': '10 minutes', 'ms': 10 * 60 * 1000},
-    {'key': '15m', 'label': '15 minutes', 'ms': 15 * 60 * 1000},
-    {'key': '30m', 'label': '30 minutes', 'ms': 30 * 60 * 1000},
-    {'key': '1h', 'label': '1 hour', 'ms': 60 * 60 * 1000},
-    {'key': '1d', 'label': '1 day', 'ms': 24 * 60 * 60 * 1000},
-    {'key': 'until', 'label': 'Until I turn it back on', 'ms': null},
-    {'key': 'custom', 'label': 'Choose date & time', 'ms': null},
+    {'key': '5m', 'labelKey': 'settings.notifications.muteOptions.5m', 'ms': 5 * 60 * 1000},
+    {'key': '10m', 'labelKey': 'settings.notifications.muteOptions.10m', 'ms': 10 * 60 * 1000},
+    {'key': '15m', 'labelKey': 'settings.notifications.muteOptions.15m', 'ms': 15 * 60 * 1000},
+    {'key': '30m', 'labelKey': 'settings.notifications.muteOptions.30m', 'ms': 30 * 60 * 1000},
+    {'key': '1h', 'labelKey': 'settings.notifications.muteOptions.1h', 'ms': 60 * 60 * 1000},
+    {'key': '1d', 'labelKey': 'settings.notifications.muteOptions.1d', 'ms': 24 * 60 * 60 * 1000},
+    {'key': 'until', 'labelKey': 'settings.notifications.muteOptions.until', 'ms': null},
+    {'key': 'custom', 'labelKey': 'settings.notifications.muteOptions.custom', 'ms': null},
   ];
 
   static const int _contentPageSize = 10;
 
   static const List<Map<String, String>> _activityFilterOptions = [
-    {'key': 'all', 'label': 'All'},
-    {'key': 'post_like', 'label': 'Like post'},
-    {'key': 'comment_like', 'label': 'Like comment'},
-    {'key': 'comment', 'label': 'Comment'},
-    {'key': 'repost', 'label': 'Repost'},
-    {'key': 'save', 'label': 'Save'},
-    {'key': 'follow', 'label': 'Follow'},
-    {'key': 'report_post', 'label': 'Report post/reel'},
-    {'key': 'report_user', 'label': 'Report user'},
+    {'key': 'all', 'labelKey': 'settings.content.activityFilter.all'},
+    {'key': 'post_like', 'labelKey': 'settings.content.activityFilter.postLike'},
+    {'key': 'comment_like', 'labelKey': 'settings.content.activityFilter.commentLike'},
+    {'key': 'comment', 'labelKey': 'settings.content.activityFilter.comment'},
+    {'key': 'repost', 'labelKey': 'settings.content.activityFilter.repost'},
+    {'key': 'save', 'labelKey': 'settings.content.activityFilter.save'},
+    {'key': 'follow', 'labelKey': 'settings.content.activityFilter.follow'},
+    {'key': 'report_post', 'labelKey': 'settings.content.activityFilter.reportPost'},
+    {'key': 'report_user', 'labelKey': 'settings.content.activityFilter.reportUser'},
   ];
 
   Timer? _cooldownTicker;
@@ -784,7 +785,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Unable to load profile details.';
+        _error = LanguageController.instance.t('settings.creator.unableToLoad');
         _loading = false;
       });
     }
@@ -860,7 +861,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _requestCurrentOtp() async {
     final password = _password.trim();
     if (password.isEmpty) {
-      setState(() => _emailError = 'Please enter your current password.');
+      setState(() => _emailError = LanguageController.instance.t('settings.email.enterCurrentPasswordFirst'));
       return;
     }
 
@@ -886,7 +887,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
           _currentCooldown = e.retryAfterSec!;
-          _emailError = 'OTP was just sent. Please wait before retrying.';
+          _emailError = LanguageController.instance.t('settings.common.otpSent');
         } else {
           _emailError = e.message;
         }
@@ -894,7 +895,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _emailError = 'Unable to send OTP.';
+        _emailError = LanguageController.instance.t('settings.common.unableToSendOtp');
       });
     } finally {
       if (!mounted) return;
@@ -907,7 +908,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _verifyCurrentOtp() async {
     final code = _currentOtp.trim();
     if (code.isEmpty) {
-      setState(() => _emailError = 'Please enter the OTP.');
+      setState(() => _emailError = LanguageController.instance.t('settings.email.enterOtpFirst'));
       return;
     }
 
@@ -931,7 +932,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _emailError = 'Invalid or expired OTP.';
+        _emailError = LanguageController.instance.t('settings.common.invalidExpiredOtp');
       });
     } finally {
       if (!mounted) return;
@@ -944,7 +945,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _requestNewOtp() async {
     final newEmail = _newEmail.trim().toLowerCase();
     if (newEmail.isEmpty || !_emailRegex.hasMatch(newEmail)) {
-      setState(() => _emailError = 'The new email address is invalid.');
+      setState(() => _emailError = LanguageController.instance.t('settings.email.invalidEmail'));
       return;
     }
 
@@ -969,7 +970,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
           _newCooldown = e.retryAfterSec!;
-          _emailError = 'OTP was just sent. Please wait before retrying.';
+          _emailError = LanguageController.instance.t('settings.common.otpSent');
         } else {
           _emailError = e.message;
         }
@@ -977,7 +978,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _emailError = 'Unable to send OTP to the new email.';
+        _emailError = LanguageController.instance.t('settings.email.unableToSendOtpNew');
       });
     } finally {
       if (!mounted) return;
@@ -990,7 +991,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _verifyNewOtp() async {
     final code = _newOtp.trim();
     if (code.isEmpty) {
-      setState(() => _emailError = 'Please enter the OTP.');
+      setState(() => _emailError = LanguageController.instance.t('settings.email.enterOtpFirst'));
       return;
     }
 
@@ -1013,7 +1014,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _currentEmail = nextEmail;
         }
         _emailStep = _EmailChangeStep.done;
-        _emailSuccess = 'Email updated successfully.';
+        _emailSuccess = LanguageController.instance.t('settings.email.emailUpdatedSuccess');
       });
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (!mounted) return;
@@ -1030,7 +1031,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _emailError = 'Invalid or expired OTP.';
+        _emailError = LanguageController.instance.t('settings.common.invalidExpiredOtp');
       });
     } finally {
       if (!mounted) return;
@@ -1059,7 +1060,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _creatorError = 'Unable to load creator verification status.';
+        _creatorError = LanguageController.instance.t('settings.creator.unableToLoad');
       });
     } finally {
       if (!mounted) return;
@@ -1082,8 +1083,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       setState(() {
         _creatorNote = '';
-        _creatorSuccess =
-            'Your creator verification request has been submitted.';
+        _creatorSuccess = LanguageController.instance.t('settings.creator.requestSubmitted');
       });
       await _loadCreatorVerificationStatus();
     } on ApiException catch (e) {
@@ -1094,7 +1094,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _creatorError = 'Unable to submit creator verification request.';
+        _creatorError = LanguageController.instance.t('settings.creator.unableToSubmit');
       });
     } finally {
       if (!mounted) return;
@@ -1123,7 +1123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _notificationError = 'Unable to load notification settings.';
+        _notificationError = LanguageController.instance.t('settings.common.failedToUpdate');
       });
     } finally {
       if (!mounted) return;
@@ -1138,22 +1138,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String? mutedUntil,
     required bool mutedIndefinitely,
   }) {
-    if (enabled) return 'Enabled';
-    if (mutedIndefinitely) return 'Muted until you turn it back on';
+    final lc = LanguageController.instance;
+    if (enabled) return lc.t('settings.notifications.status.enabled');
+    if (mutedIndefinitely) return lc.t('settings.notifications.status.mutedIndefinitely');
     if (mutedUntil != null && mutedUntil.isNotEmpty) {
       final dt = DateTime.tryParse(mutedUntil)?.toUtc();
       if (dt != null) {
         final now = DateTime.now().toUtc();
         if (dt.isAfter(now)) {
           final diff = dt.difference(now);
-          if (diff.inMinutes < 1) return 'Muted for less than a minute';
-          if (diff.inHours < 1) return 'Muted for ${diff.inMinutes} minutes';
-          if (diff.inDays < 1) return 'Muted for ${diff.inHours} hours';
-          return 'Muted for ${diff.inDays} days';
+          if (diff.inMinutes < 1) return lc.t('settings.notifications.status.mutedLessThanMinute');
+          if (diff.inHours < 1) return lc.t('settings.notifications.status.mutedMinutes', {'n': '${diff.inMinutes}'});
+          if (diff.inDays < 1) return lc.t('settings.notifications.status.mutedHours', {'n': '${diff.inHours}'});
+          return lc.t('settings.notifications.status.mutedDays', {'n': '${diff.inDays}'});
         }
       }
     }
-    return 'Muted';
+    return lc.t('settings.notifications.status.muted');
   }
 
   String? _buildLocalDateTimeIso(String date, String time) {
@@ -1299,7 +1300,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _violationError = 'Unable to load violation history.';
+        _violationError = LanguageController.instance.t('settings.violations.unableToLoad');
       });
     } finally {
       if (!mounted) return;
@@ -1348,7 +1349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
     } else {
       setState(() {
-        _hiddenPostsError = 'Unable to load hidden posts.';
+        _hiddenPostsError = LanguageController.instance.t('settings.content.unableToLoadHiddenPosts');
       });
     }
 
@@ -1363,7 +1364,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
     } else {
       setState(() {
-        _blockedUsersError = 'Unable to load blocked users.';
+        _blockedUsersError = LanguageController.instance.t('settings.content.unableToLoadBlockedUsers');
       });
     }
 
@@ -1414,7 +1415,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return loadedCount;
       setState(() {
-        _activityError = 'Unable to load activity log.';
+        _activityError = LanguageController.instance.t('settings.content.unableToLoadActivity');
       });
     } finally {
       if (!mounted) return loadedCount;
@@ -1466,31 +1467,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _formatViolationSeverityLabel(String? value) {
-    if (value == null || value.isEmpty) return 'N/A';
-    if (value == 'high') return 'High';
-    if (value == 'medium') return 'Medium';
-    return 'Low';
+    final lc = LanguageController.instance;
+    if (value == null || value.isEmpty) return lc.t('settings.violations.severity.na');
+    if (value == 'high') return lc.t('settings.violations.severity.high');
+    if (value == 'medium') return lc.t('settings.violations.severity.medium');
+    return lc.t('settings.violations.severity.low');
   }
 
   String _formatViolationActionLabel(String action) {
+    final lc = LanguageController.instance;
     switch (action) {
       case 'remove_post':
-        return 'Removed post';
+        return lc.t('settings.violations.action.removedPost');
       case 'restrict_post':
-        return 'Restricted post';
+        return lc.t('settings.violations.action.restrictedPost');
       case 'delete_comment':
-        return 'Deleted comment';
+        return lc.t('settings.violations.action.deletedComment');
       case 'warn':
       case 'warn_user':
-        return 'Warning issued';
+        return lc.t('settings.violations.action.warningIssued');
       case 'mute_interaction':
-        return 'Interaction muted';
+        return lc.t('settings.violations.action.interactionMuted');
       case 'suspend_user':
-        return 'Account suspended';
+        return lc.t('settings.violations.action.accountSuspended');
       case 'limit_account':
-        return 'Account limited';
+        return lc.t('settings.violations.action.accountLimited');
       default:
-        return 'Policy action';
+        return lc.t('settings.violations.action.policyAction');
     }
   }
 
@@ -1516,18 +1519,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _violationSubtitle(_ViolationHistoryItem item) {
+    final lc = LanguageController.instance;
     if (item.action == 'mute_interaction') {
       final remaining = _formatViolationRemainingHourMinute(
         item.actionExpiresAt,
       );
       return remaining != null
-          ? 'Interaction muted · Remaining $remaining'
-          : 'Interaction muted · Until turn on';
+          ? lc.t('settings.violations.subtitle.interactionMutedRemaining', {'time': remaining})
+          : lc.t('settings.violations.subtitle.interactionMutedUntilOn');
     }
     if (_isViolationWarnAction(item.action)) {
-      return 'Severity ${_formatViolationSeverityLabel(item.severity)} · No strike added';
+      return lc.t('settings.violations.subtitle.severityNoStrike', {'severity': _formatViolationSeverityLabel(item.severity)});
     }
-    return 'Severity ${_formatViolationSeverityLabel(item.severity)} · Strike +${item.strikeDelta} (Total ${item.strikeTotalAfter})';
+    return lc.t('settings.violations.subtitle.severityWithStrike', {
+      'severity': _formatViolationSeverityLabel(item.severity),
+      'delta': item.strikeDelta,
+      'total': item.strikeTotalAfter,
+    });
   }
 
   Future<void> _openViolationDetail(_ViolationHistoryItem item) async {
@@ -1540,50 +1548,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _activityTitle(_ContentActivityItem item) {
+    final lc = LanguageController.instance;
     final meta = item.meta;
     final authorName = (meta?.postAuthorDisplayName?.trim().isNotEmpty == true)
         ? meta!.postAuthorDisplayName!.trim()
         : (meta?.postAuthorUsername?.trim().isNotEmpty == true)
         ? '@${meta!.postAuthorUsername!.trim()}'
-        : 'this post';
+        : lc.t('settings.content.activityType.thisPost');
     final targetName = (meta?.targetDisplayName?.trim().isNotEmpty == true)
         ? meta!.targetDisplayName!.trim()
         : (meta?.targetUsername?.trim().isNotEmpty == true)
         ? '@${meta!.targetUsername!.trim()}'
-        : 'this account';
+        : lc.t('settings.content.activityType.thisAccount');
 
     switch (item.type) {
       case 'post_like':
-        return 'Liked $authorName';
+        return lc.t('settings.content.activityType.likedPost', {'name': authorName});
       case 'comment_like':
-        return 'Liked a comment';
+        return lc.t('settings.content.activityType.likedComment');
       case 'comment':
-        return 'Commented on $authorName';
+        return lc.t('settings.content.activityType.commentedOn', {'name': authorName});
       case 'repost':
-        return 'Reposted $authorName';
+        return lc.t('settings.content.activityType.repostedPost', {'name': authorName});
       case 'save':
-        return 'Saved $authorName';
+        return lc.t('settings.content.activityType.savedPost', {'name': authorName});
       case 'follow':
-        return 'Followed $targetName';
+        return lc.t('settings.content.activityType.followedUser', {'name': targetName});
       case 'report_post':
-        return 'Reported $authorName';
+        return lc.t('settings.content.activityType.reportedPost', {'name': authorName});
       case 'report_user':
-        return 'Reported $targetName';
+        return lc.t('settings.content.activityType.reportedUser', {'name': targetName});
       default:
-        return 'Activity';
+        return lc.t('settings.content.activityType.activity');
     }
   }
 
   String _activitySubtitle(_ContentActivityItem item) {
+    final lc = LanguageController.instance;
     final meta = item.meta;
     final commentSnippet = meta?.commentSnippet?.trim();
     final captionSnippet = meta?.postCaption;
     if (item.type == 'comment_like' || item.type == 'comment') {
       return (commentSnippet != null && commentSnippet.isNotEmpty)
           ? commentSnippet
-          : 'Comment';
+          : lc.t('settings.content.activityType.comment');
     }
-    return _cleanSnippetText(captionSnippet, fallback: 'Post');
+    return _cleanSnippetText(captionSnippet, fallback: lc.t('settings.content.activityType.post'));
   }
 
   bool _isActivityClickable(_ContentActivityItem item) {
@@ -1659,7 +1669,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _hiddenPostsError = 'Unable to unhide this post.';
+        _hiddenPostsError = LanguageController.instance.t('settings.content.unableToUnhide');
       });
     } finally {
       if (!mounted) return;
@@ -1670,6 +1680,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmAndUnhide(_HiddenPostItem item) async {
+    final lc = LanguageController.instance;
     final postId = item.id;
     if (postId.isEmpty) return;
     final confirmed = await showDialog<bool>(
@@ -1684,11 +1695,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel'),
+            child: Text(lc.t('common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Unhide'),
+            child: Text(lc.t('settings.unhide')),
           ),
         ],
       ),
@@ -1729,7 +1740,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _blockedUsersError = 'Unable to unblock this account.';
+        _blockedUsersError = LanguageController.instance.t('settings.content.unableToUnblock');
       });
     } finally {
       if (!mounted) return;
@@ -1740,6 +1751,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmAndUnblock(_BlockedUserItem item) async {
+    final lc = LanguageController.instance;
     if (item.userId.isEmpty) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1756,11 +1768,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel'),
+            child: Text(lc.t('common.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Unblock'),
+            child: Text(lc.t('settings.unblock')),
           ),
         ],
       ),
@@ -1777,6 +1789,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool mutedIndefinitely,
     required Future<void> Function(String? until, bool indefinitely) onSave,
   }) async {
+    final lc = LanguageController.instance;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -1853,7 +1866,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : Colors.transparent,
                   ),
                   child: Text(
-                    opt['label'] as String,
+                    lc.t(opt['labelKey'] as String),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1979,7 +1992,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 size: 16,
                               ),
                               label: Text(
-                                customDate.isEmpty ? 'Select date' : customDate,
+                                customDate.isEmpty ? lc.t('settings.common.selectDate') : customDate,
                               ),
                             ),
                           ),
@@ -2000,7 +2013,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     },
                               icon: Icon(Icons.schedule_rounded, size: 16),
                               label: Text(
-                                customTime.isEmpty ? 'Select time' : customTime,
+                                customTime.isEmpty ? lc.t('settings.common.selectTime') : customTime,
                               ),
                             ),
                           ),
@@ -2022,7 +2035,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: saving
                               ? null
                               : () => Navigator.of(dialogCtx).pop(),
-                          child: Text('Cancel'),
+                          child: Text(lc.t('common.cancel')),
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
@@ -2052,8 +2065,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       if (iso == null) {
                                         setModalState(() {
                                           saving = false;
-                                          error =
-                                              'Please select a valid date and time.';
+                                          error = lc.t('settings.common.pleaseSelectValidDateTime');
                                         });
                                         return;
                                       }
@@ -2061,8 +2073,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       if (!dt.isAfter(DateTime.now().toUtc())) {
                                         setModalState(() {
                                           saving = false;
-                                          error =
-                                              'Please choose a future time.';
+                                          error = lc.t('settings.common.pleaseChooseFutureTime');
                                         });
                                         return;
                                       }
@@ -2092,11 +2103,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       saving = false;
                                       error = e is ApiException
                                           ? e.message
-                                          : 'Failed to update notifications';
+                                          : lc.t('settings.common.failedUpdateNotifications');
                                     });
                                   }
                                 },
-                          child: Text(saving ? 'Saving...' : 'Save'),
+                          child: Text(saving ? lc.t('settings.common.savingDots') : lc.t('common.save')),
                         ),
                       ],
                     ),
@@ -2213,14 +2224,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
           _passwordCooldown = e.retryAfterSec!;
-          _passwordError = 'OTP was just sent. Please wait before retrying.';
+          _passwordError = LanguageController.instance.t('settings.common.otpSent');
         } else {
           _passwordError = e.message;
         }
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _passwordError = 'Unable to send OTP.');
+      setState(() => _passwordError = LanguageController.instance.t('settings.common.unableToSendOtp'));
     } finally {
       if (!mounted) return;
       setState(() => _passwordSubmitting = false);
@@ -2228,9 +2239,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _verifyPasswordOtp() async {
+    final lc = LanguageController.instance;
     final code = _passwordOtp.trim();
     if (code.isEmpty) {
-      setState(() => _passwordError = 'Please enter the OTP.');
+      setState(() => _passwordError = lc.t('settings.email.enterOtpFirst'));
       return;
     }
     setState(() {
@@ -2247,7 +2259,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _passwordError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _passwordError = 'Invalid or expired OTP.');
+      setState(() => _passwordError = lc.t('settings.common.invalidExpiredOtp'));
     } finally {
       if (!mounted) return;
       setState(() => _passwordSubmitting = false);
@@ -2255,34 +2267,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmPasswordChange() async {
+    final lc = LanguageController.instance;
     final current = _passwordCurrent.trim();
     final next = _passwordNew.trim();
     final confirm = _passwordConfirm.trim();
 
     if (current.isEmpty) {
-      setState(() => _passwordError = 'Please enter your current password.');
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.enterCurrentPasswordError'));
       return;
     }
     if (next.isEmpty) {
-      setState(() => _passwordError = 'Please enter a new password.');
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.enterNewPasswordError'));
       return;
     }
     if (next == current) {
       setState(() {
-        _passwordError =
-            'New password must be different from your current password.';
+        _passwordError = lc.t('settings.passwordSecurity.passwordSameError');
       });
       return;
     }
     if (!_passwordRegex.hasMatch(next)) {
       setState(() {
-        _passwordError =
-            'Password must be at least 8 characters and include uppercase, lowercase, and a number.';
+        _passwordError = lc.t('settings.passwordSecurity.passwordFormatError');
       });
       return;
     }
     if (next != confirm) {
-      setState(() => _passwordError = 'New passwords do not match.');
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.passwordMismatchError'));
       return;
     }
 
@@ -2300,7 +2311,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _passwordChangedAt = DateTime.now().toIso8601String();
         _passwordStep = _PasswordChangeStep.done;
-        _passwordSuccess = 'Password updated successfully.';
+        _passwordSuccess = lc.t('settings.passwordSecurity.passwordUpdatedSuccess');
         _passwordLogoutPrompt = true;
         _passwordCurrent = '';
         _passwordNew = '';
@@ -2312,7 +2323,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _passwordError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _passwordError = 'Unable to change password.');
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.unableToChangePassword'));
     } finally {
       if (!mounted) return;
       setState(() => _passwordSubmitting = false);
@@ -2335,7 +2346,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _passwordLogoutError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _passwordLogoutError = 'Unable to log out other devices.');
+      setState(() => _passwordLogoutError = LanguageController.instance.t('settings.passwordSecurity.unableToLogoutDevices'));
     } finally {
       if (!mounted) return;
       setState(() => _passwordLogoutSubmitting = false);
@@ -2382,14 +2393,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
           _twoFactorCooldown = e.retryAfterSec!;
-          _twoFactorError = 'OTP was just sent. Please wait before retrying.';
+          _twoFactorError = LanguageController.instance.t('settings.common.otpSent');
         } else {
           _twoFactorError = e.message;
         }
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _twoFactorError = 'Unable to send OTP.');
+      setState(() => _twoFactorError = LanguageController.instance.t('settings.common.unableToSendOtp'));
     } finally {
       if (!mounted) return;
       setState(() => _twoFactorSubmitting = false);
@@ -2397,9 +2408,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _verifyTwoFactorOtp() async {
+    final lc = LanguageController.instance;
     final code = _twoFactorOtp.trim();
     if (code.isEmpty) {
-      setState(() => _twoFactorError = 'Please enter the OTP.');
+      setState(() => _twoFactorError = lc.t('settings.email.enterOtpFirst'));
       return;
     }
     setState(() {
@@ -2418,15 +2430,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _twoFactorEnabled = enabled;
         _twoFactorStep = _TwoFactorStep.done;
         _twoFactorSuccess = enabled
-            ? 'Two-factor authentication enabled.'
-            : 'Two-factor authentication disabled.';
+            ? lc.t('settings.passwordSecurity.twoFactor.enabled')
+            : lc.t('settings.passwordSecurity.twoFactor.disabled');
       });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _twoFactorError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _twoFactorError = 'Invalid or expired OTP.');
+      setState(() => _twoFactorError = lc.t('settings.common.invalidExpiredOtp'));
     } finally {
       if (!mounted) return;
       setState(() => _twoFactorSubmitting = false);
@@ -2515,9 +2527,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _requestPasskeyOtp() async {
+    final lc = LanguageController.instance;
     final password = _passkeyPassword.trim();
     if (password.isEmpty) {
-      setState(() => _passkeyError = 'Please enter your current password.');
+      setState(() => _passkeyError = lc.t('settings.email.enterCurrentPasswordFirst'));
       return;
     }
 
@@ -2539,14 +2552,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
           _passkeyCooldown = e.retryAfterSec!;
-          _passkeyError = 'OTP was just sent. Please wait before retrying.';
+          _passkeyError = lc.t('settings.common.otpSent');
         } else {
           _passkeyError = e.message;
         }
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _passkeyError = 'Unable to send OTP.');
+      setState(() => _passkeyError = lc.t('settings.common.unableToSendOtp'));
     } finally {
       if (!mounted) return;
       setState(() => _passkeySubmitting = false);
@@ -2554,9 +2567,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _verifyPasskeyOtp() async {
+    final lc = LanguageController.instance;
     final code = _passkeyOtp.trim();
     if (code.isEmpty) {
-      setState(() => _passkeyError = 'Please enter the OTP.');
+      setState(() => _passkeyError = lc.t('settings.email.enterOtpFirst'));
       return;
     }
 
@@ -2578,7 +2592,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _passkeyError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _passkeyError = 'Invalid or expired OTP.');
+      setState(() => _passkeyError = lc.t('settings.common.invalidExpiredOtp'));
     } finally {
       if (!mounted) return;
       setState(() => _passkeySubmitting = false);
@@ -2586,27 +2600,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmPasskey() async {
+    final lc = LanguageController.instance;
     final next = _passkeyNew.trim();
     final confirm = _passkeyConfirm.trim();
     if (_hasPasskey && _passkeyCurrent.trim().isEmpty) {
-      setState(() => _passkeyError = 'Current passkey is required.');
+      setState(() => _passkeyError = lc.t('settings.passwordSecurity.passkey.currentPasskeyRequired'));
       return;
     }
     if (next.isEmpty) {
-      setState(() => _passkeyError = 'Please enter a new passkey.');
+      setState(() => _passkeyError = lc.t('settings.passwordSecurity.passkey.enterNewPasskey'));
       return;
     }
     if (!_passkeyRegex.hasMatch(next)) {
-      setState(() => _passkeyError = 'Passkey must be exactly 6 digits.');
+      setState(() => _passkeyError = lc.t('settings.passwordSecurity.passkey.passkeyMustBe6Digits'));
       return;
     }
     if (next != confirm) {
-      setState(() => _passkeyError = 'Passkeys do not match.');
+      setState(() => _passkeyError = lc.t('settings.passwordSecurity.passkey.passkeysMismatch'));
       return;
     }
     if (_hasPasskey && next == _passkeyCurrent) {
       setState(() {
-        _passkeyError = 'New passkey must be different from current passkey.';
+        _passkeyError = lc.t('settings.passwordSecurity.passkey.newPasskeySameAsCurrent');
       });
       return;
     }
@@ -2627,7 +2642,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _passkeyEnabled = true;
         _passkeyCurrent = next;
         _passkeyStep = _PasskeyStep.done;
-        _passkeySuccess = 'Passkey updated successfully.';
+        _passkeySuccess = lc.t('settings.passwordSecurity.passkey.passkeyUpdatedSuccess');
         _passkeyOtp = '';
         _passkeyNew = '';
         _passkeyConfirm = '';
@@ -2637,7 +2652,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _passkeyError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _passkeyError = 'Unable to update passkey.');
+      setState(() => _passkeyError = lc.t('settings.passwordSecurity.passkey.unableToUpdatePasskey'));
     } finally {
       if (!mounted) return;
       setState(() => _passkeySubmitting = false);
@@ -2660,7 +2675,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _passkeyToggleError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _passkeyToggleError = 'Unable to update passkey.');
+      setState(() => _passkeyToggleError = LanguageController.instance.t('settings.passwordSecurity.passkey.unableToUpdatePasskey'));
     } finally {
       if (!mounted) return;
       setState(() => _passkeyToggleSubmitting = false);
@@ -2697,7 +2712,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final osLabel = (os.isNotEmpty && os.toLowerCase() != 'unknown')
           ? os
           : 'Mobile';
-      return 'Cordigram App on $osLabel';
+      return LanguageController.instance.t('settings.passwordSecurity.devices.cordigramAppOn', {'os': osLabel});
     }
 
     if (info.isNotEmpty) return info;
@@ -2706,7 +2721,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (os.isNotEmpty) os,
     ];
     if (parts.isNotEmpty) return parts.join(' on ');
-    return type.isEmpty ? 'Unknown device' : '$type device';
+    return type.isEmpty
+        ? LanguageController.instance.t('settings.passwordSecurity.devices.unknownDevice')
+        : LanguageController.instance.t('settings.passwordSecurity.devices.typeDevice', {'type': type});
   }
 
   String _resolveDeviceTime(Map<String, dynamic> device) {
@@ -2714,7 +2731,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         (device['lastSeenAt'] as String?) ?? (device['firstSeenAt'] as String?);
     final text = _formatRelativeTime(raw);
     if (text.isEmpty) return '';
-    return 'Last active $text.';
+    return LanguageController.instance.t('settings.common.lastActive', {'time': text});
   }
 
   bool get _hasOtherLoginDevices {
@@ -2754,7 +2771,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _loginDevicesError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loginDevicesError = 'Unable to load login devices.');
+      setState(() => _loginDevicesError = LanguageController.instance.t('settings.passwordSecurity.devices.unableToLogoutDevice'));
     } finally {
       if (!mounted) return;
       setState(() => _loginDevicesLoading = false);
@@ -2776,7 +2793,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _loginDevicesError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loginDevicesError = 'Unable to log out this device.');
+      setState(() => _loginDevicesError = LanguageController.instance.t('settings.passwordSecurity.devices.unableToLogoutDevice'));
     } finally {
       if (!mounted) return;
       setState(() {
@@ -2787,7 +2804,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _logoutAllDevices() async {
     if (_loginDevicesCurrent == null || _loginDevicesCurrent!.isEmpty) {
-      setState(() => _logoutAllError = 'Unable to detect this device.');
+      setState(() => _logoutAllError = LanguageController.instance.t('settings.common.unableDetectDevice'));
       return;
     }
     setState(() {
@@ -2812,7 +2829,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _logoutAllError = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _logoutAllError = 'Unable to log out devices.');
+      setState(() => _logoutAllError = LanguageController.instance.t('settings.passwordSecurity.devices.unableToLogoutAll'));
     } finally {
       if (!mounted) return;
       setState(() => _logoutAllSubmitting = false);
@@ -2820,36 +2837,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _formatRelativeTime(String? value) {
+    final lc = LanguageController.instance;
     if (value == null || value.isEmpty) return '';
     final dt = DateTime.tryParse(value);
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
-    if (diff.inDays < 30) return '${diff.inDays}d ago';
+    if (diff.inMinutes < 1) return lc.t('settings.common.justNow');
+    if (diff.inHours < 1) return lc.t('settings.common.minutesAgo', {'m': diff.inMinutes});
+    if (diff.inDays < 1) return lc.t('settings.common.hoursAgo', {'h': diff.inHours});
+    if (diff.inDays < 30) return lc.t('settings.common.daysAgo', {'d': diff.inDays});
     final months = (diff.inDays / 30).floor();
-    if (months < 12) return '${months}mo ago';
+    if (months < 12) return lc.t('settings.common.monthsAgo', {'mo': months});
     final years = (diff.inDays / 365).floor();
-    return '${years}y ago';
+    return lc.t('settings.common.yearsAgo', {'y': years});
   }
 
   String _formatRequirementLabel(String value) {
+    final lc = LanguageController.instance;
     switch (value) {
       case 'account_age':
-        return 'Account age';
+        return lc.t('settings.creator.requirementAccountAge');
       case 'followers_count':
-        return 'Followers';
+        return lc.t('settings.creator.requirementFollowers');
       case 'posts_count':
-        return 'Posts';
+        return lc.t('settings.creator.requirementPosts');
       case 'active_posting_days_30d':
-        return 'Active posting days (30d)';
+        return lc.t('settings.creator.requirementActivePostingDays');
       case 'engagement_per_post_30d':
-        return 'Average engagement/post (30d)';
+        return lc.t('settings.creator.requirementEngagement');
       case 'recent_violations_90d':
-        return 'Recent violations (90d)';
+        return lc.t('settings.creator.requirementViolations');
       case 'score':
-        return 'Creator score';
+        return lc.t('settings.creator.requirementScore');
       default:
         return value;
     }
@@ -2861,23 +2880,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _sectionTitle(SettingsTab tab) {
+    final lc = LanguageController.instance;
     switch (tab) {
       case SettingsTab.personalInfo:
-        return 'Personal info';
+        return lc.t('settings.tab.personalInfo');
       case SettingsTab.profile:
-        return 'Profile';
+        return lc.t('settings.tab.profile');
       case SettingsTab.creatorVerification:
-        return 'Creator verification';
+        return lc.t('settings.tab.creatorVerification');
       case SettingsTab.passwordSecurity:
-        return 'Password & Security';
+        return lc.t('settings.tab.passwordSecurity');
       case SettingsTab.content:
-        return 'Content';
+        return lc.t('settings.tab.content');
       case SettingsTab.violations:
-        return 'Violation Center';
+        return lc.t('settings.tab.violations');
       case SettingsTab.notifications:
-        return 'Notifications';
+        return lc.t('settings.tab.notifications');
       case SettingsTab.system:
-        return 'System';
+        return lc.t('settings.tab.system');
     }
   }
 
@@ -2903,23 +2923,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _sectionDescription(SettingsTab tab) {
+    final lc = LanguageController.instance;
     switch (tab) {
       case SettingsTab.personalInfo:
-        return 'Account email and personal details shown on your profile.';
+        return lc.t('settings.tab.personalInfoDesc');
       case SettingsTab.profile:
-        return 'Control who can view profile sections and follower lists.';
+        return lc.t('settings.tab.profileDesc');
       case SettingsTab.creatorVerification:
-        return 'Check eligibility and request creator badge verification.';
+        return lc.t('settings.tab.creatorVerificationDesc');
       case SettingsTab.passwordSecurity:
-        return 'Manage password, two-factor, passkey, and login devices.';
+        return lc.t('settings.tab.passwordSecurityDesc');
       case SettingsTab.content:
-        return 'Review activity log, hidden posts, and blocked users.';
+        return lc.t('settings.tab.contentDesc');
       case SettingsTab.violations:
-        return 'Review moderation actions and your strike history.';
+        return lc.t('settings.tab.violationsDesc');
       case SettingsTab.notifications:
-        return 'Control when notification alerts are delivered.';
+        return lc.t('settings.tab.notificationsDesc');
       case SettingsTab.system:
-        return 'Manage app appearance and global behavior.';
+        return lc.t('settings.tab.systemDesc');
     }
   }
 
@@ -2973,9 +2994,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _toVisibilityLabel(String value) {
-    if (value == 'private') return 'Private';
-    if (value == 'followers') return 'Followers';
-    return 'Public';
+    final lc = LanguageController.instance;
+    if (value == 'private') return lc.t('settings.visibility.private');
+    if (value == 'followers') return lc.t('settings.visibility.followers');
+    return lc.t('settings.visibility.public');
   }
 
   String _visibilityOf(String key) {
@@ -3127,7 +3149,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       setState(() {
         _profile = prev;
-        _visibilityError = 'Unable to update visibility setting.';
+        _visibilityError = LanguageController.instance.t('settings.common.failedUpdateVisibility');
       });
     } finally {
       if (!mounted) return;
@@ -3139,12 +3161,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _valueOrNotSet(String? value, {bool prefixAt = false}) {
     final text = value?.trim() ?? '';
-    if (text.isEmpty) return 'Not set';
+    if (text.isEmpty) return LanguageController.instance.t('settings.common.notSet');
     return prefixAt ? '@$text' : text;
   }
 
   String _displayBirthdate(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return 'Not set';
+    if (raw == null || raw.trim().isEmpty) return LanguageController.instance.t('settings.common.notSet');
     try {
       final dt = DateTime.parse(raw);
       const months = [
@@ -3233,66 +3255,141 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSystemTab() {
+    final lc = LanguageController.instance;
     return AnimatedBuilder(
-      animation: ThemeController.instance,
-      builder: (context, _) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: _accent.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                ThemeController.instance.isDarkMode
-                    ? Icons.dark_mode_rounded
-                    : Icons.light_mode_rounded,
-                color: _accent,
-                size: 20,
-              ),
+      animation: Listenable.merge([ThemeController.instance, lc]),
+      builder: (context, _) => Column(
+        children: [
+          // Appearance toggle
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _border),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Appearance',
-                    style: TextStyle(
-                      color: _textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: _accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Switch between Dark and Light mode',
-                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  child: Icon(
+                    ThemeController.instance.isDarkMode
+                        ? Icons.dark_mode_rounded
+                        : Icons.light_mode_rounded,
+                    color: _accent,
+                    size: 20,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lc.t('settings.system.appearance.title'),
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        lc.t('settings.system.appearance.description'),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Switch(
+                  value: ThemeController.instance.isDarkMode,
+                  activeColor: _accent,
+                  onChanged: (value) {
+                    ThemeController.instance.setThemeMode(
+                      value ? ThemeMode.dark : ThemeMode.light,
+                    );
+                    setState(() {});
+                  },
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Switch(
-              value: ThemeController.instance.isDarkMode,
-              activeColor: _accent,
-              onChanged: (value) {
-                ThemeController.instance.setThemeMode(
-                  value ? ThemeMode.dark : ThemeMode.light,
-                );
-                setState(() {});
-              },
+          ),
+          const SizedBox(height: 10),
+          // Language picker
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _border),
             ),
-          ],
-        ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: _accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.language_rounded,
+                    color: _accent,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lc.t('settings.system.language.title'),
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        lc.t('settings.system.language.description'),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                DropdownButton<String>(
+                  value: lc.language,
+                  dropdownColor: _surface,
+                  underline: const SizedBox.shrink(),
+                  style: TextStyle(color: _textPrimary, fontSize: 13),
+                  items: LanguageController.supported.map((code) {
+                    return DropdownMenuItem(
+                      value: code,
+                      child: Text(
+                        lc.t('settings.system.language.options.$code'),
+                        style: TextStyle(color: _textPrimary, fontSize: 13),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (code) {
+                    if (code != null) {
+                      lc.setLanguage(code);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3310,17 +3407,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _stepLabel() {
+    final lc = LanguageController.instance;
     switch (_emailStep) {
       case _EmailChangeStep.password:
-        return 'Step 1 · Verify password';
+        return lc.t('settings.emailStep.verifyPassword');
       case _EmailChangeStep.currentOtp:
-        return 'Step 2 · Current email OTP';
+        return lc.t('settings.emailStep.currentOtp');
       case _EmailChangeStep.newEmail:
-        return 'Step 3 · Enter new email';
+        return lc.t('settings.emailStep.enterNewEmail');
       case _EmailChangeStep.newOtp:
-        return 'Step 4 · New email OTP';
+        return lc.t('settings.emailStep.newOtp');
       case _EmailChangeStep.done:
-        return 'Completed';
+        return lc.t('settings.emailStep.completed');
     }
   }
 
@@ -3394,13 +3492,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildAccountEmailSection() {
-    final currentEmail = _currentEmail ?? 'Loading...';
+    final lc = LanguageController.instance;
+    final currentEmail = _currentEmail ?? lc.t('common.loading');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Account email',
+          lc.t('settings.accountEmail'),
           style: TextStyle(
             color: _textPrimary,
             fontSize: 18,
@@ -3409,7 +3508,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Manage your sign-in email and verification steps.',
+          lc.t('settings.manageSignInEmail'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 14),
@@ -3425,7 +3524,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Current email',
+                            lc.t('settings.currentEmail'),
                             style: TextStyle(
                               color: _textSecondary,
                               fontSize: 12,
@@ -3458,7 +3557,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: Text('Change email'),
+                      child: Text(lc.t('settings.changeEmail')),
                     ),
                   ],
                 ),
@@ -3483,7 +3582,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: _textPrimary,
                           ),
                           label: Text(
-                            'Back',
+                            lc.t('common.back'),
                             style: TextStyle(color: _textPrimary),
                           ),
                         ),
@@ -3511,7 +3610,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 8),
                     if (_emailStep == _EmailChangeStep.password) ...[
                       Text(
-                        'Current password',
+                        lc.t('settings.email.currentPassword'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -3527,25 +3626,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (v) => _password = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
-                          'Enter your password',
+                          lc.t('settings.email.enterPassword'),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'We\'ll send a 6-digit OTP to your current email.',
+                        lc.t('settings.email.willSendOtpCurrent'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         primaryLabel: _emailSubmitting
-                            ? 'Sending...'
-                            : 'Send OTP',
+                            ? lc.t('settings.common.sending')
+                            : lc.t('settings.common.sendOtp'),
                         onPrimary: _emailSubmitting ? null : _requestCurrentOtp,
                       ),
                     ],
                     if (_emailStep == _EmailChangeStep.currentOtp) ...[
                       Text(
-                        'Enter OTP from current email',
+                        lc.t('settings.email.enterOtpCurrent'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -3567,27 +3666,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _currentExpiresSec != null
-                            ? 'OTP expires in ${_currentExpiresSec}s.'
-                            : 'OTP expires in 5 minutes.',
+                            ? lc.t('settings.common.otpExpiresInSec', {'sec': _currentExpiresSec})
+                            : lc.t('settings.common.otpExpiresIn5Min'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         secondaryLabel: _currentCooldown > 0
-                            ? 'Resend (${_currentCooldown}s)'
-                            : 'Resend OTP',
+                            ? lc.t('settings.common.resendWithCooldown', {'sec': _currentCooldown})
+                            : lc.t('settings.common.resendOtp'),
                         onSecondary: _requestCurrentOtp,
                         secondaryDisabled:
                             _emailSubmitting || _currentCooldown > 0,
                         primaryLabel: _emailSubmitting
-                            ? 'Verifying...'
-                            : 'Verify',
+                            ? lc.t('settings.common.verifying')
+                            : lc.t('settings.common.verify'),
                         onPrimary: _emailSubmitting ? null : _verifyCurrentOtp,
                       ),
                     ],
                     if (_emailStep == _EmailChangeStep.newEmail) ...[
                       Text(
-                        'New email',
+                        lc.t('settings.email.newEmail'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -3604,25 +3703,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'We\'ll send a 6-digit OTP to the new email.',
+                        lc.t('settings.email.willSendOtpNew'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'After this change, your old email is removed and sign-in uses the new email.',
+                        lc.t('settings.email.afterChangeNote'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         primaryLabel: _emailSubmitting
-                            ? 'Sending...'
-                            : 'Send OTP',
+                            ? lc.t('settings.common.sending')
+                            : lc.t('settings.common.sendOtp'),
                         onPrimary: _emailSubmitting ? null : _requestNewOtp,
                       ),
                     ],
                     if (_emailStep == _EmailChangeStep.newOtp) ...[
                       Text(
-                        'OTP for new email',
+                        lc.t('settings.email.otpForNewEmail'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -3644,20 +3743,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _newExpiresSec != null
-                            ? 'OTP expires in ${_newExpiresSec}s.'
-                            : 'OTP expires in 5 minutes.',
+                            ? lc.t('settings.common.otpExpiresInSec', {'sec': _newExpiresSec})
+                            : lc.t('settings.common.otpExpiresIn5Min'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         secondaryLabel: _newCooldown > 0
-                            ? 'Resend (${_newCooldown}s)'
-                            : 'Resend OTP',
+                            ? lc.t('settings.common.resendWithCooldown', {'sec': _newCooldown})
+                            : lc.t('settings.common.resendOtp'),
                         onSecondary: _requestNewOtp,
                         secondaryDisabled: _emailSubmitting || _newCooldown > 0,
                         primaryLabel: _emailSubmitting
-                            ? 'Verifying...'
-                            : 'Confirm',
+                            ? lc.t('settings.common.verifying')
+                            : lc.t('settings.email.confirm'),
                         onPrimary: _emailSubmitting ? null : _verifyNewOtp,
                       ),
                     ],
@@ -3766,7 +3865,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : Colors.transparent,
                 ),
                 child: Text(
-                  saving ? 'Saving...' : _toVisibilityLabel(currentVisibility!),
+                  saving ? LanguageController.instance.t('settings.common.saving') : _toVisibilityLabel(currentVisibility!),
                   style: TextStyle(
                     fontSize: 12,
                     color: (!enabled || saving) ? _textSecondary : _textPrimary,
@@ -3791,6 +3890,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildPersonalInfoTab() {
+    final lc = LanguageController.instance;
     final profile = _profile;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3798,7 +3898,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildAccountEmailSection(),
         const SizedBox(height: 18),
         Text(
-          'Personal info',
+          lc.t('settings.personalInfo'),
           style: TextStyle(
             color: _textPrimary,
             fontSize: 18,
@@ -3807,46 +3907,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Details shown on your profile.',
+          lc.t('settings.tab.personalInfoDesc'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 14),
         _buildCard(
           children: [
             _buildInfoRow(
-              title: 'Display name',
+              title: lc.t('settings.personalInfo.displayName'),
               value: _valueOrNotSet(profile?.displayName),
             ),
             _buildInfoRow(
-              title: 'Username',
+              title: lc.t('settings.personalInfo.username'),
               value: _valueOrNotSet(profile?.username, prefixAt: true),
             ),
             _buildInfoRow(
-              title: 'Birthdate',
+              title: lc.t('settings.personalInfo.birthdate'),
               value: _displayBirthdate(profile?.birthdate),
               field: 'birthdate',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Gender',
+              title: lc.t('settings.personalInfo.gender'),
               value: _valueOrNotSet(profile?.gender),
               field: 'gender',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Location',
+              title: lc.t('settings.personalInfo.location'),
               value: _valueOrNotSet(profile?.location),
               field: 'location',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Workplace',
+              title: lc.t('settings.personalInfo.workplace'),
               value: _valueOrNotSet(profile?.workplace?.companyName),
               field: 'workplace',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Bio',
+              title: lc.t('settings.personalInfo.bio'),
               value: _valueOrNotSet(profile?.bio),
               field: 'bio',
               enabled: profile != null,
@@ -3882,7 +3982,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: Text('Edit profile'),
+            child: Text(lc.t('settings.editProfile')),
           ),
         ),
       ],
@@ -3890,12 +3990,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildProfileTab() {
+    final lc = LanguageController.instance;
     final profile = _profile;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Profile visibility',
+          lc.t('settings.profileVisibility'),
           style: TextStyle(
             color: _textPrimary,
             fontSize: 18,
@@ -3904,33 +4005,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Control who can view your profile, About section, and follower lists.',
+          lc.t('settings.controlWhoCanView'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 14),
         _buildCard(
           children: [
             _buildInfoRow(
-              title: 'Profile page',
-              value: 'Who can view your profile page and tabs.',
+              title: lc.t('settings.profile.profilePage'),
+              value: lc.t('settings.profilePageDesc'),
               field: 'profile',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'About this user',
-              value: 'Who can open the About overlay on your profile.',
+              title: lc.t('settings.profile.aboutThisUser'),
+              value: lc.t('settings.aboutThisUserDesc'),
               field: 'about',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Followers list',
-              value: 'Who can view your followers list.',
+              title: lc.t('settings.profile.followersList'),
+              value: lc.t('settings.followersListDesc'),
               field: 'followers',
               enabled: profile != null,
             ),
             _buildInfoRow(
-              title: 'Following list',
-              value: 'Who can view the accounts you follow.',
+              title: lc.t('settings.profile.followingList'),
+              value: lc.t('settings.followingListDesc'),
               field: 'following',
               enabled: profile != null,
             ),
@@ -3999,6 +4100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildCreatorLatestRequest(_CreatorLatestRequest request) {
+    final lc = LanguageController.instance;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -4013,7 +4115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Row(
             children: [
               Text(
-                'Latest request',
+                lc.t('settings.creator.latestRequest'),
                 style: TextStyle(
                   color: _textPrimary,
                   fontSize: 13,
@@ -4041,28 +4143,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if ((request.createdAt ?? '').isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'Submitted ${_formatRelativeTime(request.createdAt)}',
+              lc.t('settings.creator.submitted', {'time': _formatRelativeTime(request.createdAt)}),
               style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.reviewedAt ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              'Reviewed ${_formatRelativeTime(request.reviewedAt)}',
+              lc.t('settings.creator.reviewed', {'time': _formatRelativeTime(request.reviewedAt)}),
               style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.decisionReason ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              'Reason: ${request.decisionReason}',
+              lc.t('settings.creator.reason', {'reason': request.decisionReason}),
               style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.cooldownUntil ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              'You can request again ${_formatRelativeTime(request.cooldownUntil)}',
+              lc.t('settings.creator.canRequestAgain', {'time': _formatRelativeTime(request.cooldownUntil)}),
               style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
@@ -4072,13 +4174,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildCreatorVerificationTab() {
+    final lc = LanguageController.instance;
     final status = _creatorStatus;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Creator verification',
+          lc.t('settings.creator.title'),
           style: TextStyle(
             color: _textPrimary,
             fontSize: 18,
@@ -4087,7 +4190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Apply for the blue creator badge and unlock creator privileges once your account meets quality requirements.',
+          lc.t('settings.creator.description'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 14),
@@ -4100,7 +4203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   if (_creatorLoading)
                     Text(
-                      'Loading creator eligibility...',
+                      lc.t('settings.creator.loadingEligibility'),
                       style: TextStyle(color: _textSecondary, fontSize: 13),
                     ),
                   if (status != null && status.account.isCreatorVerified) ...[
@@ -4118,7 +4221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       child: Text(
-                        'Your account is creator verified.',
+                        lc.t('settings.creator.accountVerified'),
                         style: TextStyle(color: _textPrimary),
                       ),
                     ),
@@ -4136,7 +4239,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Creator score',
+                            lc.t('settings.creator.creatorScore'),
                             style: TextStyle(
                               color: _textPrimary,
                               fontSize: 13,
@@ -4155,8 +4258,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 6),
                           Text(
                             status.eligibility.eligible
-                                ? 'Your account currently meets all conditions.'
-                                : 'Improve the missing conditions below to become eligible.',
+                                ? lc.t('settings.creator.meetsAllConditions')
+                                : lc.t('settings.creator.improveMissing'),
                             style: TextStyle(
                               color: _textSecondary,
                               fontSize: 12,
@@ -4169,48 +4272,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _buildCard(
                       children: [
                         _buildCreatorMetricRow(
-                          title: 'Account age',
-                          value: '${status.eligibility.accountAgeDays} days',
-                          threshold:
-                              'Minimum ${status.criteria.minAccountAgeDays} days',
+                          title: lc.t('settings.profile.accountAge'),
+                          value: lc.t('settings.creator.accountAgeDays', {'days': status.eligibility.accountAgeDays}),
+                          threshold: lc.t('settings.creator.minimum', {'value': status.criteria.minAccountAgeDays}),
                         ),
                         _buildCreatorMetricRow(
-                          title: 'Followers',
+                          title: lc.t('settings.creator.followersLabel'),
                           value: '${status.eligibility.followersCount}',
-                          threshold:
-                              'Minimum ${status.criteria.minFollowersCount}',
+                          threshold: lc.t('settings.creator.minimum', {'value': status.criteria.minFollowersCount}),
                         ),
                         _buildCreatorMetricRow(
-                          title: 'Published posts',
+                          title: lc.t('settings.profile.publishedPosts'),
                           value: '${status.eligibility.postsCount}',
-                          threshold: 'Minimum ${status.criteria.minPostsCount}',
+                          threshold: lc.t('settings.creator.minimum', {'value': status.criteria.minPostsCount}),
                         ),
                         _buildCreatorMetricRow(
-                          title: 'Active posting days (30d)',
+                          title: lc.t('settings.creator.activePostingDays'),
                           value: '${status.eligibility.activePostingDays30d}',
-                          threshold:
-                              'Minimum ${status.criteria.minActivePostingDays30d}',
+                          threshold: lc.t('settings.creator.minimum', {'value': status.criteria.minActivePostingDays30d}),
                         ),
                         _buildCreatorMetricRow(
-                          title: 'Avg engagement/post (30d)',
+                          title: lc.t('settings.creator.avgEngagement'),
                           value: _formatNum(
                             status.eligibility.engagementPerPost30d,
                           ),
-                          threshold:
-                              'Minimum ${_formatNum(status.criteria.minEngagementPerPost30d)}',
+                          threshold: lc.t('settings.creator.minimum', {'value': _formatNum(status.criteria.minEngagementPerPost30d)}),
                         ),
                         _buildCreatorMetricRow(
-                          title: 'Recent violations (90d)',
+                          title: lc.t('settings.creator.recentViolations'),
                           value: '${status.eligibility.recentViolations90d}',
-                          threshold:
-                              'Maximum ${status.criteria.maxRecentViolations90d}',
+                          threshold: lc.t('settings.creator.maximum', {'value': status.criteria.maxRecentViolations90d}),
                         ),
                       ],
                     ),
                     if (status.eligibility.failedRequirements.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       Text(
-                        'Missing requirements: ${status.eligibility.failedRequirements.map(_formatRequirementLabel).join(', ')}',
+                        lc.t('settings.creator.missingRequirements', {'list': status.eligibility.failedRequirements.map(_formatRequirementLabel).join(', ')}),
                         style: TextStyle(color: _danger, fontSize: 12),
                       ),
                     ],
@@ -4220,7 +4318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                     const SizedBox(height: 12),
                     Text(
-                      'Request note (optional)',
+                      lc.t('settings.creator.requestNote'),
                       style: TextStyle(
                         color: _textPrimary,
                         fontSize: 13,
@@ -4235,7 +4333,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: (v) => _creatorNote = v,
                       style: TextStyle(color: _textPrimary),
                       decoration: _emailInputDecoration(
-                        'Share details that help admin understand your creator journey.',
+                        lc.t('settings.creator.requestNotePlaceholder'),
                       ),
                     ),
                     if (_creatorError != null) ...[
@@ -4269,7 +4367,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            child: Text('Refresh status'),
+                            child: Text(lc.t('settings.refreshStatus')),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -4293,8 +4391,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             child: Text(
                               _creatorSubmitting
-                                  ? 'Submitting...'
-                                  : 'Request creator',
+                                  ? lc.t('settings.creator.submittingDots')
+                                  : lc.t('settings.creator.requestCreator'),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -4317,33 +4415,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _passwordStepLabel() {
-    if (_passwordStep == _PasswordChangeStep.otp) return 'Step 1 · Email OTP';
+    final lc = LanguageController.instance;
+    if (_passwordStep == _PasswordChangeStep.otp) return lc.t('settings.emailStep.currentOtp');
     if (_passwordStep == _PasswordChangeStep.form) {
-      return 'Step 2 · Update password';
+      return lc.t('settings.emailStep.updatePassword');
     }
-    return 'Completed';
+    return lc.t('settings.emailStep.completed');
   }
 
   String _passkeyStepLabel() {
-    if (_passkeyStep == _PasskeyStep.password)
-      return 'Step 1 · Verify password';
-    if (_passkeyStep == _PasskeyStep.otp) return 'Step 2 · Email OTP';
-    if (_passkeyStep == _PasskeyStep.form) {
-      return _hasPasskey ? 'Step 3 · Change passkey' : 'Step 3 · Set passkey';
+    final lc = LanguageController.instance;
+    if (_passkeyStep == _PasskeyStep.password) {
+      return lc.t('settings.emailStep.verifyPassword');
     }
-    return 'Completed';
+    if (_passkeyStep == _PasskeyStep.otp) return lc.t('settings.emailStep.currentOtp');
+    if (_passkeyStep == _PasskeyStep.form) {
+      return _hasPasskey ? lc.t('settings.emailStep.changePasskey') : lc.t('settings.emailStep.setPasskey');
+    }
+    return lc.t('settings.emailStep.completed');
   }
 
   Widget _buildActionHeader({
     required VoidCallback? onBack,
     required String stepLabel,
   }) {
+    final lc = LanguageController.instance;
     return Row(
       children: [
         TextButton.icon(
           onPressed: onBack,
           icon: Icon(Icons.arrow_back_rounded, size: 16),
-          label: Text('Back'),
+          label: Text(lc.t('common.back')),
           style: TextButton.styleFrom(foregroundColor: _textPrimary),
         ),
         const Spacer(),
@@ -4367,6 +4469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildPasswordSecurityTab() {
+    final lc = LanguageController.instance;
     String sixDigits(String value) {
       final digits = value.replaceAll(RegExp(r'\D'), '');
       return digits.length > 6 ? digits.substring(0, 6) : digits;
@@ -4376,7 +4479,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Password & Security',
+          lc.t('settings.passwordSecurity.title'),
           style: TextStyle(
             color: _textPrimary,
             fontSize: 18,
@@ -4385,7 +4488,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Manage your login protection and password updates.',
+          lc.t('settings.passwordSecurity.description'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 14),
@@ -4399,7 +4502,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Change password',
+                      lc.t('settings.changePassword'),
                       style: TextStyle(
                         color: _textPrimary,
                         fontSize: 14,
@@ -4409,10 +4512,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _passwordStatusLoading
-                          ? 'Loading last password change...'
+                          ? lc.t('settings.passwordSecurity.loadingLastChange')
                           : (_passwordChangedAt != null
-                                ? 'Last changed ${_formatRelativeTime(_passwordChangedAt)}'
-                                : 'Password has not been changed yet.'),
+                                ? lc.t('settings.passwordSecurity.lastChanged', {'time': _formatRelativeTime(_passwordChangedAt)})
+                                : lc.t('settings.passwordSecurity.neverChanged')),
                       style: TextStyle(color: _textSecondary, fontSize: 12),
                     ),
                     const SizedBox(height: 12),
@@ -4424,7 +4527,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           backgroundColor: _accent,
                           foregroundColor: Colors.white,
                         ),
-                        child: Text('Change password'),
+                        child: Text(lc.t('settings.changePassword')),
                       ),
                     ),
                   ],
@@ -4443,7 +4546,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 8),
                     if (_passwordStep == _PasswordChangeStep.otp) ...[
                       Text(
-                        'OTP for password change',
+                        lc.t('settings.passwordSecurity.otpForPasswordChange'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -4465,21 +4568,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _passwordExpiresSec != null
-                            ? 'OTP expires in ${_passwordExpiresSec}s.'
-                            : 'OTP expires in 5 minutes.',
+                            ? lc.t('settings.common.otpExpiresInSec', {'sec': _passwordExpiresSec})
+                            : lc.t('settings.common.otpExpiresIn5Min'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         secondaryLabel: _passwordCooldown > 0
-                            ? 'Resend (${_passwordCooldown}s)'
-                            : 'Resend OTP',
+                            ? lc.t('settings.common.resendWithCooldown', {'sec': _passwordCooldown})
+                            : lc.t('settings.common.resendOtp'),
                         onSecondary: () => _requestPasswordOtp(),
                         secondaryDisabled:
                             _passwordSubmitting || _passwordCooldown > 0,
                         primaryLabel: _passwordSubmitting
-                            ? 'Verifying...'
-                            : 'Verify',
+                            ? lc.t('settings.common.verifying')
+                            : lc.t('settings.common.verify'),
                         onPrimary: _passwordSubmitting
                             ? null
                             : _verifyPasswordOtp,
@@ -4487,7 +4590,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                     if (_passwordStep == _PasswordChangeStep.form) ...[
                       Text(
-                        'Current password',
+                        lc.t('settings.passwordSecurity.currentPassword'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -4503,12 +4606,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (v) => _passwordCurrent = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
-                          'Enter current password',
+                          lc.t('settings.passwordSecurity.enterCurrentPassword'),
                         ),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'New password',
+                        lc.t('settings.passwordSecurity.newPassword'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -4524,12 +4627,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (v) => _passwordNew = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
-                          'Create a new password',
+                          lc.t('settings.passwordSecurity.createNewPassword'),
                         ),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Confirm new password',
+                        lc.t('settings.passwordSecurity.confirmNewPassword'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -4545,19 +4648,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (v) => _passwordConfirm = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
-                          'Re-enter new password',
+                          lc.t('settings.passwordSecurity.reEnterNewPassword'),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Password must be at least 8 characters and include uppercase, lowercase, and a number.',
+                        lc.t('settings.passwordSecurity.passwordRequirements'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         primaryLabel: _passwordSubmitting
                             ? 'Updating...'
-                            : 'Change password',
+                            : lc.t('settings.changePassword'),
                         onPrimary: _passwordSubmitting
                             ? null
                             : _confirmPasswordChange,
@@ -4575,14 +4678,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         child: Text(
-                          _passwordSuccess ?? 'Password updated successfully.',
+                          _passwordSuccess ?? lc.t('settings.passwordSecurity.passwordUpdatedSuccess'),
                           style: TextStyle(color: _textPrimary),
                         ),
                       ),
                       if (_passwordLogoutPrompt) ...[
                         const SizedBox(height: 12),
                         Text(
-                          'Do you want to log out of all other devices?',
+                          lc.t('settings.passwordSecurity.logoutOtherDevices'),
                           style: TextStyle(color: _textSecondary, fontSize: 12),
                         ),
                         if (_passwordLogoutError != null) ...[
@@ -4594,7 +4697,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                         const SizedBox(height: 10),
                         _buildStepActions(
-                          secondaryLabel: 'No, keep signed in',
+                          secondaryLabel: lc.t('settings.passwordSecurity.noKeepSignedIn'),
                           onSecondary: () {
                             setState(() {
                               _passwordLogoutPrompt = false;
@@ -4602,8 +4705,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           },
                           secondaryDisabled: _passwordLogoutSubmitting,
                           primaryLabel: _passwordLogoutSubmitting
-                              ? 'Logging out...'
-                              : 'Yes, log out others',
+                              ? lc.t('settings.passwordSecurity.loggingOutDots')
+                              : lc.t('settings.passwordSecurity.yesLogOutOthers'),
                           onPrimary: _passwordLogoutSubmitting
                               ? null
                               : _logoutOtherDevicesAfterPassword,
@@ -4633,7 +4736,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Two-factor authentication',
+                      lc.t('settings.passwordSecurity.twoFactor.title'),
                       style: TextStyle(
                         color: _textPrimary,
                         fontSize: 14,
@@ -4642,7 +4745,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Require an email OTP each time you sign in.',
+                      lc.t('settings.passwordSecurity.twoFactor.description'),
                       style: TextStyle(color: _textSecondary, fontSize: 12),
                     ),
                     const SizedBox(height: 12),
@@ -4658,8 +4761,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Text(
                           _twoFactorLoading
-                              ? 'Loading...'
-                              : (_twoFactorEnabled ? 'Disable' : 'Enable'),
+                              ? lc.t('common.loading')
+                              : (_twoFactorEnabled ? lc.t('settings.passwordSecurity.twoFactor.disableLabel') : lc.t('settings.passwordSecurity.twoFactor.enableLabel')),
                         ),
                       ),
                     ),
@@ -4677,15 +4780,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ? null
                           : _handleTwoFactorBack,
                       stepLabel: _twoFactorStep == _TwoFactorStep.otp
-                          ? 'Step 1 - Email OTP'
-                          : 'Completed',
+                          ? lc.t('settings.emailStep.currentOtp')
+                          : lc.t('settings.emailStep.completed'),
                     ),
                     const SizedBox(height: 8),
                     if (_twoFactorStep == _TwoFactorStep.otp) ...[
                       Text(
                         _twoFactorTarget
-                            ? 'OTP to enable two-factor'
-                            : 'OTP to disable two-factor',
+                            ? lc.t('settings.passwordSecurity.twoFactor.otpToEnable')
+                            : lc.t('settings.passwordSecurity.twoFactor.otpToDisable'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -4707,22 +4810,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _twoFactorExpiresSec != null
-                            ? 'OTP expires in ${_twoFactorExpiresSec}s.'
-                            : 'OTP expires in 5 minutes.',
+                            ? lc.t('settings.common.otpExpiresInSec', {'sec': _twoFactorExpiresSec})
+                            : lc.t('settings.common.otpExpiresIn5Min'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         secondaryLabel: _twoFactorCooldown > 0
-                            ? 'Resend (${_twoFactorCooldown}s)'
-                            : 'Resend OTP',
+                            ? lc.t('settings.common.resendWithCooldown', {'sec': _twoFactorCooldown})
+                            : lc.t('settings.common.resendOtp'),
                         onSecondary: () =>
                             _requestTwoFactorOtp(_twoFactorTarget),
                         secondaryDisabled:
                             _twoFactorSubmitting || _twoFactorCooldown > 0,
                         primaryLabel: _twoFactorSubmitting
-                            ? 'Verifying...'
-                            : (_twoFactorTarget ? 'Enable' : 'Disable'),
+                            ? lc.t('settings.common.verifying')
+                            : (_twoFactorTarget ? lc.t('settings.passwordSecurity.twoFactor.enableLabel') : lc.t('settings.passwordSecurity.twoFactor.disableLabel')),
                         onPrimary: _twoFactorSubmitting
                             ? null
                             : _verifyTwoFactorOtp,
@@ -4740,7 +4843,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         child: Text(
-                          _twoFactorSuccess ?? 'Two-factor updated.',
+                          _twoFactorSuccess ?? lc.t('settings.passwordSecurity.twoFactor.updated'),
                           style: TextStyle(color: _textPrimary),
                         ),
                       ),
@@ -4766,7 +4869,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Passkeys',
+                    lc.t('settings.passwordSecurity.passkey.title'),
                     style: TextStyle(
                       color: _textPrimary,
                       fontSize: 14,
@@ -4775,13 +4878,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Use a 6-digit passkey for quick verification.',
+                    lc.t('settings.passwordSecurity.passkey.description'),
                     style: TextStyle(color: _textSecondary, fontSize: 12),
                   ),
                   if (_hasPasskey) ...[
                     const SizedBox(height: 6),
                     Text(
-                      _passkeyEnabled ? 'Status: Enabled' : 'Status: Disabled',
+                      _passkeyEnabled
+                          ? lc.t('settings.passwordSecurity.passkey.statusEnabled')
+                          : lc.t('settings.passwordSecurity.passkey.statusDisabled'),
                       style: TextStyle(color: _textSecondary, fontSize: 12),
                     ),
                   ],
@@ -4802,8 +4907,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           child: Text(
                             _passkeyToggleSubmitting
-                                ? 'Updating...'
-                                : (_passkeyEnabled ? 'Disable' : 'Enable'),
+                                ? lc.t('settings.passwordSecurity.passkey.updating')
+                                : (_passkeyEnabled
+                                    ? lc.t('settings.passwordSecurity.twoFactor.disableLabel')
+                                    : lc.t('settings.passwordSecurity.twoFactor.enableLabel')),
                           ),
                         ),
                       ),
@@ -4821,10 +4928,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Text(
                           _passkeyStatusLoading
-                              ? 'Loading...'
+                              ? lc.t('common.loading')
                               : (_hasPasskey
-                                    ? 'Change passkey'
-                                    : 'Set passkey'),
+                                    ? lc.t('settings.passwordSecurity.passkey.changePasskey')
+                                    : lc.t('settings.passwordSecurity.passkey.setPasskey')),
                         ),
                       ),
                     ),
@@ -4853,7 +4960,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 8),
                     if (_passkeyStep == _PasskeyStep.password) ...[
                       Text(
-                        'Current password',
+                        lc.t('settings.passwordSecurity.currentPassword'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -4867,19 +4974,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (v) => _passkeyPassword = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
-                          'Enter your password',
+                          lc.t('settings.email.enterPassword'),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'We\'ll send a 6-digit OTP to confirm your passkey change.',
+                        lc.t('settings.passwordSecurity.passkey.willSendOtpPasskey'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         primaryLabel: _passkeySubmitting
-                            ? 'Sending...'
-                            : 'Send OTP',
+                            ? lc.t('settings.common.sending')
+                            : lc.t('settings.common.sendOtp'),
                         onPrimary: _passkeySubmitting
                             ? null
                             : _requestPasskeyOtp,
@@ -4887,7 +4994,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                     if (_passkeyStep == _PasskeyStep.otp) ...[
                       Text(
-                        'OTP for passkey setup',
+                        lc.t('settings.passwordSecurity.passkey.otpForPasskey'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -4909,21 +5016,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _passkeyExpiresSec != null
-                            ? 'OTP expires in ${_passkeyExpiresSec}s.'
-                            : 'OTP expires in 5 minutes.',
+                            ? lc.t('settings.common.otpExpiresInSec', {'sec': _passkeyExpiresSec})
+                            : lc.t('settings.common.otpExpiresIn5Min'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
                         secondaryLabel: _passkeyCooldown > 0
-                            ? 'Resend (${_passkeyCooldown}s)'
-                            : 'Resend OTP',
+                            ? lc.t('settings.common.resendWithCooldown', {'sec': _passkeyCooldown})
+                            : lc.t('settings.common.resendOtp'),
                         onSecondary: _requestPasskeyOtp,
                         secondaryDisabled:
                             _passkeySubmitting || _passkeyCooldown > 0,
                         primaryLabel: _passkeySubmitting
-                            ? 'Verifying...'
-                            : 'Verify',
+                            ? lc.t('settings.common.verifying')
+                            : lc.t('settings.common.verify'),
                         onPrimary: _passkeySubmitting
                             ? null
                             : _verifyPasskeyOtp,
@@ -4932,7 +5039,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (_passkeyStep == _PasskeyStep.form) ...[
                       if (_hasPasskey) ...[
                         Text(
-                          'Current passkey',
+                          lc.t('settings.passwordSecurity.passkey.currentPasskey'),
                           style: TextStyle(
                             color: _textPrimary,
                             fontSize: 13,
@@ -4981,7 +5088,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(height: 10),
                       ],
                       Text(
-                        'New passkey',
+                        lc.t('settings.passwordSecurity.passkey.newPasskey'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -4997,12 +5104,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (v) => _passkeyNew = sixDigits(v),
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
-                          'Enter 6-digit passkey',
+                          lc.t('settings.passwordSecurity.passkey.enter6Digit'),
                         ).copyWith(counterText: ''),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Confirm passkey',
+                        lc.t('settings.passwordSecurity.passkey.confirmPasskey'),
                         style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
@@ -5018,17 +5125,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (v) => _passkeyConfirm = sixDigits(v),
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
-                          'Re-enter passkey',
+                          lc.t('settings.passwordSecurity.passkey.reEnterPasskey'),
                         ).copyWith(counterText: ''),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Passkey must be exactly 6 digits.',
+                        lc.t('settings.passwordSecurity.passkey.passkeyMust6Digits'),
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
-                        primaryLabel: _passkeySubmitting ? 'Saving...' : 'Save',
+                        primaryLabel: _passkeySubmitting ? lc.t('settings.common.savingDots') : lc.t('common.save'),
                         onPrimary: _passkeySubmitting ? null : _confirmPasskey,
                       ),
                     ],
@@ -5044,7 +5151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         child: Text(
-                          _passkeySuccess ?? 'Passkey updated successfully.',
+                          _passkeySuccess ?? lc.t('settings.passwordSecurity.passkey.passkeyUpdatedSuccess'),
                           style: TextStyle(color: _textPrimary),
                         ),
                       ),
@@ -5070,7 +5177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Where you\'re logged in',
+                    lc.t('settings.passwordSecurity.devices.title'),
                     style: TextStyle(
                       color: _textPrimary,
                       fontSize: 14,
@@ -5079,7 +5186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Review devices that have accessed your account.',
+                    lc.t('settings.passwordSecurity.devices.description'),
                     style: TextStyle(color: _textSecondary, fontSize: 12),
                   ),
                   const SizedBox(height: 12),
@@ -5091,7 +5198,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
                       ),
-                      child: Text('View devices'),
+                      child: Text(lc.t('settings.viewDevices')),
                     ),
                   ),
                 ],
@@ -5107,7 +5214,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Padding(
                         padding: EdgeInsets.only(bottom: 8),
                         child: Text(
-                          'Loading devices...',
+                          lc.t('settings.passwordSecurity.devices.loadingDevices'),
                           style: TextStyle(color: _textSecondary, fontSize: 12),
                         ),
                       ),
@@ -5123,7 +5230,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Padding(
                         padding: EdgeInsets.only(bottom: 8),
                         child: Text(
-                          'No login devices found.',
+                          lc.t('settings.passwordSecurity.devices.noDevicesFound'),
                           style: TextStyle(color: _textSecondary, fontSize: 12),
                         ),
                       ),
@@ -5175,7 +5282,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     Padding(
                                       padding: EdgeInsets.only(top: 4),
                                       child: Text(
-                                        'Current device',
+                                        lc.t('settings.passwordSecurity.devices.currentDevice'),
                                         style: TextStyle(
                                           color: _accent,
                                           fontSize: 11,
@@ -5195,7 +5302,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   foregroundColor: _danger,
                                 ),
                                 child: Text(
-                                  isSubmitting ? 'Logging out...' : 'Log out',
+                                  isSubmitting
+                                      ? lc.t('settings.passwordSecurity.devices.loggingOut')
+                                      : lc.t('settings.passwordSecurity.devices.logOut'),
                                 ),
                               ),
                           ],
@@ -5227,8 +5336,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           child: Text(
                             _logoutAllSubmitting
-                                ? 'Logging out...'
-                                : 'Log out all other devices',
+                                ? lc.t('settings.passwordSecurity.devices.loggingOutAll')
+                                : lc.t('settings.passwordSecurity.devices.logOutAllOthers'),
                           ),
                         ),
                       ),
@@ -5243,6 +5352,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildContentTab() {
+    final lc = LanguageController.instance;
     final visibleActivityItems = _activityItems
         .take(_activityVisibleCount)
         .toList(growable: false);
@@ -5331,7 +5441,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Content',
+          lc.t('settings.content.title'),
           style: TextStyle(
             color: _textPrimary,
             fontSize: 18,
@@ -5340,7 +5450,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Manage hidden posts, blocked users, and your activity log.',
+          lc.t('settings.content.description'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 14),
@@ -5348,8 +5458,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             buildAccordionHeader(
-              title: 'Activity log',
-              desc: 'Track all of your interactions across the platform.',
+              title: lc.t('settings.activity.activityLog'),
+              desc: lc.t('settings.content.activityLogDesc'),
               isOpen: _contentActivityOpen,
               onTap: () => _toggleContentSection('activity'),
             ),
@@ -5365,7 +5475,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         final key = option['key']!;
                         final active = _activityFilter == key;
                         return ChoiceChip(
-                          label: Text(option['label']!),
+                          label: Text(lc.t(option['labelKey']!)),
                           selected: active,
                           showCheckmark: false,
                           onSelected: (_) {
@@ -5532,7 +5642,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? null
                         : _handleSeeMoreActivity,
                     child: Text(
-                      _activityLoadingMore ? 'Loading...' : 'See more',
+                      _activityLoadingMore ? lc.t('common.loading') : lc.t('common.seeMore'),
                     ),
                   ),
                 ),
@@ -5545,7 +5655,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             buildAccordionHeader(
-              title: 'Hidden posts',
+              title: lc.t('settings.activity.hiddenPosts'),
               desc:
                   'Posts you hide are removed from your feed. You can unhide them anytime.',
               isOpen: _contentHiddenOpen,
@@ -5661,7 +5771,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: isSubmitting
                               ? null
                               : () => _confirmAndUnhide(post),
-                          child: Text(isSubmitting ? 'Unhiding...' : 'Unhide'),
+                          child: Text(isSubmitting ? '${lc.t('settings.unhide')}...' : lc.t('settings.unhide')),
                         ),
                       ],
                     ),
@@ -5673,7 +5783,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                   child: OutlinedButton(
                     onPressed: _handleSeeMoreHiddenPosts,
-                    child: Text('See more'),
+                    child: Text(lc.t('common.seeMore')),
                   ),
                 ),
             ],
@@ -5685,7 +5795,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             buildAccordionHeader(
-              title: 'Blocked users',
+              title: lc.t('settings.activity.blockedUsers'),
               desc: 'People you block cannot view your profile or content.',
               isOpen: _contentBlockedOpen,
               onTap: () => _toggleContentSection('blocked'),
@@ -5789,7 +5899,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ? null
                               : () => _confirmAndUnblock(user),
                           child: Text(
-                            isSubmitting ? 'Unblocking...' : 'Unblock',
+                            isSubmitting ? '${lc.t('settings.unblock')}...' : lc.t('settings.unblock'),
                           ),
                         ),
                       ],
@@ -5985,6 +6095,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildNotificationsTab() {
+    final lc = LanguageController.instance;
     final settings = _notificationSettings;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -6048,7 +6159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
                       ),
-                      child: Text('Enable'),
+                      child: Text(lc.t('common.enable')),
                     ),
                 ],
               ),
@@ -6079,9 +6190,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             buildRow(
-              title: 'Push notifications',
+              title: lc.t('settings.notifications.pushNotifications'),
               status: _notificationLoading
-                  ? 'Loading...'
+                  ? lc.t('common.loading')
                   : _notificationStatusLabel(
                       enabled: settings?.enabled ?? true,
                       mutedUntil: settings?.mutedUntil,
@@ -6093,7 +6204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onMute: settings == null
                   ? null
                   : () => _openNotificationMuteOverlay(
-                      title: 'Mute notifications',
+                      title: lc.t('settings.notifications.muteNotifications'),
                       subtitle:
                           'Choose how long to pause alerts for your account.',
                       mutedUntil: settings.mutedUntil,
@@ -6166,15 +6277,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 builder: (_) {
                   final category = _notificationCategories[i];
                   final key = category['key']!;
-                  final label = category['label']!;
-                  final description = category['description']!;
+                  final label = lc.t(category['labelKey']!);
+                  final description = lc.t(category['descKey']!);
                   final categorySettings = settings?.categories[key];
                   final enabled = categorySettings?.enabled ?? true;
 
                   return buildRow(
                     title: label,
                     status: _notificationLoading
-                        ? 'Loading...'
+                        ? lc.t('common.loading')
                         : _notificationStatusLabel(
                             enabled: categorySettings?.enabled ?? true,
                             mutedUntil: categorySettings?.mutedUntil,
@@ -6186,9 +6297,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onMute: categorySettings == null
                         ? null
                         : () => _openNotificationMuteOverlay(
-                            title: 'Mute notifications',
-                            subtitle:
-                                'Choose how long to pause alerts for $label.',
+                            title: lc.t('settings.notifications.muteNotifications'),
+                            subtitle: lc.t('settings.notifications.chooseHowLongCategory', {'label': label}),
                             mutedUntil: categorySettings.mutedUntil,
                             mutedIndefinitely:
                                 categorySettings.mutedIndefinitely,
@@ -6253,6 +6363,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildContent() {
+    final lc = LanguageController.instance;
     if (_loading) {
       return Center(child: CircularProgressIndicator(color: _accent));
     }
@@ -6270,7 +6381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(color: _danger, fontSize: 14),
               ),
               const SizedBox(height: 12),
-              ElevatedButton(onPressed: _loadProfile, child: Text('Retry')),
+              ElevatedButton(onPressed: _loadProfile, child: Text(lc.t('common.retry'))),
             ],
           ),
         ),
@@ -6507,6 +6618,7 @@ class _ViolationDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lc = LanguageController.instance;
     final tokens = _tokens(context);
     final recordedAt = _formatRelativeTime(item.createdAt);
     final severityText = _formatSeverityLabel(item.severity);
@@ -6641,7 +6753,7 @@ class _ViolationDetailScreen extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => Navigator.of(context).pop(),
               icon: Icon(Icons.close_rounded),
-              label: Text('Close'),
+              label: Text(lc.t('common.close')),
             ),
           ),
         ],

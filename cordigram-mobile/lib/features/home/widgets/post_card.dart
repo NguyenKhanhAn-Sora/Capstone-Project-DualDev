@@ -8,6 +8,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 import '../models/feed_post.dart';
 import '../../profile/profile_screen.dart';
 import 'media_carousel.dart';
+import '../../../core/services/language_controller.dart';
 
 // ── Sponsored ad creative ────────────────────────────────────────────────────
 
@@ -276,6 +277,7 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _openMoreMenu(BuildContext triggerContext) async {
     final scheme = Theme.of(context).colorScheme;
+    final lc = LanguageController.instance;
     final isOwner =
         widget.viewerId != null &&
         widget.state.post.authorId != null &&
@@ -290,67 +292,67 @@ class _PostCardState extends State<PostCard> {
 
     final entries = <({String id, String label, bool danger})>[];
     if (isOwner && isAdPost && widget.useAdsMenuMode) {
-      entries.add((id: 'goToAdsPost', label: 'Go to ads', danger: false));
-      entries.add((id: 'detailAds', label: 'Detail ads', danger: false));
+      entries.add((id: 'goToAdsPost', label: lc.t('post.menu.goToAds'), danger: false));
+      entries.add((id: 'detailAds', label: lc.t('post.menu.detailAds'), danger: false));
       entries.add((
         id: 'toggleHideLike',
-        label: post.hideLikeCount == true ? 'Show like' : 'Hide like',
+        label: post.hideLikeCount == true ? lc.t('post.menu.showLike') : lc.t('post.menu.hideLike'),
         danger: false,
       ));
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
     } else if (isOwner) {
-      entries.add((id: 'editPost', label: 'Edit post', danger: false));
+      entries.add((id: 'editPost', label: lc.t('post.menu.editPost'), danger: false));
       entries.add((
         id: 'editVisibility',
-        label: 'Edit visibility',
+        label: lc.t('post.menu.editVisibility'),
         danger: false,
       ));
       entries.add((
         id: 'toggleComments',
         label: post.allowComments == false
-            ? 'Turn on comments'
-            : 'Turn off comments',
+            ? lc.t('post.menu.commentsOn')
+            : lc.t('post.menu.commentsOff'),
         danger: false,
       ));
       entries.add((
         id: 'toggleHideLike',
-        label: post.hideLikeCount == true ? 'Show like' : 'Hide like',
+        label: post.hideLikeCount == true ? lc.t('post.menu.showLike') : lc.t('post.menu.hideLike'),
         danger: false,
       ));
       entries.add((
         id: 'muteNotifications',
         label: post.kind.toLowerCase() == 'reel'
-            ? 'Mute this reel'
-            : 'Mute this post',
+            ? lc.t('post.menu.muteReel')
+            : lc.t('post.menu.mutePost'),
         danger: false,
       ));
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
-      entries.add((id: 'deletePost', label: 'Delete post', danger: true));
+      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
+      entries.add((id: 'deletePost', label: lc.t('post.menu.deletePost'), danger: true));
     } else {
-      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
       entries.add((
         id: 'followToggle',
-        label: widget.state.following ? 'Unfollow' : 'Follow',
+        label: widget.state.following ? lc.t('post.menu.unfollow') : lc.t('post.menu.follow'),
         danger: false,
       ));
       entries.add((
         id: 'saveToggle',
         label: (isAdPost && widget.useAdsMenuMode)
-            ? (widget.state.saved ? 'Unsave this ads' : 'Save this ads')
-            : (widget.state.saved ? 'Unsave this post' : 'Save this post'),
+            ? (widget.state.saved ? lc.t('post.menu.unsaveAds') : lc.t('post.menu.saveAds'))
+            : (widget.state.saved ? lc.t('post.menu.unsavePost') : lc.t('post.menu.savePost')),
         danger: false,
       ));
       entries.add((
         id: 'hidePost',
         label: (isAdPost && widget.useAdsMenuMode)
-            ? 'Hide this ads'
-            : 'Hide this post',
+            ? lc.t('post.menu.hideAds')
+            : lc.t('post.menu.hidePost'),
         danger: false,
       ));
-      entries.add((id: 'reportPost', label: 'Report', danger: false));
+      entries.add((id: 'reportPost', label: lc.t('post.menu.report'), danger: false));
       entries.add((
         id: 'blockAccount',
-        label: 'Block this account',
+        label: lc.t('post.menu.blockAccount'),
         danger: true,
       ));
     }
@@ -674,7 +676,7 @@ class _PostHeader extends StatelessWidget {
                       GestureDetector(
                         onTap: () => onFollow?.call(!isFollowing),
                         child: Text(
-                          isFollowing ? 'Following' : 'Follow',
+                          isFollowing ? LanguageController.instance.t('post.following') : LanguageController.instance.t('post.follow'),
                           style: TextStyle(
                             color: isFollowing
                                 ? scheme.onSurfaceVariant
@@ -701,7 +703,7 @@ class _PostHeader extends StatelessWidget {
                         ),
                       ],
                       Text(
-                        'Sponsored',
+                        LanguageController.instance.t('post.sponsored'),
                         style: TextStyle(
                           color: scheme.primary,
                           fontSize: 12,
@@ -739,42 +741,38 @@ class _PostHeader extends StatelessWidget {
   /// Mirrors date-fns `formatDistanceToNow(date, { addSuffix: true })`.
   /// Thresholds are minute-based, same as the web feed.
   static String _timeAgo(String iso) {
+    final lc = LanguageController.instance;
     try {
       final dt = DateTime.parse(iso).toLocal();
       final diff = DateTime.now().difference(dt);
-      if (diff.isNegative) return 'just now';
+      if (diff.isNegative) return lc.t('post.time.justNow');
 
       final mins = (diff.inSeconds / 60).round();
 
-      if (mins < 1) return 'just now';
-      if (mins < 2) return '1 minute ago';
-      if (mins < 45) return '$mins minutes ago';
-      if (mins < 90) return 'about 1 hour ago';
-      if (mins < 1440)
-        return 'about ${(mins / 60).round()} hours ago'; // up to 24 h
-      if (mins < 2520) return '1 day ago'; // 24 h – 42 h
-      if (mins < 43200)
-        return '${(mins / 1440).round()} days ago'; // up to 30 d
-      if (mins < 86400)
-        return 'about ${(mins / 43200).round()} months ago'; // 30–60 d
+      if (mins < 1) return lc.t('post.time.justNow');
+      if (mins < 2) return lc.t('post.time.minuteAgo', {'n': '1'});
+      if (mins < 45) return lc.t('post.time.minutesAgo', {'n': '$mins'});
+      if (mins < 90) return lc.t('post.time.aboutHourAgo');
+      if (mins < 1440) return lc.t('post.time.hoursAgo', {'n': '${(mins / 60).round()}'});
+      if (mins < 2520) return lc.t('post.time.dayAgo', {'n': '1'});
+      if (mins < 43200) return lc.t('post.time.daysAgo', {'n': '${(mins / 1440).round()}'});
+      if (mins < 86400) return lc.t('post.time.monthsAgo', {'n': '${(mins / 43200).round()}'});
 
-      // 60 d – 1 year  →  "X months ago"
-      const int minsPerYear = 525960; // 365.25 * 24 * 60
+      const int minsPerYear = 525960;
       if (mins < minsPerYear) {
-        return '${(mins / 43200).round()} months ago';
+        return lc.t('post.time.monthsAgo', {'n': '${(mins / 43200).round()}'});
       }
 
-      // ≥ 1 year
       final months = (mins / 43200).round();
-      if (months < 15) return 'about 1 year ago';
-      if (months < 21) return 'over 1 year ago';
-      if (months < 24) return 'almost 2 years ago';
+      if (months < 15) return lc.t('post.time.aboutYearAgo');
+      if (months < 21) return lc.t('post.time.overYearAgo');
+      if (months < 24) return lc.t('post.time.almostTwoYearsAgo');
 
       final years = months ~/ 12;
       final rem = months % 12;
-      if (rem < 3) return 'about $years years ago';
-      if (rem < 9) return 'over $years years ago';
-      return 'almost ${years + 1} years ago';
+      if (rem < 3) return lc.t('post.time.aboutYearsAgo', {'n': '$years'});
+      if (rem < 9) return lc.t('post.time.overYearsAgo', {'n': '$years'});
+      return lc.t('post.time.almostYearsAgo', {'n': '${years + 1}'});
     } catch (_) {
       return '';
     }
@@ -982,7 +980,7 @@ class _PostContentState extends State<_PostContent> {
           GestureDetector(
             onTap: () => setState(() => _expanded = !_expanded),
             child: Text(
-              _expanded ? 'See less' : 'See more',
+              _expanded ? LanguageController.instance.t('post.seeLess') : LanguageController.instance.t('post.seeMore'),
               style: const TextStyle(
                 color: Color(0xFF4AA3E4),
                 fontSize: 13,
@@ -1071,7 +1069,7 @@ class _RepostBanner extends StatelessWidget {
           child: Row(
             children: [
               Text(
-                'Reposted from ',
+                '${LanguageController.instance.t('post.repostedFrom')} ',
                 style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
               ),
               Expanded(
@@ -1258,7 +1256,7 @@ class _AdCtaBanner extends StatelessWidget {
                   ],
                 ),
                 child: Text(
-                  creative.cta.isNotEmpty ? creative.cta : 'Shop Now',
+                  creative.cta.isNotEmpty ? creative.cta : LanguageController.instance.t('post.shopNow'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
@@ -1439,6 +1437,7 @@ class _ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final lc = LanguageController.instance;
     final commentsLocked = state.post.allowComments == false;
 
     return Padding(
@@ -1454,7 +1453,7 @@ class _ActionBar extends StatelessWidget {
                     ? const Color(0xFF2b74b0)
                     : scheme.onSurfaceVariant,
               ),
-              label: 'Like',
+              label: lc.t('post.actions.like'),
               color: state.liked
                   ? const Color(0xFF2b74b0)
                   : scheme.onSurfaceVariant,
@@ -1465,7 +1464,7 @@ class _ActionBar extends StatelessWidget {
           Expanded(
             child: _ActionButton(
               icon: Icons.chat_bubble_outline_rounded,
-              label: commentsLocked ? 'Comments off' : 'Comment',
+              label: commentsLocked ? lc.t('post.actions.commentsOff') : lc.t('post.actions.comment'),
               color: commentsLocked
                   ? const Color(0xFF5A6786)
                   : scheme.onSurfaceVariant,
@@ -1475,15 +1474,15 @@ class _ActionBar extends StatelessWidget {
           Expanded(
             child: _ActionButton(
               icon: Icons.repeat_rounded,
-              label: 'Repost',
+              label: lc.t('post.actions.repost'),
               color: scheme.onSurfaceVariant,
               onTap:
                   onRepost ??
                   () {
                     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                      const SnackBar(
-                        content: Text('Repost is not available right now'),
-                        backgroundColor: Color(0xFFB91C1C),
+                      SnackBar(
+                        content: Text(LanguageController.instance.t('post.repostUnavailable')),
+                        backgroundColor: const Color(0xFFB91C1C),
                       ),
                     );
                   },
@@ -1494,7 +1493,7 @@ class _ActionBar extends StatelessWidget {
               icon: state.saved
                   ? Icons.bookmark_rounded
                   : Icons.bookmark_border_rounded,
-              label: 'Save',
+              label: lc.t('post.actions.save'),
               color: state.saved
                   ? const Color(0xFF4AA3E4)
                   : scheme.onSurfaceVariant,

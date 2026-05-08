@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import 'models/profile_detail.dart';
 import 'services/profile_service.dart';
 
@@ -606,6 +607,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final lc = LanguageController.instance;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return DraggableScrollableSheet(
       expand: false,
@@ -641,7 +643,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Edit Profile',
+                    'Edit Profile', // sheet title – not in i18n keys list
                     style: TextStyle(
                       color: _textPrimary,
                       fontSize: 18,
@@ -686,7 +688,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                   ),
                   children: [
                     _buildField(
-                      label: 'Display Name',
+                      label: lc.t('profile.editSheet.displayName'),
                       hint: 'Your full name',
                       controller: _displayNameCtrl,
                       maxLength: 30,
@@ -722,7 +724,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                   children: [
                     Expanded(
                       child: _OutlineButton(
-                        label: 'Cancel',
+                        label: lc.t('profile.editSheet.cancel'),
                         onTap: _saving
                             ? null
                             : () => Navigator.of(context).pop(),
@@ -731,7 +733,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _FillButton(
-                        label: 'Save',
+                        label: lc.t('profile.editSheet.save'),
                         loading: _saving,
                         onTap: (_saving || _checkingUsername) ? null : _save,
                       ),

@@ -21,6 +21,7 @@ import {
   blockUser,
   searchProfiles,
   uploadCommentMedia,
+  translateComment,
   type ProfileSearchItem,
 } from "@/lib/api";
 import {
@@ -313,6 +314,8 @@ export default function ReelComments({
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [translatedComments, setTranslatedComments] = useState<Map<string, string>>(new Map());
+  const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState<number>(initialCount ?? 0);
   const [text, setText] = useState("");
   const [commentMediaFile, setCommentMediaFile] = useState<File | null>(null);
@@ -787,6 +790,41 @@ export default function ReelComments({
     }, 160);
   }, [openCommentMenuId]);
 
+  const handleTranslateComment = useCallback(
+    async (comment: CommentItem) => {
+      if (!token || !postId || translatingIds.has(comment.id)) return;
+      if (translatedComments.has(comment.id)) {
+        setTranslatedComments((prev) => {
+          const next = new Map(prev);
+          next.delete(comment.id);
+          return next;
+        });
+        closeCommentMenu();
+        return;
+      }
+      closeCommentMenu();
+      setTranslatingIds((prev) => new Set(prev).add(comment.id));
+      try {
+        const result = await translateComment({
+          token,
+          postId,
+          commentId: comment.id,
+          targetLang: language,
+        });
+        setTranslatedComments((prev) => new Map(prev).set(comment.id, result.translatedText));
+      } catch {
+        // silently ignore — original text stays
+      } finally {
+        setTranslatingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(comment.id);
+          return next;
+        });
+      }
+    },
+    [token, postId, language, translatingIds, translatedComments, closeCommentMenu],
+  );
+
   const startEditComment = (comment: CommentItem) => {
     if (!token) return;
     closeCommentMenu();
@@ -1215,7 +1253,9 @@ export default function ReelComments({
           </div>
           {comment.content ? (
             <div className={postStyles.commentText}>
-              {renderCommentContent(comment)}
+              {translatedComments.has(comment.id)
+                ? translatedComments.get(comment.id)
+                : renderCommentContent(comment)}
             </div>
           ) : null}
           {Array.isArray(comment.linkPreviews) && comment.linkPreviews.length ? (
@@ -1434,6 +1474,19 @@ export default function ReelComments({
                       <div className={postStyles.commentMenuList}>
                         {isCommentOwner ? (
                           <>
+                            {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
+                              <button
+                                className={postStyles.commentMoreItem}
+                                onClick={() => handleTranslateComment(comment)}
+                                disabled={translatingIds.has(comment.id)}
+                              >
+                                {translatingIds.has(comment.id)
+                                  ? "Translating..."
+                                  : translatedComments.has(comment.id)
+                                  ? "Hide translation"
+                                  : "Translate comment"}
+                              </button>
+                            ) : null}
                             <button
                               className={postStyles.commentMoreItem}
                               onClick={() => startEditComment(comment)}
@@ -1459,6 +1512,19 @@ export default function ReelComments({
                           </>
                         ) : isPostOwner ? (
                           <>
+                            {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
+                              <button
+                                className={postStyles.commentMoreItem}
+                                onClick={() => handleTranslateComment(comment)}
+                                disabled={translatingIds.has(comment.id)}
+                              >
+                                {translatingIds.has(comment.id)
+                                  ? "Translating..."
+                                  : translatedComments.has(comment.id)
+                                  ? "Hide translation"
+                                  : "Translate comment"}
+                              </button>
+                            ) : null}
                             {!comment.parentId ? (
                               <button
                                 className={postStyles.commentMoreItem}
@@ -1490,6 +1556,19 @@ export default function ReelComments({
                           </>
                         ) : (
                           <>
+                            {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
+                              <button
+                                className={postStyles.commentMoreItem}
+                                onClick={() => handleTranslateComment(comment)}
+                                disabled={translatingIds.has(comment.id)}
+                              >
+                                {translatingIds.has(comment.id)
+                                  ? "Translating..."
+                                  : translatedComments.has(comment.id)
+                                  ? "Hide translation"
+                                  : "Translate comment"}
+                              </button>
+                            ) : null}
                             <button
                               className={postStyles.commentMoreItem}
                               onClick={() => handleReportComment(comment)}

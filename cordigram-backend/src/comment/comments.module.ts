@@ -15,6 +15,7 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ActivityModule } from '../activity/activity.module';
 import { User, UserSchema } from '../users/user.schema';
+import { TranslationModule } from '../translation/translation.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { User, UserSchema } from '../users/user.schema';
     CloudinaryModule,
     NotificationsModule,
     ActivityModule,
+    TranslationModule,
     MongooseModule.forFeature([
       { name: Comment.name, schema: CommentSchema },
       { name: CommentLike.name, schema: CommentLikeSchema },

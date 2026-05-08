@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -13,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../../core/widgets/comment_sheet_widgets.dart';
 import '../profile/profile_screen.dart';
 import '../report/report_comment_sheet.dart';
@@ -189,6 +191,7 @@ class CommentItem {
     this.mediaType,
     this.liked = false,
     this.linkPreviews = const [],
+    this.lang,
   });
   final String id;
   final String content;
@@ -204,6 +207,7 @@ class CommentItem {
   final String? mediaType;
   bool liked;
   final List<CommentLinkPreview> linkPreviews;
+  final String? lang;
 
   factory CommentItem.fromJson(Map<String, dynamic> j) {
     final authorRaw = j['author'];
@@ -243,6 +247,7 @@ class CommentItem {
         }
         return <CommentLinkPreview>[];
       }(),
+      lang: j['lang'] as String?,
     );
   }
 
@@ -313,6 +318,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   // ── Viewer ID (own user — for comment menu own vs other detection) ─────────
   String? _viewerId;
 
+  // ── User language (for translate comment feature) ─────────────────────────
+  String _userLanguage = 'vi';
+
   static Map<String, String> get _authHeader => {
     'Authorization': 'Bearer ${AuthStorage.accessToken}',
   };
@@ -329,11 +337,34 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
+  Future<void> _loadUserLanguage() async {
+    // Show cached value immediately so UI is responsive while API loads.
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('cordigram-language');
+    if (cached != null && mounted) setState(() => _userLanguage = cached);
+
+    // Fetch authoritative value from user settings API.
+    try {
+      final data = await ApiService.get(
+        '/users/settings',
+        extraHeaders: _authHeader,
+      );
+      final raw = (data['language'] ?? '').toString().toLowerCase();
+      const valid = {'vi', 'en', 'ja', 'zh'};
+      final resolved = valid.contains(raw) ? raw : 'en';
+      await prefs.setString('cordigram-language', resolved);
+      if (mounted) setState(() => _userLanguage = resolved);
+    } catch (_) {
+      if (cached == null && mounted) setState(() => _userLanguage = 'en');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _viewerId = widget.viewerId; // use passed-in value immediately
     if (_viewerId == null) _fetchViewerId(); // fallback if not provided
+    _loadUserLanguage();
     if (widget.initialState != null) {
       _postState = widget.initialState;
       _postLoading = false;
@@ -630,10 +661,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     try {
       if (!wasSaved) {
         await PostInteractionService.save(widget.postId);
-        _showSnack('Saved');
+        _showSnack(LanguageController.instance.t('home.snack.saved'));
       } else {
         await PostInteractionService.unsave(widget.postId);
-        _showSnack('Removed from saved');
+        _showSnack(LanguageController.instance.t('home.snack.removedFromSaved'));
       }
     } catch (_) {
       if (!mounted) return;
@@ -648,7 +679,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           impressions: s.stats.impressions,
         );
       });
-      _showSnack('Failed to update save', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.saveError'), error: true);
     }
   }
 
@@ -671,7 +702,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             stats: updated.stats,
           );
         });
-        _showSnack('Post updated');
+        _showSnack(LanguageController.instance.t('home.snack.postUpdated'));
         return;
       case PostMenuAction.editVisibility:
         final nextVisibility = await showEditVisibilitySheet(
@@ -685,7 +716,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             post: post.copyWith(visibility: nextVisibility),
           );
         });
-        _showSnack('Visibility updated');
+        _showSnack(LanguageController.instance.t('home.snack.visibilityUpdated'));
         return;
       case PostMenuAction.toggleComments:
         final currentAllowed = post.allowComments != false;
@@ -698,7 +729,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         try {
           await PostInteractionService.setAllowComments(post.id, nextAllowed);
           _showSnack(
-            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+            nextAllowed ? LanguageController.instance.t('home.snack.commentsOn') : LanguageController.instance.t('home.snack.commentsOff'),
           );
         } catch (_) {
           if (!mounted) return;
@@ -707,7 +738,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               post: post.copyWith(allowComments: currentAllowed),
             );
           });
-          _showSnack('Failed to update comments', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.commentsError'), error: true);
         }
         return;
       case PostMenuAction.toggleHideLike:
@@ -720,7 +751,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         });
         try {
           await PostInteractionService.setHideLikeCount(post.id, nextHidden);
-          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+          _showSnack(nextHidden ? LanguageController.instance.t('home.snack.likeHidden') : LanguageController.instance.t('home.snack.likeVisible'));
         } catch (_) {
           if (!mounted) return;
           setState(() {
@@ -728,13 +759,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               post: post.copyWith(hideLikeCount: currentHidden),
             );
           });
-          _showSnack('Failed to update like visibility', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.likeError'), error: true);
         }
         return;
       case PostMenuAction.copyLink:
         final link = PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
-        _showSnack('Link copied');
+        _showSnack(LanguageController.instance.t('home.snack.linkCopied'));
         return;
       case PostMenuAction.muteNotifications:
         final label = post.kind.toLowerCase() == 'reel' ? 'reel' : 'post';
@@ -746,17 +777,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         if (muted) {
           _showSnack(
             label == 'reel'
-                ? 'Reel notifications muted'
-                : 'Post notifications muted',
+                ? LanguageController.instance.t('home.snack.reelMuted')
+                : LanguageController.instance.t('home.snack.postMuted'),
           );
         }
         return;
       case PostMenuAction.deletePost:
+        final lc = LanguageController.instance;
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Delete post',
-          message: 'This action cannot be undone.',
-          confirmLabel: 'Delete',
+          title: lc.t('home.deletePost.title'),
+          message: lc.t('common.cannotUndo'),
+          confirmLabel: LanguageController.instance.t('common.delete'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -765,7 +797,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           if (!mounted) return;
           Navigator.of(context).pop({'deletedPostId': post.id});
         } catch (_) {
-          _showSnack('Failed to delete post', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.deleteError'), error: true);
         }
         return;
       case PostMenuAction.followToggle:
@@ -782,13 +814,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           if (!mounted) return;
           Navigator.of(context).pop();
         } catch (_) {
-          _showSnack('Failed to hide post', error: true);
+          _showSnack(LanguageController.instance.t('post.detail.hideError'), error: true);
         }
         return;
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack('Please sign in first', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.signInFirst'), error: true);
           return;
         }
         final reported = await showReportPostSheet(
@@ -796,18 +828,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           postId: post.id,
           authHeader: {'Authorization': 'Bearer $token'},
         );
-        if (reported) _showSnack('Report submitted');
+        if (reported) _showSnack(LanguageController.instance.t('post.detail.reportSubmitted'));
         return;
       case PostMenuAction.blockAccount:
         final userId = post.authorId;
         if (userId == null || userId.isEmpty) return;
         final username =
             post.authorUsername ?? post.author?.username ?? post.displayName;
+        final lc2 = LanguageController.instance;
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Block @$username?',
-          message: 'You will no longer see posts from this account.',
-          confirmLabel: 'Block',
+          title: lc2.t('home.blockUser.title', {'username': username}),
+          message: lc2.t('home.blockUser.message'),
+          confirmLabel: lc2.t('common.block'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -816,14 +849,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           if (!mounted) return;
           Navigator.of(context).pop();
         } catch (_) {
-          _showSnack('Failed to block account', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.blockError'), error: true);
         }
         return;
       case PostMenuAction.goToAdsPost:
-        _showSnack('Already on this ads post');
+        _showSnack(LanguageController.instance.t('post.detail.alreadyOnAds'));
         return;
       case PostMenuAction.detailAds:
-        _showSnack('Ads detail is available from Home feed', error: true);
+        _showSnack(LanguageController.instance.t('post.detail.adsFromFeed'), error: true);
         return;
     }
   }
@@ -839,9 +872,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (commentsLocked) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comments are turned off for this post'),
-          backgroundColor: Color(0xFF1A2235),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.commentsTurnedOff')),
+          backgroundColor: const Color(0xFF1A2235),
         ),
       );
       return;
@@ -931,7 +964,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
         title: Text(
-          'Post',
+          LanguageController.instance.t('post.detail.title'),
           style: TextStyle(
             color: scheme.onSurface,
             fontWeight: FontWeight.w700,
@@ -968,7 +1001,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 12 + MediaQuery.of(context).viewPadding.bottom,
               ),
               child: Text(
-                'Comments are turned off for this post.',
+                LanguageController.instance.t('post.detail.commentsTurnedOff'),
                 style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -1021,9 +1054,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3470A2),
                 ),
-                child: const Text(
-                  'Retry',
-                  style: TextStyle(color: Colors.white),
+                child: Text(
+                  LanguageController.instance.t('common.retry'),
+                  style: const TextStyle(color: Colors.white),
                 ),
               ),
             ],
@@ -1073,7 +1106,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               child: Row(
                 children: [
                   Text(
-                    'Comments',
+                    LanguageController.instance.t('post.detail.comments.title'),
                     style: TextStyle(
                       color: tokens.text,
                       fontWeight: FontWeight.w700,
@@ -1109,7 +1142,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'No comments yet.',
+                      LanguageController.instance.t('post.detail.comments.empty'),
                       style: TextStyle(color: tokens.textMuted, fontSize: 14),
                     ),
                   ],
@@ -1132,6 +1165,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   allTileKeys: _allTileKeys,
                   viewerId: _viewerId,
                   postAuthorId: _postState?.post.authorId,
+                  userLanguage: _userLanguage,
                   onDeleted: () => setState(
                     () => _comments.removeWhere((cm) => cm.id == c.id),
                   ),
@@ -1176,9 +1210,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                     TextButton(
                       onPressed: _loadComments,
-                      child: const Text(
-                        'Retry',
-                        style: TextStyle(color: Color(0xFF4AA3E4)),
+                      child: Text(
+                        LanguageController.instance.t('common.retry'),
+                        style: const TextStyle(color: Color(0xFF4AA3E4)),
                       ),
                     ),
                   ],
@@ -1215,6 +1249,7 @@ class _CommentTile extends StatefulWidget {
     this.onReply,
     this.onPinToggled,
     this.depth = 0,
+    this.userLanguage = 'vi',
   });
   final CommentItem comment;
   final String postId;
@@ -1241,6 +1276,9 @@ class _CommentTile extends StatefulWidget {
   /// 0 = root comment, 1+ = reply (one extra level of indent).
   final int depth;
 
+  /// User's preferred language — used for translate feature.
+  final String userLanguage;
+
   @override
   State<_CommentTile> createState() => _CommentTileState();
 }
@@ -1261,6 +1299,10 @@ class _CommentTileState extends State<_CommentTile> {
 
   // ── Editable content (updated optimistically after edit) ─────────────────
   late String _content;
+
+  // ── Translation state ─────────────────────────────────────────────────────
+  String? _translatedText;
+  bool _isTranslating = false;
 
   // ── URL tap recognizers (disposed in dispose()) ───────────────────────────
   final List<TapGestureRecognizer> _urlRecognizers = [];
@@ -1384,7 +1426,7 @@ class _CommentTileState extends State<_CommentTile> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isPinned ? 'Comment unpinned' : 'Comment pinned'),
+          content: Text(LanguageController.instance.t(isPinned ? 'post.detail.comments.unpinned' : 'post.detail.comments.pinned')),
           backgroundColor: const Color(0xFF1A2235),
           duration: const Duration(seconds: 2),
         ),
@@ -1395,37 +1437,50 @@ class _CommentTileState extends State<_CommentTile> {
   }
 
   void _showCommentMenu() {
+    final lc = LanguageController.instance;
     final isReply = widget.depth > 0;
+    final showTranslate =
+        (widget.comment.lang != null &&
+            widget.comment.lang != widget.userLanguage) ||
+        _translatedText != null;
     final actions = <CommentSheetAction>[
+      if (showTranslate)
+        CommentSheetAction(
+          icon: Icons.translate_rounded,
+          label: _translatedText != null
+              ? lc.t('post.detail.comments.hideTranslation')
+              : lc.t('post.detail.comments.translate'),
+          onTap: _translateComment,
+        ),
       if (_isPostOwner && !isReply)
         CommentSheetAction(
           icon: Icons.push_pin_rounded,
           label: widget.comment.pinnedAt != null
-              ? 'Unpin comment'
-              : 'Pin comment',
+              ? lc.t('post.detail.comments.unpin')
+              : lc.t('post.detail.comments.pin'),
           onTap: _onPinComment,
         ),
       if (_isOwnComment) ...[
         CommentSheetAction(
           icon: Icons.edit_outlined,
-          label: 'Edit comment',
+          label: lc.t('post.detail.commentMenu.edit'),
           onTap: _onEditComment,
         ),
         CommentSheetAction(
           icon: Icons.delete_outline_rounded,
-          label: 'Delete comment',
+          label: lc.t('post.detail.commentMenu.delete'),
           onTap: _onDeleteComment,
           danger: true,
         ),
       ] else ...[
         CommentSheetAction(
           icon: Icons.flag_outlined,
-          label: 'Report comment',
+          label: lc.t('post.detail.commentMenu.report'),
           onTap: _onReportComment,
         ),
         CommentSheetAction(
           icon: Icons.block_rounded,
-          label: 'Block this user',
+          label: lc.t('post.detail.commentMenu.block'),
           onTap: _onBlockUser,
           danger: true,
         ),
@@ -1452,17 +1507,18 @@ class _CommentTileState extends State<_CommentTile> {
             body: {'content': newContent},
             extraHeaders: widget.authHeader,
           );
-          if (mounted) setState(() => _content = newContent);
+          if (mounted) setState(() { _content = newContent; _translatedText = null; });
         },
       ),
     );
   }
 
   Future<void> _onDeleteComment() async {
+    final lc = LanguageController.instance;
     final confirmed = await showPostConfirmDialog(
       context,
-      title: 'Delete comment',
-      message: 'This will permanently delete your comment.',
+      title: lc.t('post.detail.deleteComment.title'),
+      message: lc.t('post.detail.deleteComment.message'),
       confirmLabel: 'Delete',
       danger: true,
     );
@@ -1475,19 +1531,19 @@ class _CommentTileState extends State<_CommentTile> {
       if (!mounted) return;
       widget.onDeleted?.call();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comment deleted'),
-          backgroundColor: Color(0xFF1A2235),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.commentDeleted')),
+          backgroundColor: const Color(0xFF1A2235),
+          duration: const Duration(seconds: 2),
         ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to delete comment'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.failedDeleteComment')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -1501,10 +1557,10 @@ class _CommentTileState extends State<_CommentTile> {
     ).then((reported) {
       if (!reported || !mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report submitted'),
-          backgroundColor: Color(0xFF1A2235),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.reportSubmitted')),
+          backgroundColor: const Color(0xFF1A2235),
+          duration: const Duration(seconds: 2),
         ),
       );
     });
@@ -1517,10 +1573,11 @@ class _CommentTileState extends State<_CommentTile> {
         widget.comment.author?.displayName ??
         'this user';
     if (userId == null) return;
+    final lc = LanguageController.instance;
     final confirmed = await showPostConfirmDialog(
       context,
-      title: 'Block $username?',
-      message: 'Blocking @$username will hide their content from you.',
+      title: lc.t('post.detail.blockUser.title', {'username': username}),
+      message: lc.t('post.detail.blockUser.message', {'username': username}),
       confirmLabel: 'Block',
       danger: true,
     );
@@ -1533,7 +1590,7 @@ class _CommentTileState extends State<_CommentTile> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Blocked $username'),
+          content: Text(LanguageController.instance.t('post.detail.blocked', {'username': username})),
           backgroundColor: const Color(0xFF1A2235),
           duration: const Duration(seconds: 2),
         ),
@@ -1541,10 +1598,40 @@ class _CommentTileState extends State<_CommentTile> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to block user'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.failedBlockUser')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _translateComment() async {
+    if (_translatedText != null) {
+      setState(() => _translatedText = null);
+      return;
+    }
+    setState(() => _isTranslating = true);
+    try {
+      final data = await ApiService.post(
+        '/posts/${widget.postId}/comments/${widget.comment.id}/translate'
+        '?targetLang=${widget.userLanguage}',
+        extraHeaders: widget.authHeader,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translatedText = data['translatedText'] as String?;
+        _isTranslating = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isTranslating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(LanguageController.instance.t('post.detail.failedTranslate')),
+          backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -1715,7 +1802,7 @@ class _CommentTileState extends State<_CommentTile> {
                                   ),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'Pinned',
+                                    LanguageController.instance.t('post.detail.comments.pinnedBadge'),
                                     style: TextStyle(
                                       color: tokens.textMuted,
                                       fontSize: 11,
@@ -1734,12 +1821,28 @@ class _CommentTileState extends State<_CommentTile> {
                             ),
                             const SizedBox(height: 4),
                             // Content
-                            if (_content.isNotEmpty)
+                            if (_isTranslating)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    color: tokens.primary,
+                                  ),
+                                ),
+                              )
+                            else if (_content.isNotEmpty)
                               LayoutBuilder(
                                 builder: (context, constraints) {
+                                  final displayText =
+                                      _translatedText ?? _content;
                                   final tp = TextPainter(
                                     text: TextSpan(
-                                      text: _content,
+                                      text: displayText,
                                       style: TextStyle(
                                         color: tokens.text,
                                         fontSize: 14,
@@ -1757,7 +1860,7 @@ class _CommentTileState extends State<_CommentTile> {
                                       RichText(
                                         text: TextSpan(
                                           children: _buildContentSpans(
-                                            _content,
+                                            displayText,
                                             baseColor: tokens.text,
                                             linkColor: tokens.primary,
                                           ),
@@ -1779,13 +1882,27 @@ class _CommentTileState extends State<_CommentTile> {
                                             ),
                                             child: Text(
                                               _textExpanded
-                                                  ? 'See less'
-                                                  : 'See more',
+                                                  ? LanguageController.instance.t('post.seeLess')
+                                                  : LanguageController.instance.t('post.seeMore'),
                                               style: TextStyle(
                                                 color: tokens.primary,
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w600,
                                               ),
+                                            ),
+                                          ),
+                                        ),
+                                      if (_translatedText != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 3,
+                                          ),
+                                          child: Text(
+                                            LanguageController.instance.t('post.detail.comments.translated'),
+                                            style: TextStyle(
+                                              color: tokens.textMuted,
+                                              fontSize: 11,
+                                              fontStyle: FontStyle.italic,
                                             ),
                                           ),
                                         ),
@@ -1852,7 +1969,7 @@ class _CommentTileState extends State<_CommentTile> {
                                     comment.author?.username,
                                   ),
                                   child: Text(
-                                    'Reply',
+                                    LanguageController.instance.t('post.detail.comments.reply'),
                                     style: TextStyle(
                                       color: tokens.textMuted,
                                       fontSize: 12,
@@ -1888,9 +2005,8 @@ class _CommentTileState extends State<_CommentTile> {
                                     else
                                       Text(
                                         _expanded
-                                            ? 'Hide replies'
-                                            : 'View replies'
-                                                  '${displayReplyCount > 0 ? " ($displayReplyCount)" : ""}',
+                                            ? LanguageController.instance.t('post.detail.comments.hideReplies')
+                                            : '${LanguageController.instance.t('post.detail.comments.viewReplies')}${displayReplyCount > 0 ? " ($displayReplyCount)" : ""}',
 
                                         style: TextStyle(
                                           color: tokens.primary,
@@ -1928,6 +2044,7 @@ class _CommentTileState extends State<_CommentTile> {
               allTileKeys: widget.allTileKeys,
               viewerId: widget.viewerId,
               postAuthorId: widget.postAuthorId,
+              userLanguage: widget.userLanguage,
               onDeleted: () =>
                   setState(() => _replies.removeWhere((rep) => rep.id == r.id)),
               onReply: widget.onReply,
@@ -1957,7 +2074,7 @@ class _CommentTileState extends State<_CommentTile> {
                             ),
                           )
                         : Text(
-                            'Load more replies',
+                            LanguageController.instance.t('post.detail.comments.loadMoreReplies'),
                             style: TextStyle(
                               color: tokens.primary,
                               fontSize: 12,
@@ -1998,9 +2115,9 @@ class _CommentTileState extends State<_CommentTile> {
                   ),
                   GestureDetector(
                     onTap: () => _loadReplies(nextPage: 1),
-                    child: const Text(
-                      'Retry',
-                      style: TextStyle(
+                    child: Text(
+                      LanguageController.instance.t('common.retry'),
+                      style: const TextStyle(
                         color: Color(0xFF4AA3E4),
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -2017,30 +2134,31 @@ class _CommentTileState extends State<_CommentTile> {
 
   static String _timeAgo(String? iso) {
     if (iso == null || iso.isEmpty) return '';
+    final lc = LanguageController.instance;
     try {
       final dt = DateTime.parse(iso).toLocal();
       final diff = DateTime.now().difference(dt);
-      if (diff.isNegative) return 'just now';
+      if (diff.isNegative) return lc.t('post.time.justNow');
       final mins = (diff.inSeconds / 60).round();
-      if (mins < 1) return 'just now';
-      if (mins < 2) return '1 minute ago';
-      if (mins < 45) return '$mins minutes ago';
-      if (mins < 90) return 'about 1 hour ago';
-      if (mins < 1440) return 'about ${(mins / 60).round()} hours ago';
-      if (mins < 2520) return '1 day ago';
-      if (mins < 43200) return '${(mins / 1440).round()} days ago';
-      if (mins < 86400) return 'about ${(mins / 43200).round()} months ago';
+      if (mins < 1) return lc.t('post.time.justNow');
+      if (mins < 2) return lc.t('post.time.minuteAgo', {'n': '1'});
+      if (mins < 45) return lc.t('post.time.minutesAgo', {'n': '$mins'});
+      if (mins < 90) return lc.t('post.time.aboutHourAgo');
+      if (mins < 1440) return lc.t('post.time.hoursAgo', {'n': '${(mins / 60).round()}'});
+      if (mins < 2520) return lc.t('post.time.dayAgo');
+      if (mins < 43200) return lc.t('post.time.daysAgo', {'n': '${(mins / 1440).round()}'});
+      if (mins < 86400) return lc.t('post.time.monthsAgo', {'n': '${(mins / 43200).round()}'});
       const int minsPerYear = 525960;
-      if (mins < minsPerYear) return '${(mins / 43200).round()} months ago';
+      if (mins < minsPerYear) return lc.t('post.time.monthsAgo', {'n': '${(mins / 43200).round()}'});
       final months = (mins / 43200).round();
-      if (months < 15) return 'about 1 year ago';
-      if (months < 21) return 'over 1 year ago';
-      if (months < 24) return 'almost 2 years ago';
+      if (months < 15) return lc.t('post.time.aboutYearAgo');
+      if (months < 21) return lc.t('post.time.overYearAgo');
+      if (months < 24) return lc.t('post.time.almostTwoYearsAgo');
       final years = months ~/ 12;
       final rem = months % 12;
-      if (rem < 3) return 'about $years years ago';
-      if (rem < 9) return 'over $years years ago';
-      return 'almost ${years + 1} years ago';
+      if (rem < 3) return lc.t('post.time.aboutYearsAgo', {'n': '$years'});
+      if (rem < 9) return lc.t('post.time.overYearsAgo', {'n': '$years'});
+      return lc.t('post.time.almostYearsAgo', {'n': '${years + 1}'});
     } catch (_) {
       return '';
     }
@@ -2816,7 +2934,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
               : AppSemanticColors.light);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to post comment: $e'),
+          content: Text(LanguageController.instance.t('post.detail.failedPostComment', {'error': e.toString()})),
           backgroundColor: tokens.panelMuted,
         ),
       );
@@ -2853,7 +2971,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Replying to @${widget.replyTarget!.username ?? 'user'}',
+                      LanguageController.instance.t('post.detail.comments.replyingTo', {'username': widget.replyTarget!.username ?? 'user'}),
                       style: TextStyle(color: tokens.primary, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -2901,7 +3019,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                           ),
                           SizedBox(width: 10),
                           Text(
-                            'Searching users…',
+                            LanguageController.instance.t('post.detail.comments.searchingUsers'),
                             style: TextStyle(
                               color: tokens.textMuted,
                               fontSize: 12,
@@ -2914,7 +3032,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                   ? Padding(
                       padding: EdgeInsets.all(12),
                       child: Text(
-                        'No users found',
+                        LanguageController.instance.t('post.detail.comments.noUsers'),
                         style: TextStyle(color: tokens.textMuted, fontSize: 12),
                       ),
                     )
@@ -3013,7 +3131,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                             minLines: 1,
                             style: TextStyle(color: tokens.text, fontSize: 14),
                             decoration: InputDecoration(
-                              hintText: 'Write a comment…',
+                              hintText: LanguageController.instance.t('post.detail.comments.placeholder'),
                               hintStyle: TextStyle(
                                 color: tokens.textMuted,
                                 fontSize: 14,
@@ -3800,7 +3918,8 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
         (theme.brightness == Brightness.dark
             ? AppSemanticColors.dark
             : AppSemanticColors.light);
-    final title = widget.mode == 'sticker' ? 'Stickers' : 'GIFs';
+    final lc = LanguageController.instance;
+    final title = widget.mode == 'sticker' ? lc.t('reels.gif.stickers') : lc.t('reels.gif.gifs');
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -3851,7 +3970,7 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                 controller: _searchCtrl,
                 style: TextStyle(color: tokens.text, fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'Search $title…',
+                  hintText: lc.t('reels.gif.search', {'title': title}),
                   hintStyle: TextStyle(color: tokens.textMuted),
                   prefixIcon: Icon(
                     Icons.search_rounded,
@@ -3892,7 +4011,7 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                           TextButton(
                             onPressed: () => _fetch(_searchCtrl.text),
                             child: Text(
-                              'Retry',
+                              lc.t('common.retry'),
                               style: TextStyle(color: tokens.primary),
                             ),
                           ),
@@ -3902,7 +4021,7 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                   : _items.isEmpty
                   ? Center(
                       child: Text(
-                        'No results',
+                        lc.t('reels.gif.noResults'),
                         style: TextStyle(color: tokens.textMuted),
                       ),
                     )

@@ -100,7 +100,7 @@ export function resolveApiErrorMessage(
     lower.includes("networkerror") ||
     lower.includes("network request failed")
   ) {
-    return "Cannot reach server. Check your internet or server URL and try again.";
+    return "Cannot reach server. Please try again!";
   }
 
   const status =
@@ -430,6 +430,7 @@ export type CommentItem = {
   repliesCount?: number;
   likesCount?: number;
   liked?: boolean;
+  lang?: string | null;
 };
 
 export type CommentListResponse = {
@@ -828,6 +829,27 @@ export async function updateComment(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function translateComment(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+  targetLang: string;
+}): Promise<{
+  translatedText: string;
+  sourceLang: string;
+  targetLang: string;
+  cached: boolean;
+}> {
+  const { token, postId, commentId, targetLang } = opts;
+  return apiFetch({
+    path: `/posts/${postId}/comments/${commentId}/translate?targetLang=${encodeURIComponent(targetLang)}`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
@@ -3714,13 +3736,26 @@ export async function pinDirectMessage(
     localStorage.getItem("accessToken") ||
     localStorage.getItem("token");
 
-  return apiFetch<any>({
-    path: `/direct-messages/${messageId}/pin`,
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const headers = {
+    Authorization: `Bearer ${token}`,
+  };
+  try {
+    return await apiFetch<any>({
+      path: `/direct-messages/${messageId}/pin`,
+      method: "POST",
+      headers,
+    });
+  } catch (e: unknown) {
+    const status = (e as { status?: number })?.status;
+    if (status === 404) {
+      return apiFetch<any>({
+        path: `/direct-messages/pin/${messageId}`,
+        method: "POST",
+        headers,
+      });
+    }
+    throw e;
+  }
 }
 
 export async function reportDirectMessage(
@@ -3816,13 +3851,26 @@ export async function getPinnedMessages(
     localStorage.getItem("accessToken") ||
     localStorage.getItem("token");
 
-  return apiFetch<any[]>({
-    path: `/direct-messages/pinned/${userId}`,
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const headers = {
+    Authorization: `Bearer ${token}`,
+  };
+  try {
+    return await apiFetch<any[]>({
+      path: `/direct-messages/pinned/${userId}`,
+      method: "GET",
+      headers,
+    });
+  } catch (e: unknown) {
+    const status = (e as { status?: number })?.status;
+    if (status === 404) {
+      return apiFetch<any[]>({
+        path: `/direct-messages/pins/${userId}`,
+        method: "GET",
+        headers,
+      });
+    }
+    throw e;
+  }
 }
 
 export async function getPoll(opts: {

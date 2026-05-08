@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 
 class _UserReportCategory {
   const _UserReportCategory({
@@ -153,7 +154,7 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Failed to submit report. Please try again.';
+        _error = LanguageController.instance.t('report.submitError');
       });
     }
   }
@@ -205,9 +206,9 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
                       ),
                     ),
                   ),
-                const Text(
-                  'Report User',
-                  style: TextStyle(
+                Text(
+                  LanguageController.instance.t('report.title.user'),
+                  style: const TextStyle(
                     color: Color(0xFFE8ECF8),
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -243,9 +244,9 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "What's the issue?",
-          style: TextStyle(
+        Text(
+          LanguageController.instance.t('report.whatsTheIssue'),
+          style: const TextStyle(
             color: Color(0xFFCDD5E0),
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -275,7 +276,7 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
                   ),
                 ),
                 child: Text(
-                  g.label,
+                  LanguageController.instance.t('report.categoryUser.${g.key}'),
                   style: const TextStyle(
                     color: Color(0xFFE8ECF8),
                     fontSize: 13,
@@ -296,7 +297,7 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          cat.label,
+          LanguageController.instance.t('report.categoryUser.${cat.key}'),
           style: TextStyle(
             color: cat.accent,
             fontSize: 15,
@@ -327,7 +328,7 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
                 children: [
                   Expanded(
                     child: Text(
-                      reason.label,
+                      LanguageController.instance.t('report.reasonUser.${reason.key}'),
                       style: const TextStyle(
                         color: Color(0xFFE8ECF8),
                         fontSize: 14,
@@ -347,9 +348,9 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
           );
         }),
         const SizedBox(height: 8),
-        const Text(
-          'Additional details (optional)',
-          style: TextStyle(
+        Text(
+          LanguageController.instance.t('report.additionalDetails'),
+          style: const TextStyle(
             color: Color(0xFF94A3B8),
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -362,7 +363,7 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
           maxLines: 5,
           style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
           decoration: InputDecoration(
-            hintText: 'Add more context...',
+            hintText: LanguageController.instance.t('report.addMoreContext'),
             hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
             filled: true,
             fillColor: const Color(0xFF0F172A),
@@ -406,7 +407,7 @@ class _ReportUserSheetState extends State<_ReportUserSheet> {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: Text(_submitting ? 'Submitting...' : 'Submit report'),
+            child: Text(LanguageController.instance.t(_submitting ? 'report.submitting' : 'report.submitReport')),
           ),
         ),
       ],

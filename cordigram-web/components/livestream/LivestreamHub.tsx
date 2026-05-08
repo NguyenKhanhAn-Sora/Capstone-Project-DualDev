@@ -9,12 +9,14 @@ import {
   RoomAudioRenderer,
   VideoTrack,
   useLocalParticipant,
+  useParticipants,
   useRoomContext,
   useTracks,
 } from "@livekit/components-react";
 import { ConnectionState, RoomEvent, Track, VideoQuality } from "livekit-client";
 import {
   endLivestream,
+  endLivestreamBeacon,
   getIvsIngest,
   joinLivestreamToken,
   listLiveLivestreams,
@@ -311,19 +313,25 @@ function getCameraSizeClass(size: LivestreamCameraSize) {
 
 function StreamStage({
   hostName,
-  viewerCount,
   allowFullscreen,
   cameraLayout,
   hostVideoMode,
 }: {
   hostName: string;
-  viewerCount: number;
   allowFullscreen: boolean;
   cameraLayout?: HostCameraLayout;
   hostVideoMode?: LivestreamHostVideoMode;
 }) {
   const tileRef = useRef<HTMLDivElement | null>(null);
+  const room = useRoomContext();
+  const allParticipants = useParticipants();
+  const liveViewerCount = allParticipants.filter(
+    (p) => !p.identity.startsWith("preview-") && !p.identity.includes("-host-"),
+  ).length;
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Mobile hosts publish front-camera streams mirrored at the hardware level.
+  // Track which camera is active so we can apply scaleX(-1) only for front cam.
+  const [hostIsFrontCamera, setHostIsFrontCamera] = useState(true);
   const tracks = useTracks(
     [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false },
@@ -349,6 +357,21 @@ function StreamStage({
   const layout = cameraLayout || DEFAULT_HOST_CAMERA_LAYOUT;
   const hasScreen = Boolean(hostScreenTrack?.publication) && preferredMode !== "camera-only";
   const hasCamera = Boolean(hostCameraTrack?.publication);
+
+  useEffect(() => {
+    const onData = (payload: Uint8Array) => {
+      try {
+        const parsed = JSON.parse(new TextDecoder().decode(payload)) as { type?: string; isFrontCamera?: boolean };
+        if (parsed.type === "camera_flip" && typeof parsed.isFrontCamera === "boolean") {
+          setHostIsFrontCamera(parsed.isFrontCamera);
+        }
+      } catch {
+        // Ignore unrelated data packets.
+      }
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    return () => { room.off(RoomEvent.DataReceived, onData); };
+  }, [room]);
 
   useEffect(() => {
     const publication: any = stageTrack?.publication;
@@ -401,14 +424,14 @@ function StreamStage({
           ) : hostCameraTrack ? (
             <VideoTrack
               trackRef={hostCameraTrack as any}
-              className={`${hubStyles.video} ${hubStyles.videoMirrored}`}
+              className={`${hubStyles.video} ${hostIsFrontCamera ? hubStyles.videoMirrored : ""}`}
             />
           ) : null}
 
           {hasScreen && hasCamera && hostCameraTrack ? (
             <VideoTrack
               trackRef={hostCameraTrack as any}
-              className={`${hubStyles.stageCameraOverlay} ${getCameraPositionClass(layout.cameraPosition)} ${getCameraSizeClass(layout.cameraSize)} ${hubStyles.videoMirrored}`}
+              className={`${hubStyles.stageCameraOverlay} ${getCameraPositionClass(layout.cameraPosition)} ${getCameraSizeClass(layout.cameraSize)} ${hostIsFrontCamera ? hubStyles.videoMirrored : ""}`}
             />
           ) : null}
 
@@ -455,7 +478,7 @@ function StreamStage({
                 <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
               </svg>
             </span>
-            <span className={hubStyles.feedStatsValue}>{Math.max(viewerCount - 1, 0)}</span>
+            <span className={hubStyles.feedStatsValue}>{liveViewerCount}</span>
           </p>
         </div>
       ) : (
@@ -467,14 +490,16 @@ function StreamStage({
 
 function IvsPlaybackStage({
   playbackUrl,
-  viewerCount,
 }: {
   playbackUrl: string;
-  viewerCount: number;
 }) {
   const tileRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const allParticipants = useParticipants();
+  const liveViewerCount = allParticipants.filter(
+    (p) => !p.identity.startsWith("preview-") && !p.identity.includes("-host-"),
+  ).length;
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -607,7 +632,7 @@ function IvsPlaybackStage({
               <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
             </svg>
           </span>
-          <span className={hubStyles.feedStatsValue}>{Math.max(viewerCount - 1, 0)}</span>
+          <span className={hubStyles.feedStatsValue}>{liveViewerCount}</span>
         </p>
       </div>
     </div>
@@ -615,6 +640,8 @@ function IvsPlaybackStage({
 }
 
 function FeedCardStage() {
+  const room = useRoomContext();
+  const [hostIsFrontCamera, setHostIsFrontCamera] = useState(true);
   const screenTracks = useTracks(
     [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false },
@@ -630,6 +657,21 @@ function FeedCardStage() {
     (track.participant.identity || "").includes("-host-"),
   );
 
+  useEffect(() => {
+    const onData = (payload: Uint8Array) => {
+      try {
+        const parsed = JSON.parse(new TextDecoder().decode(payload)) as { type?: string; isFrontCamera?: boolean };
+        if (parsed.type === "camera_flip" && typeof parsed.isFrontCamera === "boolean") {
+          setHostIsFrontCamera(parsed.isFrontCamera);
+        }
+      } catch {
+        // Ignore unrelated data packets.
+      }
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    return () => { room.off(RoomEvent.DataReceived, onData); };
+  }, [room]);
+
   if (!hostTrack?.publication && !hostCameraTrack?.publication) {
     return <div className={hubStyles.feedPreviewEmpty}>Waiting for live video...</div>;
   }
@@ -641,13 +683,13 @@ function FeedCardStage() {
       ) : hostCameraTrack?.publication ? (
         <VideoTrack
           trackRef={hostCameraTrack as any}
-          className={`${hubStyles.feedPreviewVideo} ${hubStyles.videoMirrored}`}
+          className={`${hubStyles.feedPreviewVideo} ${hostIsFrontCamera ? hubStyles.videoMirrored : ""}`}
         />
       ) : null}
       {hostTrack?.publication && hostCameraTrack?.publication ? (
         <VideoTrack
           trackRef={hostCameraTrack as any}
-          className={`${hubStyles.feedPreviewCameraOverlay} ${hubStyles.feedPreviewCameraBottomRight} ${hubStyles.videoMirrored}`}
+          className={`${hubStyles.feedPreviewCameraOverlay} ${hubStyles.feedPreviewCameraBottomRight} ${hostIsFrontCamera ? hubStyles.videoMirrored : ""}`}
         />
       ) : null}
     </div>
@@ -673,6 +715,7 @@ function FeedCardPreview({ streamId }: { streamId: string }) {
         const response = await joinLivestreamToken(streamId, {
           asHost: false,
           participantName: `preview-${Math.random().toString(36).slice(2, 8)}`,
+          isPreview: true,
         });
         if (disposed) return;
         setJoinToken(response.token);
@@ -1699,6 +1742,14 @@ function HostMediaControls({
   );
 }
 
+const cleanLocationLabel = (label: string) =>
+  label
+    .replace(/\b\d{4,6}\b/g, "")
+    .replace(/,\s*,+/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s*,\s*$/g, "")
+    .trim();
+
 function HostStreamAdminPanel({
   visible,
   streamId,
@@ -1735,6 +1786,10 @@ function HostStreamAdminPanel({
   const [mentionHighlight, setMentionHighlight] = useState(-1);
   const [activeMentionRange, setActiveMentionRange] = useState<{ start: number; end: number } | null>(null);
   const [ivsInfo, setIvsInfo] = useState<{ ingestEndpoint: string; streamKey: string; playbackUrl: string } | null>(null);
+  const [locationSuggestions, setLocationSuggestions] = useState<{ label: string; lat: string; lon: string }[]>([]);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [locationHighlight, setLocationHighlight] = useState(-1);
+  const [locationLoading, setLocationLoading] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const emojiRef = useRef<HTMLDivElement | null>(null);
 
@@ -1799,6 +1854,54 @@ function HostStreamAdminPanel({
       window.clearTimeout(timer);
     };
   }, [title]);
+
+  useEffect(() => {
+    if (!location.trim()) {
+      setLocationSuggestions([]);
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLocationLoading(true);
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/search");
+        url.searchParams.set("q", location);
+        url.searchParams.set("format", "jsonv2");
+        url.searchParams.set("addressdetails", "1");
+        url.searchParams.set("limit", "8");
+        const res = await fetch(url.toString(), {
+          headers: { Accept: "application/json", "Accept-Language": "en" },
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("location search failed");
+        const data = await res.json();
+        const mapped = Array.isArray(data)
+          ? data.map((item: any) => ({
+              label: cleanLocationLabel(item.display_name as string),
+              lat: item.lat as string,
+              lon: item.lon as string,
+            }))
+          : [];
+        setLocationSuggestions(mapped);
+        setLocationOpen(mapped.length > 0);
+        setLocationHighlight(mapped.length ? 0 : -1);
+      } catch {
+        if (controller.signal.aborted) return;
+        setLocationSuggestions([]);
+        setLocationOpen(false);
+      } finally {
+        if (!controller.signal.aborted) setLocationLoading(false);
+      }
+    }, 320);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [location]);
 
   useEffect(() => {
     if (!visible || meta.provider !== 'ivs') {
@@ -2096,7 +2199,62 @@ function HostStreamAdminPanel({
               maxLength={150}
               className={hubStyles.hostInput}
               placeholder="Add a location"
+              onBlur={() => setTimeout(() => setLocationOpen(false), 120)}
+              onKeyDown={(e) => {
+                if (!locationOpen) return;
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  if (!locationSuggestions.length) return;
+                  setLocationHighlight((prev) =>
+                    prev + 1 < locationSuggestions.length ? prev + 1 : 0,
+                  );
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  if (!locationSuggestions.length) return;
+                  setLocationHighlight((prev) =>
+                    prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
+                  );
+                  return;
+                }
+                if (e.key === "Enter" && locationHighlight >= 0) {
+                  e.preventDefault();
+                  const option = locationSuggestions[locationHighlight];
+                  if (option) {
+                    setLocation(option.label);
+                    setLocationOpen(false);
+                  }
+                }
+              }}
             />
+            {locationOpen && (
+              <div className={hubStyles.locationSuggestions}>
+                {locationLoading ? (
+                  <div className={hubStyles.locationMuted}>Searching...</div>
+                ) : locationSuggestions.length ? (
+                  locationSuggestions.map((option, idx) => (
+                    <button
+                      type="button"
+                      key={`${option.lat}-${option.lon}-${idx}`}
+                      className={`${hubStyles.locationOption} ${
+                        idx === locationHighlight ? hubStyles.locationOptionActive : ""
+                      }`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setLocation(option.label);
+                        setLocationOpen(false);
+                      }}
+                      onMouseEnter={() => setLocationHighlight(idx)}
+                    >
+                      {option.label}
+                    </button>
+                  ))
+                ) : (
+                  <div className={hubStyles.locationMuted}>No suggestions found.</div>
+                )}
+              </div>
+            )}
           </label>
 
           <label className={hubStyles.hostField}>
@@ -2269,7 +2427,6 @@ export default function LivestreamHub({
   const [livestreamEnded, setLivestreamEnded] = useState(false);
   const [showEndedModal, setShowEndedModal] = useState(false);
   const lastTransportResetAtRef = useRef(0);
-  const hostEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wasViewerConnectedRef = useRef(false);
   const isHostSession = forceHost || role === "host";
 
@@ -2303,40 +2460,25 @@ export default function LivestreamHub({
     [],
   );
 
-  // Auto-end livestream when host leaves or closes the page
+  // Auto-end livestream when host closes the tab or navigates away
   useEffect(() => {
     if (!isHostSession || !activeStreamMeta?.id) return;
 
-    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
-      // Prevent the default message, but this is just a fallback
-      // The actual ending happens in the cleanup
-      event.preventDefault();
-      event.returnValue = "";
+    const streamId = activeStreamMeta.id;
+    let ended = false;
+
+    const endStream = () => {
+      if (ended) return;
+      ended = true;
+      // keepalive: true guarantees the request is sent even after the page unloads
+      endLivestreamBeacon(streamId);
     };
 
-    const cleanup = async () => {
-      // Clear timeout if exists
-      if (hostEndTimeoutRef.current) {
-        clearTimeout(hostEndTimeoutRef.current);
-        hostEndTimeoutRef.current = null;
-      }
-
-      // End livestream with a small delay to ensure proper cleanup
-      if (activeStreamMeta?.id) {
-        try {
-          await endLivestream(activeStreamMeta.id);
-        } catch {
-          // Silently fail - host is leaving anyway
-        }
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("beforeunload", endStream);
 
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      // Call cleanup immediately when component unmounts or activeStreamMeta changes
-      void cleanup();
+      window.removeEventListener("beforeunload", endStream);
+      endStream();
     };
   }, [isHostSession, activeStreamMeta?.id]);
 
@@ -2713,12 +2855,10 @@ export default function LivestreamHub({
                   {useIvsPlayback ? (
                     <IvsPlaybackStage
                       playbackUrl={activeStreamMeta.ivsPlaybackUrl || ''}
-                      viewerCount={activeStreamMeta.viewerCount}
                     />
                   ) : (
                     <StreamStage
                       hostName={activeStreamMeta.hostName}
-                      viewerCount={activeStreamMeta.viewerCount}
                       allowFullscreen={!isHostSession}
                       cameraLayout={hostCameraLayout}
                       hostVideoMode={hostVideoMode}

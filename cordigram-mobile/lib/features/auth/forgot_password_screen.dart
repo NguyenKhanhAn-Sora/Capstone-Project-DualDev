@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 import 'login_screen.dart';
 
 // Password must be ≥8 chars, contain at least one letter and one digit.
@@ -116,7 +117,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('OTP resent – check your inbox.')),
+          SnackBar(content: Text(LanguageController.instance.t('auth.forgotPassword.otpResent'))),
         );
       }
     } on ApiException catch (e) {

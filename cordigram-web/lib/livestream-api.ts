@@ -101,6 +101,7 @@ export async function createLivestream(payload: {
 export async function joinLivestreamToken(streamId: string, payload?: {
   asHost?: boolean;
   participantName?: string;
+  isPreview?: boolean;
 }): Promise<JoinLivestreamResponse> {
   const token = getToken();
   const response = await fetch(`${API_BASE}/livestreams/${streamId}/join-token`, {
@@ -159,6 +160,19 @@ export async function endLivestream(streamId: string): Promise<{ ok: boolean }> 
     credentials: "include",
   });
   return handleResponse<{ ok: boolean }>(response, "Failed to end livestream.");
+}
+
+// Fire-and-forget version using keepalive:true so the request survives page unload.
+export function endLivestreamBeacon(streamId: string): void {
+  const token = getToken();
+  fetch(`${API_BASE}/livestreams/${streamId}/end`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    keepalive: true,
+  }).catch(() => undefined);
 }
 
 export async function getIvsIngest(streamId: string): Promise<IvsIngestResponse> {
