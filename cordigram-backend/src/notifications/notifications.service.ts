@@ -21,8 +21,10 @@ import { User } from '../users/user.schema';
 import { Post } from '../posts/post.schema';
 
 const DEFAULT_AVATAR_URL =
+  process.env.DEFAULT_AVATAR_URL?.trim() ||
   'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
 const CORDIGRAM_LOGO_AVATAR_URL =
+  process.env.LOGO_URL?.trim() ||
   'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
 
 export type NotificationActor = {

@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import type { Request } from 'express';
 import { SearchService } from './search.service';
@@ -109,7 +110,7 @@ export class SearchController {
     });
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('posts')
   async searchPosts(
     @Req() req: Request & { user?: AuthenticatedUser },
@@ -120,7 +121,6 @@ export class SearchController {
     @Query('sort') sort?: string,
   ) {
     const user = req.user;
-    if (!user) throw new UnauthorizedException('Unauthorized');
 
     if (!q || !q.trim()) throw new BadRequestException('q is required');
 
@@ -132,7 +132,7 @@ export class SearchController {
       : ['post'];
 
     return this.searchService.searchPosts({
-      viewerId: user.userId,
+      viewerId: user?.userId ?? null,
       q,
       limit: limit ? Number(limit) : 20,
       page: page ? Number(page) : 1,

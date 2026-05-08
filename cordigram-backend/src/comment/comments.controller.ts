@@ -17,6 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/jwt.strategy';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from '../comment/dto/create-comment.dto';
@@ -31,10 +32,10 @@ type UploadedFile = {
 };
 
 @Controller('posts/:postId/comments')
-@UseGuards(JwtAuthGuard)
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
   async list(
     @Req() req: Request,
@@ -44,13 +45,14 @@ export class CommentsController {
     @Query('parentId') parentId?: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
-    return this.commentsService.list(user?.userId ?? '', postId, {
+    return this.commentsService.list(user?.userId ?? null, postId, {
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       parentId: parentId || undefined,
     });
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':commentId')
   async getById(
     @Req() req: Request,
@@ -58,9 +60,10 @@ export class CommentsController {
     @Param('commentId') commentId: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
-    return this.commentsService.getById(user?.userId ?? '', postId, commentId);
+    return this.commentsService.getById(user?.userId ?? null, postId, commentId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   async create(
     @Req() req: Request,
@@ -71,6 +74,7 @@ export class CommentsController {
     return this.commentsService.create(user?.userId ?? '', postId, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -102,6 +106,7 @@ export class CommentsController {
     return this.commentsService.uploadMedia(user.userId, postId, file);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':commentId/like')
   async like(
     @Req() req: Request,
@@ -116,6 +121,7 @@ export class CommentsController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':commentId/like')
   async unlike(
     @Req() req: Request,
@@ -130,6 +136,7 @@ export class CommentsController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':commentId/likes')
   async listLikes(
     @Req() req: Request,
@@ -151,6 +158,7 @@ export class CommentsController {
     });
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':commentId')
   async delete(
     @Req() req: Request,
@@ -184,6 +192,7 @@ export class CommentsController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':commentId/pin')
   async pin(
     @Req() req: Request,
@@ -198,6 +207,7 @@ export class CommentsController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':commentId/pin')
   async unpin(
     @Req() req: Request,
@@ -212,6 +222,7 @@ export class CommentsController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':commentId/translate')
   async translate(
     @Req() req: Request,

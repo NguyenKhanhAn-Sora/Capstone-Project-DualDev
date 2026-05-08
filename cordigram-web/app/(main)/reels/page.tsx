@@ -41,6 +41,7 @@ import {
   refreshBlockedUserIds,
 } from "@/lib/blocked-users";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useGuestAuth } from "@/context/guest-auth-context";
 import ReelComments from "./ReelComments";
 import styles from "./reel.module.css";
 import postStyles from "../post/post.module.css";
@@ -1112,7 +1113,8 @@ export default function ReelPage({
   scopeOverride?: "all" | "following";
 } = {}) {
   const REELS_PAGE_SIZE = 10;
-  const canRender = useRequireAuth();
+  const canRender = useRequireAuth({ guestAllowed: true });
+  const { showLoginOverlay } = useGuestAuth();
   const tHome = useTranslations("home");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1551,7 +1553,6 @@ export default function ReelPage({
 
   const loadPage = useCallback(
     async (nextPage: number, opts?: { initial?: boolean }) => {
-      if (!token) return;
       const isInitial = Boolean(opts?.initial);
       if (isInitial) setLoading(true);
       else setLoadingMore(true);
@@ -1662,18 +1663,16 @@ export default function ReelPage({
   );
 
   const loadMore = useCallback(() => {
-    if (!token) return;
     if (singleMode) return;
     if (loading || loadingMore) return;
     if (!hasMore) return;
     void loadPage(page + 1);
-  }, [hasMore, loadPage, loading, loadingMore, page, singleMode, token]);
+  }, [hasMore, loadPage, loading, loadingMore, page, singleMode]);
 
   useEffect(() => {
-    if (!token) return;
     if (singleMode && requestedReelId) return;
     void loadPage(1, { initial: true });
-  }, [loadPage, requestedReelId, singleMode, token, viewerId]);
+  }, [loadPage, requestedReelId, singleMode, viewerId]);
 
   useEffect(() => {
     if (!loadingMore) autoLoadLockRef.current = false;
@@ -2224,7 +2223,7 @@ export default function ReelPage({
   };
 
   const handleLike = async (id: string, liked: boolean) => {
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     try {
       if (liked) await unlikePost({ token, postId: id });
       else await likePost({ token, postId: id });
@@ -2251,7 +2250,7 @@ export default function ReelPage({
   };
 
   const handleSave = async (id: string, saved: boolean) => {
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     updateItem(id, {
       saved: !saved,
       flags: {
@@ -2303,10 +2302,7 @@ export default function ReelPage({
 
   const handleQuickRepost = useCallback(
     async (target: RepostTarget) => {
-      if (!token) {
-        showToast("Sign in to repost");
-        return;
-      }
+      if (!token) { showLoginOverlay(); return; }
       try {
         const originalId = resolveOriginalPostId(target.postId);
         const targetId = target.postId;
@@ -2335,10 +2331,7 @@ export default function ReelPage({
 
   const handleShareQuote = useCallback(
     async (target: RepostTarget, input: QuoteInput) => {
-      if (!token) {
-        showToast("Sign in to repost");
-        return;
-      }
+      if (!token) { showLoginOverlay(); return; }
       try {
         const originalId = resolveOriginalPostId(target.postId);
         const targetId = target.postId;
@@ -2396,7 +2389,7 @@ export default function ReelPage({
       "creator";
     const kind = (target as any)?.kind === "post" ? "post" : "reel";
     if (!token) {
-      showToast("Sign in to repost");
+      showLoginOverlay();
       return;
     }
     setRepostTarget({
@@ -3238,7 +3231,8 @@ export default function ReelPage({
   };
 
   const onFollow = async (authorId: string, nextFollow: boolean) => {
-    if (!token || !authorId) return;
+    if (!token) { showLoginOverlay(); return; }
+    if (!authorId) return;
     setItems((prev) =>
       prev.map((p) =>
         p.authorId === authorId
@@ -3300,9 +3294,18 @@ export default function ReelPage({
             <div className={styles.stateCard}>{error}</div>
           ) : !items.length ? (
             <div className={styles.stateCard}>
-              {scope === "following"
-                ? tHome("feed.followingEmpty")
-                : "No reels yet."}
+              {!token ? (
+                <>
+                  <p style={{ marginBottom: 12 }}>Sign in to watch reels.</p>
+                  <a href="/login" style={{ color: "var(--accent, #0095f6)", fontWeight: 600, textDecoration: "none" }}>Log in</a>
+                  {" · "}
+                  <a href="/signup" style={{ color: "var(--accent, #0095f6)", fontWeight: 600, textDecoration: "none" }}>Sign up</a>
+                </>
+              ) : scope === "following" ? (
+                tHome("feed.followingEmpty")
+              ) : (
+                "No reels yet."
+              )}
             </div>
           ) : (
             <div className={styles.stageShell}>

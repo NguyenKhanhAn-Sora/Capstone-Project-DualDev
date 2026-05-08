@@ -372,7 +372,7 @@ const buildLocalDateTimeIso = (date: string, time: string) => {
 };
 
 export default function HashtagPage() {
-  const canRender = useRequireAuth();
+  const canRender = useRequireAuth({ guestAllowed: true });
   const params = useParams<{ tag?: string }>();
   const router = useRouter();
   const tag = useMemo(() => {

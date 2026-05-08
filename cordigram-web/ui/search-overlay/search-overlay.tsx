@@ -209,7 +209,6 @@ export default function SearchOverlay(props: {
     const token = getStoredAccessToken();
     if (!token) {
       setHistory([]);
-      setHistoryError("Session expired.");
       return;
     }
 
@@ -260,7 +259,6 @@ export default function SearchOverlay(props: {
 
     const token = getStoredAccessToken();
     if (!token) {
-      setError("Session expired.");
       return;
     }
 

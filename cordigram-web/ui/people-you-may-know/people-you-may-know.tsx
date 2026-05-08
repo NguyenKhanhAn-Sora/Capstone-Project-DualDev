@@ -13,6 +13,45 @@ import {
   type PeopleSuggestionItem,
 } from "@/lib/api";
 
+const CACHE_KEY = "peopleYouMayKnow:v1";
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+type CacheEntry = {
+  items: PeopleSuggestionItem[];
+  ts: number;
+};
+
+function readCache(): PeopleSuggestionItem[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as CacheEntry;
+    if (Date.now() - entry.ts > CACHE_TTL_MS) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return entry.items;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(items: PeopleSuggestionItem[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const entry: CacheEntry = { items, ts: Date.now() };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
+  } catch {}
+}
+
+function invalidateCache() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch {}
+}
+
 export default function PeopleYouMayKnow({
   token,
   limit = 8,
@@ -43,8 +82,18 @@ export default function PeopleYouMayKnow({
   }, [items, followingIds]);
 
   const load = useCallback(
-    async (nextLimit?: number) => {
+    async (nextLimit?: number, forceRefresh = false) => {
       if (!token) return;
+
+      // Try cache on initial load (not when expanding/collapsing or force refresh)
+      if (!forceRefresh && !nextLimit) {
+        const cached = readCache();
+        if (cached) {
+          setItems(cached);
+          return;
+        }
+      }
+
       setLoading(true);
       setError("");
       try {
@@ -52,7 +101,12 @@ export default function PeopleYouMayKnow({
           token,
           limit: nextLimit ?? limit,
         });
-        setItems(res.items || []);
+        const fetched = res.items || [];
+        setItems(fetched);
+        // Only cache the default (non-expanded) load
+        if (!nextLimit || nextLimit === limit) {
+          writeCache(fetched);
+        }
       } catch (e) {
         const err = e as ApiError;
         setError(err?.message || t("loadError"));
@@ -100,6 +154,8 @@ export default function PeopleYouMayKnow({
             return next;
           });
         }
+        // Invalidate cache so next visit reflects updated follow state
+        invalidateCache();
       } catch (e) {
         const err = e as ApiError;
         setError(err?.message || t("updateError"));

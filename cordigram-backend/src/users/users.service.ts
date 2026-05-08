@@ -343,7 +343,7 @@ export class UsersService {
   }
 
   async listFollowers(params: {
-    viewerId: string;
+    viewerId: string | null | undefined;
     userId: string;
     limit?: number;
     cursor?: string;
@@ -358,12 +358,17 @@ export class UsersService {
     }>;
     nextCursor: string | null;
   }> {
-    const viewerId = this.asObjectId(params.viewerId, 'viewerId');
+    const viewerObjectId =
+      params.viewerId && Types.ObjectId.isValid(params.viewerId)
+        ? new Types.ObjectId(params.viewerId)
+        : null;
     const ownerId = this.asObjectId(params.userId, 'userId');
 
-    const blocked = await this.blocksService.isBlockedEither(viewerId, ownerId);
-    if (blocked) {
-      throw new ForbiddenException('Action forbidden due to block');
+    if (viewerObjectId) {
+      const blocked = await this.blocksService.isBlockedEither(viewerObjectId, ownerId);
+      if (blocked) {
+        throw new ForbiddenException('Action forbidden due to block');
+      }
     }
 
     const ownerProfile = await this.profileModel
@@ -376,19 +381,21 @@ export class UsersService {
       throw new NotFoundException('Profile not found');
     }
 
-    const isOwner = viewerId.equals(ownerId);
+    const isOwner = viewerObjectId ? viewerObjectId.equals(ownerId) : false;
     const viewerFollow = isOwner
       ? true
-      : await this.followModel.exists({
-          followerId: viewerId,
-          followeeId: ownerId,
-        });
+      : viewerObjectId
+        ? await this.followModel.exists({
+            followerId: viewerObjectId,
+            followeeId: ownerId,
+          })
+        : false;
 
     const followersVisibility = ownerProfile.visibility?.followers ?? 'public';
     const canViewFollowers =
       isOwner ||
       followersVisibility === 'public' ||
-      (followersVisibility === 'followers' && Boolean(viewerFollow));
+      (followersVisibility === 'followers' && viewerObjectId && Boolean(viewerFollow));
 
     if (!canViewFollowers) {
       throw new ForbiddenException('Followers list is private');
@@ -399,8 +406,9 @@ export class UsersService {
       ? this.asObjectId(params.cursor, 'cursor')
       : null;
 
-    const { blockedIds, blockedByIds } =
-      await this.blocksService.getBlockLists(viewerId);
+    const { blockedIds, blockedByIds } = viewerObjectId
+      ? await this.blocksService.getBlockLists(viewerObjectId)
+      : { blockedIds: [], blockedByIds: [] };
     const excluded = [...blockedIds, ...blockedByIds]
       .filter((id) => Types.ObjectId.isValid(id))
       .map((id) => new Types.ObjectId(id));
@@ -435,14 +443,16 @@ export class UsersService {
         .select('userId username displayName avatarUrl')
         .lean()
         .exec(),
-      this.followModel
-        .find({
-          followerId: viewerId,
-          followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
-        })
-        .select('followeeId')
-        .lean()
-        .exec(),
+      viewerObjectId
+        ? this.followModel
+            .find({
+              followerId: viewerObjectId,
+              followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+            })
+            .select('followeeId')
+            .lean()
+            .exec()
+        : Promise.resolve([]),
       this.userModel
         .find({ _id: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
         .select('_id isCreatorVerified')
@@ -495,7 +505,7 @@ export class UsersService {
   }
 
   async listFollowing(params: {
-    viewerId: string;
+    viewerId: string | null | undefined;
     userId: string;
     limit?: number;
     cursor?: string;
@@ -510,12 +520,17 @@ export class UsersService {
     }>;
     nextCursor: string | null;
   }> {
-    const viewerId = this.asObjectId(params.viewerId, 'viewerId');
+    const viewerObjectId =
+      params.viewerId && Types.ObjectId.isValid(params.viewerId)
+        ? new Types.ObjectId(params.viewerId)
+        : null;
     const ownerId = this.asObjectId(params.userId, 'userId');
 
-    const blocked = await this.blocksService.isBlockedEither(viewerId, ownerId);
-    if (blocked) {
-      throw new ForbiddenException('Action forbidden due to block');
+    if (viewerObjectId) {
+      const blocked = await this.blocksService.isBlockedEither(viewerObjectId, ownerId);
+      if (blocked) {
+        throw new ForbiddenException('Action forbidden due to block');
+      }
     }
 
     const ownerProfile = await this.profileModel
@@ -528,19 +543,21 @@ export class UsersService {
       throw new NotFoundException('Profile not found');
     }
 
-    const isOwner = viewerId.equals(ownerId);
+    const isOwner = viewerObjectId ? viewerObjectId.equals(ownerId) : false;
     const viewerFollow = isOwner
       ? true
-      : await this.followModel.exists({
-          followerId: viewerId,
-          followeeId: ownerId,
-        });
+      : viewerObjectId
+        ? await this.followModel.exists({
+            followerId: viewerObjectId,
+            followeeId: ownerId,
+          })
+        : false;
 
     const followingVisibility = ownerProfile.visibility?.following ?? 'public';
     const canViewFollowing =
       isOwner ||
       followingVisibility === 'public' ||
-      (followingVisibility === 'followers' && Boolean(viewerFollow));
+      (followingVisibility === 'followers' && viewerObjectId && Boolean(viewerFollow));
 
     if (!canViewFollowing) {
       throw new ForbiddenException('Following list is private');
@@ -551,8 +568,9 @@ export class UsersService {
       ? this.asObjectId(params.cursor, 'cursor')
       : null;
 
-    const { blockedIds, blockedByIds } =
-      await this.blocksService.getBlockLists(viewerId);
+    const { blockedIds, blockedByIds } = viewerObjectId
+      ? await this.blocksService.getBlockLists(viewerObjectId)
+      : { blockedIds: [], blockedByIds: [] };
     const excluded = [...blockedIds, ...blockedByIds]
       .filter((id) => Types.ObjectId.isValid(id))
       .map((id) => new Types.ObjectId(id));
@@ -587,14 +605,16 @@ export class UsersService {
         .select('userId username displayName avatarUrl')
         .lean()
         .exec(),
-      this.followModel
-        .find({
-          followerId: viewerId,
-          followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
-        })
-        .select('followeeId')
-        .lean()
-        .exec(),
+      viewerObjectId
+        ? this.followModel
+            .find({
+              followerId: viewerObjectId,
+              followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+            })
+            .select('followeeId')
+            .lean()
+            .exec()
+        : Promise.resolve([]),
       this.userModel
         .find({ _id: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
         .select('_id isCreatorVerified')

@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
 import { formatRelativeTime } from "@/lib/relative-time";
 import { useLanguage } from "@/component/language-provider";
+import { useGuestAuth } from "@/context/guest-auth-context";
 import {
   createComment,
   fetchComments,
@@ -309,6 +310,7 @@ export default function ReelComments({
   style,
 }: ReelCommentsProps) {
   const { language } = useLanguage();
+  const { showLoginOverlay } = useGuestAuth();
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -1414,12 +1416,12 @@ export default function ReelComments({
             <button
               className={postStyles.linkBtn}
               onClick={() => toggleLike(comment.id, Boolean(comment.liked))}
-              disabled={!token}
               aria-pressed={comment.liked}
             >
               <IconLike filled={comment.liked} />
               <span>{comment.likesCount ?? 0}</span>
             </button>
+            {token ? (
             <div
               className={postStyles.commentMoreWrap}
               data-comment-menu="true"
@@ -1449,6 +1451,7 @@ export default function ReelComments({
                 <IconMoreHorizontal size={16} />
               </button>
             </div>
+            ) : null}
             {openCommentMenuId === comment.id && hasDOM
               ? createPortal(
                   <div
@@ -1630,7 +1633,7 @@ export default function ReelComments({
   };
 
   useEffect(() => {
-    if (!open || !token || !postId) return;
+    if (!open || !postId) return;
     setComments([]);
     setPage(1);
     setHasMore(true);
@@ -1753,7 +1756,7 @@ export default function ReelComments({
   }, [open]);
 
   const loadMore = async () => {
-    if (!token || !postId || loading || loadingMore || !hasMore) return;
+    if (!postId || loading || loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
       const res = await fetchComments({
@@ -1844,7 +1847,7 @@ export default function ReelComments({
 
   const loadReplies = useCallback(
     async (parentId: string, nextPage = 1) => {
-      if (!token || !postId) return;
+      if (!postId) return;
       setReplyState((prev) => ({
         ...prev,
         [parentId]: {
@@ -1916,7 +1919,7 @@ export default function ReelComments({
   );
 
   useEffect(() => {
-    if (!token || !postId || !open) return;
+    if (!postId || !open) return;
     let cancelled = false;
     let inFlight = false;
 
@@ -2062,7 +2065,8 @@ export default function ReelComments({
   }, [blockedIds, mergeLatestComments, open, postId, replyState, token, updateTotal]);
 
   const toggleLike = async (commentId: string, liked: boolean) => {
-    if (!token || !postId) return;
+    if (!postId) return;
+    if (!token) { showLoginOverlay(); return; }
 
     updateCommentEverywhere(commentId, (c) => ({
       ...c,

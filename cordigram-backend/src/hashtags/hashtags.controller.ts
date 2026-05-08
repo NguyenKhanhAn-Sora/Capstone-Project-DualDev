@@ -3,29 +3,21 @@ import {
   Controller,
   Get,
   Query,
-  Req,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import type { AuthenticatedUser } from '../auth/jwt.strategy';
-import type { Request } from 'express';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { HashtagsService } from './hashtags.service';
 
 @Controller('hashtags')
 export class HashtagsController {
   constructor(private readonly hashtagsService: HashtagsService) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('suggest')
   async suggest(
-    @Req() req: Request & { user?: AuthenticatedUser },
     @Query('q') q?: string,
     @Query('limit') limit?: string,
   ) {
-    const user = req.user;
-    if (!user) throw new UnauthorizedException('Unauthorized');
-
     if (!q || !q.trim()) throw new BadRequestException('q is required');
 
     const items = await this.hashtagsService.suggest({
@@ -36,15 +28,9 @@ export class HashtagsController {
     return { items, count: items.length };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('trending')
-  async trending(
-    @Req() req: Request & { user?: AuthenticatedUser },
-    @Query('limit') limit?: string,
-  ) {
-    const user = req.user;
-    if (!user) throw new UnauthorizedException('Unauthorized');
-
+  async trending(@Query('limit') limit?: string) {
     const items = await this.hashtagsService.trending({
       limit: limit ? Number(limit) : 15,
     });
@@ -52,17 +38,13 @@ export class HashtagsController {
     return { items, count: items.length };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('search')
   async search(
-    @Req() req: Request & { user?: AuthenticatedUser },
     @Query('q') q?: string,
     @Query('limit') limit?: string,
     @Query('page') page?: string,
   ) {
-    const user = req.user;
-    if (!user) throw new UnauthorizedException('Unauthorized');
-
     if (!q || !q.trim()) throw new BadRequestException('q is required');
 
     return this.hashtagsService.search({

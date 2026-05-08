@@ -21,10 +21,8 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       config.frontendUrl,
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://www.cordigram.com',
-      'https://admin.cordigram.com',
+      config.adminUrl,
+      ...config.corsExtraOrigins,
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

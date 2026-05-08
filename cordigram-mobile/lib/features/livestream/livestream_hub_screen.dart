@@ -1622,8 +1622,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
             );
             return;
           }
-          _hostStreamEnded = true;
-          unawaited(_endHostStreamAndNavigateHome(stream.id));
+          unawaited(_confirmEndLivestream());
         },
         child: scaffold,
       );
