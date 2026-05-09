@@ -1478,8 +1478,21 @@
   box-shadow: none !important;
 }
 
+/* Media (image/gif/sticker/video) should feel natural, without thick bubble frame */
+.messageBubble:has(.mediaMessage) {
+  padding: 3px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 10px;
+}
+
 .messageBubble:hover {
   transform: translateY(-1px);
+}
+
+.messageBubble:has(.mediaMessage):hover {
+  transform: none;
 }
 
 .messageBubble.sent {
@@ -1520,7 +1533,7 @@
 .messageImage {
   max-width: 300px;
   max-height: 400px;
-  border-radius: 12px;
+  border-radius: 10px;
   object-fit: cover;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1533,14 +1546,14 @@
 .messageVideo {
   max-width: 400px;
   max-height: 300px;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #000;
 }
 
 .messageGif {
   max-width: 250px;
   max-height: 250px;
-  border-radius: 8px;
+  border-radius: 10px;
   object-fit: contain;
 }
 

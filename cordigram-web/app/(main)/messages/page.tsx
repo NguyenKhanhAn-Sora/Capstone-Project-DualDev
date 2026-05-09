@@ -10452,11 +10452,18 @@ export default function MessagesPage() {
                             setShowGiphyPicker(true);
                           }}
                         >
-                          <span
-                            style={{ fontSize: "14px", fontWeight: "bold" }}
-                          >
-                            {t("chat.mediaPicker.tabGif")}
-                          </span>
+                          <img
+                            src={encodeURI(
+                              "/sounds/—Pngtree—vector gif icon_4232006.png",
+                            )}
+                            alt={t("chat.mediaPicker.tabGif")}
+                            style={{
+                              width: 18,
+                              height: 18,
+                              objectFit: "contain",
+                              display: "block",
+                            }}
+                          />
                         </button>
 
                         {/* Sticker Button */}
