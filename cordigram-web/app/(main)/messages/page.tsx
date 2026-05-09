@@ -10452,18 +10452,24 @@ export default function MessagesPage() {
                             setShowGiphyPicker(true);
                           }}
                         >
-                          <img
-                            src={encodeURI(
-                              "/sounds/—Pngtree—vector gif icon_4232006.png",
-                            )}
-                            alt={t("chat.mediaPicker.tabGif")}
-                            style={{
-                              width: 18,
-                              height: 18,
-                              objectFit: "contain",
-                              display: "block",
-                            }}
-                          />
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <rect x="3" y="5" width="18" height="14" rx="3" ry="3" />
+                            <line x1="8" y1="9" x2="8" y2="15" />
+                            <line x1="8" y1="12" x2="10.5" y2="12" />
+                            <line x1="12.5" y1="9" x2="16.5" y2="9" />
+                            <line x1="12.5" y1="12" x2="16" y2="12" />
+                            <line x1="12.5" y1="15" x2="16.5" y2="15" />
+                          </svg>
                         </button>
 
                         {/* Sticker Button */}
