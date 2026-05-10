@@ -1177,47 +1177,31 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    child: Container(
-                      height: 34,
-                      alignment: Alignment.centerLeft,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1F2D4D),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Text(
-                        'Tìm kiếm cuộc trò chuyện',
-                        style: TextStyle(
-                          color: Color(0xFFD9E1F3),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
                   _MenuActionRow(
                     title: 'Tắt thông báo tin nhắn',
-                    onTap: () {
+                    onTap: () async {
                       Navigator.of(dialogContext).pop();
-                      final muted = widget.controller.isConversationMuted(
-                        widget.thread.id,
-                      );
-                      widget.controller.setConversationMuted(
-                        widget.thread.id,
-                        !muted,
-                      );
+                      await _showMuteDurationMenu();
                     },
                   ),
                   _MenuActionRow(
-                    title: 'Chặn',
-                    onTap: () {
+                    title: widget.controller.isUserBlocked(widget.thread.id)
+                        ? 'Gỡ chặn'
+                        : 'Chặn',
+                    onTap: () async {
                       Navigator.of(dialogContext).pop();
-                      widget.controller.blockUser(widget.thread.id);
+                      try {
+                        if (widget.controller.isUserBlocked(widget.thread.id)) {
+                          await widget.controller.unblockUser(widget.thread.id);
+                        } else {
+                          await widget.controller.blockUser(widget.thread.id);
+                        }
+                      } catch (_) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Không thể cập nhật chặn')),
+                        );
+                      }
                     },
                   ),
                 ],
@@ -1226,6 +1210,63 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _showMuteDurationMenu() async {
+    final currentlyMuted = widget.controller.isConversationMuted(widget.thread.id);
+    final opts = <({String label, Duration? duration, bool forever})>[
+      if (currentlyMuted)
+        (label: 'Bật lại thông báo', duration: null, forever: false),
+      (label: 'Trong vòng 15 Phút', duration: const Duration(minutes: 15), forever: false),
+      (label: 'Trong vòng 1 Giờ', duration: const Duration(hours: 1), forever: false),
+      (label: 'Trong vòng 3 Giờ', duration: const Duration(hours: 3), forever: false),
+      (label: 'Trong vòng 8 Giờ', duration: const Duration(hours: 8), forever: false),
+      (label: 'Trong vòng 24 Giờ', duration: const Duration(hours: 24), forever: false),
+      (label: 'Cho đến khi bật lại', duration: null, forever: true),
+    ];
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.28),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A1737),
+            border: Border.all(color: const Color(0xFF5D6B87)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final item in opts)
+                InkWell(
+                  onTap: () {
+                    widget.controller.setConversationMuteDuration(
+                      widget.thread.id,
+                      duration: item.duration,
+                      forever: item.forever,
+                    );
+                    Navigator.of(ctx).pop();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1611,6 +1652,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
         ? widget.thread.name.trim().substring(0, 1).toUpperCase()
         : 'U';
     final myId = widget.controller.myUserId;
+    final isBlocked = widget.controller.isUserBlocked(widget.thread.id);
 
     return Scaffold(
       backgroundColor: _pageColor,
@@ -1698,9 +1740,49 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
             children: [
               const Divider(height: 1, color: Color(0xFF233358)),
               Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView.builder(
+                child: isBlocked
+                    ? Center(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1D2E52),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF44577F)),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Bạn đã chặn ${widget.thread.name}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              FilledButton(
+                                onPressed: () async {
+                                  try {
+                                    await widget.controller.unblockUser(widget.thread.id);
+                                  } catch (_) {
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Không thể gỡ chặn')),
+                                    );
+                                  }
+                                },
+                                child: const Text('Gỡ chặn'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ListView.builder(
                     reverse: true,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -1883,7 +1965,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: isBlocked
+          ? null
+          : SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,

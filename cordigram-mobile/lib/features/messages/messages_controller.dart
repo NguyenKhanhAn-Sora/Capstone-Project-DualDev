@@ -18,7 +18,8 @@ class MessagesController extends ChangeNotifier {
   final List<MessageThread> _threads = [];
   final Map<String, List<DmMessage>> _messagesByUser = {};
   final Map<String, VoiceControlState> _voiceByContext = {};
-  final Map<String, bool> _conversationMuted = {};
+  final Map<String, DateTime?> _conversationMutedUntil = {};
+  final Set<String> _conversationMutedForever = {};
   final Set<String> _blockedUsers = {};
 
   StreamSubscription<DmMessage>? _newMessageSub;
@@ -82,6 +83,7 @@ class MessagesController extends ChangeNotifier {
     _startInboxPolling();
     await refreshInboxCount();
     await refreshMyIdentity();
+    await refreshBlockedUsers();
     await refreshThreads();
   }
 
@@ -492,17 +494,56 @@ class MessagesController extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
-  bool isConversationMuted(String userId) => _conversationMuted[userId] == true;
+  bool isConversationMuted(String userId) {
+    if (_conversationMutedForever.contains(userId)) return true;
+    final until = _conversationMutedUntil[userId];
+    if (until == null) return false;
+    if (DateTime.now().isAfter(until)) {
+      _conversationMutedUntil.remove(userId);
+      return false;
+    }
+    return true;
+  }
 
-  void setConversationMuted(String userId, bool muted) {
-    _conversationMuted[userId] = muted;
+  void setConversationMuteDuration(
+    String userId, {
+    Duration? duration,
+    bool forever = false,
+  }) {
+    if (forever) {
+      _conversationMutedForever.add(userId);
+      _conversationMutedUntil.remove(userId);
+    } else if (duration == null) {
+      _conversationMutedForever.remove(userId);
+      _conversationMutedUntil.remove(userId);
+    } else {
+      _conversationMutedForever.remove(userId);
+      _conversationMutedUntil[userId] = DateTime.now().add(duration);
+    }
     notifyListeners();
   }
 
   bool isUserBlocked(String userId) => _blockedUsers.contains(userId);
 
-  void blockUser(String userId) {
+  Future<void> refreshBlockedUsers() async {
+    try {
+      final blocked = await DirectMessagesService.getBlockedUserIds();
+      _blockedUsers
+        ..clear()
+        ..addAll(blocked);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> blockUser(String userId) async {
+    await DirectMessagesService.blockUser(userId);
     _blockedUsers.add(userId);
+    notifyListeners();
+  }
+
+  Future<void> unblockUser(String userId) async {
+    await DirectMessagesService.unblockUser(userId);
+    _blockedUsers.remove(userId);
     notifyListeners();
   }
 
@@ -536,6 +577,7 @@ class MessagesController extends ChangeNotifier {
         ? message.receiverId
         : message.senderId;
     if (peerId.isEmpty) return;
+    if (_blockedUsers.contains(peerId)) return;
 
     final list = _messagesByUser[peerId] ?? <DmMessage>[];
     if (list.any((m) => m.id == message.id)) return;
