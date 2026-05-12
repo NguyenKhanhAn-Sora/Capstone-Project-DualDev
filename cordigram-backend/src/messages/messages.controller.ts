@@ -221,11 +221,6 @@ export class MessagesController {
     };
   }
 
-  @Get(':id')
-  async getMessage(@Param('id') messageId: string) {
-    return this.messagesService.getMessageById(messageId);
-  }
-
   @Patch(':id')
   async updateMessage(
     @Param('id') messageId: string,
@@ -311,5 +306,10 @@ export class MessagesController {
       channelId,
       req.user.userId,
     );
+  }
+
+  @Get(':id')
+  async getMessage(@Param('id') messageId: string) {
+    return this.messagesService.getMessageById(messageId);
   }
 }

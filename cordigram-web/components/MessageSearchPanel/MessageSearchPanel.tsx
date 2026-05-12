@@ -42,6 +42,7 @@ interface MessageSearchPanelProps {
   members?: Array<{ userId: string; displayName?: string; username?: string; avatarUrl?: string }>;
   dmPartnerId?: string;
   dmPartnerName?: string;
+  currentUserId?: string;
   onResultClick?: (payload: {
     messageId: string;
     channelId?: string;
@@ -174,6 +175,7 @@ export default function MessageSearchPanel({
   members = [],
   dmPartnerId,
   dmPartnerName,
+  currentUserId,
   onResultClick,
   dmPeers = [],
   serversForQuickSwitch = [],
@@ -183,6 +185,7 @@ export default function MessageSearchPanel({
   dmConversationOnlySearch = false,
 }: MessageSearchPanelProps) {
   const { t, language } = useLanguage();
+  const [themeVars, setThemeVars] = useState<React.CSSProperties>({});
   const quickSwitchParseOpts = useMemo((): ParseQuickSwitchPrefixOpts => {
     if (mode === "dm" && dmConversationOnlySearch) {
       return { enableQuickSwitch: false };
@@ -303,6 +306,43 @@ export default function MessageSearchPanel({
       setHasSearched(false);
       setLastParsed(null);
     }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || typeof window === "undefined") return;
+    const source =
+      document.getElementById("cordigram-messages-root") ||
+      document.documentElement;
+    const computed = window.getComputedStyle(source);
+    const varNames = [
+      "--color-bg",
+      "--color-surface",
+      "--color-surface-muted",
+      "--color-border",
+      "--color-text",
+      "--color-text-muted",
+      "--color-primary",
+      "--color-primary-strong",
+      "--color-panel-accent",
+      "--color-panel-success",
+      "--color-chat-modal",
+      "--color-chat-modal-border",
+      "--color-chat-input",
+      "--color-chat-input-border",
+      "--color-chat-hover",
+      "--color-chat-text-strong",
+      "--color-chat-text-secondary",
+      "--color-chat-empty",
+      "--color-on-accent",
+    ] as const;
+    const next: React.CSSProperties = {};
+    for (const name of varNames) {
+      const value = computed.getPropertyValue(name).trim();
+      if (value) {
+        (next as Record<string, string>)[name] = value;
+      }
+    }
+    setThemeVars(next);
   }, [isOpen]);
 
   const suggestCtx = useMemo(
@@ -529,6 +569,7 @@ export default function MessageSearchPanel({
       <div className={styles.overlay} onClick={onClose} />
       <div
         className={styles.modal}
+        style={themeVars}
         role="dialog"
         aria-modal="true"
         aria-labelledby="message-search-title"
@@ -861,12 +902,13 @@ export default function MessageSearchPanel({
                           });
                           setRecent(loadRecent(serverId));
                         }
-                        const currentUserId =
-                          typeof window !== "undefined"
+                        const effectiveCurrentUserId =
+                          currentUserId ||
+                          (typeof window !== "undefined"
                             ? localStorage.getItem("userId") ||
                               localStorage.getItem("currentUserId") ||
                               ""
-                            : "";
+                            : "");
                         const senderId =
                           typeof msg.senderId === "object"
                             ? String(msg.senderId?._id || "")
@@ -875,13 +917,38 @@ export default function MessageSearchPanel({
                           typeof msg.receiverId === "object"
                             ? String(msg.receiverId?._id || "")
                             : String(msg.receiverId || "");
-                        const dmUserId =
-                          dmPartnerId ||
-                          (senderId && senderId !== currentUserId
-                            ? senderId
-                            : receiverId && receiverId !== currentUserId
-                              ? receiverId
-                              : undefined);
+                        const dmUserId = dmPartnerId
+                          ? dmPartnerId
+                          : (() => {
+                              if (!effectiveCurrentUserId) {
+                                return receiverId || senderId || undefined;
+                              }
+                              if (
+                                senderId === effectiveCurrentUserId &&
+                                receiverId
+                              ) {
+                                return receiverId;
+                              }
+                              if (
+                                receiverId === effectiveCurrentUserId &&
+                                senderId
+                              ) {
+                                return senderId;
+                              }
+                              if (
+                                senderId &&
+                                senderId !== effectiveCurrentUserId
+                              ) {
+                                return senderId;
+                              }
+                              if (
+                                receiverId &&
+                                receiverId !== effectiveCurrentUserId
+                              ) {
+                                return receiverId;
+                              }
+                              return undefined;
+                            })();
                         onResultClick?.({
                           messageId: msg._id,
                           channelId: typeof cid === "string" ? cid : undefined,

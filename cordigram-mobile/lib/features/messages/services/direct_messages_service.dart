@@ -230,6 +230,50 @@ class DirectMessagesService {
         .toList();
   }
 
+  static Future<Set<String>> getBlockedUserIds() async {
+    List<dynamic> list;
+    try {
+      list = await ApiService.getList('/users/blocked', extraHeaders: _authHeaders);
+    } catch (_) {
+      final res = await ApiService.get('/users/blocked', extraHeaders: _authHeaders);
+      list = (res['items'] ?? res['data'] ?? res['blocked'] ?? res['users']) as List? ??
+          const <dynamic>[];
+    }
+    final out = <String>{};
+    for (final item in list.whereType<Map>()) {
+      final map = Map<String, dynamic>.from(item);
+      final direct = (map['userId'] ?? map['blockedUserId'] ?? map['_id'] ?? '')
+          .toString()
+          .trim();
+      if (direct.isNotEmpty) {
+        out.add(direct);
+        continue;
+      }
+      final blockedUser = map['blockedUser'];
+      if (blockedUser is Map) {
+        final id = (blockedUser['_id'] ?? blockedUser['userId'] ?? '')
+            .toString()
+            .trim();
+        if (id.isNotEmpty) out.add(id);
+      }
+    }
+    return out;
+  }
+
+  static Future<void> blockUser(String targetUserId) async {
+    await ApiService.post(
+      '/users/$targetUserId/block',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<void> unblockUser(String targetUserId) async {
+    await ApiService.delete(
+      '/users/$targetUserId/block',
+      extraHeaders: _authHeaders,
+    );
+  }
+
   /// Mirrors web DM sidebar flow:
   /// - load available users (friend candidates)
   /// - load conversation list (unread + last message)
