@@ -167,6 +167,60 @@
     "commentsOffPlaceholder": "Comments are turned off",
     "addCommentPlaceholder": "Add a comment..."
   },
+  "search": {
+    "title": "検索",
+    "tabs": {
+      "all": "すべて",
+      "people": "ユーザー",
+      "hashtags": "ハッシュタグ",
+      "reels": "リール",
+      "posts": "投稿"
+    },
+    "placeholder": {
+      "all": "ユーザー、#ハッシュタグ、投稿、リールを検索",
+      "people": "ユーザーを検索",
+      "hashtags": "ハッシュタグを検索",
+      "posts": "投稿を検索",
+      "reels": "リールを検索"
+    },
+    "aria": {
+      "clear": "クリア",
+      "close": "閉じる",
+      "clearSearch": "検索をクリア",
+      "remove": "削除"
+    },
+    "sections": {
+      "people": "ユーザー",
+      "hashtags": "ハッシュタグ",
+      "posts": "投稿",
+      "reels": "リール"
+    },
+    "seeAll": "すべて見る",
+    "usageCount": "{count} 件の投稿",
+    "loadMore": "さらに読み込む",
+    "recent": {
+      "title": "最近",
+      "clearAll": "すべてクリア",
+      "empty": "最近の検索履歴はありません。",
+      "loading": "読み込み中…",
+      "loadFailed": "履歴の読み込みに失敗しました"
+    },
+    "status": {
+      "typeToSearch": "検索するには入力してください。",
+      "searching": "検索中…",
+      "loadingMore": "さらに読み込み中…",
+      "loading": "読み込み中…",
+      "noResults": "結果がありません。",
+      "noPeople": "ユーザーが見つかりませんでした。",
+      "noReels": "リールが見つかりませんでした。",
+      "noHashtags": "ハッシュタグが見つかりませんでした。",
+      "noPosts": "投稿が見つかりませんでした。",
+      "searchFailed": "検索に失敗しました"
+    },
+    "postBy": "{author} の投稿",
+    "noCaption": "（キャプションなし）",
+    "unknown": "不明"
+  },
   "home": {
     "feed": {
       "signInToView": "フィードを表示するにはログインしてください",
@@ -193,7 +247,9 @@
       "reportSubmitted": "報告書の提出",
       "reportSubmitFailed": "レポートを送信できませんでした",
       "actionFailed": "操作に失敗しました",
-      "blockFailed": "ブロックの作成に失敗しました"
+      "blockFailed": "ブロックに失敗しました",
+      "postHidden": "投稿を非表示にしました",
+      "postHideFailed": "投稿の非表示に失敗しました"
     },
     "delete": {
       "title": "この投稿を削除しますか？",
@@ -362,10 +418,11 @@
       "editPost": "投稿を編集する",
       "editVisibility": "表示設定の編集",
       "muteNotifications": "通知をミュートする",
+      "turnOnNotifications": "通知をオンにする",
       "turnOffComments": "コメントを非表示にする",
       "turnOnComments": "コメントを有効にする",
-      "showLike": "「いいね」を表示",
-      "hideLike": "「いいね」を非表示にする",
+      "showLike": "いいね数を表示する",
+      "hideLike": "いいね数を非表示にする",
       "goToPost": "投稿へ",
       "copyLink": "リンクをコピー",
       "deletePost": "投稿を削除",
@@ -376,10 +433,25 @@
       "hidePost": "この投稿を非表示にする",
       "report": "レポート",
       "blockAccount": "このアカウントをブロックする",
-      "turnOnNotification": "Turn on notification",
-      "downloadMedia": "Download this media",
-      "goToThisReel": "Go to this reel",
-      "goToThisProfile": "Go to this profile"
+      "downloadMedia": "このメディアをダウンロード",
+      "goToThisReel": "このリールへ",
+      "goToThisProfile": "このプロフィールへ"
+    },
+    "mute": {
+      "title": "通知をミュートする",
+      "body": "この投稿の通知を一時停止する時間を選択してください。",
+      "save": "保存",
+      "saving": "保存中...",
+      "options": {
+        "5m": "5分",
+        "10m": "10分",
+        "15m": "15分",
+        "30m": "30分",
+        "1h": "1時間",
+        "1d": "1日",
+        "until": "手動でオンにするまで",
+        "custom": "日時を選択"
+      }
     },
     "follow": {
       "following": "以下",
@@ -402,12 +474,13 @@
       "overlayAlt": "投稿メディア"
     },
     "actions": {
-      "liked": "「いいね！」",
-      "like": "「いいね」",
+      "liked": "いいね済み",
+      "like": "いいね",
       "comment": "コメント",
       "saved": "保存済み",
       "save": "保存",
-      "repost": "再投稿"
+      "repost": "再投稿",
+      "reposted": "再投稿済み"
     },
     "repostOverlay": {
       "visibility": {
@@ -482,6 +555,379 @@
     "imageViewer": {
       "close": "画像を閉じる",
       "alt": "画像"
+    }
+  },
+  "hashtag": {
+    "eyebrow": "ハッシュタグ",
+    "loading": "読み込み中...",
+    "countPosts": "{count} 件の投稿",
+    "countReels": "{count} 件のリール",
+    "tabs": {
+      "posts": "投稿",
+      "reels": "リール"
+    },
+    "empty": {
+      "posts": "このハッシュタグの投稿が見つかりませんでした。",
+      "reels": "このハッシュタグのリールが見つかりませんでした。"
+    }
+  },
+  "ads": {
+    "status": {
+      "active": "配信中",
+      "hidden": "非表示",
+      "paused": "一時停止",
+      "canceled": "キャンセル",
+      "completed": "完了"
+    },
+    "dashboard": {
+      "createNew": "新しい広告を作成",
+      "loadFailed": "広告ダッシュボードの読み込みに失敗しました。"
+    },
+    "empty": {
+      "title": "広告がまだありません",
+      "goal": "目標：ブランド認知または顧客転換の向上",
+      "budget": "予算とスケジュールの計画",
+      "creative": "コンテンツ、素材、明確なCTA",
+      "cta": "最初の広告を作成"
+    },
+    "metrics": {
+      "totalBudget": "総予算",
+      "spentHint": "消費済み：{value}",
+      "impressions": "インプレッション",
+      "reachHint": "リーチ：{value}",
+      "averageCtr": "平均CTR",
+      "clicksHint": "クリック数：{value}",
+      "activeCampaigns": "配信中のキャンペーン",
+      "liveCampaigns": "現在稼働中のキャンペーン"
+    },
+    "chart": {
+      "title": "7日間のインプレッション推移",
+      "subtitle": "過去7日間の広告配信数とCTAクリック数を追跡します。"
+    },
+    "table": {
+      "title": "広告キャンペーン",
+      "subtitle": "直近5件の配信中キャンペーンを簡単に確認できます。",
+      "viewAll": "すべて見る",
+      "campaign": "キャンペーン",
+      "status": "ステータス",
+      "start": "開始日",
+      "end": "終了日",
+      "spent": "消費額",
+      "impressions": "インプレッション",
+      "ctr": "CTR",
+      "clicks": "クリック",
+      "action": "操作",
+      "details": "詳細",
+      "noActive": "現在配信中のキャンペーンはありません。",
+      "noMatch": "フィルター条件に一致するキャンペーンはありません。"
+    },
+    "campaigns": {
+      "title": "すべての広告キャンペーン",
+      "subtitle": "キャンペーンの全履歴とパフォーマンスを確認できます。",
+      "backToDashboard": "ダッシュボードに戻る",
+      "loading": "キャンペーンを読み込み中...",
+      "loadFailed": "キャンペーンの読み込みに失敗しました。",
+      "searchPlaceholder": "キャンペーン名を検索...",
+      "statusLabel": "ステータス：",
+      "statusAriaLabel": "ステータスフィルター",
+      "sortLabel": "並び替え：",
+      "sortAriaLabel": "キャンペーンの並び替え",
+      "fromDate": "開始日：",
+      "toDate": "終了日：",
+      "resultCount": "{count} 件",
+      "resultCountPlural": "{count} 件",
+      "clear": "フィルターをクリア",
+      "adminReason": "管理者の理由：{reason}",
+      "statusOptions": {
+        "all": "すべてのステータス",
+        "active": "配信中",
+        "hidden": "非表示",
+        "canceled": "キャンセル",
+        "completed": "完了"
+      },
+      "sortOptions": {
+        "newest": "最新",
+        "oldest": "最古",
+        "spent": "消費額が多い順",
+        "ctr": "CTRが高い順"
+      }
+    },
+    "detail": {
+      "backToCampaigns": "キャンペーン一覧に戻る",
+      "loading": "キャンペーン詳細を読み込み中...",
+      "loadFailed": "キャンペーン詳細の読み込みに失敗しました。",
+      "sections": {
+        "performance": "パフォーマンス詳細",
+        "configuration": "キャンペーン設定",
+        "creativeAudience": "広告クリエイティブ・ターゲット",
+        "actions": "キャンペーン操作"
+      },
+      "metrics": {
+        "spent": "消費額",
+        "impressions": "インプレッション",
+        "clicks": "クリック数",
+        "ctr": "CTR",
+        "reach": "リーチ",
+        "views": "再生回数",
+        "engagements": "エンゲージメント",
+        "engagementRate": "エンゲージメント率",
+        "avgDwell": "平均滞在時間"
+      },
+      "config": {
+        "objective": "目的",
+        "adFormat": "広告フォーマット",
+        "boostPackage": "ブーストパッケージ",
+        "durationDays": "配信日数",
+        "daysValue": "{count} 日",
+        "deliveryStateReason": "配信状態の理由",
+        "adminCancelReason": "管理者キャンセル理由",
+        "elapsedTotal": "経過 / 合計",
+        "elapsedTotalValue": "{elapsed} / {total} 日",
+        "reactionsSplit": "リアクション内訳",
+        "reactionsSplitValue": "{likes} いいね · {comments} コメント · {reposts} リポスト",
+        "notAvailable": "N/A"
+      },
+      "hiddenReason": {
+        "visible": "表示中",
+        "hiddenManually": "手動で非表示",
+        "canceledManually": "手動でキャンセル",
+        "expired": "期限切れ"
+      },
+      "creative": {
+        "edit": "編集",
+        "primaryText": "メインテキスト",
+        "headline": "見出し",
+        "description": "説明",
+        "ctaButton": "CTAボタン",
+        "destinationUrl": "リンク先URL",
+        "locationTargeting": "地域ターゲット",
+        "ageTargeting": "年齢ターゲット",
+        "interests": "興味・関心",
+        "mediaTitle": "クリエイティブ素材",
+        "noMedia": "このキャンペーンに利用可能な素材はありません。"
+      },
+      "editModal": {
+        "title": "キャンペーン詳細を編集",
+        "campaignName": "キャンペーン名",
+        "objective": "目的",
+        "selectObjective": "目的を選択",
+        "adFormat": "広告フォーマット",
+        "primaryText": "メインテキスト",
+        "headline": "見出し",
+        "cta": "CTA",
+        "selectCta": "CTAを選択",
+        "description": "説明",
+        "destinationUrl": "リンク先URL",
+        "location": "地域",
+        "selectLocation": "地域を選択",
+        "locationLocked": "広告作成後は地域を編集できません。",
+        "ageRange": "年齢範囲",
+        "ageTo": "〜",
+        "ageLocked": "広告作成後は年齢範囲を編集できません。",
+        "interests": "興味・関心",
+        "interestPlaceholder": "興味を入力して追加をクリック",
+        "add": "追加",
+        "creativeMedia": "クリエイティブ素材",
+        "mediaLocked": "ユニーク視聴回数が {limit} を超えたため、素材はロックされています。",
+        "chooseFiles": "ファイルを選択",
+        "remove": "削除",
+        "uploading": "アップロード中...",
+        "cancel": "キャンセル",
+        "saveChanges": "変更を保存",
+        "savedSuccess": "キャンペーン詳細を更新しました。",
+        "saveFailed": "キャンペーン詳細の保存に失敗しました。",
+        "loginToUpload": "素材をアップロードするには再ログインしてください。",
+        "selectVideoFile": "動画ファイルを選択してください。",
+        "selectImageFiles": "画像ファイルを選択してください。",
+        "mediaLimitReached": "現在の広告フォーマットの素材上限に達しました。",
+        "uploadFailed": "素材のアップロードに失敗しました。"
+      },
+      "upgrade": {
+        "title": "ブーストのアップグレードと期間延長",
+        "hint": "広告作成と同様にパッケージを選択してください。ブーストはアップグレードのみ可能です。",
+        "boostStrength": "1. ブーストの強度",
+        "extendDays": "2. キャンペーン日数の延長",
+        "notForDowngrade": "ダウングレードには利用できません",
+        "currentBoost": "現在のブーストパッケージ",
+        "boostUpgradeDiff": "アップグレード差額",
+        "extendDaysPackage": "日数延長パッケージ",
+        "needToPayNow": "今すぐ支払う金額",
+        "newTotalBudget": "新しい総予算",
+        "payWithStripe": "Stripeで支払う",
+        "creatingCheckout": "チェックアウトセッションを作成中...",
+        "checkoutFailed": "チェックアウトセッションの開始に失敗しました。",
+        "checkoutSessionFailed": "Stripeチェックアウトセッションを作成できませんでした。"
+      },
+      "lifecycle": {
+        "title": "ライフサイクル管理",
+        "hint": "一時的にキャンペーンを非表示にするか、配信を再開する際に再開してください。",
+        "hide": "キャンペーンを非表示",
+        "reopen": "キャンペーンを再開",
+        "requiresExtend": "このキャンペーンは期限切れです。再開前に延長パッケージを購入してください。",
+        "requiresExtendHint": "延長パッケージを選択して支払いを完了してから、キャンペーンを再開してください。",
+        "pauseSuccess": "キャンペーンが正常に非表示になりました。",
+        "resumeSuccess": "キャンペーンが正常に再開しました。",
+        "updateFailed": "キャンペーンの更新に失敗しました。"
+      },
+      "hideConfirm": {
+        "title": "このキャンペーンを非表示にしますか？",
+        "body": "この広告投稿のすべてのリポストが削除されます。削除前に、リポストのいいね数と再生回数は元の広告投稿に統合されます。",
+        "cancel": "キャンセル",
+        "confirm": "非表示を確認"
+      }
+    },
+    "create": {
+      "title": "広告キャンペーンを作成",
+      "subtitle": "シンプルな手順で広告を作成します：目的、クリエイティブ、ターゲット、パッケージ。",
+      "backToDashboard": "ダッシュボードに戻る",
+      "cancel": "キャンセル",
+      "publish": "広告を公開",
+      "objective": {
+        "title": "キャンペーン目的を選択",
+        "required": "必須",
+        "options": {
+          "awareness": { "label": "ブランド認知", "desc": "ブランドを記憶してもらえる新規ユーザーにリーチします。" },
+          "traffic": { "label": "トラフィック", "desc": "ウェブサイトや製品ページにユーザーを誘導します。" },
+          "engagement": { "label": "エンゲージメント", "desc": "いいね、コメント、シェアを増やします。" },
+          "leads": { "label": "リード獲得", "desc": "潜在顧客の連絡先情報を収集します。" },
+          "sales": { "label": "販売", "desc": "購入とコンバージョンを促進します。" },
+          "messages": { "label": "メッセージ", "desc": "提案に興味のあるユーザーとの会話を始めます。" }
+        }
+      },
+      "creative": {
+        "title": "広告クリエイティブ",
+        "mainContent": "メインコンテンツ",
+        "campaignName": "キャンペーン名",
+        "campaignNamePlaceholder": "例：新学期プロモーション",
+        "primaryText": "メインテキスト",
+        "addEmoji": "絵文字を追加",
+        "emojiIcon": "絵文字アイコン",
+        "headline": "見出し",
+        "ctaButton": "CTAボタン",
+        "selectCta": "CTAを選択",
+        "description": "説明",
+        "destinationUrl": "リンク先URL",
+        "destinationUrlPlaceholder": "https://",
+        "uploadMedia": "素材をアップロード",
+        "uploadHintSuffix": "ファイルはサーバーにアップロードされ、プレビューに反映されます。",
+        "chooseFiles": "ファイルを選択",
+        "uploading": "アップロード中...",
+        "remove": "削除",
+        "video": "動画",
+        "image": "画像",
+        "videoPreview": "動画プレビュー",
+        "creativePreview": "クリエイティブプレビュー",
+        "formatOptions": {
+          "single": "シングル画像",
+          "carousel": "カルーセル",
+          "video": "動画"
+        },
+        "mediaConfig": {
+          "video": "動画を1本アップロード",
+          "carousel": "最大5枚の画像をアップロード",
+          "single": "画像を1枚アップロード"
+        }
+      },
+      "validation": {
+        "primaryTextRequired": "メインテキストは必須です。",
+        "headlineRequired": "見出しは必須です。",
+        "destinationUrlRequired": "リンク先URLは必須です。",
+        "destinationUrlInvalidProtocol": "リンク先URLはhttp://またはhttps://で始まる必要があります。",
+        "destinationUrlInvalid": "リンク先URLが無効です。",
+        "mediaRequired": "公開前に素材をアップロードしてください。",
+        "fillRequired": "支払い前にすべての必須項目を入力してください。",
+        "loginToUpload": "素材をアップロードするには再ログインしてください。",
+        "selectVideoFile": "動画ファイルを選択してください。",
+        "selectImageFiles": "画像ファイルを選択してください。",
+        "carouselLimit": "カルーセルは最大5枚まで。1枚削除してから追加してください。",
+        "singleFileOnly": "このフォーマットはファイル1つのみ対応しています。",
+        "uploadFailed": "アップロードに失敗しました。再試行してください。",
+        "prepareCreativeFailed": "チェックアウト用の広告クリエイティブを準備できませんでした。"
+      },
+      "audience": {
+        "title": "ターゲット設定",
+        "targeting": "ターゲット",
+        "location": "地域",
+        "selectLocation": "地域を選択",
+        "loadingCountries": "国リストを読み込み中...",
+        "ageRange": "年齢範囲",
+        "ageTo": "〜",
+        "interests": "興味・関心",
+        "interestPlaceholder": "興味を入力して追加を押す",
+        "add": "追加",
+        "placement": "掲載場所",
+        "placementText": "この広告はホームフィードのみに配信されます。"
+      },
+      "package": {
+        "title": "プロモーションパッケージ",
+        "boostStrength": "1. ブーストの強度",
+        "durationPackage": "2. 期間パッケージ",
+        "boostHint": "ホームフィードでの広告ブーストの強度を設定します。",
+        "days": "{count} 日",
+        "boostPackageLabel": "ブーストパッケージ",
+        "durationPackageLabel": "期間パッケージ",
+        "totalCost": "合計費用",
+        "selected": "{boost} を {days} 日間選択しました。",
+        "boosts": {
+          "light": { "title": "ライトブースト", "level": "競争が少ない", "highlight": "初めての広告に最適" },
+          "standard": { "title": "スタンダードブースト", "level": "中程度の競争", "highlight": "最も選ばれている" },
+          "strong": { "title": "ストロングブースト", "level": "高競争", "highlight": "高い露出" }
+        },
+        "durations": {
+          "none": "延長なし",
+          "d3": "短期集中",
+          "d7": "1週間配信",
+          "d14": "継続配信",
+          "d30": "1ヶ月フルカバー"
+        }
+      },
+      "payment": {
+        "title": "支払いを確認",
+        "subtitle": "Stripeチェックアウトに移動して支払いを完了します。",
+        "objective": "目的",
+        "adFormat": "広告フォーマット",
+        "boostPackage": "ブーストパッケージ",
+        "durationPackage": "期間パッケージ",
+        "total": "合計",
+        "termsText": "私は",
+        "termsLink": "利用規約",
+        "termsAnd": "とCordigramの広告ルールに同意します。",
+        "back": "戻る",
+        "payWithStripe": "Stripeで支払う",
+        "creatingCheckout": "チェックアウトセッションを作成中...",
+        "acceptTermsFirst": "支払いを続ける前に利用規約に同意してください。",
+        "loginBeforePayment": "支払い前に再ログインしてください。",
+        "checkoutFailed": "チェックアウトセッションの開始に失敗しました。",
+        "checkoutSessionFailed": "Stripeチェックアウトセッションを作成できませんでした。"
+      },
+      "preview": {
+        "title": "ライブプレビュー",
+        "sponsored": "スポンサー",
+        "primaryTextPlaceholder": "メインテキストがここに表示されます。",
+        "headlinePlaceholder": "見出し",
+        "descriptionPlaceholder": "説明"
+      }
+    },
+    "payment": {
+      "success": {
+        "badge": "支払い成功",
+        "title": "支払い完了",
+        "subtitle": "広告キャンペーンのStripeチェックアウトが正常に完了しました。",
+        "loading": "支払い詳細を読み込み中...",
+        "missingSession": "支払いセッション情報が不足しています。",
+        "loadFailed": "支払いステータスの読み込みに失敗しました。",
+        "paymentId": "支払いID",
+        "paymentStatus": "支払いステータス",
+        "amount": "金額",
+        "backToCreate": "作成に戻る",
+        "goToDashboard": "広告ダッシュボードへ"
+      },
+      "cancel": {
+        "title": "支払いがキャンセルされました",
+        "subtitle": "Stripeチェックアウトをキャンセルしました。広告キャンペーンへの請求はまだ行われていません。",
+        "backToDashboard": "広告ダッシュボードに戻る",
+        "tryAgain": "再度支払いを試みる"
+      }
     }
   },
   "adminLogin": {

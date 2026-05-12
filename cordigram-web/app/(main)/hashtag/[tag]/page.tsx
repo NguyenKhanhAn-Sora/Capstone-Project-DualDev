@@ -49,6 +49,7 @@ import {
 import { formatRelativeTime } from "@/lib/relative-time";
 import { useLanguage } from "@/component/language-provider";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
+import { useTranslations } from "next-intl";
 
 const REPORT_ANIMATION_MS = 200;
 const QUOTE_CHAR_LIMIT = 500;
@@ -233,95 +234,6 @@ type ReportCategory = {
   reasons: Array<{ key: string; label: string }>;
 };
 
-const REPORT_GROUPS: ReportCategory[] = [
-  {
-    key: "abuse",
-    label: "Harassment / Hate speech",
-    accent: "#f59e0b",
-    reasons: [
-      { key: "harassment", label: "Targets an individual to harass" },
-      { key: "hate_speech", label: "Hate speech or discrimination" },
-      { key: "offensive_discrimination", label: "Attacks vulnerable groups" },
-    ],
-  },
-  {
-    key: "violence",
-    label: "Violence / Threats",
-    accent: "#ef4444",
-    reasons: [
-      { key: "violence_threats", label: "Threatens or promotes violence" },
-      { key: "graphic_violence", label: "Graphic violent imagery" },
-      { key: "extremism", label: "Extremism or terrorism" },
-      { key: "self_harm", label: "Self-harm or suicide" },
-    ],
-  },
-  {
-    key: "sensitive",
-    label: "Sensitive content",
-    accent: "#a855f7",
-    reasons: [
-      { key: "nudity", label: "Nudity or adult content" },
-      { key: "minor_nudity", label: "Minor safety risk" },
-      { key: "sexual_solicitation", label: "Sexual solicitation" },
-    ],
-  },
-  {
-    key: "misinfo",
-    label: "Impersonation / Misinformation",
-    accent: "#22c55e",
-    reasons: [
-      { key: "fake_news", label: "False or misleading information" },
-      { key: "impersonation", label: "Impersonation of a person or org" },
-    ],
-  },
-  {
-    key: "spam",
-    label: "Spam / Scam",
-    accent: "#14b8a6",
-    reasons: [
-      { key: "spam", label: "Spam or irrelevant content" },
-      { key: "financial_scam", label: "Financial scam" },
-      { key: "unsolicited_ads", label: "Unwanted advertising" },
-    ],
-  },
-  {
-    key: "ip",
-    label: "Intellectual property",
-    accent: "#3b82f6",
-    reasons: [
-      { key: "copyright", label: "Copyright infringement" },
-      { key: "trademark", label: "Trademark violation" },
-      { key: "brand_impersonation", label: "Brand impersonation" },
-    ],
-  },
-  {
-    key: "illegal",
-    label: "Illegal activity",
-    accent: "#f97316",
-    reasons: [
-      { key: "contraband", label: "Contraband" },
-      { key: "illegal_transaction", label: "Illegal transaction" },
-    ],
-  },
-  {
-    key: "privacy",
-    label: "Privacy violation",
-    accent: "#06b6d4",
-    reasons: [
-      { key: "doxxing", label: "Doxxing private information" },
-      {
-        key: "nonconsensual_intimate",
-        label: "Non-consensual intimate content",
-      },
-    ],
-  },
-  {
-    key: "other",
-    label: "Other",
-    accent: "#94a3b8",
-    reasons: [{ key: "other", label: "Other reason" }],
-  },
-];
 
 const getUserIdFromToken = (token: string | null): string | undefined => {
   if (!token) return undefined;
@@ -373,6 +285,8 @@ const buildLocalDateTimeIso = (date: string, time: string) => {
 
 export default function HashtagPage() {
   const canRender = useRequireAuth({ guestAllowed: true });
+  const t = useTranslations("home");
+  const tHashtag = useTranslations("hashtag");
   const params = useParams<{ tag?: string }>();
   const router = useRouter();
   const tag = useMemo(() => {
@@ -461,9 +375,99 @@ export default function HashtagPage() {
     window.setTimeout(() => setToastMessage(null), 2200);
   };
 
+  const reportGroups = useMemo<ReportCategory[]>(
+    () => [
+      {
+        key: "abuse",
+        label: t("report.groups.abuse.label"),
+        accent: "#f59e0b",
+        reasons: [
+          { key: "harassment", label: t("report.groups.abuse.reasons.harassment") },
+          { key: "hate_speech", label: t("report.groups.abuse.reasons.hateSpeech") },
+          { key: "offensive_discrimination", label: t("report.groups.abuse.reasons.offensiveDiscrimination") },
+        ],
+      },
+      {
+        key: "violence",
+        label: t("report.groups.violence.label"),
+        accent: "#ef4444",
+        reasons: [
+          { key: "violence_threats", label: t("report.groups.violence.reasons.violenceThreats") },
+          { key: "graphic_violence", label: t("report.groups.violence.reasons.graphicViolence") },
+          { key: "extremism", label: t("report.groups.violence.reasons.extremism") },
+          { key: "self_harm", label: t("report.groups.violence.reasons.selfHarm") },
+        ],
+      },
+      {
+        key: "sensitive",
+        label: t("report.groups.sensitive.label"),
+        accent: "#a855f7",
+        reasons: [
+          { key: "nudity", label: t("report.groups.sensitive.reasons.nudity") },
+          { key: "minor_nudity", label: t("report.groups.sensitive.reasons.minorNudity") },
+          { key: "sexual_solicitation", label: t("report.groups.sensitive.reasons.sexualSolicitation") },
+        ],
+      },
+      {
+        key: "misinfo",
+        label: t("report.groups.misinfo.label"),
+        accent: "#22c55e",
+        reasons: [
+          { key: "fake_news", label: t("report.groups.misinfo.reasons.fakeNews") },
+          { key: "impersonation", label: t("report.groups.misinfo.reasons.impersonation") },
+        ],
+      },
+      {
+        key: "spam",
+        label: t("report.groups.spam.label"),
+        accent: "#14b8a6",
+        reasons: [
+          { key: "spam", label: t("report.groups.spam.reasons.spam") },
+          { key: "financial_scam", label: t("report.groups.spam.reasons.financialScam") },
+          { key: "unsolicited_ads", label: t("report.groups.spam.reasons.unsolicitedAds") },
+        ],
+      },
+      {
+        key: "ip",
+        label: t("report.groups.ip.label"),
+        accent: "#3b82f6",
+        reasons: [
+          { key: "copyright", label: t("report.groups.ip.reasons.copyright") },
+          { key: "trademark", label: t("report.groups.ip.reasons.trademark") },
+          { key: "brand_impersonation", label: t("report.groups.ip.reasons.brandImpersonation") },
+        ],
+      },
+      {
+        key: "illegal",
+        label: t("report.groups.illegal.label"),
+        accent: "#f97316",
+        reasons: [
+          { key: "contraband", label: t("report.groups.illegal.reasons.contraband") },
+          { key: "illegal_transaction", label: t("report.groups.illegal.reasons.illegalTransaction") },
+        ],
+      },
+      {
+        key: "privacy",
+        label: t("report.groups.privacy.label"),
+        accent: "#06b6d4",
+        reasons: [
+          { key: "doxxing", label: t("report.groups.privacy.reasons.doxxing") },
+          { key: "nonconsensual_intimate", label: t("report.groups.privacy.reasons.nonconsensualIntimate") },
+        ],
+      },
+      {
+        key: "other",
+        label: t("report.groups.other.label"),
+        accent: "#94a3b8",
+        reasons: [{ key: "other", label: t("report.groups.other.reasons.other") }],
+      },
+    ],
+    [t],
+  );
+
   const selectedReportGroup = useMemo(
-    () => REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory],
+    () => reportGroups.find((g) => g.key === reportCategory),
+    [reportCategory, reportGroups],
   );
 
   const incrementRepostStat = (postId: string) => {
@@ -501,7 +505,7 @@ export default function HashtagPage() {
           await repostPost({ token, postId: targetId });
         } catch {}
       }
-      showToast("Reposted");
+      showToast(t("toast.reposted"));
     } catch (err) {
       const mutedMessage = getInteractionMutedMessage(err);
       if (mutedMessage) {
@@ -549,7 +553,7 @@ export default function HashtagPage() {
         } catch {}
       }
 
-      showToast("Reposted with quote");
+      showToast(t("toast.repostedWithQuote"));
     } catch (err) {
       const mutedMessage = getInteractionMutedMessage(err);
       if (mutedMessage) {
@@ -610,7 +614,7 @@ export default function HashtagPage() {
         reason: reportReason,
         note: reportNote.trim() || undefined,
       });
-      showToast("Report submitted");
+      showToast(t("toast.reportSubmitted"));
       closeReportModal();
     } catch (err) {
       const message =
@@ -639,7 +643,7 @@ export default function HashtagPage() {
         prev.filter((item) => item.id !== deleteTarget.postId),
       );
       setDeleteTarget(null);
-      showToast("Post deleted");
+      showToast(t("toast.deletedPost"));
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
@@ -667,7 +671,7 @@ export default function HashtagPage() {
       );
       setBlockTarget(undefined);
     } catch (err) {
-      showToast("Block failed");
+      showToast(t("toast.blockFailed"));
     } finally {
       setBlocking(false);
     }
@@ -701,13 +705,13 @@ export default function HashtagPage() {
     updatePost(postId, (item) => ({ ...item, allowComments }));
     try {
       await setPostAllowComments({ token, postId, allowComments });
-      showToast(allowComments ? "Comments turned on" : "Comments turned off");
+      showToast(allowComments ? t("toast.commentsOn") : t("toast.commentsOff"));
     } catch {
       updatePost(postId, (item) => ({
         ...item,
         allowComments: !allowComments,
       }));
-      showToast("Failed to update comments");
+      showToast(t("toast.commentsUpdateFailed"));
     }
   };
 
@@ -720,13 +724,13 @@ export default function HashtagPage() {
     updatePost(postId, (item) => ({ ...item, hideLikeCount }));
     try {
       await setPostHideLikeCount({ token, postId, hideLikeCount });
-      showToast(hideLikeCount ? "Like count hidden" : "Like count visible");
+      showToast(hideLikeCount ? t("toast.likeCountHidden") : t("toast.likeCountVisible"));
     } catch {
       updatePost(postId, (item) => ({
         ...item,
         hideLikeCount: !hideLikeCount,
       }));
-      showToast("Failed to update like count visibility");
+      showToast(t("toast.likeCountUpdateFailed"));
     }
   };
 
@@ -798,7 +802,7 @@ export default function HashtagPage() {
           hearts: Math.max(0, (item.stats?.hearts ?? 0) + (liked ? -1 : 1)),
         },
       }));
-      setError("Action failed");
+      setError(t("toast.actionFailed"));
     }
   };
 
@@ -828,7 +832,7 @@ export default function HashtagPage() {
           saves: Math.max(0, (item.stats?.saves ?? 0) + (saved ? -1 : 1)),
         },
       }));
-      setError("Action failed");
+      setError(t("toast.actionFailed"));
     }
   };
 
@@ -838,9 +842,9 @@ export default function HashtagPage() {
     setPosts((prev) => prev.filter((item) => item.id !== postId));
     try {
       await hidePost({ token, postId });
-      showToast("Post hidden");
+      showToast(t("toast.postHidden"));
     } catch {
-      showToast("Failed to hide post");
+      showToast(t("toast.postHideFailed"));
     }
   };
 
@@ -848,9 +852,9 @@ export default function HashtagPage() {
     const url = `${window.location.origin}/post/${postId}`;
     try {
       await navigator.clipboard.writeText(url);
-      showToast("Link copied");
+      showToast(t("toast.linkCopied"));
     } catch {
-      showToast("Copy failed");
+      showToast(t("toast.linkCopyFailed"));
     }
   };
 
@@ -903,11 +907,15 @@ export default function HashtagPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Hashtag</p>
+          <p className={styles.eyebrow}>{tHashtag("eyebrow")}</p>
           <h1 className={styles.title}>#{tag}</h1>
         </div>
         <div className={styles.meta}>
-          {loading ? "Loading..." : `${activeCount} ${tab}`}
+          {loading
+            ? tHashtag("loading")
+            : tab === "posts"
+              ? tHashtag("countPosts", { count: activeCount })
+              : tHashtag("countReels", { count: activeCount })}
         </div>
       </div>
 
@@ -920,7 +928,7 @@ export default function HashtagPage() {
             }`}
             onClick={() => setTab("posts")}
           >
-            Posts
+            {tHashtag("tabs.posts")}
           </button>
           <button
             type="button"
@@ -929,7 +937,7 @@ export default function HashtagPage() {
             }`}
             onClick={() => setTab("reels")}
           >
-            Reels
+            {tHashtag("tabs.reels")}
           </button>
         </div>
       </div>
@@ -944,7 +952,7 @@ export default function HashtagPage() {
       ) : tab === "posts" ? (
         posts.length === 0 ? (
           <div className={styles.emptyState}>
-            No posts found for this hashtag.
+            {tHashtag("empty.posts")}
           </div>
         ) : (
           <div className={styles.feedList}>
@@ -978,7 +986,7 @@ export default function HashtagPage() {
         )
       ) : reels.length === 0 ? (
         <div className={styles.emptyState}>
-          No reels found for this hashtag.
+          {tHashtag("empty.reels")}
         </div>
       ) : (
         <div className={styles.reelGrid}>
@@ -1078,9 +1086,9 @@ export default function HashtagPage() {
           aria-modal="true"
         >
           <div className={feedStyles.modalCard}>
-            <h3 className={feedStyles.modalTitle}>Delete this post?</h3>
+            <h3 className={feedStyles.modalTitle}>{t("delete.title")}</h3>
             <p className={feedStyles.modalBody}>
-              {`You are about to delete ${deleteTarget.label}'s post. This can't be undone.`}
+              {t("delete.body", { name: deleteTarget.label })}
             </p>
             {deleteError ? (
               <div className={feedStyles.inlineError}>{deleteError}</div>
@@ -1091,14 +1099,14 @@ export default function HashtagPage() {
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleteSubmitting}
               >
-                Cancel
+                {t("delete.cancel")}
               </button>
               <button
                 className={feedStyles.modalDanger}
                 onClick={confirmDelete}
                 disabled={deleteSubmitting}
               >
-                {deleteSubmitting ? "Deleting..." : "Delete"}
+                {deleteSubmitting ? t("delete.deleting") : t("delete.confirm")}
               </button>
             </div>
           </div>
@@ -1112,9 +1120,9 @@ export default function HashtagPage() {
           aria-modal="true"
         >
           <div className={feedStyles.modalCard}>
-            <h3 className={feedStyles.modalTitle}>Block this account?</h3>
+            <h3 className={feedStyles.modalTitle}>{t("block.title")}</h3>
             <p className={feedStyles.modalBody}>
-              {`You are about to block ${blockTarget.label}. They will no longer be able to interact with you.`}
+              {t("block.body", { name: blockTarget.label })}
             </p>
             <div className={feedStyles.modalActions}>
               <button
@@ -1122,14 +1130,14 @@ export default function HashtagPage() {
                 onClick={() => setBlockTarget(undefined)}
                 disabled={blocking}
               >
-                Cancel
+                {t("block.cancel")}
               </button>
               <button
                 className={feedStyles.modalDanger}
                 onClick={confirmBlock}
                 disabled={blocking}
               >
-                {blocking ? "Blocking..." : "Block"}
+                {blocking ? t("block.blocking") : t("block.confirm")}
               </button>
             </div>
           </div>
@@ -1155,14 +1163,14 @@ export default function HashtagPage() {
           >
             <div className={feedStyles.modalHeader}>
               <div>
-                <h3 className={feedStyles.modalTitle}>Report this post</h3>
+                <h3 className={feedStyles.modalTitle}>{t("report.title")}</h3>
                 <p className={feedStyles.modalBody}>
-                  {`Reporting @${reportTarget.label} post. Please pick the most accurate reason.`}
+                  {t("report.description", { name: reportTarget.label })}
                 </p>
               </div>
               <button
                 className={feedStyles.closeBtn}
-                aria-label="Close"
+                aria-label={t("report.title")}
                 onClick={closeReportModal}
               >
                 <IconClose size={24} />
@@ -1171,7 +1179,7 @@ export default function HashtagPage() {
 
             <div className={feedStyles.reportGrid}>
               <div className={feedStyles.categoryGrid}>
-                {REPORT_GROUPS.map((group) => {
+                {reportGroups.map((group) => {
                   const isActive = reportCategory === group.key;
                   return (
                     <button
@@ -1208,7 +1216,7 @@ export default function HashtagPage() {
 
               <div className={feedStyles.reasonPanel}>
                 <div className={feedStyles.reasonHeader}>
-                  Select a specific reason
+                  {t("report.selectReason")}
                 </div>
                 {selectedReportGroup ? (
                   <div className={feedStyles.reasonList}>
@@ -1237,15 +1245,15 @@ export default function HashtagPage() {
                   </div>
                 ) : (
                   <div className={feedStyles.reasonPlaceholder}>
-                    Pick a category first.
+                    {t("report.pickCategory")}
                   </div>
                 )}
 
                 <label className={feedStyles.noteLabel}>
-                  Additional notes (optional)
+                  {t("report.notes.label")}
                   <textarea
                     className={feedStyles.noteInput}
-                    placeholder="Add brief context if needed..."
+                    placeholder={t("report.notes.placeholder")}
                     value={reportNote}
                     onChange={(e) => setReportNote(e.target.value)}
                     maxLength={500}
@@ -1263,14 +1271,14 @@ export default function HashtagPage() {
                 onClick={closeReportModal}
                 disabled={reportSubmitting}
               >
-                Cancel
+                {t("report.cancel")}
               </button>
               <button
                 className={feedStyles.modalPrimary}
                 disabled={!reportReason || reportSubmitting}
                 onClick={submitReport}
               >
-                {reportSubmitting ? "Submitting..." : "Submit report"}
+                {reportSubmitting ? t("report.submitting") : t("report.submit")}
               </button>
             </div>
           </div>
@@ -1286,14 +1294,14 @@ export default function HashtagPage() {
           <div className={feedStyles.modalCard}>
             <div className={feedStyles.modalHeader}>
               <div>
-                <h3 className={feedStyles.modalTitle}>Post visibility</h3>
+                <h3 className={feedStyles.modalTitle}>{t("visibility.title")}</h3>
                 <p className={feedStyles.modalBody}>
-                  Choose who can see this post.
+                  {t("visibility.description")}
                 </p>
               </div>
               <button
                 className={feedStyles.closeBtn}
-                aria-label="Close"
+                aria-label={t("visibility.cancel")}
                 onClick={() => setVisibilityModalOpen(false)}
               >
                 <IconClose size={20} />
@@ -1303,18 +1311,18 @@ export default function HashtagPage() {
               {[
                 {
                   value: "public" as const,
-                  title: "Public",
-                  description: "Anyone can view this post",
+                  title: t("visibility.options.public.title"),
+                  description: t("visibility.options.public.description"),
                 },
                 {
                   value: "followers" as const,
-                  title: "Followers",
-                  description: "Only followers can view this post",
+                  title: t("visibility.options.followers.title"),
+                  description: t("visibility.options.followers.description"),
                 },
                 {
                   value: "private" as const,
-                  title: "Private",
-                  description: "Only you can view this post",
+                  title: t("visibility.options.private.title"),
+                  description: t("visibility.options.private.description"),
                 },
               ].map((opt) => {
                 const active = visibilitySelected === opt.value;
@@ -1349,13 +1357,13 @@ export default function HashtagPage() {
                 className={feedStyles.modalSecondary}
                 onClick={() => setVisibilityModalOpen(false)}
               >
-                Cancel
+                {t("visibility.cancel")}
               </button>
               <button
                 className={feedStyles.modalPrimary}
                 onClick={submitVisibility}
               >
-                Save
+                {t("visibility.update")}
               </button>
             </div>
           </div>
@@ -1420,6 +1428,7 @@ function HashtagPostCard({
   ) => void;
 }) {
   const router = useRouter();
+  const t = useTranslations("home");
   const { language } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -1519,13 +1528,13 @@ function HashtagPostCard({
   );
   const isFollowing = Boolean(item.following);
   const authorLabel =
-    item.authorDisplayName || item.author?.displayName || "this user";
+    item.authorDisplayName || item.author?.displayName || t("block.thisUser");
   const commentsToggleLabel = item.allowComments
-    ? "Turn off comments"
-    : "Turn on comments";
+    ? t("menu.turnOffComments")
+    : t("menu.turnOnComments");
   const hideLikeToggleLabel = item.hideLikeCount
-    ? "Show like counts"
-    : "Hide like counts";
+    ? t("menu.showLike")
+    : t("menu.hideLike");
   const [muteModalOpen, setMuteModalOpen] = useState(false);
   const [muteOption, setMuteOption] = useState("5m");
   const [muteCustomDate, setMuteCustomDate] = useState("");
@@ -1535,16 +1544,16 @@ function HashtagPostCard({
 
   const muteOptions = useMemo(
     () => [
-      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
-      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
-      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
-      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
-      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
-      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
-      { key: "until", label: "Until I turn it back on", ms: null },
-      { key: "custom", label: "Choose date & time", ms: null },
+      { key: "5m", label: t("mute.options.5m"), ms: 5 * 60 * 1000 },
+      { key: "10m", label: t("mute.options.10m"), ms: 10 * 60 * 1000 },
+      { key: "15m", label: t("mute.options.15m"), ms: 15 * 60 * 1000 },
+      { key: "30m", label: t("mute.options.30m"), ms: 30 * 60 * 1000 },
+      { key: "1h", label: t("mute.options.1h"), ms: 60 * 60 * 1000 },
+      { key: "1d", label: t("mute.options.1d"), ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: t("mute.options.until"), ms: null },
+      { key: "custom", label: t("mute.options.custom"), ms: null },
     ],
-    [],
+    [t],
   );
 
   const isMutedForPost = useMemo(() => {
@@ -1751,7 +1760,7 @@ function HashtagPostCard({
                         onEdit(item);
                       }}
                     >
-                      Edit post
+                      {t("menu.editPost")}
                     </button>
                     <button
                       className={feedStyles.menuItem}
@@ -1760,7 +1769,7 @@ function HashtagPostCard({
                         onOpenVisibility(item.id, item.visibility || "public");
                       }}
                     >
-                      Edit visibility
+                      {t("menu.editVisibility")}
                     </button>
                     <button
                       className={feedStyles.menuItem}
@@ -1774,8 +1783,8 @@ function HashtagPostCard({
                       }}
                     >
                       {isMutedForPost
-                        ? "Turn on notification"
-                        : "Mute notifications"}
+                        ? t("menu.turnOnNotifications")
+                        : t("menu.muteNotifications")}
                     </button>
                     <button
                       className={feedStyles.menuItem}
@@ -1800,7 +1809,7 @@ function HashtagPostCard({
                         className={feedStyles.menuItem}
                         onClick={() => router.push(`/post/${item.id}`)}
                       >
-                        Go to post
+                        {t("menu.goToPost")}
                       </button>
                     ) : null}
                     <button
@@ -1810,7 +1819,7 @@ function HashtagPostCard({
                         onCopyLink(item.id);
                       }}
                     >
-                      Copy link
+                      {t("menu.copyLink")}
                     </button>
                     <button
                       className={`${feedStyles.menuItem} ${
@@ -1821,7 +1830,7 @@ function HashtagPostCard({
                         onDeleteIntent(item.id, authorLabel);
                       }}
                     >
-                      Delete post
+                      {t("menu.deletePost")}
                     </button>
                   </div>
                 ) : (
@@ -1831,7 +1840,7 @@ function HashtagPostCard({
                         className={feedStyles.menuItem}
                         onClick={() => router.push(`/post/${item.id}`)}
                       >
-                        Go to post
+                        {t("menu.goToPost")}
                       </button>
                     ) : null}
                     <button
@@ -1841,7 +1850,7 @@ function HashtagPostCard({
                         onCopyLink(item.id);
                       }}
                     >
-                      Copy link
+                      {t("menu.copyLink")}
                     </button>
                     {authorOwnerId ? (
                       <button
@@ -1851,7 +1860,7 @@ function HashtagPostCard({
                           onFollow(authorOwnerId, !isFollowing);
                         }}
                       >
-                        {isFollowing ? "Unfollow" : "Follow"}
+                        {isFollowing ? t("menu.unfollow") : t("menu.follow")}
                       </button>
                     ) : null}
                     <button
@@ -1861,7 +1870,7 @@ function HashtagPostCard({
                         onSave(item.id, !saved);
                       }}
                     >
-                      {saved ? "Unsave this post" : "Save this post"}
+                      {saved ? t("menu.unsave") : t("menu.save")}
                     </button>
                     <button
                       className={feedStyles.menuItem}
@@ -1870,7 +1879,7 @@ function HashtagPostCard({
                         onHide(item.id);
                       }}
                     >
-                      Hide this post
+                      {t("menu.hidePost")}
                     </button>
                     <button
                       className={feedStyles.menuItem}
@@ -1879,7 +1888,7 @@ function HashtagPostCard({
                         onReportIntent(item.id, authorLabel);
                       }}
                     >
-                      Report
+                      {t("menu.report")}
                     </button>
                     <button
                       className={`${feedStyles.menuItem} ${
@@ -1890,7 +1899,7 @@ function HashtagPostCard({
                         onBlockUser(authorOwnerId, authorLabel);
                       }}
                     >
-                      Block this account
+                      {t("menu.blockAccount")}
                     </button>
                   </div>
                 )}
@@ -2048,11 +2057,11 @@ function HashtagPostCard({
           onClick={() => onLike(item.id, !liked)}
         >
           <IconLike size={20} filled={liked} />
-          <span>{liked ? "Liked" : "Like"}</span>
+          <span>{liked ? t("actions.liked") : t("actions.like")}</span>
         </button>
         <button className={feedStyles.actionBtn} onClick={quickOpenPost}>
           <IconComment size={20} />
-          <span>Comment</span>
+          <span>{t("actions.comment")}</span>
         </button>
         <button
           className={`${feedStyles.actionBtn} ${
@@ -2061,7 +2070,7 @@ function HashtagPostCard({
           onClick={() => onSave(item.id, !saved)}
         >
           <IconSave size={20} filled={saved} />
-          <span>{saved ? "Saved" : "Save"}</span>
+          <span>{saved ? t("actions.saved") : t("actions.save")}</span>
         </button>
         <button
           className={`${feedStyles.actionBtn} ${
@@ -2070,12 +2079,12 @@ function HashtagPostCard({
           onClick={() =>
             onShare(
               item.id,
-              item.authorUsername || item.author?.username || "this user",
+              item.authorUsername || item.author?.username || t("block.thisUser"),
             )
           }
         >
           <IconReup size={20} />
-          <span>{reposted ? "Reposted" : "Repost"}</span>
+          <span>{reposted ? t("actions.reposted") : t("actions.repost")}</span>
         </button>
       </div>
 
@@ -2092,14 +2101,14 @@ function HashtagPostCard({
           >
             <div className={feedStyles.modalHeader}>
               <div>
-                <h3 className={feedStyles.modalTitle}>Mute notifications</h3>
+                <h3 className={feedStyles.modalTitle}>{t("mute.title")}</h3>
                 <p className={feedStyles.modalBody}>
-                  Choose how long to pause alerts for this post.
+                  {t("mute.body")}
                 </p>
               </div>
               <button
                 className={feedStyles.closeBtn}
-                aria-label="Close"
+                aria-label={t("mute.title")}
                 onClick={closeMuteModal}
               >
                 <IconClose size={18} />
@@ -2160,7 +2169,7 @@ function HashtagPostCard({
                 onClick={handleSavePostMute}
                 disabled={muteSaving}
               >
-                {muteSaving ? "Saving..." : "Save"}
+                {muteSaving ? t("mute.saving") : t("mute.save")}
               </button>
             </div>
           </div>

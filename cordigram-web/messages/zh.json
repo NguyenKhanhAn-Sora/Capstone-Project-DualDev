@@ -167,6 +167,60 @@
     "commentsOffPlaceholder": "Comments are turned off",
     "addCommentPlaceholder": "Add a comment..."
   },
+  "search": {
+    "title": "搜索",
+    "tabs": {
+      "all": "全部",
+      "people": "用户",
+      "hashtags": "话题标签",
+      "reels": "视频",
+      "posts": "帖子"
+    },
+    "placeholder": {
+      "all": "搜索用户、#话题标签、帖子、视频",
+      "people": "搜索用户",
+      "hashtags": "搜索话题标签",
+      "posts": "搜索帖子",
+      "reels": "搜索视频"
+    },
+    "aria": {
+      "clear": "清除",
+      "close": "关闭",
+      "clearSearch": "清除搜索",
+      "remove": "删除"
+    },
+    "sections": {
+      "people": "用户",
+      "hashtags": "话题标签",
+      "posts": "帖子",
+      "reels": "视频"
+    },
+    "seeAll": "查看全部",
+    "usageCount": "{count} 篇帖子",
+    "loadMore": "加载更多",
+    "recent": {
+      "title": "最近",
+      "clearAll": "全部清除",
+      "empty": "暂无最近搜索。",
+      "loading": "加载中…",
+      "loadFailed": "加载历史记录失败"
+    },
+    "status": {
+      "typeToSearch": "请输入以搜索。",
+      "searching": "搜索中…",
+      "loadingMore": "加载更多…",
+      "loading": "加载中…",
+      "noResults": "无结果。",
+      "noPeople": "未找到用户。",
+      "noReels": "未找到视频。",
+      "noHashtags": "未找到话题标签。",
+      "noPosts": "未找到帖子。",
+      "searchFailed": "搜索失败"
+    },
+    "postBy": "由 {author} 发布",
+    "noCaption": "（无说明）",
+    "unknown": "未知"
+  },
   "home": {
     "feed": {
       "signInToView": "登录以查看动态",
@@ -193,7 +247,9 @@
       "reportSubmitted": "报告已提交",
       "reportSubmitFailed": "无法提交报告",
       "actionFailed": "操作失败",
-      "blockFailed": "区块生成失败"
+      "blockFailed": "屏蔽失败",
+      "postHidden": "帖子已隐藏",
+      "postHideFailed": "隐藏帖子失败"
     },
     "delete": {
       "title": "删除这篇帖子？",
@@ -362,10 +418,11 @@
       "editPost": "编辑帖子",
       "editVisibility": "编辑可见性",
       "muteNotifications": "静音通知",
+      "turnOnNotifications": "开启通知",
       "turnOffComments": "关闭评论",
       "turnOnComments": "开启评论",
-      "showLike": "点赞",
-      "hideLike": "隐藏 喜欢",
+      "showLike": "显示点赞数",
+      "hideLike": "隐藏点赞数",
       "goToPost": "前往帖子",
       "copyLink": "复制链接",
       "deletePost": "删除帖子",
@@ -376,10 +433,25 @@
       "hidePost": "隐藏此帖子",
       "report": "报告",
       "blockAccount": "屏蔽该账号",
-      "turnOnNotification": "Turn on notification",
-      "downloadMedia": "Download this media",
-      "goToThisReel": "Go to this reel",
-      "goToThisProfile": "Go to this profile"
+      "downloadMedia": "下载此媒体",
+      "goToThisReel": "前往此短视频",
+      "goToThisProfile": "前往此主页"
+    },
+    "mute": {
+      "title": "静音通知",
+      "body": "选择暂停此帖子通知的时长。",
+      "save": "保存",
+      "saving": "保存中...",
+      "options": {
+        "5m": "5分钟",
+        "10m": "10分钟",
+        "15m": "15分钟",
+        "30m": "30分钟",
+        "1h": "1小时",
+        "1d": "1天",
+        "until": "直到我手动开启",
+        "custom": "选择日期和时间"
+      }
     },
     "follow": {
       "following": "接下来",
@@ -402,12 +474,13 @@
       "overlayAlt": "发布媒体"
     },
     "actions": {
-      "liked": "点赞",
+      "liked": "已点赞",
       "like": "点赞",
       "comment": "评论",
       "saved": "已保存",
       "save": "保存",
-      "repost": "转发"
+      "repost": "转发",
+      "reposted": "已转发"
     },
     "repostOverlay": {
       "visibility": {
@@ -482,6 +555,379 @@
     "imageViewer": {
       "close": "关闭图片",
       "alt": "图片"
+    }
+  },
+  "hashtag": {
+    "eyebrow": "话题标签",
+    "loading": "加载中...",
+    "countPosts": "{count} 篇帖子",
+    "countReels": "{count} 个短视频",
+    "tabs": {
+      "posts": "帖子",
+      "reels": "短视频"
+    },
+    "empty": {
+      "posts": "该话题下没有找到帖子。",
+      "reels": "该话题下没有找到短视频。"
+    }
+  },
+  "ads": {
+    "status": {
+      "active": "投放中",
+      "hidden": "已隐藏",
+      "paused": "已暂停",
+      "canceled": "已取消",
+      "completed": "已完成"
+    },
+    "dashboard": {
+      "createNew": "创建新广告",
+      "loadFailed": "广告仪表盘加载失败。"
+    },
+    "empty": {
+      "title": "暂无广告",
+      "goal": "目标：提升品牌认知或转化率",
+      "budget": "预算与排期规划",
+      "creative": "内容、素材和明确的行动号召",
+      "cta": "创建首个广告"
+    },
+    "metrics": {
+      "totalBudget": "总预算",
+      "spentHint": "已花费：{value}",
+      "impressions": "展示次数",
+      "reachHint": "触达：{value}",
+      "averageCtr": "平均点击率",
+      "clicksHint": "点击次数：{value}",
+      "activeCampaigns": "投放中的广告系列",
+      "liveCampaigns": "当前正在运行的广告系列"
+    },
+    "chart": {
+      "title": "7日展示趋势",
+      "subtitle": "追踪过去7天的广告投放量和CTA点击数。"
+    },
+    "table": {
+      "title": "广告系列",
+      "subtitle": "快速查看您最近5个投放中的广告系列。",
+      "viewAll": "查看全部",
+      "campaign": "广告系列",
+      "status": "状态",
+      "start": "开始时间",
+      "end": "结束时间",
+      "spent": "已花费",
+      "impressions": "展示",
+      "ctr": "点击率",
+      "clicks": "点击",
+      "action": "操作",
+      "details": "详情",
+      "noActive": "当前没有投放中的广告系列。",
+      "noMatch": "没有符合筛选条件的广告系列。"
+    },
+    "campaigns": {
+      "title": "全部广告系列",
+      "subtitle": "查看您所有广告系列的完整历史与数据。",
+      "backToDashboard": "返回仪表盘",
+      "loading": "正在加载广告系列...",
+      "loadFailed": "加载广告系列失败。",
+      "searchPlaceholder": "搜索广告系列名称...",
+      "statusLabel": "状态：",
+      "statusAriaLabel": "状态筛选",
+      "sortLabel": "排序：",
+      "sortAriaLabel": "广告系列排序",
+      "fromDate": "开始日期：",
+      "toDate": "结束日期：",
+      "resultCount": "{count} 个结果",
+      "resultCountPlural": "{count} 个结果",
+      "clear": "清除筛选",
+      "adminReason": "管理员原因：{reason}",
+      "statusOptions": {
+        "all": "所有状态",
+        "active": "投放中",
+        "hidden": "已隐藏",
+        "canceled": "已取消",
+        "completed": "已完成"
+      },
+      "sortOptions": {
+        "newest": "最新",
+        "oldest": "最旧",
+        "spent": "花费最多",
+        "ctr": "点击率最高"
+      }
+    },
+    "detail": {
+      "backToCampaigns": "返回广告系列",
+      "loading": "正在加载广告系列详情...",
+      "loadFailed": "加载广告系列详情失败。",
+      "sections": {
+        "performance": "效果数据",
+        "configuration": "广告系列配置",
+        "creativeAudience": "广告创意与受众",
+        "actions": "广告系列操作"
+      },
+      "metrics": {
+        "spent": "已花费",
+        "impressions": "展示次数",
+        "clicks": "点击次数",
+        "ctr": "点击率",
+        "reach": "触达人数",
+        "views": "播放次数",
+        "engagements": "互动次数",
+        "engagementRate": "互动率",
+        "avgDwell": "平均停留时间"
+      },
+      "config": {
+        "objective": "目标",
+        "adFormat": "广告格式",
+        "boostPackage": "推广套餐",
+        "durationDays": "投放天数",
+        "daysValue": "{count} 天",
+        "deliveryStateReason": "投放状态原因",
+        "adminCancelReason": "管理员取消原因",
+        "elapsedTotal": "已过 / 总计",
+        "elapsedTotalValue": "{elapsed} / {total} 天",
+        "reactionsSplit": "互动分布",
+        "reactionsSplitValue": "{likes} 点赞 · {comments} 评论 · {reposts} 转发",
+        "notAvailable": "N/A"
+      },
+      "hiddenReason": {
+        "visible": "可见",
+        "hiddenManually": "手动隐藏",
+        "canceledManually": "手动取消",
+        "expired": "已过期"
+      },
+      "creative": {
+        "edit": "编辑",
+        "primaryText": "主要文案",
+        "headline": "标题",
+        "description": "描述",
+        "ctaButton": "CTA按钮",
+        "destinationUrl": "目标链接",
+        "locationTargeting": "地区定向",
+        "ageTargeting": "年龄定向",
+        "interests": "兴趣标签",
+        "mediaTitle": "创意素材",
+        "noMedia": "该广告系列暂无素材。"
+      },
+      "editModal": {
+        "title": "编辑广告系列详情",
+        "campaignName": "广告系列名称",
+        "objective": "目标",
+        "selectObjective": "选择目标",
+        "adFormat": "广告格式",
+        "primaryText": "主要文案",
+        "headline": "标题",
+        "cta": "CTA",
+        "selectCta": "选择CTA",
+        "description": "描述",
+        "destinationUrl": "目标链接",
+        "location": "地区",
+        "selectLocation": "选择地区",
+        "locationLocked": "广告创建后无法修改地区。",
+        "ageRange": "年龄范围",
+        "ageTo": "至",
+        "ageLocked": "广告创建后无法修改年龄范围。",
+        "interests": "兴趣标签",
+        "interestPlaceholder": "输入兴趣并点击添加",
+        "add": "添加",
+        "creativeMedia": "创意素材",
+        "mediaLocked": "独立观看次数超过 {limit} 后，素材将被锁定。",
+        "chooseFiles": "选择文件",
+        "remove": "移除",
+        "uploading": "上传中...",
+        "cancel": "取消",
+        "saveChanges": "保存更改",
+        "savedSuccess": "广告系列详情已成功更新。",
+        "saveFailed": "保存广告系列详情失败。",
+        "loginToUpload": "请重新登录以上传素材。",
+        "selectVideoFile": "请选择视频文件。",
+        "selectImageFiles": "请选择图片文件。",
+        "mediaLimitReached": "已达到当前广告格式的素材上限。",
+        "uploadFailed": "素材上传失败。"
+      },
+      "upgrade": {
+        "title": "升级推广套餐并延长投放",
+        "hint": "像创建广告一样选择套餐。推广套餐只能升级，不能降级。",
+        "boostStrength": "1. 推广强度",
+        "extendDays": "2. 延长投放天数",
+        "notForDowngrade": "不可用于降级",
+        "currentBoost": "当前推广套餐",
+        "boostUpgradeDiff": "套餐升级差价",
+        "extendDaysPackage": "延长天数套餐",
+        "needToPayNow": "需立即支付",
+        "newTotalBudget": "新总预算",
+        "payWithStripe": "通过Stripe支付",
+        "creatingCheckout": "正在创建结账会话...",
+        "checkoutFailed": "启动结账会话失败。",
+        "checkoutSessionFailed": "无法创建Stripe结账会话。"
+      },
+      "lifecycle": {
+        "title": "生命周期管理",
+        "hint": "暂时隐藏广告系列，或在需要恢复投放时重新开启。",
+        "hide": "隐藏广告系列",
+        "reopen": "重新开启广告系列",
+        "requiresExtend": "此广告系列已过期，请先购买延长套餐再重新开启。",
+        "requiresExtendHint": "请先选择延长套餐并完成付款，然后重新开启广告系列。",
+        "pauseSuccess": "广告系列已成功隐藏。",
+        "resumeSuccess": "广告系列已成功重新开启。",
+        "updateFailed": "更新广告系列失败。"
+      },
+      "hideConfirm": {
+        "title": "隐藏此广告系列？",
+        "body": "此广告帖子的所有转发将被删除。删除前，转发的点赞和播放数将合并到原始广告帖子中。",
+        "cancel": "取消",
+        "confirm": "确认隐藏"
+      }
+    },
+    "create": {
+      "title": "创建广告系列",
+      "subtitle": "按简单流程创建广告：目标、创意、受众和套餐定价。",
+      "backToDashboard": "返回仪表盘",
+      "cancel": "取消",
+      "publish": "发布广告",
+      "objective": {
+        "title": "选择广告系列目标",
+        "required": "必填",
+        "options": {
+          "awareness": { "label": "品牌认知", "desc": "触达可能记住您品牌的新用户。" },
+          "traffic": { "label": "网站流量", "desc": "将用户引导至您的网站或产品页面。" },
+          "engagement": { "label": "互动", "desc": "获得更多点赞、评论和转发。" },
+          "leads": { "label": "获取线索", "desc": "收集潜在客户的联系信息。" },
+          "sales": { "label": "销售", "desc": "推动购买和转化行为。" },
+          "messages": { "label": "私信", "desc": "与对您产品感兴趣的用户开启对话。" }
+        }
+      },
+      "creative": {
+        "title": "广告创意",
+        "mainContent": "主要内容",
+        "campaignName": "广告系列名称",
+        "campaignNamePlaceholder": "例如：开学季促销",
+        "primaryText": "主要文案",
+        "addEmoji": "添加表情",
+        "emojiIcon": "表情图标",
+        "headline": "标题",
+        "ctaButton": "行动号召按钮",
+        "selectCta": "选择CTA",
+        "description": "描述",
+        "destinationUrl": "目标链接",
+        "destinationUrlPlaceholder": "https://",
+        "uploadMedia": "上传素材",
+        "uploadHintSuffix": "文件将上传至服务器并在预览中显示。",
+        "chooseFiles": "选择文件",
+        "uploading": "上传中...",
+        "remove": "移除",
+        "video": "视频",
+        "image": "图片",
+        "videoPreview": "视频预览",
+        "creativePreview": "创意预览",
+        "formatOptions": {
+          "single": "单张图片",
+          "carousel": "轮播",
+          "video": "视频"
+        },
+        "mediaConfig": {
+          "video": "上传一个视频",
+          "carousel": "最多上传5张图片",
+          "single": "上传一张图片"
+        }
+      },
+      "validation": {
+        "primaryTextRequired": "主要文案为必填项。",
+        "headlineRequired": "标题为必填项。",
+        "destinationUrlRequired": "目标链接为必填项。",
+        "destinationUrlInvalidProtocol": "目标链接必须以 http:// 或 https:// 开头。",
+        "destinationUrlInvalid": "目标链接无效。",
+        "mediaRequired": "发布前请先上传素材。",
+        "fillRequired": "付款前请填写所有必填字段。",
+        "loginToUpload": "请重新登录以上传素材。",
+        "selectVideoFile": "请选择视频文件。",
+        "selectImageFiles": "请选择图片文件。",
+        "carouselLimit": "轮播最多支持5张图片，请先移除一张再上传。",
+        "singleFileOnly": "此格式仅支持一个文件。",
+        "uploadFailed": "上传失败，请重试。",
+        "prepareCreativeFailed": "无法准备广告创意以进行结账。"
+      },
+      "audience": {
+        "title": "受众定向",
+        "targeting": "定向",
+        "location": "地区",
+        "selectLocation": "选择地区",
+        "loadingCountries": "正在加载国家列表...",
+        "ageRange": "年龄范围",
+        "ageTo": "至",
+        "interests": "兴趣标签",
+        "interestPlaceholder": "输入兴趣并按添加",
+        "add": "添加",
+        "placement": "投放位置",
+        "placementText": "此广告仅在首页信息流中投放。"
+      },
+      "package": {
+        "title": "推广套餐",
+        "boostStrength": "1. 推广强度",
+        "durationPackage": "2. 时长套餐",
+        "boostHint": "控制您的广告在首页信息流中的推广强度。",
+        "days": "{count} 天",
+        "boostPackageLabel": "推广套餐",
+        "durationPackageLabel": "时长套餐",
+        "totalCost": "总费用",
+        "selected": "您选择了 {boost}，投放 {days} 天。",
+        "boosts": {
+          "light": { "title": "轻度推广", "level": "低竞争", "highlight": "首次投放首选" },
+          "standard": { "title": "标准推广", "level": "中等竞争", "highlight": "最受欢迎" },
+          "strong": { "title": "强力推广", "level": "高竞争", "highlight": "高曝光" }
+        },
+        "durations": {
+          "none": "不延长",
+          "d3": "短期爆发",
+          "d7": "一周投放",
+          "d14": "持续投放",
+          "d30": "整月覆盖"
+        }
+      },
+      "payment": {
+        "title": "确认付款",
+        "subtitle": "您将被重定向至Stripe Checkout以完成付款。",
+        "objective": "目标",
+        "adFormat": "广告格式",
+        "boostPackage": "推广套餐",
+        "durationPackage": "时长套餐",
+        "total": "合计",
+        "termsText": "我同意",
+        "termsLink": "条款",
+        "termsAnd": "和Cordigram的广告规则。",
+        "back": "返回",
+        "payWithStripe": "通过Stripe支付",
+        "creatingCheckout": "正在创建结账会话...",
+        "acceptTermsFirst": "请在继续付款前接受条款。",
+        "loginBeforePayment": "付款前请重新登录。",
+        "checkoutFailed": "启动结账会话失败。",
+        "checkoutSessionFailed": "无法创建Stripe结账会话。"
+      },
+      "preview": {
+        "title": "实时预览",
+        "sponsored": "赞助内容",
+        "primaryTextPlaceholder": "您的主要文案将显示在此处。",
+        "headlinePlaceholder": "标题",
+        "descriptionPlaceholder": "描述"
+      }
+    },
+    "payment": {
+      "success": {
+        "badge": "支付成功",
+        "title": "支付完成",
+        "subtitle": "Stripe Checkout已成功处理您的广告系列付款。",
+        "loading": "正在加载支付详情...",
+        "missingSession": "缺少支付会话信息。",
+        "loadFailed": "加载支付状态失败。",
+        "paymentId": "支付ID",
+        "paymentStatus": "支付状态",
+        "amount": "金额",
+        "backToCreate": "返回创建广告",
+        "goToDashboard": "前往广告仪表盘"
+      },
+      "cancel": {
+        "title": "支付已取消",
+        "subtitle": "您已取消Stripe结账，广告系列尚未被扣费。",
+        "backToDashboard": "返回广告仪表盘",
+        "tryAgain": "重新支付"
+      }
     }
   },
   "adminLogin": {

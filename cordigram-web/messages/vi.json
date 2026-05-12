@@ -88,6 +88,60 @@
     "loadError": "Không thể tải gợi ý",
     "updateError": "Không thể cập nhật theo dõi"
   },
+  "search": {
+    "title": "Tìm kiếm",
+    "tabs": {
+      "all": "Tất cả",
+      "people": "User",
+      "hashtags": "Hashtag",
+      "reels": "Reels",
+      "posts": "Bài viết"
+    },
+    "placeholder": {
+      "all": "Tìm người dùng, #hashtag, bài viết, reels",
+      "people": "Tìm người dùng",
+      "hashtags": "Tìm hashtag",
+      "posts": "Tìm bài viết",
+      "reels": "Tìm reels"
+    },
+    "aria": {
+      "clear": "Xóa",
+      "close": "Đóng",
+      "clearSearch": "Xóa tìm kiếm",
+      "remove": "Xóa"
+    },
+    "sections": {
+      "people": "Người dùng",
+      "hashtags": "Hashtag",
+      "posts": "Bài viết",
+      "reels": "Reels"
+    },
+    "seeAll": "Xem tất cả",
+    "usageCount": "{count} bài viết",
+    "loadMore": "Tải thêm",
+    "recent": {
+      "title": "Gần đây",
+      "clearAll": "Xóa tất cả",
+      "empty": "Chưa có tìm kiếm gần đây.",
+      "loading": "Đang tải…",
+      "loadFailed": "Không thể tải lịch sử"
+    },
+    "status": {
+      "typeToSearch": "Nhập để tìm kiếm.",
+      "searching": "Đang tìm kiếm…",
+      "loadingMore": "Đang tải thêm…",
+      "loading": "Đang tải…",
+      "noResults": "Không có kết quả.",
+      "noPeople": "Không tìm thấy người dùng.",
+      "noReels": "Không tìm thấy reels.",
+      "noHashtags": "Không tìm thấy hashtag.",
+      "noPosts": "Không tìm thấy bài viết.",
+      "searchFailed": "Tìm kiếm thất bại"
+    },
+    "postBy": "Bài viết của {author}",
+    "noCaption": "(không có chú thích)",
+    "unknown": "ẩn danh"
+  },
   "home": {
     "feed": {
       "signInToView": "Đăng nhập để xem bảng tin",
@@ -114,7 +168,9 @@
       "reportSubmitted": "Đã gửi báo cáo",
       "reportSubmitFailed": "Không thể gửi báo cáo",
       "actionFailed": "Thao tác thất bại",
-      "blockFailed": "Chặn thất bại"
+      "blockFailed": "Chặn thất bại",
+      "postHidden": "Đã ẩn bài viết",
+      "postHideFailed": "Không thể ẩn bài viết"
     },
     "delete": {
       "title": "Xóa bài viết này?",
@@ -283,10 +339,11 @@
       "editPost": "Chỉnh sửa bài viết",
       "editVisibility": "Chỉnh sửa quyền xem",
       "muteNotifications": "Tắt thông báo",
+      "turnOnNotifications": "Bật thông báo",
       "turnOffComments": "Tắt bình luận",
       "turnOnComments": "Bật bình luận",
-      "showLike": "Hiện lượt thích",
-      "hideLike": "Ẩn lượt thích",
+      "showLike": "Hiện số lượt thích",
+      "hideLike": "Ẩn số lượt thích",
       "goToPost": "Đi tới bài viết",
       "copyLink": "Sao chép liên kết",
       "deletePost": "Xóa bài viết",
@@ -297,6 +354,22 @@
       "hidePost": "Ẩn bài viết này",
       "report": "Báo cáo",
       "blockAccount": "Chặn tài khoản này"
+    },
+    "mute": {
+      "title": "Tắt thông báo",
+      "body": "Chọn thời gian tạm dừng thông báo cho bài viết này.",
+      "save": "Lưu",
+      "saving": "Đang lưu...",
+      "options": {
+        "5m": "5 phút",
+        "10m": "10 phút",
+        "15m": "15 phút",
+        "30m": "30 phút",
+        "1h": "1 giờ",
+        "1d": "1 ngày",
+        "until": "Cho đến khi tôi bật lại",
+        "custom": "Chọn ngày & giờ"
+      }
     },
     "follow": {
       "following": "Đang theo dõi",
@@ -324,7 +397,8 @@
       "comment": "Bình luận",
       "saved": "Đã lưu",
       "save": "Lưu",
-      "repost": "Đăng lại"
+      "repost": "Đăng lại",
+      "reposted": "Đã đăng lại"
     },
     "repostOverlay": {
       "visibility": {
@@ -399,6 +473,379 @@
     "imageViewer": {
       "close": "Đóng ảnh",
       "alt": "Hình ảnh"
+    }
+  },
+  "hashtag": {
+    "eyebrow": "Hashtag",
+    "loading": "Đang tải...",
+    "countPosts": "{count} bài viết",
+    "countReels": "{count} reels",
+    "tabs": {
+      "posts": "Bài viết",
+      "reels": "Reels"
+    },
+    "empty": {
+      "posts": "Không tìm thấy bài viết nào với hashtag này.",
+      "reels": "Không tìm thấy reel nào với hashtag này."
+    }
+  },
+  "ads": {
+    "status": {
+      "active": "Đang chạy",
+      "hidden": "Đã ẩn",
+      "paused": "Tạm dừng",
+      "canceled": "Đã hủy",
+      "completed": "Hoàn thành"
+    },
+    "dashboard": {
+      "createNew": "Tạo quảng cáo mới",
+      "loadFailed": "Tải trang tổng quan quảng cáo thất bại."
+    },
+    "empty": {
+      "title": "Chưa có quảng cáo",
+      "goal": "Mục tiêu: tăng nhận diện thương hiệu hoặc chuyển đổi",
+      "budget": "Lập kế hoạch ngân sách và lịch chạy",
+      "creative": "Nội dung, phương tiện và lời kêu gọi hành động rõ ràng",
+      "cta": "Tạo quảng cáo đầu tiên"
+    },
+    "metrics": {
+      "totalBudget": "Tổng ngân sách",
+      "spentHint": "Đã chi: {value}",
+      "impressions": "Lượt hiển thị",
+      "reachHint": "Tiếp cận: {value}",
+      "averageCtr": "CTR trung bình",
+      "clicksHint": "Lượt nhấp: {value}",
+      "activeCampaigns": "Chiến dịch đang chạy",
+      "liveCampaigns": "Chiến dịch hiện đang hoạt động"
+    },
+    "chart": {
+      "title": "Xu hướng hiển thị 7 ngày",
+      "subtitle": "Theo dõi lượt hiển thị và nhấp CTA trong 7 ngày qua."
+    },
+    "table": {
+      "title": "Chiến dịch quảng cáo",
+      "subtitle": "Xem nhanh 5 chiến dịch đang chạy gần nhất.",
+      "viewAll": "Xem tất cả",
+      "campaign": "Chiến dịch",
+      "status": "Trạng thái",
+      "start": "Bắt đầu",
+      "end": "Kết thúc",
+      "spent": "Đã chi",
+      "impressions": "Hiển thị",
+      "ctr": "CTR",
+      "clicks": "Nhấp",
+      "action": "Thao tác",
+      "details": "Chi tiết",
+      "noActive": "Không có chiến dịch đang chạy.",
+      "noMatch": "Không có chiến dịch phù hợp với bộ lọc."
+    },
+    "campaigns": {
+      "title": "Tất cả chiến dịch quảng cáo",
+      "subtitle": "Lịch sử đầy đủ các chiến dịch và hiệu suất của bạn.",
+      "backToDashboard": "Về trang tổng quan",
+      "loading": "Đang tải chiến dịch...",
+      "loadFailed": "Tải chiến dịch thất bại.",
+      "searchPlaceholder": "Tìm tên chiến dịch...",
+      "statusLabel": "Trạng thái:",
+      "statusAriaLabel": "Lọc trạng thái",
+      "sortLabel": "Sắp xếp:",
+      "sortAriaLabel": "Sắp xếp chiến dịch",
+      "fromDate": "Từ ngày:",
+      "toDate": "Đến ngày:",
+      "resultCount": "{count} kết quả",
+      "resultCountPlural": "{count} kết quả",
+      "clear": "Xóa bộ lọc",
+      "adminReason": "Lý do quản trị: {reason}",
+      "statusOptions": {
+        "all": "Tất cả trạng thái",
+        "active": "Đang chạy",
+        "hidden": "Đã ẩn",
+        "canceled": "Đã hủy",
+        "completed": "Hoàn thành"
+      },
+      "sortOptions": {
+        "newest": "Mới nhất",
+        "oldest": "Cũ nhất",
+        "spent": "Chi nhiều nhất",
+        "ctr": "CTR cao nhất"
+      }
+    },
+    "detail": {
+      "backToCampaigns": "Về danh sách chiến dịch",
+      "loading": "Đang tải chi tiết chiến dịch...",
+      "loadFailed": "Tải chi tiết chiến dịch thất bại.",
+      "sections": {
+        "performance": "Phân tích hiệu suất",
+        "configuration": "Cấu hình chiến dịch",
+        "creativeAudience": "Nội dung quảng cáo & Đối tượng",
+        "actions": "Hành động chiến dịch"
+      },
+      "metrics": {
+        "spent": "Đã chi",
+        "impressions": "Lượt hiển thị",
+        "clicks": "Lượt nhấp",
+        "ctr": "CTR",
+        "reach": "Tiếp cận",
+        "views": "Lượt xem",
+        "engagements": "Tương tác",
+        "engagementRate": "Tỷ lệ tương tác",
+        "avgDwell": "Thời gian xem TB"
+      },
+      "config": {
+        "objective": "Mục tiêu",
+        "adFormat": "Định dạng quảng cáo",
+        "boostPackage": "Gói tăng cường",
+        "durationDays": "Số ngày chạy",
+        "daysValue": "{count} ngày",
+        "deliveryStateReason": "Lý do trạng thái phân phối",
+        "adminCancelReason": "Lý do hủy từ quản trị viên",
+        "elapsedTotal": "Đã qua / Tổng",
+        "elapsedTotalValue": "{elapsed} / {total} ngày",
+        "reactionsSplit": "Phân bổ phản ứng",
+        "reactionsSplitValue": "{likes} thích · {comments} bình luận · {reposts} chia sẻ",
+        "notAvailable": "N/A"
+      },
+      "hiddenReason": {
+        "visible": "Hiển thị",
+        "hiddenManually": "Đã ẩn thủ công",
+        "canceledManually": "Đã hủy thủ công",
+        "expired": "Đã hết hạn"
+      },
+      "creative": {
+        "edit": "Chỉnh sửa",
+        "primaryText": "Văn bản chính",
+        "headline": "Tiêu đề",
+        "description": "Mô tả",
+        "ctaButton": "Nút CTA",
+        "destinationUrl": "URL đích",
+        "locationTargeting": "Nhắm mục tiêu địa điểm",
+        "ageTargeting": "Nhắm mục tiêu độ tuổi",
+        "interests": "Sở thích",
+        "mediaTitle": "Phương tiện sáng tạo",
+        "noMedia": "Không có phương tiện nào cho chiến dịch này."
+      },
+      "editModal": {
+        "title": "Chỉnh sửa chi tiết chiến dịch",
+        "campaignName": "Tên chiến dịch",
+        "objective": "Mục tiêu",
+        "selectObjective": "Chọn mục tiêu",
+        "adFormat": "Định dạng quảng cáo",
+        "primaryText": "Văn bản chính",
+        "headline": "Tiêu đề",
+        "cta": "CTA",
+        "selectCta": "Chọn CTA",
+        "description": "Mô tả",
+        "destinationUrl": "URL đích",
+        "location": "Địa điểm",
+        "selectLocation": "Chọn địa điểm",
+        "locationLocked": "Không thể chỉnh sửa địa điểm sau khi tạo quảng cáo.",
+        "ageRange": "Độ tuổi",
+        "ageTo": "đến",
+        "ageLocked": "Không thể chỉnh sửa độ tuổi sau khi tạo quảng cáo.",
+        "interests": "Sở thích",
+        "interestPlaceholder": "Nhập sở thích và nhấn Thêm",
+        "add": "Thêm",
+        "creativeMedia": "Phương tiện sáng tạo",
+        "mediaLocked": "Phương tiện bị khóa vì lượt xem duy nhất vượt quá {limit}.",
+        "chooseFiles": "Chọn tệp",
+        "remove": "Xóa",
+        "uploading": "Đang tải lên...",
+        "cancel": "Hủy",
+        "saveChanges": "Lưu thay đổi",
+        "savedSuccess": "Đã cập nhật chi tiết chiến dịch thành công.",
+        "saveFailed": "Lưu chi tiết chiến dịch thất bại.",
+        "loginToUpload": "Vui lòng đăng nhập lại để tải phương tiện lên.",
+        "selectVideoFile": "Vui lòng chọn tệp video.",
+        "selectImageFiles": "Vui lòng chọn tệp ảnh.",
+        "mediaLimitReached": "Đã đạt giới hạn phương tiện cho định dạng quảng cáo hiện tại.",
+        "uploadFailed": "Tải phương tiện lên thất bại."
+      },
+      "upgrade": {
+        "title": "Nâng cấp gói tăng cường và gia hạn",
+        "hint": "Chọn gói như trang Tạo quảng cáo. Chỉ có thể nâng cấp, không thể hạ cấp.",
+        "boostStrength": "1. Mức độ tăng cường",
+        "extendDays": "2. Gia hạn số ngày chiến dịch",
+        "notForDowngrade": "Không khả dụng để hạ cấp",
+        "currentBoost": "Gói tăng cường hiện tại",
+        "boostUpgradeDiff": "Chênh lệch nâng cấp",
+        "extendDaysPackage": "Gói gia hạn ngày",
+        "needToPayNow": "Cần thanh toán ngay",
+        "newTotalBudget": "Tổng ngân sách mới",
+        "payWithStripe": "Thanh toán qua Stripe",
+        "creatingCheckout": "Đang tạo phiên thanh toán...",
+        "checkoutFailed": "Không thể khởi động phiên thanh toán.",
+        "checkoutSessionFailed": "Không thể tạo phiên Stripe Checkout."
+      },
+      "lifecycle": {
+        "title": "Quản lý vòng đời",
+        "hint": "Ẩn chiến dịch tạm thời hoặc mở lại khi cần tiếp tục phân phối.",
+        "hide": "Ẩn chiến dịch",
+        "reopen": "Mở lại chiến dịch",
+        "requiresExtend": "Chiến dịch đã hết hạn. Vui lòng mua gói gia hạn trước khi mở lại.",
+        "requiresExtendHint": "Chọn gói gia hạn, hoàn tất thanh toán, sau đó mở lại chiến dịch.",
+        "pauseSuccess": "Chiến dịch đã được ẩn thành công.",
+        "resumeSuccess": "Chiến dịch đã được mở lại thành công.",
+        "updateFailed": "Cập nhật chiến dịch thất bại."
+      },
+      "hideConfirm": {
+        "title": "Ẩn chiến dịch này?",
+        "body": "Tất cả bài đăng lại của quảng cáo này sẽ bị xóa. Trước khi xóa, tất cả lượt thích và xem từ bài đăng lại sẽ được gộp vào bài quảng cáo gốc.",
+        "cancel": "Hủy",
+        "confirm": "Xác nhận ẩn"
+      }
+    },
+    "create": {
+      "title": "Tạo chiến dịch quảng cáo",
+      "subtitle": "Xây dựng quảng cáo theo luồng đơn giản: mục tiêu, nội dung, đối tượng và gói giá.",
+      "backToDashboard": "Về trang tổng quan",
+      "cancel": "Hủy",
+      "publish": "Đăng quảng cáo",
+      "objective": {
+        "title": "Chọn mục tiêu chiến dịch",
+        "required": "Bắt buộc",
+        "options": {
+          "awareness": { "label": "Nhận diện thương hiệu", "desc": "Tiếp cận những người có thể nhớ thương hiệu của bạn." },
+          "traffic": { "label": "Lưu lượng truy cập", "desc": "Dẫn người dùng đến website hoặc trang sản phẩm." },
+          "engagement": { "label": "Tương tác", "desc": "Nhận nhiều phản ứng, bình luận và chia sẻ hơn." },
+          "leads": { "label": "Tạo khách hàng tiềm năng", "desc": "Thu thập thông tin liên hệ từ khách hàng tiềm năng." },
+          "sales": { "label": "Doanh số", "desc": "Thúc đẩy mua hàng và hành động chuyển đổi." },
+          "messages": { "label": "Tin nhắn", "desc": "Bắt đầu cuộc trò chuyện với người quan tâm đến sản phẩm." }
+        }
+      },
+      "creative": {
+        "title": "Nội dung quảng cáo",
+        "mainContent": "Nội dung chính",
+        "campaignName": "Tên chiến dịch",
+        "campaignNamePlaceholder": "vd. Khuyến mãi tựu trường",
+        "primaryText": "Văn bản chính",
+        "addEmoji": "Thêm emoji",
+        "emojiIcon": "Biểu tượng emoji",
+        "headline": "Tiêu đề",
+        "ctaButton": "Nút kêu gọi hành động",
+        "selectCta": "Chọn CTA",
+        "description": "Mô tả",
+        "destinationUrl": "URL đích",
+        "destinationUrlPlaceholder": "https://",
+        "uploadMedia": "Tải lên phương tiện",
+        "uploadHintSuffix": "Tệp được tải lên máy chủ và hiển thị trong bản xem trước.",
+        "chooseFiles": "Chọn tệp",
+        "uploading": "Đang tải lên...",
+        "remove": "Xóa",
+        "video": "Video",
+        "image": "Ảnh",
+        "videoPreview": "Xem trước video",
+        "creativePreview": "Xem trước nội dung",
+        "formatOptions": {
+          "single": "Một ảnh",
+          "carousel": "Carousel",
+          "video": "Video"
+        },
+        "mediaConfig": {
+          "video": "Tải lên một video",
+          "carousel": "Tải lên tối đa 5 ảnh",
+          "single": "Tải lên một ảnh"
+        }
+      },
+      "validation": {
+        "primaryTextRequired": "Văn bản chính là bắt buộc.",
+        "headlineRequired": "Tiêu đề là bắt buộc.",
+        "destinationUrlRequired": "URL đích là bắt buộc.",
+        "destinationUrlInvalidProtocol": "URL đích phải bắt đầu bằng http:// hoặc https://.",
+        "destinationUrlInvalid": "URL đích không hợp lệ.",
+        "mediaRequired": "Vui lòng tải lên phương tiện trước khi đăng.",
+        "fillRequired": "Vui lòng điền đầy đủ các trường bắt buộc trước khi thanh toán.",
+        "loginToUpload": "Vui lòng đăng nhập lại để tải phương tiện lên.",
+        "selectVideoFile": "Vui lòng chọn tệp video.",
+        "selectImageFiles": "Vui lòng chọn tệp ảnh.",
+        "carouselLimit": "Carousel hỗ trợ tối đa 5 ảnh. Xóa một ảnh để tải thêm.",
+        "singleFileOnly": "Định dạng này chỉ hỗ trợ một tệp.",
+        "uploadFailed": "Tải lên thất bại. Vui lòng thử lại.",
+        "prepareCreativeFailed": "Không thể chuẩn bị nội dung quảng cáo để thanh toán."
+      },
+      "audience": {
+        "title": "Nhắm mục tiêu đối tượng",
+        "targeting": "Nhắm mục tiêu",
+        "location": "Địa điểm",
+        "selectLocation": "Chọn địa điểm",
+        "loadingCountries": "Đang tải quốc gia...",
+        "ageRange": "Độ tuổi",
+        "ageTo": "đến",
+        "interests": "Sở thích",
+        "interestPlaceholder": "Nhập sở thích và nhấn Thêm",
+        "add": "Thêm",
+        "placement": "Vị trí hiển thị",
+        "placementText": "Quảng cáo sẽ chỉ được phân phối trên Trang chủ."
+      },
+      "package": {
+        "title": "Gói quảng bá",
+        "boostStrength": "1. Mức độ tăng cường",
+        "durationPackage": "2. Gói thời lượng",
+        "boostHint": "Kiểm soát mức độ tăng cường quảng cáo trên Trang chủ.",
+        "days": "{count} ngày",
+        "boostPackageLabel": "Gói tăng cường",
+        "durationPackageLabel": "Gói thời lượng",
+        "totalCost": "Tổng chi phí",
+        "selected": "Bạn đã chọn {boost} trong {days} ngày.",
+        "boosts": {
+          "light": { "title": "Tăng cường nhẹ", "level": "Ít cạnh tranh", "highlight": "Tốt nhất cho lần đầu" },
+          "standard": { "title": "Tăng cường tiêu chuẩn", "level": "Cạnh tranh trung bình", "highlight": "Được chọn nhiều nhất" },
+          "strong": { "title": "Tăng cường mạnh", "level": "Cạnh tranh cao", "highlight": "Hiển thị cao" }
+        },
+        "durations": {
+          "none": "Không gia hạn",
+          "d3": "Chạy ngắn",
+          "d7": "Chạy một tuần",
+          "d14": "Phân phối liên tục",
+          "d30": "Trọn tháng"
+        }
+      },
+      "payment": {
+        "title": "Xác nhận thanh toán",
+        "subtitle": "Bạn sẽ được chuyển đến Stripe Checkout để hoàn tất thanh toán.",
+        "objective": "Mục tiêu",
+        "adFormat": "Định dạng quảng cáo",
+        "boostPackage": "Gói tăng cường",
+        "durationPackage": "Gói thời lượng",
+        "total": "Tổng cộng",
+        "termsText": "Tôi đồng ý với",
+        "termsLink": "Điều khoản",
+        "termsAnd": "và quy tắc quảng cáo của Cordigram.",
+        "back": "Quay lại",
+        "payWithStripe": "Thanh toán qua Stripe",
+        "creatingCheckout": "Đang tạo phiên thanh toán...",
+        "acceptTermsFirst": "Vui lòng chấp nhận điều khoản trước khi tiến hành thanh toán.",
+        "loginBeforePayment": "Vui lòng đăng nhập lại trước khi thanh toán.",
+        "checkoutFailed": "Không thể khởi động phiên thanh toán.",
+        "checkoutSessionFailed": "Không thể tạo phiên Stripe Checkout."
+      },
+      "preview": {
+        "title": "Xem trước trực tiếp",
+        "sponsored": "Được tài trợ",
+        "primaryTextPlaceholder": "Văn bản chính sẽ hiển thị tại đây.",
+        "headlinePlaceholder": "Tiêu đề",
+        "descriptionPlaceholder": "Mô tả"
+      }
+    },
+    "payment": {
+      "success": {
+        "badge": "Thanh toán thành công",
+        "title": "Thanh toán hoàn tất",
+        "subtitle": "Stripe Checkout đã xử lý thành công cho chiến dịch quảng cáo của bạn.",
+        "loading": "Đang tải thông tin thanh toán...",
+        "missingSession": "Thiếu thông tin phiên thanh toán.",
+        "loadFailed": "Tải trạng thái thanh toán thất bại.",
+        "paymentId": "Mã thanh toán",
+        "paymentStatus": "Trạng thái thanh toán",
+        "amount": "Số tiền",
+        "backToCreate": "Quay lại tạo quảng cáo",
+        "goToDashboard": "Đến trang tổng quan quảng cáo"
+      },
+      "cancel": {
+        "title": "Thanh toán đã hủy",
+        "subtitle": "Bạn đã hủy Stripe Checkout. Chiến dịch quảng cáo chưa bị tính phí.",
+        "backToDashboard": "Về trang tổng quan quảng cáo",
+        "tryAgain": "Thử thanh toán lại"
+      }
     }
   }
 }

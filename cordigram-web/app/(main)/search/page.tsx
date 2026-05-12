@@ -11,6 +11,7 @@ import {
   type MouseEvent,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import styles from "./search.module.css";
 import {
   addSearchHistory,
@@ -69,6 +70,7 @@ function useDebouncedUrlQueryParam(param: string, delayMs: number) {
 }
 
 export default function SearchAllPage() {
+  const t = useTranslations("search");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -144,7 +146,7 @@ export default function SearchAllPage() {
         setReels(filterFeedItemsByBlockedAuthors(r.items ?? [], blockedIds));
       } catch (err: any) {
         if (cancelled) return;
-        setError(err?.message || "Search failed");
+        setError(err?.message || t("status.searchFailed"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -193,7 +195,7 @@ export default function SearchAllPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div className={styles.titleRow}>
-          <div className={styles.title}>Search</div>
+          <div className={styles.title}>{t("title")}</div>
         </div>
 
         <div className={styles.inputWrap}>
@@ -202,14 +204,14 @@ export default function SearchAllPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleEnterToSearch}
-            placeholder="Search people, #hashtags, posts, reels"
+            placeholder={t("placeholder.all")}
             spellCheck={false}
           />
           {query.trim() ? (
             <button
               className={styles.clearBtn}
               type="button"
-              aria-label="Clear"
+              aria-label={t("aria.clear")}
               onClick={() => setQuery("")}
             >
               <IconClear />
@@ -222,28 +224,28 @@ export default function SearchAllPage() {
             className={`${styles.tab} ${styles.tabActive}`}
             href={`/search?q=${qParam}`}
           >
-            All
+            {t("tabs.all")}
           </Link>
           <Link className={styles.tab} href={`/search/people?q=${qParam}`}>
-            People
+            {t("tabs.people")}
           </Link>
           <Link className={styles.tab} href={`/search/hashtags?q=${qParam}`}>
-            Hashtags
+            {t("tabs.hashtags")}
           </Link>
           <Link className={styles.tab} href={`/search/reels?q=${qParam}`}>
-            Reels
+            {t("tabs.reels")}
           </Link>
           <Link className={styles.tab} href={`/search/post?q=${qParam}`}>
-            Posts
+            {t("tabs.posts")}
           </Link>
         </div>
       </div>
 
       <div className={styles.body}>
         {!normalized ? (
-          <div className={styles.muted}>Type to search.</div>
+          <div className={styles.muted}>{t("status.typeToSearch")}</div>
         ) : null}
-        {loading ? <div className={styles.muted}>Searching…</div> : null}
+        {loading ? <div className={styles.muted}>{t("status.searching")}</div> : null}
         {error ? <div className={styles.error}>{error}</div> : null}
 
         {normalized ? (
@@ -251,12 +253,12 @@ export default function SearchAllPage() {
             {people.length ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <div className={styles.sectionTitle}>People</div>
+                  <div className={styles.sectionTitle}>{t("sections.people")}</div>
                   <Link
                     className={styles.tab}
                     href={`/search/people?q=${qParam}`}
                   >
-                    See all
+                    {t("seeAll")}
                   </Link>
                 </div>
                 {people.slice(0, 12).map((p) => (
@@ -298,28 +300,28 @@ export default function SearchAllPage() {
             {hashtags.length ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <div className={styles.sectionTitle}>Hashtags</div>
+                  <div className={styles.sectionTitle}>{t("sections.hashtags")}</div>
                   <Link
                     className={styles.tab}
                     href={`/search/hashtags?q=${qParam}`}
                   >
-                    See all
+                    {t("seeAll")}
                   </Link>
                 </div>
-                {hashtags.slice(0, 10).map((t) => (
+                {hashtags.slice(0, 10).map((tag) => (
                   <div
-                    key={t.id}
+                    key={tag.id}
                     className={styles.row}
                     onClick={async () => {
-                      await addToHistory({ kind: "hashtag", tag: t.name });
-                      router.push(`/hashtag/${encodeURIComponent(t.name)}`);
+                      await addToHistory({ kind: "hashtag", tag: tag.name });
+                      router.push(`/hashtag/${encodeURIComponent(tag.name)}`);
                     }}
                   >
                     <HashTile className={styles.hashTile} />
                     <div className={styles.meta}>
-                      <div className={styles.label}>#{t.name}</div>
+                      <div className={styles.label}>#{tag.name}</div>
                       <div className={styles.subtitle}>
-                        {t.usageCount} posts
+                        {t("usageCount", { count: tag.usageCount })}
                       </div>
                     </div>
                   </div>
@@ -330,12 +332,12 @@ export default function SearchAllPage() {
             {posts.length ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <div className={styles.sectionTitle}>Posts</div>
+                  <div className={styles.sectionTitle}>{t("sections.posts")}</div>
                   <Link
                     className={styles.tab}
                     href={`/search/post?q=${qParam}`}
                   >
-                    See all
+                    {t("seeAll")}
                   </Link>
                 </div>
                 <div className={styles.compactFeedWrap}>
@@ -357,12 +359,12 @@ export default function SearchAllPage() {
             {reels.length ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <div className={styles.sectionTitle}>Reels</div>
+                  <div className={styles.sectionTitle}>{t("sections.reels")}</div>
                   <Link
                     className={styles.tab}
                     href={`/search/reels?q=${qParam}`}
                   >
-                    See all
+                    {t("seeAll")}
                   </Link>
                 </div>
                 <div className={styles.reelsGrid}>
@@ -427,7 +429,7 @@ export default function SearchAllPage() {
             !hashtags.length &&
             !posts.length &&
             !reels.length ? (
-              <div className={styles.muted}>No results.</div>
+              <div className={styles.muted}>{t("status.noResults")}</div>
             ) : null}
           </>
         ) : null}

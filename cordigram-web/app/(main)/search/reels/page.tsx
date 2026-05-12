@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import styles from "../search.module.css";
 import { addSearchHistory, searchPosts, type FeedItem } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
@@ -48,6 +49,7 @@ function useDebouncedUrlQueryParam(param: string, delayMs: number) {
 }
 
 export default function SearchReelsPage() {
+  const t = useTranslations("search");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -109,7 +111,7 @@ export default function SearchReelsPage() {
       })
       .catch((err: any) => {
         if (cancelled) return;
-        setError(err?.message || "Search failed");
+        setError(err?.message || t("status.searchFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -173,7 +175,7 @@ export default function SearchReelsPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div className={styles.titleRow}>
-          <div className={styles.title}>Search</div>
+          <div className={styles.title}>{t("title")}</div>
         </div>
 
         <div className={styles.inputWrap}>
@@ -182,14 +184,14 @@ export default function SearchReelsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleEnterToSearch}
-            placeholder="Search reels"
+            placeholder={t("placeholder.reels")}
             spellCheck={false}
           />
           {query.trim() ? (
             <button
               className={styles.clearBtn}
               type="button"
-              aria-label="Clear"
+              aria-label={t("aria.clear")}
               onClick={() => setQuery("")}
             >
               <IconClear />
@@ -199,32 +201,32 @@ export default function SearchReelsPage() {
 
         <div className={styles.tabs}>
           <Link className={styles.tab} href={`/search?q=${qParam}`}>
-            All
+            {t("tabs.all")}
           </Link>
           <Link className={styles.tab} href={`/search/people?q=${qParam}`}>
-            People
+            {t("tabs.people")}
           </Link>
           <Link
             className={`${styles.tab} ${styles.tabActive}`}
             href={`/search/reels?q=${qParam}`}
           >
-            Reels
+            {t("tabs.reels")}
           </Link>
           <Link className={styles.tab} href={`/search/post?q=${qParam}`}>
-            Posts
+            {t("tabs.posts")}
           </Link>
         </div>
       </div>
 
       <div className={styles.body}>
         {!normalized ? (
-          <div className={styles.muted}>Type to search.</div>
+          <div className={styles.muted}>{t("status.typeToSearch")}</div>
         ) : null}
         {loading && page === 1 ? (
-          <div className={styles.muted}>Searching…</div>
+          <div className={styles.muted}>{t("status.searching")}</div>
         ) : null}
         <Link className={styles.tab} href={`/search/hashtags?q=${qParam}`}>
-          Hashtags
+          {t("tabs.hashtags")}
         </Link>
         {error ? <div className={styles.error}>{error}</div> : null}
 
@@ -267,7 +269,7 @@ export default function SearchReelsPage() {
             })}
           </div>
         ) : !loading && !error && normalized ? (
-          <div className={styles.muted}>No reels found.</div>
+          <div className={styles.muted}>{t("status.noReels")}</div>
         ) : null}
 
         {hasMore ? (
@@ -277,7 +279,7 @@ export default function SearchReelsPage() {
             disabled={loading}
             onClick={() => setPage((p) => p + 1)}
           >
-            {loading ? "Loading…" : "Load more"}
+            {loading ? t("status.loading") : t("loadMore")}
           </button>
         ) : null}
       </div>

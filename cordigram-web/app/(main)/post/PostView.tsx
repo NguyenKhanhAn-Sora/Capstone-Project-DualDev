@@ -1200,6 +1200,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   );
   const [commentMediaError, setCommentMediaError] = useState("");
   const [commentMediaUploading, setCommentMediaUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [commentMentionDraft, setCommentMentionDraft] = useState("");
   const [commentMentionSuggestions, setCommentMentionSuggestions] = useState<
     ProfileSearchItem[]
@@ -2695,6 +2696,56 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
     });
+  };
+
+  const applyCommentMediaFile = (file: File) => {
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      setCommentMediaError("Only image or video files are allowed");
+      return;
+    }
+    setCommentMediaError("");
+    clearStickerSelection();
+    setCommentMediaFile(file);
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const handleCommentPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          applyCommentMediaFile(file);
+          break;
+        }
+      }
+    }
+  };
+
+  const handleCommentDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (commentsLocked || submitting) return;
+    setIsDragOver(true);
+  };
+
+  const handleCommentDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleCommentDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    if (commentsLocked || submitting) return;
+    const file = e.dataTransfer.files[0];
+    if (file) applyCommentMediaFile(file);
   };
 
   const selectSticker = (sticker: { id: string; url: string }) => {
@@ -5929,7 +5980,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       </button>
                     </div>
                   ) : null}
-                  <div className={styles.commentComposer}>
+                  <div
+                    className={`${styles.commentComposer}${isDragOver ? ` ${styles.commentComposerDragOver}` : ""}`}
+                    onDragOver={handleCommentDragOver}
+                    onDragLeave={handleCommentDragLeave}
+                    onDrop={handleCommentDrop}
+                  >
+                    {isDragOver && (
+                      <div className={styles.commentComposerDropHint}>
+                        Drop image or video here
+                      </div>
+                    )}
                     <div className={styles.commentComposerRow}>
                       <div className={styles.composerInput}>
                         <textarea
@@ -5942,6 +6003,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           }
                           value={commentText}
                           onChange={handleCommentChange}
+                          onPaste={handleCommentPaste}
                           onKeyDown={(e) => {
                             if (commentMentionOpen) {
                               if (e.key === "ArrowDown") {

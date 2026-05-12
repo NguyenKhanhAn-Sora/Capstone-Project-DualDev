@@ -1346,6 +1346,17 @@
   line-height: 1.4;
 }
 
+.commentAvatarLink {
+  flex: 0 0 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  transition: opacity 120ms ease;
+}
+
+.commentAvatarLink:hover {
+  opacity: 0.8;
+}
+
 .commentAvatar {
   width: 24px;
   height: 24px;
@@ -1376,6 +1387,15 @@
   align-items: center;
   gap: 6px;
   margin-right: 6px;
+}
+
+.commentAuthorLink {
+  text-decoration: none;
+}
+
+.commentAuthorLink:hover .commentAuthor {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .commentAuthor {

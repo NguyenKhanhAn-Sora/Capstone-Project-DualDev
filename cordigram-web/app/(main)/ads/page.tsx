@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { getAdsDashboard, type AdsDashboardResponse } from "@/lib/api";
 import styles from "./ads.module.css";
@@ -17,13 +18,7 @@ const integer = (value: number) => new Intl.NumberFormat("en-US").format(value);
 
 const pct = (value: number) => `${value.toFixed(2)}%`;
 
-function statusLabel(status: "active" | "hidden" | "paused" | "canceled" | "completed") {
-  if (status === "active") return "Active";
-  if (status === "hidden") return "Hidden";
-  if (status === "paused") return "Paused";
-  if (status === "canceled") return "Canceled";
-  return "Completed";
-}
+type CampaignStatus = "active" | "hidden" | "paused" | "canceled" | "completed";
 
 function EmptyMegaphoneIcon() {
   return (
@@ -90,6 +85,7 @@ function CreativeIcon() {
 export default function AdsPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
+  const t = useTranslations("ads");
   const [dashboard, setDashboard] = useState<AdsDashboardResponse | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -118,7 +114,7 @@ export default function AdsPage() {
       .catch((error) => {
         if (cancelled) return;
         setDashboard(null);
-        setLoadError(error instanceof Error ? error.message : "Failed to load ads dashboard.");
+        setLoadError(error instanceof Error ? error.message : t("dashboard.loadFailed"));
       })
       .finally(() => {
         if (cancelled) return;
@@ -193,7 +189,7 @@ export default function AdsPage() {
             <div className={styles.emptyVisual}>
               <EmptyMegaphoneIcon />
             </div>
-            <h2 className={styles.emptyTitle}>No ads yet</h2>
+            <h2 className={styles.emptyTitle}>{t("empty.title")}</h2>
             {loadError ? <p className={styles.cardSubtitle}>{loadError}</p> : null}
 
             <div className={styles.emptyChecklist}>
@@ -201,19 +197,19 @@ export default function AdsPage() {
                 <span className={styles.checkIcon}>
                   <GoalIcon />
                 </span>
-                <span>Goal: increase awareness or conversions</span>
+                <span>{t("empty.goal")}</span>
               </div>
               <div className={styles.checkItem}>
                 <span className={styles.checkIcon}>
                   <BudgetIcon />
                 </span>
-                <span>Budget and schedule planning</span>
+                <span>{t("empty.budget")}</span>
               </div>
               <div className={styles.checkItem}>
                 <span className={styles.checkIcon}>
                   <CreativeIcon />
                 </span>
-                <span>Content, media, and clear CTA</span>
+                <span>{t("empty.creative")}</span>
               </div>
             </div>
 
@@ -223,7 +219,7 @@ export default function AdsPage() {
                 className={styles.emptyCtaBtn}
                 onClick={() => router.push("/ads/create")}
               >
-                Create your first ad
+                {t("empty.cta")}
               </button>
             </div>
           </div>
@@ -236,33 +232,33 @@ export default function AdsPage() {
               className={`${styles.primaryBtn} ${styles.primaryBtnCompact}`}
               onClick={() => router.push("/ads/create")}
             >
-              Create new ad
+              {t("dashboard.createNew")}
             </button>
           </section>
 
           <section className={styles.metricsGrid}>
             <article className={styles.metricCard}>
-              <p className={styles.metricLabel}>Total budget</p>
+              <p className={styles.metricLabel}>{t("metrics.totalBudget")}</p>
               <p className={styles.metricValue}>{money(summary.totalBudget)}</p>
-              <p className={styles.metricHint}>Spent: {money(summary.totalSpent)}</p>
+              <p className={styles.metricHint}>{t("metrics.spentHint", { value: money(summary.totalSpent) })}</p>
             </article>
 
             <article className={styles.metricCard}>
-              <p className={styles.metricLabel}>Impressions</p>
+              <p className={styles.metricLabel}>{t("metrics.impressions")}</p>
               <p className={styles.metricValue}>{integer(summary.impressions)}</p>
-              <p className={styles.metricHint}>Reach: {integer(summary.reach)}</p>
+              <p className={styles.metricHint}>{t("metrics.reachHint", { value: integer(summary.reach) })}</p>
             </article>
 
             <article className={styles.metricCard}>
-              <p className={styles.metricLabel}>Average CTR</p>
+              <p className={styles.metricLabel}>{t("metrics.averageCtr")}</p>
               <p className={styles.metricValue}>{pct(summary.ctr)}</p>
-              <p className={styles.metricHint}>Clicks: {integer(summary.clicks)}</p>
+              <p className={styles.metricHint}>{t("metrics.clicksHint", { value: integer(summary.clicks) })}</p>
             </article>
 
             <article className={styles.metricCard}>
-              <p className={styles.metricLabel}>Active campaigns</p>
+              <p className={styles.metricLabel}>{t("metrics.activeCampaigns")}</p>
               <p className={styles.metricValue}>{summary.activeCount}</p>
-              <p className={styles.metricHint}>Live campaigns currently running</p>
+              <p className={styles.metricHint}>{t("metrics.liveCampaigns")}</p>
             </article>
           </section>
 
@@ -270,9 +266,9 @@ export default function AdsPage() {
             <article className={styles.chartCard}>
               <div className={styles.cardHead}>
                 <div>
-                  <h3 className={styles.cardTitle}>7-day impressions trend</h3>
+                  <h3 className={styles.cardTitle}>{t("chart.title")}</h3>
                   <p className={styles.cardSubtitle}>
-                    Track ad delivery and CTA clicks over the last 7 days.
+                    {t("chart.subtitle")}
                   </p>
                 </div>
               </div>
@@ -296,9 +292,9 @@ export default function AdsPage() {
             <article className={styles.tableCard}>
               <div className={styles.cardHead}>
                 <div>
-                  <h3 className={styles.cardTitle}>Ad campaigns</h3>
+                  <h3 className={styles.cardTitle}>{t("table.title")}</h3>
                   <p className={styles.cardSubtitle}>
-                    Quick view of your 5 latest active campaigns.
+                    {t("table.subtitle")}
                   </p>
                 </div>
                 <button
@@ -306,7 +302,7 @@ export default function AdsPage() {
                   className={styles.secondaryBtn}
                   onClick={() => router.push("/ads/campaigns")}
                 >
-                  View all
+                  {t("table.viewAll")}
                 </button>
               </div>
 
@@ -314,13 +310,13 @@ export default function AdsPage() {
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Campaign</th>
-                      <th>Status</th>
-                      <th>Spent</th>
-                      <th>Impr.</th>
-                      <th>CTR</th>
-                      <th>Clicks</th>
-                      <th>Action</th>
+                      <th>{t("table.campaign")}</th>
+                      <th>{t("table.status")}</th>
+                      <th>{t("table.spent")}</th>
+                      <th>{t("table.impressions")}</th>
+                      <th>{t("table.ctr")}</th>
+                      <th>{t("table.clicks")}</th>
+                      <th>{t("table.action")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -332,7 +328,7 @@ export default function AdsPage() {
                             <span
                               className={`${styles.status} ${styles[`status_${item.status === "active" ? "active" : item.status === "hidden" ? "hidden" : item.status === "canceled" ? "canceled" : "paused"}`]}`}
                             >
-                              {statusLabel(item.status)}
+                              {t(`status.${item.status as CampaignStatus}`)}
                             </span>
                           </td>
                           <td>{money(item.spent)}</td>
@@ -345,7 +341,7 @@ export default function AdsPage() {
                               className={styles.secondaryBtn}
                               onClick={() => router.push(`/ads/campaigns/${item.id}`)}
                             >
-                              Details
+                              {t("table.details")}
                             </button>
                           </td>
                         </tr>
@@ -353,7 +349,7 @@ export default function AdsPage() {
                     })}
                     {activeCampaignsPreview.length === 0 ? (
                       <tr>
-                        <td colSpan={8}>No active campaigns right now.</td>
+                        <td colSpan={8}>{t("table.noActive")}</td>
                       </tr>
                     ) : null}
                   </tbody>

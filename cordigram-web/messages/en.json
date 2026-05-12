@@ -88,6 +88,60 @@
     "loadError": "Failed to load suggestions",
     "updateError": "Failed to update follow"
   },
+  "search": {
+    "title": "Search",
+    "tabs": {
+      "all": "All",
+      "people": "People",
+      "hashtags": "Hashtags",
+      "reels": "Reels",
+      "posts": "Posts"
+    },
+    "placeholder": {
+      "all": "Search people, #hashtags, posts, reels",
+      "people": "Search people",
+      "hashtags": "Search hashtags",
+      "posts": "Search posts",
+      "reels": "Search reels"
+    },
+    "aria": {
+      "clear": "Clear",
+      "close": "Close",
+      "clearSearch": "Clear search",
+      "remove": "Remove"
+    },
+    "sections": {
+      "people": "People",
+      "hashtags": "Hashtags",
+      "posts": "Posts",
+      "reels": "Reels"
+    },
+    "seeAll": "See all",
+    "usageCount": "{count} posts",
+    "loadMore": "Load more",
+    "recent": {
+      "title": "Recent",
+      "clearAll": "Clear all",
+      "empty": "No recent searches yet.",
+      "loading": "Loading…",
+      "loadFailed": "Failed to load history"
+    },
+    "status": {
+      "typeToSearch": "Type to search.",
+      "searching": "Searching…",
+      "loadingMore": "Loading more…",
+      "loading": "Loading…",
+      "noResults": "No results.",
+      "noPeople": "No people found.",
+      "noReels": "No reels found.",
+      "noHashtags": "No hashtags found.",
+      "noPosts": "No posts found.",
+      "searchFailed": "Search failed"
+    },
+    "postBy": "Post by {author}",
+    "noCaption": "(no caption)",
+    "unknown": "unknown"
+  },
   "home": {
     "feed": {
       "signInToView": "Sign in to view the feed",
@@ -114,7 +168,9 @@
       "reportSubmitted": "Report submitted",
       "reportSubmitFailed": "Could not submit report",
       "actionFailed": "Action failed",
-      "blockFailed": "Block failed"
+      "blockFailed": "Block failed",
+      "postHidden": "Post hidden",
+      "postHideFailed": "Failed to hide post"
     },
     "delete": {
       "title": "Delete this post?",
@@ -283,10 +339,11 @@
       "editPost": "Edit post",
       "editVisibility": "Edit visibility",
       "muteNotifications": "Mute notifications",
+      "turnOnNotifications": "Turn on notification",
       "turnOffComments": "Turn off comments",
       "turnOnComments": "Turn on comments",
-      "showLike": "Show like",
-      "hideLike": "Hide like",
+      "showLike": "Show like counts",
+      "hideLike": "Hide like counts",
       "goToPost": "Go to post",
       "copyLink": "Copy link",
       "deletePost": "Delete post",
@@ -297,6 +354,22 @@
       "hidePost": "Hide this post",
       "report": "Report",
       "blockAccount": "Block this account"
+    },
+    "mute": {
+      "title": "Mute notifications",
+      "body": "Choose how long to pause alerts for this post.",
+      "save": "Save",
+      "saving": "Saving...",
+      "options": {
+        "5m": "5 minutes",
+        "10m": "10 minutes",
+        "15m": "15 minutes",
+        "30m": "30 minutes",
+        "1h": "1 hour",
+        "1d": "1 day",
+        "until": "Until I turn it back on",
+        "custom": "Choose date & time"
+      }
     },
     "follow": {
       "following": "Following",
@@ -324,7 +397,8 @@
       "comment": "Comment",
       "saved": "Saved",
       "save": "Save",
-      "repost": "Repost"
+      "repost": "Repost",
+      "reposted": "Reposted"
     },
     "repostOverlay": {
       "visibility": {
@@ -399,6 +473,379 @@
     "imageViewer": {
       "close": "Close image",
       "alt": "Image"
+    }
+  },
+  "hashtag": {
+    "eyebrow": "Hashtag",
+    "loading": "Loading...",
+    "countPosts": "{count} posts",
+    "countReels": "{count} reels",
+    "tabs": {
+      "posts": "Posts",
+      "reels": "Reels"
+    },
+    "empty": {
+      "posts": "No posts found for this hashtag.",
+      "reels": "No reels found for this hashtag."
+    }
+  },
+  "ads": {
+    "status": {
+      "active": "Active",
+      "hidden": "Hidden",
+      "paused": "Paused",
+      "canceled": "Canceled",
+      "completed": "Completed"
+    },
+    "dashboard": {
+      "createNew": "Create new ad",
+      "loadFailed": "Failed to load ads dashboard."
+    },
+    "empty": {
+      "title": "No ads yet",
+      "goal": "Goal: increase awareness or conversions",
+      "budget": "Budget and schedule planning",
+      "creative": "Content, media, and clear CTA",
+      "cta": "Create your first ad"
+    },
+    "metrics": {
+      "totalBudget": "Total budget",
+      "spentHint": "Spent: {value}",
+      "impressions": "Impressions",
+      "reachHint": "Reach: {value}",
+      "averageCtr": "Average CTR",
+      "clicksHint": "Clicks: {value}",
+      "activeCampaigns": "Active campaigns",
+      "liveCampaigns": "Live campaigns currently running"
+    },
+    "chart": {
+      "title": "7-day impressions trend",
+      "subtitle": "Track ad delivery and CTA clicks over the last 7 days."
+    },
+    "table": {
+      "title": "Ad campaigns",
+      "subtitle": "Quick view of your 5 latest active campaigns.",
+      "viewAll": "View all",
+      "campaign": "Campaign",
+      "status": "Status",
+      "start": "Start",
+      "end": "End",
+      "spent": "Spent",
+      "impressions": "Impr.",
+      "ctr": "CTR",
+      "clicks": "Clicks",
+      "action": "Action",
+      "details": "Details",
+      "noActive": "No active campaigns right now.",
+      "noMatch": "No campaigns matched your filters."
+    },
+    "campaigns": {
+      "title": "All Ad Campaigns",
+      "subtitle": "Full history of your campaigns and performance.",
+      "backToDashboard": "Back to dashboard",
+      "loading": "Loading campaigns...",
+      "loadFailed": "Failed to load campaigns.",
+      "searchPlaceholder": "Search campaign name...",
+      "statusLabel": "Status:",
+      "statusAriaLabel": "Status filter",
+      "sortLabel": "Sort by:",
+      "sortAriaLabel": "Sort campaigns",
+      "fromDate": "From date:",
+      "toDate": "To date:",
+      "resultCount": "{count} result",
+      "resultCountPlural": "{count} results",
+      "clear": "Clear",
+      "adminReason": "Admin reason: {reason}",
+      "statusOptions": {
+        "all": "All status",
+        "active": "Active",
+        "hidden": "Hidden",
+        "canceled": "Canceled",
+        "completed": "Completed"
+      },
+      "sortOptions": {
+        "newest": "Newest",
+        "oldest": "Oldest",
+        "spent": "Highest spent",
+        "ctr": "Highest CTR"
+      }
+    },
+    "detail": {
+      "backToCampaigns": "Back to campaigns",
+      "loading": "Loading campaign details...",
+      "loadFailed": "Failed to load campaign details.",
+      "sections": {
+        "performance": "Performance Breakdown",
+        "configuration": "Campaign Configuration",
+        "creativeAudience": "Ad Creative & Audience",
+        "actions": "Campaign Actions"
+      },
+      "metrics": {
+        "spent": "Spent",
+        "impressions": "Impressions",
+        "clicks": "Clicks",
+        "ctr": "CTR",
+        "reach": "Reach",
+        "views": "Views",
+        "engagements": "Engagements",
+        "engagementRate": "Engagement rate",
+        "avgDwell": "Avg dwell"
+      },
+      "config": {
+        "objective": "Objective",
+        "adFormat": "Ad format",
+        "boostPackage": "Boost package",
+        "durationDays": "Duration days",
+        "daysValue": "{count} days",
+        "deliveryStateReason": "Delivery state reason",
+        "adminCancelReason": "Admin cancellation reason",
+        "elapsedTotal": "Elapsed / total",
+        "elapsedTotalValue": "{elapsed} / {total} days",
+        "reactionsSplit": "Reactions split",
+        "reactionsSplitValue": "{likes} likes · {comments} comments · {reposts} reposts",
+        "notAvailable": "N/A"
+      },
+      "hiddenReason": {
+        "visible": "Visible",
+        "hiddenManually": "Hidden manually",
+        "canceledManually": "Canceled manually",
+        "expired": "Expired"
+      },
+      "creative": {
+        "edit": "Edit",
+        "primaryText": "Primary text",
+        "headline": "Headline",
+        "description": "Description",
+        "ctaButton": "CTA button",
+        "destinationUrl": "Destination URL",
+        "locationTargeting": "Location targeting",
+        "ageTargeting": "Age targeting",
+        "interests": "Interests",
+        "mediaTitle": "Creative Media",
+        "noMedia": "No media available for this campaign."
+      },
+      "editModal": {
+        "title": "Edit Campaign Details",
+        "campaignName": "Campaign name",
+        "objective": "Objective",
+        "selectObjective": "Select objective",
+        "adFormat": "Ad format",
+        "primaryText": "Primary text",
+        "headline": "Headline",
+        "cta": "CTA",
+        "selectCta": "Select CTA",
+        "description": "Description",
+        "destinationUrl": "Destination URL",
+        "location": "Location",
+        "selectLocation": "Select location",
+        "locationLocked": "Location cannot be edited after ad creation.",
+        "ageRange": "Age range",
+        "ageTo": "to",
+        "ageLocked": "Age range cannot be edited after ad creation.",
+        "interests": "Interests",
+        "interestPlaceholder": "Type interest and click Add",
+        "add": "Add",
+        "creativeMedia": "Creative media",
+        "mediaLocked": "Media is locked because unique views exceeded {limit}.",
+        "chooseFiles": "Choose files",
+        "remove": "Remove",
+        "uploading": "Uploading...",
+        "cancel": "Cancel",
+        "saveChanges": "Save changes",
+        "savedSuccess": "Campaign details updated successfully.",
+        "saveFailed": "Failed to save campaign details.",
+        "loginToUpload": "Please login again to upload media.",
+        "selectVideoFile": "Please select a video file.",
+        "selectImageFiles": "Please select image files.",
+        "mediaLimitReached": "Media limit reached for current ad format.",
+        "uploadFailed": "Failed to upload media."
+      },
+      "upgrade": {
+        "title": "Upgrade boost and extend duration",
+        "hint": "Choose package cards like Create Ads. Boost can only be upgraded, not downgraded.",
+        "boostStrength": "1. Boost strength",
+        "extendDays": "2. Extend campaign days",
+        "notForDowngrade": "Not available for downgrade",
+        "currentBoost": "Current boost",
+        "boostUpgradeDiff": "Boost upgrade difference",
+        "extendDaysPackage": "Extend days package",
+        "needToPayNow": "Need to pay now",
+        "newTotalBudget": "New total budget",
+        "payWithStripe": "Pay with Stripe",
+        "creatingCheckout": "Creating checkout...",
+        "checkoutFailed": "Failed to start checkout session.",
+        "checkoutSessionFailed": "Unable to create Stripe checkout session."
+      },
+      "lifecycle": {
+        "title": "Lifecycle Management",
+        "hint": "Hide the campaign temporarily or reopen it when delivery should resume.",
+        "hide": "Hide Campaign",
+        "reopen": "Reopen Campaign",
+        "requiresExtend": "This campaign has expired. Please purchase an extension package before reopening.",
+        "requiresExtendHint": "Select an extension package, complete payment, then reopen the campaign.",
+        "pauseSuccess": "Campaign has been hidden successfully.",
+        "resumeSuccess": "Campaign has been reopened successfully.",
+        "updateFailed": "Failed to update campaign."
+      },
+      "hideConfirm": {
+        "title": "Hide this campaign?",
+        "body": "All reposts of this ads post will be removed. Before removal, all repost likes and views will be merged into the original ads post.",
+        "cancel": "Cancel",
+        "confirm": "Confirm hide"
+      }
+    },
+    "create": {
+      "title": "Create Ad Campaign",
+      "subtitle": "Build your ad in a simple flow: objective, creative, audience, and package pricing.",
+      "backToDashboard": "Back to dashboard",
+      "cancel": "Cancel",
+      "publish": "Publish Ad",
+      "objective": {
+        "title": "Choose Campaign Objective",
+        "required": "Required",
+        "options": {
+          "awareness": { "label": "Awareness", "desc": "Reach new people likely to remember your brand." },
+          "traffic": { "label": "Traffic", "desc": "Send people to your website or product page." },
+          "engagement": { "label": "Engagement", "desc": "Get more reactions, comments, and shares." },
+          "leads": { "label": "Lead generation", "desc": "Collect contact info from potential customers." },
+          "sales": { "label": "Sales", "desc": "Drive purchases and conversion actions." },
+          "messages": { "label": "Messages", "desc": "Start conversations with people interested in your offer." }
+        }
+      },
+      "creative": {
+        "title": "Ad Creative",
+        "mainContent": "Main content",
+        "campaignName": "Campaign name",
+        "campaignNamePlaceholder": "e.g. Back to school promo",
+        "primaryText": "Primary text",
+        "addEmoji": "Add emoji",
+        "emojiIcon": "Emoji icon",
+        "headline": "Headline",
+        "ctaButton": "CTA button",
+        "selectCta": "Select CTA",
+        "description": "Description",
+        "destinationUrl": "Destination URL",
+        "destinationUrlPlaceholder": "https://",
+        "uploadMedia": "Upload media",
+        "uploadHintSuffix": "Files are uploaded to server and reflected in preview.",
+        "chooseFiles": "Choose files",
+        "uploading": "Uploading...",
+        "remove": "Remove",
+        "video": "Video",
+        "image": "Image",
+        "videoPreview": "Video preview",
+        "creativePreview": "Creative preview",
+        "formatOptions": {
+          "single": "Single image",
+          "carousel": "Carousel",
+          "video": "Video"
+        },
+        "mediaConfig": {
+          "video": "Upload one video",
+          "carousel": "Upload up to 5 images",
+          "single": "Upload one image"
+        }
+      },
+      "validation": {
+        "primaryTextRequired": "Primary text is required.",
+        "headlineRequired": "Headline is required.",
+        "destinationUrlRequired": "Destination URL is required.",
+        "destinationUrlInvalidProtocol": "Destination URL must start with http:// or https://.",
+        "destinationUrlInvalid": "Destination URL is invalid.",
+        "mediaRequired": "Please upload media before publishing.",
+        "fillRequired": "Please fill all required fields before payment.",
+        "loginToUpload": "Please login again to upload media.",
+        "selectVideoFile": "Please select a video file.",
+        "selectImageFiles": "Please select image files.",
+        "carouselLimit": "Carousel supports up to 5 images. Remove one to upload more.",
+        "singleFileOnly": "This format only supports one file.",
+        "uploadFailed": "Upload failed. Please try again.",
+        "prepareCreativeFailed": "Failed to prepare ad creative for checkout."
+      },
+      "audience": {
+        "title": "Audience Targeting",
+        "targeting": "Targeting",
+        "location": "Location",
+        "selectLocation": "Select location",
+        "loadingCountries": "Loading countries...",
+        "ageRange": "Age range",
+        "ageTo": "to",
+        "interests": "Interests",
+        "interestPlaceholder": "Type an interest and press Add",
+        "add": "Add",
+        "placement": "Placement",
+        "placementText": "This ad will be delivered only on Home Feed."
+      },
+      "package": {
+        "title": "Promotion package",
+        "boostStrength": "1. Boost strength",
+        "durationPackage": "2. Duration package",
+        "boostHint": "Controls how strongly your ad is boosted in Home Feed.",
+        "days": "{count} days",
+        "boostPackageLabel": "Boost package",
+        "durationPackageLabel": "Duration package",
+        "totalCost": "Total cost",
+        "selected": "You selected {boost} for {days} days.",
+        "boosts": {
+          "light": { "title": "Light Boost", "level": "Low competition", "highlight": "Best for first ad" },
+          "standard": { "title": "Standard Boost", "level": "Medium competition", "highlight": "Most chosen" },
+          "strong": { "title": "Strong Boost", "level": "High competition", "highlight": "High visibility" }
+        },
+        "durations": {
+          "none": "No extension",
+          "d3": "Short burst",
+          "d7": "One week run",
+          "d14": "Sustained delivery",
+          "d30": "Full month coverage"
+        }
+      },
+      "payment": {
+        "title": "Confirm Payment",
+        "subtitle": "You will be redirected to Stripe Checkout to complete payment.",
+        "objective": "Objective",
+        "adFormat": "Ad format",
+        "boostPackage": "Boost package",
+        "durationPackage": "Duration package",
+        "total": "Total",
+        "termsText": "I agree to the",
+        "termsLink": "Term",
+        "termsAnd": "and advertising rules of Cordigram.",
+        "back": "Back",
+        "payWithStripe": "Pay with Stripe",
+        "creatingCheckout": "Creating checkout...",
+        "acceptTermsFirst": "Please accept the terms before continuing to payment.",
+        "loginBeforePayment": "Please login again before payment.",
+        "checkoutFailed": "Failed to start checkout session.",
+        "checkoutSessionFailed": "Unable to create Stripe checkout session."
+      },
+      "preview": {
+        "title": "Live preview",
+        "sponsored": "Sponsored",
+        "primaryTextPlaceholder": "Your primary text will appear here.",
+        "headlinePlaceholder": "Headline",
+        "descriptionPlaceholder": "Description"
+      }
+    },
+    "payment": {
+      "success": {
+        "badge": "Payment successful",
+        "title": "Payment Completed",
+        "subtitle": "Stripe checkout has returned successfully for your ads campaign.",
+        "loading": "Loading payment details...",
+        "missingSession": "Missing payment session information.",
+        "loadFailed": "Failed to load payment status.",
+        "paymentId": "Payment ID",
+        "paymentStatus": "Payment status",
+        "amount": "Amount",
+        "backToCreate": "Back to create",
+        "goToDashboard": "Go to Ads dashboard"
+      },
+      "cancel": {
+        "title": "Payment Canceled",
+        "subtitle": "You canceled Stripe checkout. Your ad campaign has not been charged yet.",
+        "backToDashboard": "Back to Ads dashboard",
+        "tryAgain": "Try payment again"
+      }
     }
   }
 }

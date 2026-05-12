@@ -1120,6 +1120,29 @@
   background: var(--color-surface, #0f172a);
   border-radius: 18px;
   padding: 6px 10px 10px;
+  position: relative;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.commentComposerDragOver {
+  border-color: var(--color-primary-strong, #7c3aed);
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.commentComposerDropHint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.1);
+  border-radius: 18px;
+  pointer-events: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary-strong, #7c3aed);
+  gap: 6px;
+  z-index: 5;
 }
 
 .commentComposerRow {

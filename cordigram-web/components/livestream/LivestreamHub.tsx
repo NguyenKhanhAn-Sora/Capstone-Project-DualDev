@@ -42,6 +42,7 @@ import hubStyles from "./livestream-hub.module.css";
 type LiveComment = {
   id: string;
   authorHandle: string;
+  authorId?: string;
   isHost: boolean;
   text: string;
   avatarUrl?: string;
@@ -80,16 +81,12 @@ const hostLatencyOptions: Array<{
 type HistoryWireComment = {
   id: string;
   authorHandle: string;
+  authorId?: string;
   isHost: boolean;
   text: string;
   avatarUrl?: string;
 };
 
-type ShareVideoConstraints = {
-  width: { ideal: number; max: number };
-  height: { ideal: number; max: number };
-  frameRate: { ideal: number; max: number };
-};
 
 function toHandle(raw?: string): string {
   const base = (raw || "").trim().replace(/^@+/, "");
@@ -171,52 +168,26 @@ function getLatencyLabel(mode: LivestreamLatencyMode): string {
   return "Adaptive latency";
 }
 
-function getScreenShareConstraints(mode: LivestreamLatencyMode): ShareVideoConstraints {
-  if (mode === "low") {
-    return {
-      width: { ideal: 960, max: 1280 },
-      height: { ideal: 540, max: 720 },
-      frameRate: { ideal: 20, max: 24 },
-    };
-  }
 
-  if (mode === "balanced") {
-    return {
-      width: { ideal: 1280, max: 1280 },
-      height: { ideal: 720, max: 720 },
-      frameRate: { ideal: 24, max: 30 },
-    };
-  }
-
-  return {
-    width: { ideal: 1920, max: 1920 },
-    height: { ideal: 1080, max: 1080 },
-    frameRate: { ideal: 30, max: 30 },
-  };
-}
-
-function getRoomPerfConfig(mode: LivestreamLatencyMode): {
+function getRoomPerfConfig(_mode: LivestreamLatencyMode): {
   adaptiveStream: boolean;
   dynacast: boolean;
 } {
-  if (mode === "low") {
-    return { adaptiveStream: true, dynacast: true };
-  }
-  if (mode === "balanced") {
-    return { adaptiveStream: true, dynacast: true };
-  }
-
-  // Adaptive mode in this app is quality-priority for screen share readability.
-  // Disable downscaling heuristics to keep full-resolution detail whenever possible.
+  // Always disable adaptive stream and dynacast so LiveKit never auto-downgrades
+  // resolution/bitrate based on viewport size or bandwidth estimates.
   return { adaptiveStream: false, dynacast: false };
 }
 
 function getScreenSharePublishOptions(mode: LivestreamLatencyMode) {
+  // simulcast: false + scalabilityMode L1T1 → single quality layer, no temporal
+  // scaling. SFU forwards exactly what the host encodes to every viewer.
   if (mode === "low") {
     return {
       source: Track.Source.ScreenShare,
+      simulcast: false,
+      scalabilityMode: "L1T1",
       videoEncoding: {
-        maxBitrate: 2_500_000,
+        maxBitrate: 3_000_000,
         maxFramerate: 24,
       },
     };
@@ -225,8 +196,10 @@ function getScreenSharePublishOptions(mode: LivestreamLatencyMode) {
   if (mode === "balanced") {
     return {
       source: Track.Source.ScreenShare,
+      simulcast: false,
+      scalabilityMode: "L1T1",
       videoEncoding: {
-        maxBitrate: 4_000_000,
+        maxBitrate: 6_000_000,
         maxFramerate: 30,
       },
     };
@@ -234,26 +207,83 @@ function getScreenSharePublishOptions(mode: LivestreamLatencyMode) {
 
   return {
     source: Track.Source.ScreenShare,
+    simulcast: false,
+    scalabilityMode: "L1T1",
     videoEncoding: {
-      maxBitrate: 12_000_000,
+      maxBitrate: 15_000_000,
       maxFramerate: 30,
     },
+  };
+}
+
+function getCameraPublishOptions(mode: LivestreamLatencyMode) {
+  if (mode === "low") {
+    return {
+      source: Track.Source.Camera,
+      simulcast: false,
+      scalabilityMode: "L1T1",
+      videoEncoding: {
+        maxBitrate: 1_500_000,
+        maxFramerate: 24,
+      },
+    };
+  }
+
+  if (mode === "balanced") {
+    return {
+      source: Track.Source.Camera,
+      simulcast: false,
+      scalabilityMode: "L1T1",
+      videoEncoding: {
+        maxBitrate: 3_000_000,
+        maxFramerate: 30,
+      },
+    };
+  }
+
+  return {
+    source: Track.Source.Camera,
     simulcast: false,
+    scalabilityMode: "L1T1",
+    videoEncoding: {
+      maxBitrate: 6_000_000,
+      maxFramerate: 30,
+    },
   };
 }
 
 function getDisplayMediaCaptureOptions(mode: LivestreamLatencyMode): DisplayMediaStreamOptions {
-  const base = getScreenShareConstraints(mode);
-  const maxFrameRate = mode === "adaptive" ? 60 : base.frameRate.max;
+  // Match constraints with LivestreamCreatePanel so the Hub "share screen" button
+  // and the pending track from CreatePanel both use the same resolution ceiling.
+  if (mode === "low") {
+    return {
+      video: {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        frameRate: { ideal: 24, max: 30 },
+        cursor: "always",
+      } as MediaTrackConstraints,
+      audio: true,
+    };
+  }
+
+  if (mode === "balanced") {
+    return {
+      video: {
+        width: { ideal: 1920, max: 2560 },
+        height: { ideal: 1080, max: 1440 },
+        frameRate: { ideal: 30, max: 30 },
+        cursor: "always",
+      } as MediaTrackConstraints,
+      audio: true,
+    };
+  }
 
   return {
     video: {
-      width: base.width,
-      height: base.height,
-      frameRate: {
-        ideal: base.frameRate.ideal,
-        max: maxFrameRate,
-      },
+      width: { ideal: 2560, max: 3840 },
+      height: { ideal: 1440, max: 2160 },
+      frameRate: { ideal: 30, max: 60 },
       cursor: "always",
     } as MediaTrackConstraints,
     audio: true,
@@ -362,7 +392,7 @@ function StreamStage({
     }
 
     try {
-      publication.setVideoQuality(isFullscreen ? VideoQuality.HIGH : VideoQuality.MEDIUM);
+      publication.setVideoQuality(VideoQuality.HIGH);
       publication.setSubscribed(true);
     } catch {
       // Ignore quality pinning errors on unsupported publication types.
@@ -761,12 +791,14 @@ function LiveComments({
       commentId,
       text,
       author,
+      authorId,
       isHost,
       avatarUrl,
     }: {
       commentId: string;
       text: string;
       author: string;
+      authorId?: string;
       isHost: boolean;
       avatarUrl?: string;
     }) => {
@@ -776,6 +808,7 @@ function LiveComments({
           commentId,
           text,
           author,
+          authorId,
           isHost,
           avatarUrl,
         }),
@@ -883,6 +916,7 @@ function LiveComments({
         .map((item) => ({
           id: item.id,
           authorHandle: item.authorHandle,
+          authorId: item.authorId,
           isHost: item.isHost,
           text: item.text,
           avatarUrl: item.avatarUrl,
@@ -943,6 +977,7 @@ function LiveComments({
           type?: "comment" | "meta_update" | "comment_history" | "comment_history_request";
           text?: string;
           author?: string;
+          authorId?: string;
           avatarUrl?: string;
           patch?: LivestreamMetaPatch;
           commentId?: string;
@@ -957,6 +992,7 @@ function LiveComments({
             appendComment({
               id: item.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               authorHandle: toHandle(item.authorHandle),
+              authorId: item.authorId || undefined,
               isHost: Boolean(item.isHost),
               text: item.text.trim(),
               avatarUrl: (item.avatarUrl || "").trim(),
@@ -978,9 +1014,14 @@ function LiveComments({
         if (parsed.type !== "comment" || !parsed.text?.trim()) return;
 
         const author = parsed.author?.trim() || participant?.name || "Viewer";
+        const incomingAuthorId =
+          parsed.authorId?.trim() ||
+          participant?.identity?.split("-")[0] ||
+          undefined;
         appendComment({
           id: parsed.commentId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           authorHandle: toHandle(author),
+          authorId: incomingAuthorId,
           isHost:
             typeof parsed.isHost === "boolean"
               ? parsed.isHost
@@ -1054,6 +1095,7 @@ function LiveComments({
 
     const author = toHandle(localParticipant.name || "Viewer");
     const isHost = Boolean(localParticipant.identity?.includes("-host-"));
+    const authorId = localParticipant.identity?.split("-")[0] || undefined;
 
     // Optimistic: clear input and show comment immediately before network call.
     setDraft("");
@@ -1061,6 +1103,7 @@ function LiveComments({
     appendComment({
       id: commentId,
       authorHandle: author,
+      authorId,
       isHost,
       text: content,
       avatarUrl: myAvatarUrl,
@@ -1077,6 +1120,7 @@ function LiveComments({
         commentId,
         text: content,
         author,
+        authorId,
         isHost,
         avatarUrl: myAvatarUrl,
       });
@@ -1135,16 +1179,32 @@ function LiveComments({
         {!comments.length ? <p className={hubStyles.commentEmpty}>No comments yet.</p> : null}
         {comments.map((item) => (
           <div key={item.id} className={hubStyles.commentItem}>
-            <span className={hubStyles.commentAvatar} aria-hidden>
-              {item.avatarUrl ? (
-                <img src={item.avatarUrl} alt="" className={hubStyles.commentAvatarImage} />
-              ) : (
-                getAvatarInitial(item.authorHandle)
-              )}
-            </span>
+            <Link
+              href={item.authorId ? `/profile/${item.authorId}` : `/profile/${item.authorHandle.replace(/^@/, "")}`}
+              className={hubStyles.commentAvatarLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              tabIndex={-1}
+              aria-label={`View ${item.authorHandle}'s profile`}
+            >
+              <span className={hubStyles.commentAvatar} aria-hidden>
+                {item.avatarUrl ? (
+                  <img src={item.avatarUrl} alt="" className={hubStyles.commentAvatarImage} />
+                ) : (
+                  getAvatarInitial(item.authorHandle)
+                )}
+              </span>
+            </Link>
             <div className={hubStyles.commentBody}>
               <span className={hubStyles.commentAuthorWrap}>
-                <strong className={hubStyles.commentAuthor}>{item.authorHandle}</strong>
+                <Link
+                  href={item.authorId ? `/profile/${item.authorId}` : `/profile/${item.authorHandle.replace(/^@/, "")}`}
+                  className={hubStyles.commentAuthorLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <strong className={hubStyles.commentAuthor}>{item.authorHandle}</strong>
+                </Link>
                 {item.isHost ? (
                   <span className={hubStyles.commentHostBadge} title="Host" aria-label="Host">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1354,9 +1414,10 @@ function HostMediaControls({
       }
 
       if (needsCamera && pendingCameraTrack) {
-        await (localParticipant as any).publishTrack(pendingCameraTrack, {
-          source: Track.Source.Camera,
-        });
+        await (localParticipant as any).publishTrack(
+          pendingCameraTrack,
+          getCameraPublishOptions(latencyMode),
+        );
       }
 
       setSelectedShareMode(config.mode);
@@ -1474,9 +1535,10 @@ function HostMediaControls({
       await unpublishTracksBySources([Track.Source.Camera]);
     }
 
-    await (localParticipant as any).publishTrack(videoTrack, {
-      source: Track.Source.Camera,
-    });
+    await (localParticipant as any).publishTrack(
+      videoTrack,
+      getCameraPublishOptions(latencyMode),
+    );
 
     videoTrack.onended = () => {
       void unpublishTracksBySources([Track.Source.Camera]);

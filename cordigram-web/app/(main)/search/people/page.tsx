@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import styles from "../search.module.css";
 import {
   addSearchHistory,
@@ -57,6 +58,7 @@ function useDebouncedUrlQueryParam(param: string, delayMs: number) {
 }
 
 export default function SearchPeoplePage() {
+  const t = useTranslations("search");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -102,7 +104,7 @@ export default function SearchPeoplePage() {
       })
       .catch((err: any) => {
         if (cancelled) return;
-        setError(err?.message || "Search failed");
+        setError(err?.message || t("status.searchFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -146,7 +148,7 @@ export default function SearchPeoplePage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div className={styles.titleRow}>
-          <div className={styles.title}>Search</div>
+          <div className={styles.title}>{t("title")}</div>
         </div>
 
         <div className={styles.inputWrap}>
@@ -155,14 +157,14 @@ export default function SearchPeoplePage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleEnterToSearch}
-            placeholder="Search people"
+            placeholder={t("placeholder.people")}
             spellCheck={false}
           />
           {query.trim() ? (
             <button
               className={styles.clearBtn}
               type="button"
-              aria-label="Clear"
+              aria-label={t("aria.clear")}
               onClick={() => setQuery("")}
             >
               <IconClear />
@@ -172,32 +174,32 @@ export default function SearchPeoplePage() {
 
         <div className={styles.tabs}>
           <Link className={styles.tab} href={`/search?q=${qParam}`}>
-            All
+            {t("tabs.all")}
           </Link>
           <Link
             className={`${styles.tab} ${styles.tabActive}`}
             href={`/search/people?q=${qParam}`}
           >
-            People
+            {t("tabs.people")}
           </Link>
           <Link className={styles.tab} href={`/search/reels?q=${qParam}`}>
-            Reels
+            {t("tabs.reels")}
           </Link>
           <Link className={styles.tab} href={`/search/post?q=${qParam}`}>
-            Posts
+            {t("tabs.posts")}
           </Link>
         </div>
       </div>
 
       <div className={styles.body}>
         {!normalized ? (
-          <div className={styles.muted}>Type to search.</div>
+          <div className={styles.muted}>{t("status.typeToSearch")}</div>
         ) : null}
-        {loading ? <div className={styles.muted}>Searching…</div> : null}
+        {loading ? <div className={styles.muted}>{t("status.searching")}</div> : null}
         {error ? <div className={styles.error}>{error}</div> : null}
 
         <Link className={styles.tab} href={`/search/hashtags?q=${qParam}`}>
-          Hashtags
+          {t("tabs.hashtags")}
         </Link>
         {items.map((p) => (
           <div
@@ -228,7 +230,7 @@ export default function SearchPeoplePage() {
         ))}
 
         {!loading && !error && normalized && items.length === 0 ? (
-          <div className={styles.muted}>No people found.</div>
+          <div className={styles.muted}>{t("status.noPeople")}</div>
         ) : null}
       </div>
     </div>

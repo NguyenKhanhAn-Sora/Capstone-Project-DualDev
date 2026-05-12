@@ -26,6 +26,7 @@ import {
   type SearchSuggestionItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { useTranslations } from "next-intl";
 
 type Tab = "all" | "people" | "hashtags" | "posts" | "reels";
 
@@ -149,6 +150,7 @@ export default function SearchOverlay(props: {
   onClose: () => void;
 }) {
   const { open, closing, onClose } = props;
+  const t = useTranslations("search");
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -218,7 +220,7 @@ export default function SearchOverlay(props: {
         setHistory(res.items ?? []);
       })
       .catch((err: any) => {
-        setHistoryError(err?.message || "Failed to load history");
+        setHistoryError(err?.message || t("recent.loadFailed"));
       })
       .finally(() => setHistoryLoading(false));
 
@@ -334,7 +336,7 @@ export default function SearchOverlay(props: {
         }
       } catch (err: any) {
         if (err?.name === "AbortError") return;
-        setError(err?.message || "Search failed");
+        setError(err?.message || t("status.searchFailed"));
       } finally {
         setLoading(false);
       }
@@ -533,8 +535,8 @@ export default function SearchOverlay(props: {
         data-closing={closing ? "1" : "0"}
       >
         <div className={styles.header}>
-          <div className={styles.title}>Search</div>
-          <button className={styles.close} onClick={onClose} aria-label="Close">
+          <div className={styles.title}>{t("title")}</div>
+          <button className={styles.close} onClick={onClose} aria-label={t("aria.close")}>
             <IconClose />
           </button>
         </div>
@@ -547,7 +549,7 @@ export default function SearchOverlay(props: {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleEnterToSearch}
               className={styles.input}
-              placeholder="Search people, #hashtags, posts, reels"
+              placeholder={t("placeholder.all")}
               spellCheck={false}
             />
             {query.trim() ? (
@@ -557,7 +559,7 @@ export default function SearchOverlay(props: {
                   setQuery("");
                   setTimeout(() => inputRef.current?.focus(), 0);
                 }}
-                aria-label="Clear search"
+                aria-label={t("aria.clearSearch")}
                 type="button"
               >
                 <IconClear />
@@ -571,32 +573,32 @@ export default function SearchOverlay(props: {
             className={`${styles.tab} ${tab === "all" ? styles.tabActive : ""}`}
             onClick={() => setTab("all")}
           >
-            All
+            {t("tabs.all")}
           </button>
           <button
             className={`${styles.tab} ${tab === "people" ? styles.tabActive : ""}`}
             onClick={() => setTab("people")}
           >
-            People
+            {t("tabs.people")}
           </button>
           <button
             className={`${styles.tab} ${tab === "hashtags" ? styles.tabActive : ""}`}
             onClick={() => setTab("hashtags")}
           >
-            Hashtags
+            {t("tabs.hashtags")}
           </button>
           <button
             className={`${styles.tab} ${tab === "posts" ? styles.tabActive : ""}`}
             onClick={() => setTab("posts")}
           >
-            Posts
+            {t("tabs.posts")}
           </button>
 
           <button
             className={`${styles.tab} ${tab === "reels" ? styles.tabActive : ""}`}
             onClick={() => setTab("reels")}
           >
-            Reels
+            {t("tabs.reels")}
           </button>
         </div>
 
@@ -604,23 +606,23 @@ export default function SearchOverlay(props: {
           {!normalized ? (
             <>
               <div className={styles.sectionHeader}>
-                <div className={styles.sectionTitle}>Recent</div>
+                <div className={styles.sectionTitle}>{t("recent.title")}</div>
                 {history.length ? (
                   <button className={styles.ghostBtn} onClick={clearAllHistory}>
-                    Clear all
+                    {t("recent.clearAll")}
                   </button>
                 ) : null}
               </div>
 
               {historyLoading ? (
-                <div className={styles.loading}>Loading…</div>
+                <div className={styles.loading}>{t("recent.loading")}</div>
               ) : null}
               {historyError ? (
                 <div className={styles.error}>{historyError}</div>
               ) : null}
 
               {!historyLoading && !historyError && !history.length ? (
-                <div className={styles.muted}>No recent searches yet.</div>
+                <div className={styles.muted}>{t("recent.empty")}</div>
               ) : null}
 
               {history.map((h) => (
@@ -656,7 +658,7 @@ export default function SearchOverlay(props: {
                             const raw = (h.label || "").trim();
                             const title =
                               raw === "Post" || raw === "Reel" ? "" : raw;
-                            return title || "(no caption)";
+                            return title || t("noCaption");
                           })()}
                         </div>
                         <div className={styles.postSubtitle}>
@@ -677,7 +679,7 @@ export default function SearchOverlay(props: {
                       e.stopPropagation();
                       deleteHistory(h.id);
                     }}
-                    aria-label="Remove"
+                    aria-label={t("aria.remove")}
                   >
                     <IconTrash />
                   </button>
@@ -687,7 +689,7 @@ export default function SearchOverlay(props: {
           ) : (
             <>
               {loading ? (
-                <div className={styles.loading}>Searching…</div>
+                <div className={styles.loading}>{t("status.searching")}</div>
               ) : null}
               {error ? <div className={styles.error}>{error}</div> : null}
 
@@ -696,13 +698,13 @@ export default function SearchOverlay(props: {
                   {groupedAll.profiles.length ? (
                     <>
                       <div className={styles.sectionHeader}>
-                        <div className={styles.sectionTitle}>People</div>
+                        <div className={styles.sectionTitle}>{t("sections.people")}</div>
                         <button
                           type="button"
                           className={styles.ghostBtn}
                           onClick={() => goSeeAll("/search/people")}
                         >
-                          See all
+                          {t("seeAll")}
                         </button>
                       </div>
                       {groupedAll.profiles.slice(0, 3).map((s) => (
@@ -731,7 +733,7 @@ export default function SearchOverlay(props: {
                   {groupedAll.hashtags.length ? (
                     <>
                       <div className={styles.sectionHeader}>
-                        <div className={styles.sectionTitle}>Hashtags</div>
+                        <div className={styles.sectionTitle}>{t("sections.hashtags")}</div>
                       </div>
                       {groupedAll.hashtags.slice(0, 3).map((s) => (
                         <div
@@ -758,13 +760,13 @@ export default function SearchOverlay(props: {
                   {postItems.length ? (
                     <>
                       <div className={styles.sectionHeader}>
-                        <div className={styles.sectionTitle}>Posts</div>
+                        <div className={styles.sectionTitle}>{t("sections.posts")}</div>
                         <button
                           type="button"
                           className={styles.ghostBtn}
                           onClick={() => goSeeAll("/search/post")}
                         >
-                          See all
+                          {t("seeAll")}
                         </button>
                       </div>
                       {postItems.slice(0, 2).map((p) => (
@@ -780,13 +782,10 @@ export default function SearchOverlay(props: {
                           <div className={styles.meta}>
                             <div className={styles.postLabel}>
                               {(p.content || "").trim().slice(0, 90) ||
-                                "(no caption)"}
+                                t("noCaption")}
                             </div>
                             <div className={styles.postSubtitle}>
-                              Post by{" "}
-                              {p.authorUsername
-                                ? `@${p.authorUsername}`
-                                : "unknown"}
+                              {t("postBy", { author: p.authorUsername ? `@${p.authorUsername}` : t("unknown") })}
                             </div>
                           </div>
                           <div />
@@ -798,13 +797,13 @@ export default function SearchOverlay(props: {
                   {reelItems.length ? (
                     <>
                       <div className={styles.sectionHeader}>
-                        <div className={styles.sectionTitle}>Reels</div>
+                        <div className={styles.sectionTitle}>{t("sections.reels")}</div>
                         <button
                           type="button"
                           className={styles.ghostBtn}
                           onClick={() => goSeeAll("/search/reels")}
                         >
-                          See all
+                          {t("seeAll")}
                         </button>
                       </div>
                       <div className={styles.reelsGrid}>
@@ -838,7 +837,7 @@ export default function SearchOverlay(props: {
                   !error &&
                   !suggestItems.length &&
                   !postItems.length ? (
-                    <div className={styles.muted}>No results.</div>
+                    <div className={styles.muted}>{t("status.noResults")}</div>
                   ) : null}
                 </>
               ) : null}
@@ -846,13 +845,13 @@ export default function SearchOverlay(props: {
               {tab === "people" ? (
                 <>
                   <div className={styles.sectionHeader}>
-                    <div className={styles.sectionTitle}>People</div>
+                    <div className={styles.sectionTitle}>{t("sections.people")}</div>
                     <button
                       type="button"
                       className={styles.ghostBtn}
                       onClick={() => goSeeAll("/search/people")}
                     >
-                      See all
+                      {t("seeAll")}
                     </button>
                   </div>
                   {peopleItems.slice(0, 10).map((p) => (
@@ -876,31 +875,31 @@ export default function SearchOverlay(props: {
                     </div>
                   ))}
                   {!loading && !error && !peopleItems.length ? (
-                    <div className={styles.muted}>No people found.</div>
+                    <div className={styles.muted}>{t("status.noPeople")}</div>
                   ) : null}
                 </>
               ) : null}
 
               {tab === "hashtags" ? (
                 <>
-                  {hashtagItems.map((t) => (
+                  {hashtagItems.map((tag) => (
                     <div
-                      key={t.id}
+                      key={tag.id}
                       className={styles.row}
-                      onClick={() => pickHashtag(t)}
+                      onClick={() => pickHashtag(tag)}
                     >
                       <HashTile />
                       <div className={styles.meta}>
-                        <div className={styles.label}>#{t.name}</div>
+                        <div className={styles.label}>#{tag.name}</div>
                         <div className={styles.subtitle}>
-                          {t.usageCount} posts
+                          {t("usageCount", { count: tag.usageCount })}
                         </div>
                       </div>
                       <div />
                     </div>
                   ))}
                   {!loading && !error && !hashtagItems.length ? (
-                    <div className={styles.muted}>No hashtags found.</div>
+                    <div className={styles.muted}>{t("status.noHashtags")}</div>
                   ) : null}
                 </>
               ) : null}
@@ -908,13 +907,13 @@ export default function SearchOverlay(props: {
               {tab === "posts" ? (
                 <>
                   <div className={styles.sectionHeader}>
-                    <div className={styles.sectionTitle}>Posts</div>
+                    <div className={styles.sectionTitle}>{t("sections.posts")}</div>
                     <button
                       type="button"
                       className={styles.ghostBtn}
                       onClick={() => goSeeAll("/search/post")}
                     >
-                      See all
+                      {t("seeAll")}
                     </button>
                   </div>
                   {postItems.slice(0, 10).map((p) => (
@@ -930,20 +929,17 @@ export default function SearchOverlay(props: {
                       <div className={styles.meta}>
                         <div className={styles.postLabel}>
                           {(p.content || "").trim().slice(0, 90) ||
-                            "(no caption)"}
+                            t("noCaption")}
                         </div>
                         <div className={styles.postSubtitle}>
-                          Post by{" "}
-                          {p.authorUsername
-                            ? `@${p.authorUsername}`
-                            : "unknown"}
+                          {t("postBy", { author: p.authorUsername ? `@${p.authorUsername}` : t("unknown") })}
                         </div>
                       </div>
                       <div />
                     </div>
                   ))}
                   {!loading && !error && !postItems.length ? (
-                    <div className={styles.muted}>No posts found.</div>
+                    <div className={styles.muted}>{t("status.noPosts")}</div>
                   ) : null}
                 </>
               ) : null}
@@ -951,17 +947,17 @@ export default function SearchOverlay(props: {
               {tab === "reels" ? (
                 <>
                   <div className={styles.sectionHeader}>
-                    <div className={styles.sectionTitle}>Reels</div>
+                    <div className={styles.sectionTitle}>{t("sections.reels")}</div>
                     <button
                       type="button"
                       className={styles.ghostBtn}
                       onClick={() => goSeeAll("/search/reels")}
                     >
-                      See all
+                      {t("seeAll")}
                     </button>
                   </div>
                   {!loading && !error && !reelItems.length ? (
-                    <div className={styles.muted}>No reels found.</div>
+                    <div className={styles.muted}>{t("status.noReels")}</div>
                   ) : null}
 
                   {reelItems.length ? (

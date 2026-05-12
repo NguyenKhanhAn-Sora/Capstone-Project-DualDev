@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import styles from "../search.module.css";
 import { IconClear } from "../_components/search-shared";
 import HomePage from "../../page";
@@ -43,6 +44,7 @@ function useDebouncedUrlQueryParam(param: string, delayMs: number) {
 }
 
 export default function SearchPostsPage() {
+  const t = useTranslations("search");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -65,7 +67,7 @@ export default function SearchPostsPage() {
   const header = (
     <div className={styles.header}>
       <div className={styles.titleRow}>
-        <div className={styles.title}>Search</div>
+        <div className={styles.title}>{t("title")}</div>
       </div>
 
       <div className={styles.inputWrap}>
@@ -74,14 +76,14 @@ export default function SearchPostsPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleEnterToSearch}
-          placeholder="Search posts"
+          placeholder={t("placeholder.posts")}
           spellCheck={false}
         />
         {query.trim() ? (
           <button
             className={styles.clearBtn}
             type="button"
-            aria-label="Clear"
+            aria-label={t("aria.clear")}
             onClick={() => setQuery("")}
           >
             <IconClear />
@@ -91,22 +93,22 @@ export default function SearchPostsPage() {
 
       <div className={styles.tabs}>
         <Link className={styles.tab} href={`/search?q=${qParam}`}>
-          All
+          {t("tabs.all")}
         </Link>
         <Link className={styles.tab} href={`/search/people?q=${qParam}`}>
-          People
+          {t("tabs.people")}
         </Link>
         <Link className={styles.tab} href={`/search/hashtags?q=${qParam}`}>
-          Hashtags
+          {t("tabs.hashtags")}
         </Link>
         <Link className={styles.tab} href={`/search/reels?q=${qParam}`}>
-          Reels
+          {t("tabs.reels")}
         </Link>
         <Link
           className={`${styles.tab} ${styles.tabActive}`}
           href={`/search/post?q=${qParam}`}
         >
-          Posts
+          {t("tabs.posts")}
         </Link>
       </div>
     </div>
@@ -117,7 +119,7 @@ export default function SearchPostsPage() {
       <div className={styles.page}>
         {header}
         <div className={styles.body}>
-          <div className={styles.muted}>Type to search.</div>
+          <div className={styles.muted}>{t("status.typeToSearch")}</div>
         </div>
       </div>
     );

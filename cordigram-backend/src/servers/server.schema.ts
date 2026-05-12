@@ -113,7 +113,7 @@ export interface ServerSafetySettings {
 @Schema({ timestamps: true })
 export class Server extends Document {
   @Prop({ required: true, trim: true })
-  name: string;
+  name!: string;
 
   /**
    * Boost theo server (MVP entitlement). Nếu userId nằm trong danh sách này
@@ -123,28 +123,28 @@ export class Server extends Document {
   boostedByUserIds?: string[];
 
   @Prop({ type: String, default: null })
-  description: string | null;
+  description!: string | null;
 
   @Prop({
     type: String,
     enum: ['vi', 'en'],
     default: 'vi',
   })
-  primaryLanguage: ServerPrimaryLanguage;
+  primaryLanguage!: ServerPrimaryLanguage;
 
   @Prop({ type: String, default: null })
-  avatarUrl: string | null;
+  avatarUrl!: string | null;
 
   @Prop({ type: String, default: null })
-  bannerUrl: string | null;
+  bannerUrl!: string | null;
 
   /** Ảnh biểu ngữ (URL); màu nền card dùng bannerColor. */
   @Prop({ type: String, default: null })
-  bannerImageUrl: string | null;
+  bannerImageUrl!: string | null;
 
   /** Gradient / màu nền biểu ngữ (preset), luôn có kể cả khi có ảnh. */
   @Prop({ type: String, default: null })
-  bannerColor: string | null;
+  bannerColor!: string | null;
 
   @Prop({
     type: [
@@ -155,7 +155,7 @@ export class Server extends Document {
     ],
     default: [],
   })
-  profileTraits: Array<{ emoji: string; text: string }>;
+  profileTraits!: Array<{ emoji: string; text: string }>;
 
   @Prop({
     type: String,
@@ -170,17 +170,17 @@ export class Server extends Document {
     ],
     default: 'custom',
   })
-  template: ServerTemplate;
+  template!: ServerTemplate;
 
   @Prop({
     type: String,
     enum: ['club-community', 'me-and-friends'],
     default: 'me-and-friends',
   })
-  purpose: ServerPurpose;
+  purpose!: ServerPurpose;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  ownerId: Types.ObjectId;
+  ownerId!: Types.ObjectId;
 
   /**
    * Soft delete (for admin restore + history).
@@ -211,7 +211,7 @@ export class Server extends Document {
     ],
     default: [],
   })
-  members: ServerMember[];
+  members!: ServerMember[];
 
   @Prop({
     type: [
@@ -224,10 +224,10 @@ export class Server extends Document {
     ],
     default: [],
   })
-  bannedUsers: BannedUser[];
+  bannedUsers!: BannedUser[];
 
   @Prop({ type: [Types.ObjectId], ref: 'Channel', default: [] })
-  channels: Types.ObjectId[];
+  channels!: Types.ObjectId[];
 
   @Prop({
     type: [
@@ -240,16 +240,16 @@ export class Server extends Document {
     ],
     default: [],
   })
-  serverCategories: ServerCategory[];
+  serverCategories!: ServerCategory[];
 
   @Prop({ type: Number, default: 0 })
-  memberCount: number;
+  memberCount!: number;
 
   @Prop({ type: Boolean, default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @Prop({ type: Boolean, default: true })
-  isPublic: boolean;
+  isPublic!: boolean;
 
   /**
    * Control cách user tham gia server + điều kiện chat.
@@ -260,13 +260,13 @@ export class Server extends Document {
     enum: ['invite_only', 'apply', 'discoverable'],
     default: 'discoverable',
   })
-  accessMode: ServerAccessMode;
+  accessMode!: ServerAccessMode;
 
   @Prop({ type: Boolean, default: false })
-  isAgeRestricted: boolean;
+  isAgeRestricted!: boolean;
 
   @Prop({ type: Boolean, default: false })
-  hasRules: boolean;
+  hasRules!: boolean;
 
   /**
    * Application form used when accessMode = 'apply'.
@@ -299,7 +299,7 @@ export class Server extends Document {
       updatedAt: null,
     }),
   })
-  joinApplicationForm: JoinApplicationFormSettings;
+  joinApplicationForm!: JoinApplicationFormSettings;
 
   @Prop({
     type: {
@@ -321,7 +321,7 @@ export class Server extends Document {
       systemChannelId: null,
     }),
   })
-  interactionSettings: ServerInteractionSettings;
+  interactionSettings!: ServerInteractionSettings;
 
   @Prop({
     type: {
@@ -409,7 +409,7 @@ export class Server extends Document {
       },
     }),
   })
-  safetySettings: ServerSafetySettings;
+  safetySettings!: ServerSafetySettings;
 
   @Prop({
     type: {
@@ -425,7 +425,7 @@ export class Server extends Document {
       activatedAt: null,
     }),
   })
-  communitySettings: CommunitySettings;
+  communitySettings!: CommunitySettings;
 
   /**
    * Approval status for appearing in public Explore/Discovery surfaces.
@@ -438,14 +438,14 @@ export class Server extends Document {
     enum: ['pending', 'approved', 'rejected', 'removed'],
     default: 'pending',
   })
-  communityDiscoveryStatus: CommunityDiscoveryStatus;
+  communityDiscoveryStatus!: CommunityDiscoveryStatus;
 
   /**
    * Mức mở rộng ô sticker do chủ máy chủ gán cho server này (theo gói Boost trên tài khoản chủ).
    * Một chủ tối đa gán đồng thời cho 2 máy chủ.
    */
   @Prop({ type: String, default: null })
-  stickerBoostTier: 'basic' | 'boost' | null;
+  stickerBoostTier!: 'basic' | 'boost' | null;
 
   /** Sticker tùy chỉnh do máy chủ quản lý (hiển thị trong picker; chỉ dùng được trong kênh cùng server). */
   @Prop({
@@ -460,7 +460,7 @@ export class Server extends Document {
     ],
     default: [],
   })
-  customStickers: Array<{
+  customStickers!: Array<{
     _id?: Types.ObjectId;
     imageUrl: string;
     name: string;
@@ -482,7 +482,7 @@ export class Server extends Document {
     ],
     default: [],
   })
-  customEmojis: Array<{
+  customEmojis!: Array<{
     _id?: Types.ObjectId;
     imageUrl: string;
     name: string;

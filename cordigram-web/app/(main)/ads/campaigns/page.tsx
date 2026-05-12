@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { getAdsDashboard, type AdsDashboardResponse } from "@/lib/api";
