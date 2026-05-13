@@ -16,6 +16,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ConfigService } from '../config/config.service';
 import { IvsService } from './ivs.service';
 import { Block } from '../users/block.schema';
+import { Follow } from '../users/follow.schema';
 import { LivestreamMuteService } from './livestream-mute.service';
 
 const MAX_CONCURRENT_LIVESTREAMS = 5;
@@ -36,6 +37,8 @@ export class LivestreamService {
     private readonly profileModel: Model<Profile>,
     @InjectModel(Block.name)
     private readonly blockModel: Model<Block>,
+    @InjectModel(Follow.name)
+    private readonly followModel: Model<Follow>,
     private readonly livekitService: LivekitService,
     private readonly ivsService: IvsService,
     private readonly notificationsService: NotificationsService,
@@ -213,27 +216,54 @@ export class LivestreamService {
     return stream;
   }
 
-  async listLive() {
+  async listLive(viewerUserId?: string) {
     const streams = await this.livestreamModel
       .find({ status: 'live' })
       .sort({ startedAt: -1 })
       .limit(MAX_CONCURRENT_LIVESTREAMS)
       .exec();
 
+    // Collect hostUserIds of follower-only streams to batch-check follows
+    const followerOnlyHostIds = streams
+      .filter((s) => s.visibility === 'followers')
+      .map((s) => new Types.ObjectId(s.hostUserId.toString()));
+
+    let followedHostIdSet = new Set<string>();
+    if (viewerUserId && followerOnlyHostIds.length > 0) {
+      const follows = await this.followModel
+        .find({
+          followerId: new Types.ObjectId(viewerUserId),
+          followeeId: { $in: followerOnlyHostIds },
+        })
+        .select('followeeId')
+        .lean();
+      followedHostIdSet = new Set(follows.map((f) => f.followeeId.toString()));
+    }
+
+    const visible = streams.filter((s) => {
+      const hostId = s.hostUserId?.toString?.() ?? '';
+      if (s.visibility === 'public') return true;
+      if (s.visibility === 'followers') {
+        return hostId === viewerUserId || followedHostIdSet.has(hostId);
+      }
+      // private: only the host can see their own stream
+      return hostId === viewerUserId;
+    });
+
     const [participantCounts, hostIdentityMap] = await Promise.all([
       Promise.all(
-        streams.map((stream) =>
+        visible.map((stream) =>
           this.livekitService.getParticipantCount(stream.roomName),
         ),
       ),
-      this.getHostIdentityMap(streams),
+      this.getHostIdentityMap(visible),
     ]);
 
     return {
       maxConcurrentLivestreams: MAX_CONCURRENT_LIVESTREAMS,
       maxViewersPerRoom: MAX_VIEWERS_PER_ROOM,
-      activeCount: streams.length,
-      items: streams.map((stream, i) => {
+      activeCount: visible.length,
+      items: visible.map((stream, i) => {
         const hostId = stream.hostUserId?.toString?.() ?? '';
         const hostIdentity = hostIdentityMap.get(hostId);
         return this.toResponse(stream, participantCounts[i], hostIdentity);
@@ -356,6 +386,24 @@ export class LivestreamService {
 
     if (asHost && !isHost) {
       throw new ForbiddenException('Only the host can publish this livestream');
+    }
+
+    // Visibility check: enforce access for non-host, non-preview viewers.
+    if (!isHost && !opts.isPreview) {
+      if (stream.visibility === 'private') {
+        throw new ForbiddenException('This livestream is private');
+      }
+      if (stream.visibility === 'followers') {
+        const isFollowing = await this.followModel.exists({
+          followerId: new Types.ObjectId(user.userId),
+          followeeId: new Types.ObjectId(stream.hostUserId.toString()),
+        });
+        if (!isFollowing) {
+          throw new ForbiddenException(
+            'This livestream is for followers only',
+          );
+        }
+      }
     }
 
     // Block check: if host has blocked this viewer, deny entry.

@@ -10,6 +10,7 @@ import { IvsService } from './ivs.service';
 import { LivestreamMute, LivestreamMuteSchema } from './livestream-mute.schema';
 import { LivestreamMuteService } from './livestream-mute.service';
 import { Block, BlockSchema } from '../users/block.schema';
+import { Follow, FollowSchema } from '../users/follow.schema';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { Block, BlockSchema } from '../users/block.schema';
       { name: Profile.name, schema: ProfileSchema },
       { name: LivestreamMute.name, schema: LivestreamMuteSchema },
       { name: Block.name, schema: BlockSchema },
+      { name: Follow.name, schema: FollowSchema },
     ]),
   ],
   providers: [LivestreamService, IvsService, LivestreamMuteService],

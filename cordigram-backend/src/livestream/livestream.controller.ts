@@ -21,8 +21,8 @@ export class LivestreamController {
   constructor(private readonly livestreamService: LivestreamService) {}
 
   @Get('live')
-  async listLive() {
-    return this.livestreamService.listLive();
+  async listLive(@CurrentUser() user: { userId: string }) {
+    return this.livestreamService.listLive(user.userId);
   }
 
   @Post()
