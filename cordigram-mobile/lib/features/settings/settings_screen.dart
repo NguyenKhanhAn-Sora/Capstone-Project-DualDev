@@ -564,6 +564,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ];
 
   Timer? _cooldownTicker;
+  Timer? _loginDevicesRefreshTimer;
   SettingsTab? _selectedTab;
 
   ProfileDetail? _profile;
@@ -623,6 +624,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _violationLoading = false;
   String? _violationError;
   int _currentStrikeTotal = 0;
+
+  bool _hasPassword = true;
+
+  // Eye-toggle visibility states for password inputs
+  bool _showEmailPassword = false;
+  bool _showPasswordCurrent = false;
+  bool _showPasswordNew = false;
+  bool _showPasswordConfirm = false;
+  bool _showPasskeyPassword = false;
+  bool _showPasskeyNew = false;
+  bool _showPasskeyConfirm = false;
 
   bool _showChangePassword = false;
   _PasswordChangeStep _passwordStep = _PasswordChangeStep.otp;
@@ -761,6 +773,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _cooldownTicker?.cancel();
+    _loginDevicesRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -813,6 +826,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _resetEmailFlow() {
     _emailStep = _EmailChangeStep.password;
     _password = '';
+    _showEmailPassword = false;
     _currentOtp = '';
     _newEmail = '';
     _newOtp = '';
@@ -829,7 +843,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _resetEmailFlow();
       _showChangeEmail = true;
+      if (!_hasPassword) {
+        _emailStep = _EmailChangeStep.currentOtp;
+      }
     });
+    if (!_hasPassword) {
+      _requestCurrentOtp();
+    }
   }
 
   void _handleEmailBack() {
@@ -842,7 +862,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _resetEmailFlow();
           break;
         case _EmailChangeStep.currentOtp:
-          _emailStep = _EmailChangeStep.password;
+          if (!_hasPassword) {
+            _showChangeEmail = false;
+            _resetEmailFlow();
+          } else {
+            _emailStep = _EmailChangeStep.password;
+          }
           break;
         case _EmailChangeStep.newEmail:
           _emailStep = _EmailChangeStep.currentOtp;
@@ -860,7 +885,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _requestCurrentOtp() async {
     final password = _password.trim();
-    if (password.isEmpty) {
+    if (_hasPassword && password.isEmpty) {
       setState(() => _emailError = LanguageController.instance.t('settings.email.enterCurrentPasswordFirst'));
       return;
     }
@@ -873,7 +898,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       final res = await ProfileService.requestChangeEmailCurrentOtp(
-        password: password,
+        password: _hasPassword ? password : null,
       );
       if (!mounted) return;
       setState(() {
@@ -2139,6 +2164,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final passkey = results[2];
       setState(() {
         _passwordChangedAt = password['lastChangedAt'] as String?;
+        _hasPassword = password['hasPassword'] as bool? ?? true;
         _twoFactorEnabled = twoFactor['enabled'] as bool? ?? false;
         _hasPasskey = passkey['hasPasskey'] as bool? ?? false;
         _passkeyEnabled = _hasPasskey
@@ -2169,6 +2195,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _passwordCurrent = '';
     _passwordNew = '';
     _passwordConfirm = '';
+    _showPasswordCurrent = false;
+    _showPasswordNew = false;
+    _showPasswordConfirm = false;
     _passwordSubmitting = false;
     _passwordError = null;
     _passwordSuccess = null;
@@ -2272,7 +2301,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final next = _passwordNew.trim();
     final confirm = _passwordConfirm.trim();
 
-    if (current.isEmpty) {
+    if (_hasPassword && current.isEmpty) {
       setState(() => _passwordError = lc.t('settings.passwordSecurity.enterCurrentPasswordError'));
       return;
     }
@@ -2280,7 +2309,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _passwordError = lc.t('settings.passwordSecurity.enterNewPasswordError'));
       return;
     }
-    if (next == current) {
+    if (_hasPassword && next == current) {
       setState(() {
         _passwordError = lc.t('settings.passwordSecurity.passwordSameError');
       });
@@ -2304,7 +2333,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     try {
       await ProfileService.confirmPasswordChange(
-        currentPassword: current,
+        currentPassword: _hasPassword ? current : null,
         newPassword: next,
       );
       if (!mounted) return;
@@ -2460,6 +2489,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _passkeyNew = '';
     _passkeyConfirm = '';
     _showCurrentPasskey = false;
+    _showPasskeyPassword = false;
+    _showPasskeyNew = false;
+    _showPasskeyConfirm = false;
     _passkeySubmitting = false;
     _passkeyError = null;
     _passkeySuccess = null;
@@ -2479,6 +2511,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _passkeyToggleSubmitting = false;
     _passkeyToggleError = null;
 
+    _loginDevicesRefreshTimer?.cancel();
+    _loginDevicesRefreshTimer = null;
     _showLoginDevices = false;
     _loginDevicesLoading = false;
     _loginDevicesError = null;
@@ -2503,7 +2537,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _resetPasskeyFlow();
       _showPasskeyFlow = true;
+      if (!_hasPassword) {
+        _passkeyStep = _PasskeyStep.otp;
+      }
     });
+    if (!_hasPassword) {
+      _requestPasskeyOtp();
+    }
   }
 
   void _handlePasskeyBack() {
@@ -2514,7 +2554,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
       if (_passkeyStep == _PasskeyStep.otp) {
-        _passkeyStep = _PasskeyStep.password;
+        if (!_hasPassword) {
+          _showPasskeyFlow = false;
+          _resetPasskeyFlow();
+        } else {
+          _passkeyStep = _PasskeyStep.password;
+        }
         return;
       }
       if (_passkeyStep == _PasskeyStep.form) {
@@ -2529,7 +2574,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _requestPasskeyOtp() async {
     final lc = LanguageController.instance;
     final password = _passkeyPassword.trim();
-    if (password.isEmpty) {
+    if (_hasPassword && password.isEmpty) {
       setState(() => _passkeyError = lc.t('settings.email.enterCurrentPasswordFirst'));
       return;
     }
@@ -2540,7 +2585,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _passkeySuccess = null;
     });
     try {
-      final res = await ProfileService.requestPasskeyOtp(password: password);
+      final res = await ProfileService.requestPasskeyOtp(
+        password: _hasPassword ? password : null,
+      );
       if (!mounted) return;
       setState(() {
         _passkeyExpiresSec = (res['expiresSec'] as num?)?.toInt();
@@ -2726,7 +2773,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         : LanguageController.instance.t('settings.passwordSecurity.devices.typeDevice', {'type': type});
   }
 
-  String _resolveDeviceTime(Map<String, dynamic> device) {
+  String _resolveDeviceTime(Map<String, dynamic> device, {bool isCurrent = false}) {
+    if (isCurrent) return '';
+    final isActive = device['isActive'] as bool? ?? false;
+    if (isActive) return LanguageController.instance.t('settings.passwordSecurity.devices.activeNow');
     final raw =
         (device['lastSeenAt'] as String?) ?? (device['firstSeenAt'] as String?);
     final text = _formatRelativeTime(raw);
@@ -2748,6 +2798,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _logoutAllError = null;
     });
     await _loadLoginDevices();
+    _loginDevicesRefreshTimer?.cancel();
+    _loginDevicesRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _loadLoginDevices(),
+    );
   }
 
   Future<void> _loadLoginDevices() async {
@@ -3620,13 +3675,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       TextField(
                         key: const ValueKey('email-change-password-input'),
-                        obscureText: true,
+                        obscureText: !_showEmailPassword,
                         enableSuggestions: false,
                         autocorrect: false,
                         onChanged: (v) => _password = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           lc.t('settings.email.enterPassword'),
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showEmailPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: _textSecondary,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _showEmailPassword = !_showEmailPassword),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -4589,27 +4653,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                     if (_passwordStep == _PasswordChangeStep.form) ...[
-                      Text(
-                        lc.t('settings.passwordSecurity.currentPassword'),
-                        style: TextStyle(
-                          color: _textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                      if (_hasPassword) ...[
+                        Text(
+                          lc.t('settings.passwordSecurity.currentPassword'),
+                          style: TextStyle(
+                            color: _textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        key: const ValueKey('password-change-current-input'),
-                        obscureText: true,
-                        enableSuggestions: false,
-                        autocorrect: false,
-                        onChanged: (v) => _passwordCurrent = v,
-                        style: TextStyle(color: _textPrimary),
-                        decoration: _emailInputDecoration(
-                          lc.t('settings.passwordSecurity.enterCurrentPassword'),
+                        const SizedBox(height: 8),
+                        TextField(
+                          key: const ValueKey('password-change-current-input'),
+                          obscureText: !_showPasswordCurrent,
+                          enableSuggestions: false,
+                          autocorrect: false,
+                          onChanged: (v) => _passwordCurrent = v,
+                          style: TextStyle(color: _textPrimary),
+                          decoration: _emailInputDecoration(
+                            lc.t('settings.passwordSecurity.enterCurrentPassword'),
+                          ).copyWith(
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _showPasswordCurrent ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                color: _textSecondary,
+                                size: 20,
+                              ),
+                              onPressed: () => setState(() => _showPasswordCurrent = !_showPasswordCurrent),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
+                        const SizedBox(height: 10),
+                      ],
                       Text(
                         lc.t('settings.passwordSecurity.newPassword'),
                         style: TextStyle(
@@ -4621,13 +4696,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       TextField(
                         key: const ValueKey('password-change-new-input'),
-                        obscureText: true,
+                        obscureText: !_showPasswordNew,
                         enableSuggestions: false,
                         autocorrect: false,
                         onChanged: (v) => _passwordNew = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           lc.t('settings.passwordSecurity.createNewPassword'),
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPasswordNew ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: _textSecondary,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _showPasswordNew = !_showPasswordNew),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -4642,13 +4726,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       TextField(
                         key: const ValueKey('password-change-confirm-input'),
-                        obscureText: true,
+                        obscureText: !_showPasswordConfirm,
                         enableSuggestions: false,
                         autocorrect: false,
                         onChanged: (v) => _passwordConfirm = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           lc.t('settings.passwordSecurity.reEnterNewPassword'),
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPasswordConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: _textSecondary,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _showPasswordConfirm = !_showPasswordConfirm),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -4970,11 +5063,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       TextField(
                         key: const ValueKey('passkey-password-input'),
-                        obscureText: true,
+                        obscureText: !_showPasskeyPassword,
                         onChanged: (v) => _passkeyPassword = v,
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           lc.t('settings.email.enterPassword'),
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPasskeyPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: _textSecondary,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _showPasskeyPassword = !_showPasskeyPassword),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -5100,12 +5202,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         key: const ValueKey('passkey-new-input'),
                         keyboardType: TextInputType.number,
                         maxLength: 6,
-                        obscureText: true,
+                        obscureText: !_showPasskeyNew,
                         onChanged: (v) => _passkeyNew = sixDigits(v),
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           lc.t('settings.passwordSecurity.passkey.enter6Digit'),
-                        ).copyWith(counterText: ''),
+                        ).copyWith(
+                          counterText: '',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPasskeyNew ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: _textSecondary,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _showPasskeyNew = !_showPasskeyNew),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Text(
@@ -5121,12 +5233,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         key: const ValueKey('passkey-confirm-input'),
                         keyboardType: TextInputType.number,
                         maxLength: 6,
-                        obscureText: true,
+                        obscureText: !_showPasskeyConfirm,
                         onChanged: (v) => _passkeyConfirm = sixDigits(v),
                         style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           lc.t('settings.passwordSecurity.passkey.reEnterPasskey'),
-                        ).copyWith(counterText: ''),
+                        ).copyWith(
+                          counterText: '',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPasskeyConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: _textSecondary,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _showPasskeyConfirm = !_showPasskeyConfirm),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -5271,13 +5393,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    _resolveDeviceTime(device),
-                                    style: TextStyle(
-                                      color: _textSecondary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
+                                  Builder(builder: (_) {
+                                    final isActive = device['isActive'] as bool? ?? false;
+                                    final timeText = _resolveDeviceTime(device, isCurrent: isCurrent);
+                                    if (isCurrent) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    if (isActive) {
+                                      return Container(
+                                        margin: const EdgeInsets.only(top: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF16a34a).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(999),
+                                          border: Border.all(
+                                            color: const Color(0xFF16a34a).withValues(alpha: 0.3),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          timeText,
+                                          style: const TextStyle(
+                                            color: Color(0xFF16a34a),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return Text(
+                                      timeText,
+                                      style: TextStyle(
+                                        color: _textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  }),
                                   if (isCurrent)
                                     Padding(
                                       padding: EdgeInsets.only(top: 4),

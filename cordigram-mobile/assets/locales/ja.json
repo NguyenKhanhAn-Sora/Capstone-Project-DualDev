@@ -271,6 +271,7 @@
         "loadingDevices": "デバイスを読み込んでいます...",
         "noDevicesFound": "ログインデバイスが見つかりませんでした。",
         "currentDevice": "現在のデバイス",
+        "activeNow": "アクティブ中",
         "logOut": "ログアウト",
         "loggingOut": "ログアウト中...",
         "logOutAllOthers": "他のすべてのデバイスをログアウト",

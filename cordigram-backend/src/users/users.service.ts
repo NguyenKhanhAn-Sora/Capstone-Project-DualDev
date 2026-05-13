@@ -1990,16 +1990,17 @@ export class UsersService {
 
   async getPasswordChangeStatus(userId: string): Promise<{
     lastChangedAt: string | null;
+    hasPassword: boolean;
   }> {
     const user = await this.userModel
       .findById(userId)
-      .select('passwordChangedAt')
+      .select('passwordChangedAt passwordHash')
       .lean()
       .exec();
     const lastChangedAt = user?.passwordChangedAt
       ? new Date(user.passwordChangedAt).toISOString()
       : null;
-    return { lastChangedAt };
+    return { lastChangedAt, hasPassword: !!user?.passwordHash };
   }
 
   async getPasskeyStatus(
@@ -2073,16 +2074,28 @@ export class UsersService {
       lastSeenAt?: string | null;
     }>;
   }> {
+    const baseId = params.deviceId?.trim()
+      ? params.deviceId.trim()
+      : `${params.userAgent ?? ''}::${params.ip ?? ''}`;
+    const currentDeviceIdHash = baseId ? this.hashDeviceId(baseId) : undefined;
+
+    // Update lastSeenAt for the current device synchronously so the read
+    // below reflects it as active immediately (avoids the race condition
+    // where fire-and-forget in jwt.strategy hasn't written yet).
+    if (currentDeviceIdHash && params.deviceId?.trim()) {
+      await this.touchDeviceLastSeen({
+        userId: params.userId,
+        deviceId: params.deviceId.trim(),
+      });
+    }
+
     const user = await this.userModel
       .findById(params.userId)
       .select('loginDevices')
       .lean()
       .exec();
 
-    const baseId = params.deviceId?.trim()
-      ? params.deviceId.trim()
-      : `${params.userAgent ?? ''}::${params.ip ?? ''}`;
-    const currentDeviceIdHash = baseId ? this.hashDeviceId(baseId) : undefined;
+    const activeThreshold = new Date(Date.now() - 5 * 60 * 1000);
 
     const devices = (user?.loginDevices ?? [])
       .slice()
@@ -2107,9 +2120,41 @@ export class UsersService {
         lastSeenAt: item.lastSeenAt
           ? new Date(item.lastSeenAt).toISOString()
           : null,
+        // Current device is always active; others use the 5-minute threshold
+        isActive:
+          item.deviceIdHash === currentDeviceIdHash
+            ? true
+            : item.lastSeenAt
+              ? new Date(item.lastSeenAt) >= activeThreshold
+              : false,
       }));
 
     return { currentDeviceIdHash, devices };
+  }
+
+  async touchDeviceLastSeen(params: {
+    userId: string;
+    deviceId: string;
+  }): Promise<void> {
+    const deviceIdHash = this.hashDeviceId(params.deviceId.trim());
+    const threshold = new Date(Date.now() - 2 * 60 * 1000);
+    await this.userModel
+      .updateOne(
+        {
+          _id: params.userId,
+          loginDevices: {
+            $elemMatch: {
+              deviceIdHash,
+              $or: [
+                { lastSeenAt: { $lt: threshold } },
+                { lastSeenAt: { $exists: false } },
+              ],
+            },
+          },
+        },
+        { $set: { 'loginDevices.$.lastSeenAt': new Date() } },
+      )
+      .exec();
   }
 
   async isLoginDeviceActive(params: {
@@ -2290,6 +2335,11 @@ export class UsersService {
       })
       .exec();
 
+    this.notificationsService.emitForceLogoutToDevice(
+      params.deviceIdHash,
+      'session_revoked',
+    );
+
     return { loggedOut: true };
   }
 
@@ -2306,6 +2356,15 @@ export class UsersService {
       throw new BadRequestException('Device identifier is required');
     }
     const currentDeviceIdHash = this.hashDeviceId(baseId);
+
+    const user = await this.userModel
+      .findById(params.userId)
+      .select('loginDevices')
+      .lean()
+      .exec();
+    const removedHashes = (user?.loginDevices ?? [])
+      .filter((d) => d.deviceIdHash !== currentDeviceIdHash)
+      .map((d) => d.deviceIdHash);
 
     await this.userModel
       .updateOne(
@@ -2324,6 +2383,10 @@ export class UsersService {
         deviceIdHash: { $ne: currentDeviceIdHash },
       })
       .exec();
+
+    for (const hash of removedHashes) {
+      this.notificationsService.emitForceLogoutToDevice(hash, 'session_revoked');
+    }
 
     return { loggedOut: true, currentDeviceIdHash };
   }
@@ -2527,7 +2590,7 @@ export class UsersService {
 
   async requestChangeEmailCurrentOtp(params: {
     userId: string;
-    password: string;
+    password?: string;
   }): Promise<{ expiresSec: number }> {
     const user = await this.userModel
       .findById(params.userId)
@@ -2539,13 +2602,14 @@ export class UsersService {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    if (!user.passwordHash) {
-      throw new UnauthorizedException('Invalid sign-in method');
-    }
-
-    const passwordOk = await bcrypt.compare(params.password, user.passwordHash);
-    if (!passwordOk) {
-      throw new UnauthorizedException('Incorrect password');
+    if (user.passwordHash) {
+      if (!params.password) {
+        throw new UnauthorizedException('Password is required');
+      }
+      const passwordOk = await bcrypt.compare(params.password, user.passwordHash);
+      if (!passwordOk) {
+        throw new UnauthorizedException('Incorrect password');
+      }
     }
 
     const { code, expiresMs } = await this.otpService.requestOtp(user.email);
@@ -2589,10 +2653,6 @@ export class UsersService {
 
     if (user.status === 'banned') {
       throw new ForbiddenException('Account is suspended.');
-    }
-
-    if (!user.passwordHash) {
-      throw new BadRequestException('Password is not set for this account.');
     }
 
     const { code, expiresMs } = await this.otpService.requestOtp(user.email);
@@ -2647,7 +2707,7 @@ export class UsersService {
 
   async confirmPasswordChange(params: {
     userId: string;
-    currentPassword: string;
+    currentPassword?: string;
     newPassword: string;
   }): Promise<{ updated: boolean }> {
     const user = await this.userModel
@@ -2659,10 +2719,6 @@ export class UsersService {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    if (!user.passwordHash) {
-      throw new BadRequestException('Password is not set for this account.');
-    }
-
     if (!user.passwordChange?.verifiedAt) {
       throw new BadRequestException('OTP verification required.');
     }
@@ -2671,18 +2727,22 @@ export class UsersService {
       throw new BadRequestException('OTP expired. Please request a new code.');
     }
 
-    const currentOk = await bcrypt.compare(
-      params.currentPassword,
-      user.passwordHash,
-    );
-    if (!currentOk) {
-      throw new UnauthorizedException('Current password is incorrect.');
-    }
-
-    if (params.currentPassword === params.newPassword) {
-      throw new BadRequestException(
-        'New password must be different from current password.',
+    if (user.passwordHash) {
+      if (!params.currentPassword) {
+        throw new BadRequestException('Current password is required.');
+      }
+      const currentOk = await bcrypt.compare(
+        params.currentPassword,
+        user.passwordHash,
       );
+      if (!currentOk) {
+        throw new UnauthorizedException('Current password is incorrect.');
+      }
+      if (params.currentPassword === params.newPassword) {
+        throw new BadRequestException(
+          'New password must be different from current password.',
+        );
+      }
     }
 
     if (!this.isPasswordStrong(params.newPassword)) {
@@ -2706,7 +2766,7 @@ export class UsersService {
 
   async requestPasskeyOtp(params: {
     userId: string;
-    password: string;
+    password?: string;
   }): Promise<{ expiresSec: number }> {
     const user = await this.userModel
       .findById(params.userId)
@@ -2722,13 +2782,14 @@ export class UsersService {
       throw new ForbiddenException('Account is suspended.');
     }
 
-    if (!user.passwordHash) {
-      throw new BadRequestException('Password is not set for this account.');
-    }
-
-    const passwordOk = await bcrypt.compare(params.password, user.passwordHash);
-    if (!passwordOk) {
-      throw new UnauthorizedException('Current password is incorrect.');
+    if (user.passwordHash) {
+      if (!params.password) {
+        throw new BadRequestException('Password is required.');
+      }
+      const passwordOk = await bcrypt.compare(params.password, user.passwordHash);
+      if (!passwordOk) {
+        throw new UnauthorizedException('Current password is incorrect.');
+      }
     }
 
     const { code, expiresMs } = await this.otpService.requestOtp(user.email);

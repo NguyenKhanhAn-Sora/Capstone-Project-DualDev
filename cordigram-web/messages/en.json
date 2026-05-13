@@ -1,5 +1,10 @@
 {
   "settings": {
+    "devices": {
+      "thisDevice": "This device",
+      "activeNow": "Active now",
+      "lastActive": "Last active {time}."
+    },
     "system": {
       "title": "System",
       "description": "Choose your language and theme preferences.",

@@ -271,6 +271,7 @@
         "loadingDevices": "Đang tải thiết bị...",
         "noDevicesFound": "Không tìm thấy thiết bị đăng nhập nào.",
         "currentDevice": "Thiết bị hiện tại",
+        "activeNow": "Đang hoạt động",
         "logOut": "Đăng xuất",
         "loggingOut": "Đang đăng xuất...",
         "logOutAllOthers": "Đăng xuất tất cả thiết bị khác",

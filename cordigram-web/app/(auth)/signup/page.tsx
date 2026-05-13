@@ -1096,7 +1096,7 @@ export default function SignupPage() {
           {fieldError.username ? (
             <p className={styles.fieldError}>{fieldError.username}</p>
           ) : (
-            <p className="text-[12px]">
+            <p className="text-[12px] text-[#5b6378]">
               Username can only include letters, numbers, underscores, and dots
             </p>
           )}
@@ -1174,6 +1174,7 @@ export default function SignupPage() {
               setBirthdate(next);
               setFieldError((prev) => ({ ...prev, birthdate: undefined }));
             }}
+            forceLight
           />
           {fieldError.birthdate && (
             <p className={styles.fieldError}>{fieldError.birthdate}</p>

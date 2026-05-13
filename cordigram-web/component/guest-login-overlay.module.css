@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(0, 0, 0, 0.65);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -19,8 +19,8 @@
 .card {
   position: relative;
   width: min(400px, 100%);
-  background: linear-gradient(145deg, rgba(18, 24, 45, 0.97), rgba(18, 26, 52, 0.99));
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 40px 32px 32px;
   display: flex;
@@ -28,7 +28,7 @@
   align-items: center;
   gap: 12px;
   animation: slideUp 0.2s ease;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-strong);
 }
 
 @keyframes slideUp {
@@ -43,7 +43,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--color-text-muted, #8899aa);
+  color: var(--color-text-muted);
   padding: 4px;
   border-radius: 6px;
   display: flex;
@@ -53,25 +53,25 @@
 }
 
 .closeBtn:hover {
-  color: var(--color-text, #fff);
+  color: var(--color-text);
 }
 
 .lockIcon {
-  color: var(--color-accent, #7895ff);
+  color: var(--accent-color);
   margin-bottom: 4px;
 }
 
 .title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--color-text, #fff);
+  color: var(--color-text);
   margin: 0;
   text-align: center;
 }
 
 .subtitle {
   font-size: 0.875rem;
-  color: var(--color-text-muted, #8899aa);
+  color: var(--color-text-muted);
   text-align: center;
   margin: 0;
   line-height: 1.5;
@@ -88,7 +88,7 @@
   flex: 1;
   padding: 11px 0;
   border-radius: 10px;
-  background: var(--color-accent, #7895ff);
+  background: var(--accent-color);
   color: #fff;
   font-weight: 600;
   font-size: 0.9rem;
@@ -105,9 +105,9 @@
   flex: 1;
   padding: 11px 0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--color-text, #fff);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
   font-weight: 600;
   font-size: 0.9rem;
   text-align: center;
@@ -116,14 +116,14 @@
 }
 
 .btnSecondary:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-border);
 }
 
 .guestBtn {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--color-text-muted, #8899aa);
+  color: var(--color-text-muted);
   font-size: 0.8rem;
   margin-top: 4px;
   padding: 4px 8px;
@@ -132,5 +132,5 @@
 }
 
 .guestBtn:hover {
-  color: var(--color-text, #fff);
+  color: var(--color-text);
 }

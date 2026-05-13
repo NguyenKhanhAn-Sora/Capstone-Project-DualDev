@@ -271,6 +271,7 @@
         "loadingDevices": "Loading devices...",
         "noDevicesFound": "No login devices found.",
         "currentDevice": "Current device",
+        "activeNow": "Active now",
         "logOut": "Log out",
         "loggingOut": "Logging out...",
         "logOutAllOthers": "Log out all other devices",

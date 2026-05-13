@@ -45,6 +45,7 @@ type DateSelectProps = {
   maxDate?: Date | null;
   minDate?: Date | null;
   minYear?: number;
+  forceLight?: boolean;
 };
 
 type PopoverPos = {
@@ -66,6 +67,7 @@ export function DateSelect({
   maxDate,
   minDate,
   minYear = 1900,
+  forceLight = false,
 }: DateSelectProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -284,6 +286,7 @@ export function DateSelect({
               data-date-select-portal="true"
               className={styles.popover}
               role="dialog"
+              {...(forceLight ? { "data-theme": "light" } : {})}
               onMouseDownCapture={(e) => {
                 if (!monthMenuOpen && !yearMenuOpen) return;
                 const target = e.target as Node;

@@ -1,8 +1,7 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class RequestChangeEmailCurrentOtpDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @MinLength(6)
-  password!: string;
+  password?: string;
 }

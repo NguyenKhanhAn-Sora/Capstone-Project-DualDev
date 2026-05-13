@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { OnModuleInit } from '@nestjs/common';
 import type { Model } from 'mongoose';
 import type { Server, Socket } from 'socket.io';
+import { createHmac } from 'crypto';
 import { ConfigService } from '../config/config.service';
 import { FcmPushService } from './fcm-push.service';
 import type { NotificationRealtimePayload } from './notifications.service';
@@ -34,6 +35,8 @@ export class NotificationsGateway
   server: Server;
 
   private readonly connections = new Map<string, Set<string>>();
+  /** Maps deviceIdHash → Set<socketId> for targeted per-device emits */
+  private readonly deviceConnections = new Map<string, Set<string>>();
   private readonly onlineStatsKey = 'global';
   private peakOnlineUsers = 0;
 
@@ -91,6 +94,15 @@ export class NotificationsGateway
     current.add(client.id);
     this.connections.set(userId, current);
 
+    const rawDeviceId = client.handshake.query?.deviceId as string | undefined;
+    if (rawDeviceId?.trim()) {
+      const deviceIdHash = this.hashDeviceId(rawDeviceId.trim());
+      client.data.deviceIdHash = deviceIdHash;
+      const devSockets = this.deviceConnections.get(deviceIdHash) ?? new Set<string>();
+      devSockets.add(client.id);
+      this.deviceConnections.set(deviceIdHash, devSockets);
+    }
+
     client.emit('system:online-stats', this.getOnlineStatsSnapshot());
     void this.publishOnlineStats();
   }
@@ -103,6 +115,15 @@ export class NotificationsGateway
     current.delete(client.id);
     if (!current.size) {
       this.connections.delete(userId);
+    }
+
+    const deviceIdHash = client.data?.deviceIdHash as string | undefined;
+    if (deviceIdHash) {
+      const devSockets = this.deviceConnections.get(deviceIdHash);
+      if (devSockets) {
+        devSockets.delete(client.id);
+        if (!devSockets.size) this.deviceConnections.delete(deviceIdHash);
+      }
     }
 
     void this.publishOnlineStats();
@@ -125,8 +146,23 @@ export class NotificationsGateway
     }
   }
 
+  emitToDevice<T>(deviceIdHash: string, event: string, payload: T): void {
+    const sockets = this.deviceConnections.get(deviceIdHash);
+    if (sockets?.size) {
+      sockets.forEach((socketId) => {
+        this.server.to(socketId).emit(event, payload);
+      });
+    }
+  }
+
   emitToAll<T>(event: string, payload: T): void {
     this.server.emit(event, payload);
+  }
+
+  private hashDeviceId(deviceId: string): string {
+    return createHmac('sha256', this.config.jwtSecret)
+      .update(deviceId)
+      .digest('hex');
   }
 
   getConnectedUserCount(): number {

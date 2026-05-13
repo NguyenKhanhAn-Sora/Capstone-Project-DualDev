@@ -2021,7 +2021,7 @@ export type ChangeEmailVerifyResponse = {
 
 export async function requestChangeEmailCurrentOtp(opts: {
   token: string;
-  password: string;
+  password?: string;
 }): Promise<ChangeEmailOtpResponse> {
   const { token, password } = opts;
   return apiFetch<ChangeEmailOtpResponse>({
@@ -2758,6 +2758,7 @@ export type ConfirmPasswordChangeResponse = {
 
 export type PasswordChangeStatusResponse = {
   lastChangedAt: string | null;
+  hasPassword: boolean;
 };
 
 export type PasskeyStatusResponse = {
@@ -3081,7 +3082,7 @@ export async function verifyPasswordChangeOtp(opts: {
 
 export async function confirmPasswordChange(opts: {
   token: string;
-  currentPassword: string;
+  currentPassword?: string;
   newPassword: string;
 }): Promise<ConfirmPasswordChangeResponse> {
   const { token, currentPassword, newPassword } = opts;
@@ -3196,7 +3197,7 @@ export async function resendTwoFactorLoginOtp(opts: {
 
 export async function requestPasskeyOtp(opts: {
   token: string;
-  password: string;
+  password?: string;
 }): Promise<{ expiresSec: number }> {
   const { token, password } = opts;
   return apiFetch<{ expiresSec: number }>({
@@ -3469,6 +3470,7 @@ export type LoginDeviceItem = {
   loginMethod?: string;
   firstSeenAt?: string | null;
   lastSeenAt?: string | null;
+  isActive?: boolean;
 };
 
 export type LoginDevicesResponse = {

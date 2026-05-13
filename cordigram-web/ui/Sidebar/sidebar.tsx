@@ -239,8 +239,13 @@ export default function Sidebar() {
     (token: string) => {
       socketRef.current?.disconnect();
 
+      const deviceId =
+        typeof window !== "undefined"
+          ? (window.localStorage.getItem("cordigramDeviceId") ?? undefined)
+          : undefined;
       const socket = io(`${getApiBaseUrl()}/notifications`, {
         auth: { token },
+        query: deviceId ? { deviceId } : {},
         transports: ["websocket"],
       });
 
