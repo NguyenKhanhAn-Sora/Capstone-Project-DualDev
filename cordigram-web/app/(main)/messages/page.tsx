@@ -2158,10 +2158,11 @@ export default function MessagesPage() {
   // ✅ New message in channel from WebSocket (thành viên khác gửi → hiện ngay không cần reload)
   useEffect(() => {
     if (!newMessageChannel?.message || !selectedChannel) return;
-    const skipBlockForApplyAccepted =
+    const skipBlockForApplyVerificationOnly =
       myServerAccessStatus?.accessMode === "apply" &&
-      myServerAccessStatus.status === "accepted";
-    if (myServerAccessStatus?.chatViewBlocked && !skipBlockForApplyAccepted) {
+      myServerAccessStatus.status === "accepted" &&
+      myServerAccessStatus?.chatBlockReason === "verification";
+    if (myServerAccessStatus?.chatViewBlocked && !skipBlockForApplyVerificationOnly) {
       clearNewMessageChannel();
       return;
     }
@@ -4784,17 +4785,18 @@ export default function MessagesPage() {
   };
 
   /**
-   * Apply-to-join: sau khi chủ server duyệt (accepted), user đã là thành viên — không hiện
-   * màn xác minh/quy định dạng "trước khi chat" (chỉ dành cho người chưa được vào server / chờ duyệt).
+   * Apply + accepted: backend bỏ chặn khi lý do duy nhất là "verification" (chờ email / 5 phút / 10 phút).
+   * Không áp dụng cho age_ack: vẫn cần bấm "Tiếp tục" (ack API) dù đã đủ 18 — trùng với createMessage 403.
    */
-  const isApplyModeAcceptedMember =
+  const applyAcceptedSkipsVerificationBlockOnly =
     myServerAccessStatus?.accessMode === "apply" &&
-    myServerAccessStatus.status === "accepted";
+    myServerAccessStatus.status === "accepted" &&
+    myServerAccessStatus?.chatBlockReason === "verification";
 
   const shouldBlockServerChatInput = Boolean(
     selectedServer &&
       !selectedDirectMessageFriend &&
-      !isApplyModeAcceptedMember &&
+      !applyAcceptedSkipsVerificationBlockOnly &&
       (myServerAccessStatus?.chatViewBlocked === true ||
         (myServerAccessStatus?.hasRules === true &&
           !myServerAccessStatus?.acceptedRules)),
@@ -4808,10 +4810,10 @@ export default function MessagesPage() {
   }, [shouldBlockServerChatInput]);
 
   useEffect(() => {
-    if (!isApplyModeAcceptedMember) return;
+    if (!applyAcceptedSkipsVerificationBlockOnly) return;
     setVerificationRulesOpen(false);
     setShowAcceptRulesModal(false);
-  }, [isApplyModeAcceptedMember]);
+  }, [applyAcceptedSkipsVerificationBlockOnly]);
 
   const handleSendMessage = async () => {
     if (shouldBlockServerChatInput) {
@@ -5023,9 +5025,10 @@ export default function MessagesPage() {
       setMyServerAccessStatus(status);
       const applyAccepted =
         status.accessMode === "apply" && status.status === "accepted";
-      const stillBlocked = applyAccepted
-        ? false
-        : status.chatViewBlocked || (status.hasRules && !status.acceptedRules);
+      const stillBlocked =
+        applyAccepted && status.chatBlockReason === "verification"
+          ? false
+          : status.chatViewBlocked || (status.hasRules && !status.acceptedRules);
       if (!stillBlocked) {
         setVerificationRulesOpen(false);
         setVerificationAccessSettings(null);
@@ -10725,7 +10728,7 @@ export default function MessagesPage() {
       {(verificationRulesOpen || showAcceptRulesModal) &&
         selectedServer &&
         !selectedDirectMessageFriend &&
-        !isApplyModeAcceptedMember &&
+        !applyAcceptedSkipsVerificationBlockOnly &&
         (() => {
         const srv = currentServer;
         const hasRulesContent = (verificationAccessSettings?.rules?.length ?? 0) > 0;

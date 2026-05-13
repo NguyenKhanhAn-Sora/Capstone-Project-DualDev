@@ -146,11 +146,40 @@ class ServersService {
         '/profiles/me',
         extraHeaders: _authHeaders,
       );
-      final raw = res['birthdate']?.toString();
+      final raw = birthdateStringFromMeResponse(res);
       return ageYearsFromBirthdateString(raw);
     } catch (_) {
       return null;
     }
+  }
+
+  /// API có thể trả `birthdate` là chuỗi, epoch ms, hoặc `{\$date: ...}` (BSON).
+  static String? birthdateStringFromMeResponse(Map<String, dynamic> res) {
+    return coerceBirthdateDynamicToString(res['birthdate']);
+  }
+
+  static String? coerceBirthdateDynamicToString(dynamic v) {
+    if (v == null) return null;
+    if (v is String) {
+      final t = v.trim();
+      return t.isEmpty ? null : t;
+    }
+    if (v is num) {
+      final ms = v.toDouble();
+      final epochMs =
+          ms.abs() > 1e12 ? ms.toInt() : (ms * 1000).round();
+      final d = DateTime.fromMillisecondsSinceEpoch(epochMs, isUtc: true);
+      final y = d.year.toString().padLeft(4, '0');
+      final m = d.month.toString().padLeft(2, '0');
+      final day = d.day.toString().padLeft(2, '0');
+      return '$y-$m-$day';
+    }
+    if (v is Map) {
+      final inner = v[r'$date'];
+      return coerceBirthdateDynamicToString(inner);
+    }
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
   }
 
   /// Parse tuổi (số năm đầy đủ) từ chuỗi ngày sinh — dùng chung cho gate tuổi.
@@ -160,6 +189,7 @@ class ServersService {
     if (s.isEmpty) return null;
     DateTime? d = DateTime.tryParse(s);
     d ??= _tryParseYmdPrefix(s);
+    d ??= _tryParseDdMmYyyy(s);
     if (d == null) return null;
     final now = DateTime.now();
     var age = now.year - d.year;
@@ -179,6 +209,24 @@ class ServersService {
     if (y == null || mo == null || day == null) return null;
     if (mo < 1 || mo > 12 || day < 1 || day > 31) return null;
     return DateTime(y, mo, day);
+  }
+
+  /// `dd/MM/yyyy` hoặc `d/M/yyyy` (phổ biến trên app Việt).
+  static DateTime? _tryParseDdMmYyyy(String s) {
+    final m = RegExp(
+      r'^(\d{1,2})/(\d{1,2})/(\d{4})$',
+    ).firstMatch(s.trim());
+    if (m == null) return null;
+    final day = int.tryParse(m.group(1)!);
+    final mo = int.tryParse(m.group(2)!);
+    final y = int.tryParse(m.group(3)!);
+    if (day == null || mo == null || y == null) return null;
+    if (mo < 1 || mo > 12 || day < 1 || day > 31) return null;
+    try {
+      return DateTime(y, mo, day);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Sau khi đã [joinServer], xác nhận đã đọc cảnh báo máy chủ giới hạn độ tuổi (NSFW).

@@ -42,6 +42,52 @@ type MulterFile = {
   size: number;
 };
 
+/** Chuẩn hóa một giá trị birthdate lưu trong DB (Date, số ms, chuỗi, BSON {$date}). */
+function coerceBirthdateValueToIso(raw: unknown): string | null {
+  if (raw == null || raw === '') return null;
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return raw.toISOString().slice(0, 10);
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  }
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (!s) return null;
+    const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+    if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  if (typeof raw === 'object' && raw !== null && '$date' in raw) {
+    return coerceBirthdateValueToIso((raw as { $date?: unknown }).$date);
+  }
+  return null;
+}
+
+/** Đọc birthdate từ Profile Mongoose hoặc plain — tránh mất ngày sinh khi kiểu runtime không phải Date. */
+function birthdateIsoFromProfileDocument(profile: unknown): string | null {
+  if (!profile || typeof profile !== 'object') return null;
+  const asRec = profile as Record<string, unknown>;
+  let raw: unknown = asRec['birthdate'];
+  if (
+    raw === undefined &&
+    typeof (profile as { toObject?: () => Record<string, unknown> }).toObject ===
+      'function'
+  ) {
+    try {
+      const plain = (
+        profile as { toObject: () => Record<string, unknown> }
+      ).toObject();
+      raw = plain['birthdate'];
+    } catch {
+      /* ignore */
+    }
+  }
+  return coerceBirthdateValueToIso(raw);
+}
+
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 /** Multer trần — kiểm tra kích thước thật theo Boost + context trong handler. */
 const AVATAR_UPLOAD_MULTER_CEILING = 600 * 1024 * 1024;
@@ -165,23 +211,7 @@ export class ProfilesController {
       )
       .lean();
 
-    /** Chuẩn hóa ngày sinh — trong DB có thể là Date hoặc chuỗi ISO / yyyy-MM-dd. */
-    const birthdateIso = ((): string | null => {
-      const raw = (profile as { birthdate?: unknown }).birthdate;
-      if (raw == null) return null;
-      if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
-        return raw.toISOString().slice(0, 10);
-      }
-      if (typeof raw === 'string') {
-        const s = raw.trim();
-        if (!s) return null;
-        const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-        if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
-        const d = new Date(s);
-        if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-      }
-      return null;
-    })();
+    const birthdateIso = birthdateIsoFromProfileDocument(profile);
 
     return {
       id: profile._id?.toString?.() ?? (profile as { id?: string }).id,

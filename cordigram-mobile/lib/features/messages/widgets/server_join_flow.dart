@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/api_service.dart';
@@ -45,25 +44,21 @@ class InviteCustomizeResult {
 class ServerJoinFlow {
   ServerJoinFlow._();
 
-  static NavigatorState _nav(BuildContext context) =>
-      Navigator.of(context, rootNavigator: true);
-
-  static void _setLoaderFlag(void Function(bool v) setLoad, bool v) {
-    setLoad(v);
-  }
-
+  /// [loaderDialogHolder][0] giữ context của route dialog loader — pop đúng overlay, tránh
+  /// `Navigator.pop` mù + chồng dialog (gây crash `_dependents.isEmpty`).
   static void _openLoad(
     BuildContext context,
-    void Function(bool v) setLoadOpen,
+    List<BuildContext?> loaderDialogHolder,
   ) {
-    // Avoid popping before the route exists: open after the next frame, then mark open.
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!context.mounted) return;
-      showDialog<void>(
-        context: context,
-        useRootNavigator: true,
-        barrierDismissible: false,
-        builder: (_) => PopScope(
+    if (!context.mounted) return;
+    loaderDialogHolder[0] = null;
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        loaderDialogHolder[0] = dialogCtx;
+        return PopScope(
           canPop: false,
           child: Center(
             child: Card(
@@ -71,42 +66,22 @@ class ServerJoinFlow {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: CircularProgressIndicator(
-                  color: Theme.of(context).colorScheme.primary,
+                  color: Theme.of(dialogCtx).colorScheme.primary,
                 ),
               ),
             ),
           ),
-        ),
-      );
-      _setLoaderFlag(setLoadOpen, true);
-    });
+        );
+      },
+    );
   }
 
-  static void _closeLoad(
-    BuildContext context,
-    bool loadOpen,
-    void Function(bool v) setLoadOpen,
-  ) {
-    if (!loadOpen) return;
-    void tryPop(int attempt) {
-      if (!context.mounted) return;
-      final nav = _nav(context);
-      if (nav.canPop()) {
-        nav.pop();
-        _setLoaderFlag(setLoadOpen, false);
-        return;
-      }
-      if (attempt >= 12) {
-        _setLoaderFlag(setLoadOpen, false);
-        return;
-      }
-      final ms = attempt < 4 ? 16 : 48;
-      Future<void>.delayed(Duration(milliseconds: ms), () {
-        tryPop(attempt + 1);
-      });
+  static void _closeLoad(List<BuildContext?> loaderDialogHolder) {
+    final ctx = loaderDialogHolder[0];
+    loaderDialogHolder[0] = null;
+    if (ctx != null && ctx.mounted) {
+      Navigator.of(ctx).pop();
     }
-
-    SchedulerBinding.instance.addPostFrameCallback((_) => tryPop(0));
   }
 
   static List<Map<String, dynamic>> _coerceQuestions(dynamic raw) {
@@ -115,6 +90,11 @@ class ServerJoinFlow {
     for (final e in raw) {
       if (e is! Map) continue;
       final m = Map<String, dynamic>.from(e);
+      final idRaw =
+          (m['id'] ?? m['_id'] ?? m['questionId'])?.toString().trim() ?? '';
+      if (idRaw.isNotEmpty) {
+        m['id'] = idRaw;
+      }
       final opts = m['options'];
       if (opts is! List || opts.isEmpty) {
         final alt = m['choices'] ?? m['option'];
@@ -127,23 +107,33 @@ class ServerJoinFlow {
     return out;
   }
 
+  /// Ưu tiên GET `/access/join-form` (đủ câu hỏi, đã chuẩn hóa); fallback form nhúng trong `/access/settings`.
   static Future<Map<String, dynamic>> _loadJoinForm(
     String serverId,
     Map<String, dynamic> settings,
   ) async {
+    Map<String, dynamic>? fromApi;
+    try {
+      final fetched = await ServersService.getJoinApplicationForm(serverId);
+      final qs = _coerceQuestions(fetched['questions']);
+      fromApi = {...Map<String, dynamic>.from(fetched), 'questions': qs};
+    } catch (_) {
+      fromApi = null;
+    }
     final embedded = settings['joinApplicationForm'];
+    if (fromApi != null) {
+      final embEnabled = embedded is Map && embedded['enabled'] == true;
+      if (embEnabled && fromApi['enabled'] != true) {
+        fromApi = {...fromApi, 'enabled': true};
+      }
+      return fromApi;
+    }
     if (embedded is Map<String, dynamic>) {
       final m = Map<String, dynamic>.from(embedded);
       m['questions'] = _coerceQuestions(m['questions']);
       return m;
     }
-    try {
-      final fetched = await ServersService.getJoinApplicationForm(serverId);
-      final qs = _coerceQuestions(fetched['questions']);
-      return {...fetched, 'questions': qs};
-    } catch (_) {
-      return {'enabled': false, 'questions': <dynamic>[]};
-    }
+    return {'enabled': false, 'questions': <dynamic>[]};
   }
 
   static List<Map<String, dynamic>> _rulesList(Map<String, dynamic> settings) {
@@ -355,6 +345,7 @@ class ServerJoinFlow {
                       Expanded(
                         child: ListView(
                           controller: scrollCtrl,
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: EdgeInsets.fromLTRB(
                             16,
                             12,
@@ -1055,10 +1046,9 @@ class ServerJoinFlow {
     VoidCallback? onNavigateToMessagesHome,
   }) async {
     if (!context.mounted) return false;
-    var loadOpen = false;
-    void setLoad(bool v) => loadOpen = v;
-    void openLoad() => _openLoad(context, setLoad);
-    void closeLoad() => _closeLoad(context, loadOpen, setLoad);
+    final loaderDialogHolder = <BuildContext?>[null];
+    void openLoad() => _openLoad(context, loaderDialogHolder);
+    void closeLoad() => _closeLoad(loaderDialogHolder);
 
     openLoad();
     try {
@@ -1080,13 +1070,6 @@ class ServerJoinFlow {
             access['hasRules'] == true && access['acceptedRules'] != true;
 
         if (pendingApply) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Đơn đăng ký của bạn đang chờ duyệt. Bạn có thể vào máy chủ nhưng có thể chưa chat được.',
-              ),
-            ),
-          );
           await onOpenServerInApp?.call(serverId, channelId: initialChannelId);
           return true;
         }
@@ -1267,13 +1250,6 @@ class ServerJoinFlow {
         }
         closeLoad();
         if (!context.mounted) return false;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Đơn đăng ký đã được gửi. Vui lòng chờ chủ máy chủ hoặc quản trị viên duyệt.',
-            ),
-          ),
-        );
         await onOpenServerInApp?.call(serverId, channelId: initialChannelId);
         return true;
       }

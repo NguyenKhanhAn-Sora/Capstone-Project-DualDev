@@ -259,23 +259,31 @@ export class ServerAccessService {
       options?: string[];
     }>;
   }> {
+    void requesterUserId;
     const server = await this.serversService.getServerById(serverId);
-    const isOwner = String(server.ownerId) === String(requesterUserId);
-    const canManageServer = await this.rolesService.hasPermission(
-      serverId,
-      requesterUserId,
-      'manageServer',
-    );
-    if (!isOwner && !canManageServer) {
-      throw new ForbiddenException(
-        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới xem được',
-      );
-    }
+    const raw = Array.isArray((server as any)?.joinApplicationForm?.questions)
+      ? ((server as any).joinApplicationForm.questions as any[])
+      : [];
+    /** Người join qua invite/link cần đủ câu hỏi — không giới hạn chỉ chủ/mod đọc GET này (PATCH vẫn khóa). */
+    const questions = raw.map((q) => ({
+      id: String(q?.id ?? q?._id ?? '').trim(),
+      title: String(q?.title ?? '').trim(),
+      type:
+        q?.type === 'paragraph'
+          ? ('paragraph' as const)
+          : q?.type === 'multiple_choice'
+            ? ('multiple_choice' as const)
+            : ('short' as const),
+      required: q?.required !== false,
+      options: Array.isArray(q?.options)
+        ? q.options
+            .map((x: unknown) => String(x ?? '').trim())
+            .filter(Boolean)
+        : [],
+    }));
     return {
       enabled: Boolean((server as any)?.joinApplicationForm?.enabled),
-      questions: Array.isArray((server as any)?.joinApplicationForm?.questions)
-        ? (server as any).joinApplicationForm.questions
-        : [],
+      questions,
     };
   }
 
