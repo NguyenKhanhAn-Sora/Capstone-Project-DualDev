@@ -495,6 +495,7 @@ class MessagesController extends ChangeNotifier {
   }
 
   bool isConversationMuted(String userId) {
+    if (DirectMessagesService.isConversationMuted(userId)) return true;
     if (_conversationMutedForever.contains(userId)) return true;
     final until = _conversationMutedUntil[userId];
     if (until == null) return false;
@@ -505,6 +506,12 @@ class MessagesController extends ChangeNotifier {
     return true;
   }
 
+  /// DM mute: "until I turn back on" (excludes timed mutes).
+  bool isConversationMutedForever(String userId) {
+    if (_conversationMutedForever.contains(userId)) return true;
+    return DirectMessagesService.isConversationMutedForever(userId);
+  }
+
   void setConversationMuteDuration(
     String userId, {
     Duration? duration,
@@ -513,12 +520,15 @@ class MessagesController extends ChangeNotifier {
     if (forever) {
       _conversationMutedForever.add(userId);
       _conversationMutedUntil.remove(userId);
+      DirectMessagesService.setConversationMuted(userId, forever: true);
     } else if (duration == null) {
       _conversationMutedForever.remove(userId);
       _conversationMutedUntil.remove(userId);
+      DirectMessagesService.setConversationMuted(userId, duration: null);
     } else {
       _conversationMutedForever.remove(userId);
       _conversationMutedUntil[userId] = DateTime.now().add(duration);
+      DirectMessagesService.setConversationMuted(userId, duration: duration);
     }
     notifyListeners();
   }
@@ -584,7 +594,10 @@ class MessagesController extends ChangeNotifier {
     list.add(message);
     _messagesByUser[peerId] = list;
     _patchThreadLastMessage(peerId, message.content);
-    MessageNotificationSound.play();
+    // Mute affects alerts only; messages must still be received and shown.
+    if (!isConversationMuted(peerId)) {
+      MessageNotificationSound.play();
+    }
     refreshInboxCount();
     notifyListeners();
   }

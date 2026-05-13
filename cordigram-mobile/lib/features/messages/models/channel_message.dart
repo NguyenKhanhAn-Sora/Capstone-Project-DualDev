@@ -19,6 +19,7 @@ class ChannelMessage {
     this.pinnedAt,
     this.replyTo,
     this.senderAvatarUrl,
+    this.stickerReplyWelcomeEnabled = true,
   });
 
   final String id;
@@ -38,6 +39,9 @@ class ChannelMessage {
   final DateTime? pinnedAt;
   final ChannelReplyMessage? replyTo;
   final String? senderAvatarUrl;
+
+  /// Server interaction setting; only used when [type] is `welcome`.
+  final bool stickerReplyWelcomeEnabled;
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
     final senderRaw = json['sender'] ?? json['senderId'];
@@ -98,6 +102,7 @@ class ChannelMessage {
               Map<String, dynamic>.from(json['replyTo']),
             )
           : null,
+      stickerReplyWelcomeEnabled: json['stickerReplyWelcomeEnabled'] != false,
     );
   }
 }

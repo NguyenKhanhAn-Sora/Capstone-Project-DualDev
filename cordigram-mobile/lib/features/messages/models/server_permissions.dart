@@ -32,6 +32,9 @@ class CurrentUserServerPermissions {
   bool get canAccessPrivateChannel =>
       isOwner || canManageServer || canManageChannels;
 
+  /// Same rule as web `canManageJoinApplications` (owner or quản lý máy chủ).
+  bool get canManageJoinApplications => isOwner || canManageServer;
+
   factory CurrentUserServerPermissions.fromJson(Map<String, dynamic> json) {
     bool b(String k, {bool def = false}) {
       final v = json[k];

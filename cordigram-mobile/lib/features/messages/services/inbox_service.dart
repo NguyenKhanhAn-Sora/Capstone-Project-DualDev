@@ -1,6 +1,7 @@
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
 import '../models/inbox_models.dart';
+import 'direct_messages_service.dart';
 
 class InboxService {
   InboxService._();
@@ -42,6 +43,12 @@ class InboxService {
     final res = await ApiService.get('/inbox/unread', extraHeaders: _authHeaders);
     return _itemMaps(res)
         .map(InboxUnreadItem.fromJson)
+        .where((item) {
+          if (item is InboxUnreadDmItem) {
+            return !DirectMessagesService.isConversationMuted(item.userId);
+          }
+          return true;
+        })
         .toList();
   }
 

@@ -22,6 +22,7 @@ import {
   calcAgeFromBirthdate,
   computeVerificationChecks,
   evaluateChannelChatGate,
+  evaluateMemberRulesAndApplyGate,
   getVerificationWaitSeconds,
   normalizeServerVerificationLevel,
   type ChatGateBlockReason,
@@ -983,7 +984,26 @@ export class ServerAccessService {
       Boolean((doc as any)?.ageRestrictedAcknowledged) ||
       legacyMemberNoUserServerRow;
 
-    const gate = evaluateChannelChatGate({
+    let acceptedRulesEffective: boolean;
+    if (isBypass) {
+      acceptedRulesEffective = true;
+    } else if (doc) {
+      acceptedRulesEffective = Boolean((doc as any).acceptedRules);
+    } else if (rawMemberJoinedAt != null) {
+      acceptedRulesEffective = !hasRules;
+    } else {
+      acceptedRulesEffective = false;
+    }
+
+    const memberGate = evaluateMemberRulesAndApplyGate({
+      isBypass,
+      accessMode,
+      usStatus: (doc as any)?.status,
+      hasRules,
+      acceptedRulesEffective,
+    });
+
+    const verificationGate = evaluateChannelChatGate({
       isAgeRestricted,
       ageRestrictedAcknowledged: ageAckForGate,
       birthdate,
@@ -996,18 +1016,24 @@ export class ServerAccessService {
 
     const applyJoinAccepted =
       accessMode === 'apply' && (doc as any)?.status === 'accepted';
-    const chatViewBlocked =
-      !gate.allowed && !(applyJoinAccepted && gate.reason === 'verification');
-    const chatBlockReason = chatViewBlocked ? (gate.reason ?? null) : null;
+    const blockedByVerification =
+      !verificationGate.allowed &&
+      !(applyJoinAccepted && verificationGate.reason === 'verification');
+
+    const chatViewBlocked = !memberGate.allowed || blockedByVerification;
+    const chatBlockReason: ChatGateBlockReason | null = chatViewBlocked
+      ? !memberGate.allowed
+        ? (memberGate.reason ?? null)
+        : (verificationGate.reason ?? null)
+      : null;
 
     const ageYears = calcAgeFromBirthdate(birthdate);
 
-    // Thành viên đã có trong server trước khi bật "apply": không áp dụng ngược.
-    // Nếu chưa có bản ghi UserServer (dữ liệu cũ), coi như đã chấp nhận quy định / không bắt ACK tuổi lại.
+    // Legacy: có trong members nhưng chưa có UserServer — đồng bộ với joinServer / gate kênh.
     const base = !doc
       ? {
           status: 'accepted' as UserServerStatus,
-          acceptedRules: true,
+          acceptedRules: !hasRules,
         }
       : {
           status: doc.status ?? null,
@@ -1148,7 +1174,7 @@ export class ServerAccessService {
       return updated as any;
     }
 
-    // Đã là thành viên: chế độ apply chỉ áp dụng lần gia nhập đầu tiên, không ghi đè pending.
+    // Đã là thành viên: luôn sync acceptedRules nếu client gửi đồng ý (invite đã mở nhưng chưa POST rules).
     if (this.serversService.isMember(server as any, userId)) {
       const existing = await this.userServerModel
         .findOne({
@@ -1158,6 +1184,24 @@ export class ServerAccessService {
         .lean()
         .exec();
       if (existing) {
+        if (
+          opts?.rulesAccepted === true &&
+          serverHasRules &&
+          !(existing as any).acceptedRules
+        ) {
+          const updated = await this.userServerModel
+            .findOneAndUpdate(
+              {
+                userId: new Types.ObjectId(userId),
+                serverId: new Types.ObjectId(serverId),
+              },
+              { $set: { acceptedRules: true } },
+              { new: true },
+            )
+            .lean()
+            .exec();
+          return updated as any;
+        }
         return existing as any;
       }
       const grandfatherAcceptedRules = !serverHasRules;

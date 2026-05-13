@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
@@ -48,6 +49,20 @@ class GiphySearchService {
     return _fetchList(
       '$_base/stickers/search?api_key=${AppConfig.giphyApiKey}&q=$q&limit=24&rating=g&lang=en',
     );
+  }
+
+  /// Giống cordigram-web `getRandomWaveSticker`: sticker chào / vẫy tay.
+  static Future<GiphySearchItem?> getRandomWaveSticker() async {
+    if (AppConfig.giphyApiKey.isEmpty) return null;
+    const queries = ['wave hello', 'hi wave', 'waving hand'];
+    final rnd = Random();
+    for (final q in queries) {
+      final list = await searchStickers(q);
+      if (list.isNotEmpty) {
+        return list[rnd.nextInt(list.length)];
+      }
+    }
+    return null;
   }
 
   static Future<List<GiphySearchItem>> _fetchList(String url) async {

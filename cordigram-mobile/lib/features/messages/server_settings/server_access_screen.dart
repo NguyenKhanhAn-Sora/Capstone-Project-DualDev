@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../server_access_constants.dart';
 import '../services/servers_service.dart';
 
 class ServerAccessScreen extends StatefulWidget {
@@ -52,6 +54,8 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
   bool _initialJoinEnabled = false;
   List<Map<String, dynamic>> _initialQuestions = <Map<String, dynamic>>[];
   final List<String> _pendingRuleAdds = <String>[];
+  bool _discoveryLoading = false;
+  Map<String, dynamic>? _discovery;
 
   @override
   void dispose() {
@@ -85,15 +89,15 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
       }
       final rulesRaw = (a['rules'] is List)
           ? (a['rules'] as List)
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList()
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
           : <Map<String, dynamic>>[];
       final qRaw = (j['questions'] is List)
           ? (j['questions'] as List)
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList()
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
           : <Map<String, dynamic>>[];
       if (!mounted) return;
       setState(() {
@@ -118,6 +122,24 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (mounted) await _refreshDiscoveryIfNeeded();
+  }
+
+  Future<void> _refreshDiscoveryIfNeeded() async {
+    if (_accessMode != 'discoverable') {
+      if (mounted) setState(() => _discovery = null);
+      return;
+    }
+    setState(() => _discoveryLoading = true);
+    try {
+      final d = await ServersService.getDiscoveryEligibility(widget.serverId);
+      if (!mounted) return;
+      setState(() => _discovery = d);
+    } catch (_) {
+      if (mounted) setState(() => _discovery = null);
+    } finally {
+      if (mounted) setState(() => _discoveryLoading = false);
+    }
   }
 
   @override
@@ -126,26 +148,31 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
     _load();
   }
 
-  List<Map<String, dynamic>> _normalizeQuestions(List<Map<String, dynamic>> src) {
-    return src.map((q) {
-      final type = (q['type'] ?? 'short').toString();
-      return {
-        'id': (q['id'] ?? '').toString(),
-        'title': (q['title'] ?? '').toString().trim(),
-        'type': type == 'paragraph' || type == 'multiple_choice'
-            ? type
-            : 'short',
-        'required': q['required'] != false,
-        'options': type == 'multiple_choice'
-            ? ((q['options'] is List)
-                ? (q['options'] as List)
-                    .map((e) => e.toString().trim())
-                    .where((e) => e.isNotEmpty)
-                    .toList()
-                : <String>[])
-            : <String>[],
-      };
-    }).where((q) => (q['title'] as String).isNotEmpty).toList();
+  List<Map<String, dynamic>> _normalizeQuestions(
+    List<Map<String, dynamic>> src,
+  ) {
+    return src
+        .map((q) {
+          final type = (q['type'] ?? 'short').toString();
+          return {
+            'id': (q['id'] ?? '').toString(),
+            'title': (q['title'] ?? '').toString().trim(),
+            'type': type == 'paragraph' || type == 'multiple_choice'
+                ? type
+                : 'short',
+            'required': q['required'] != false,
+            'options': type == 'multiple_choice'
+                ? ((q['options'] is List)
+                      ? (q['options'] as List)
+                            .map((e) => e.toString().trim())
+                            .where((e) => e.isNotEmpty)
+                            .toList()
+                      : <String>[])
+                : <String>[],
+          };
+        })
+        .where((q) => (q['title'] as String).isNotEmpty)
+        .toList();
   }
 
   Future<void> _saveAll() async {
@@ -166,9 +193,9 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
         await ServersService.postAccessRule(widget.serverId, r);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu thay đổi')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đã lưu thay đổi')));
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -197,18 +224,24 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: const Text('Câu trả lời ngắn',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Câu trả lời ngắn',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(ctx, 'short'),
             ),
             ListTile(
-              title: const Text('Đoạn văn',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Đoạn văn',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(ctx, 'paragraph'),
             ),
             ListTile(
-              title: const Text('Nhiều lựa chọn',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Nhiều lựa chọn',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(ctx, 'multiple_choice'),
             ),
           ],
@@ -217,7 +250,9 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
     );
     if (type == null || !mounted) return;
 
-    final titleCtrl = TextEditingController(text: existing?['title']?.toString() ?? '');
+    final titleCtrl = TextEditingController(
+      text: existing?['title']?.toString() ?? '',
+    );
     final opts = <TextEditingController>[];
     final existingOpts = (existing?['options'] is List)
         ? (existing!['options'] as List).map((e) => e.toString()).toList()
@@ -235,8 +270,10 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
         return StatefulBuilder(
           builder: (ctx, setLocal) => AlertDialog(
             backgroundColor: _cardBg,
-            title: const Text('Thêm/Sửa câu hỏi',
-                style: TextStyle(color: Colors.white)),
+            title: const Text(
+              'Thêm/Sửa câu hỏi',
+              style: TextStyle(color: Colors.white),
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -268,7 +305,10 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                                 opts.removeAt(i);
                               });
                             },
-                            icon: const Icon(Icons.close, color: Colors.white70),
+                            icon: const Icon(
+                              Icons.close,
+                              color: Colors.white70,
+                            ),
                           ),
                         ],
                       ),
@@ -309,8 +349,10 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
 
     setState(() {
       final row = <String, dynamic>{
-        'id': (existing?['id'] ?? DateTime.now().microsecondsSinceEpoch.toString())
-            .toString(),
+        'id':
+            (existing?['id'] ??
+                    DateTime.now().microsecondsSinceEpoch.toString())
+                .toString(),
         'title': title,
         'type': type,
         'required': true,
@@ -320,7 +362,10 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
         _questions = [..._questions, row];
       } else {
         _questions = _questions
-            .map((q) => q['id']?.toString() == existing['id']?.toString() ? row : q)
+            .map(
+              (q) =>
+                  q['id']?.toString() == existing['id']?.toString() ? row : q,
+            )
             .toList();
       }
     });
@@ -331,7 +376,9 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
     final pad = MediaQuery.paddingOf(context);
     final hPad = MediaQuery.sizeOf(context).width > 520 ? 24.0 : 14.0;
     final allRules = [
-      ..._rules.map((e) => (e['content'] ?? '').toString()).where((e) => e.isNotEmpty),
+      ..._rules
+          .map((e) => (e['content'] ?? '').toString())
+          .where((e) => e.isNotEmpty),
       ..._pendingRuleAdds,
     ];
 
@@ -339,7 +386,10 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
       backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: _bg,
-        title: const Text('Truy cập', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text(
+          'Truy cập',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
           TextButton(
             onPressed: widget.canManage && _dirty && !_saving ? _saveAll : null,
@@ -356,185 +406,323 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  color: const Color(0xFF7FB6FF),
-                  child: ListView(
-                    padding: EdgeInsets.fromLTRB(hPad, 12, hPad, pad.bottom + 24),
-                    children: [
-                      _modeSection(),
-                      const SizedBox(height: 16),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        tileColor: _cardBg,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        title: const Text('Giới hạn độ tuổi (18+)',
-                            style: TextStyle(color: Colors.white)),
-                        value: _isAgeRestricted,
-                        onChanged: widget.canManage ? (v) => setState(() => _isAgeRestricted = v) : null,
-                      ),
-                      const SizedBox(height: 12),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        tileColor: _cardBg,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        title: const Text('Bật quy định máy chủ',
-                            style: TextStyle(color: Colors.white)),
-                        value: _hasRules,
-                        onChanged: widget.canManage ? (v) => setState(() => _hasRules = v) : null,
-                      ),
-                      const SizedBox(height: 12),
-                      _sectionCard(
-                        title: 'Quy định',
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (allRules.isEmpty)
-                              const Text('Chưa có quy định.',
-                                  style: TextStyle(color: Color(0xFF8EA3CC))),
-                            for (var i = 0; i < allRules.length; i++)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Text('${i + 1}. ${allRules[i]}',
-                                    style: const TextStyle(color: Colors.white70)),
-                              ),
-                            if (widget.canManage) ...[
-                              const SizedBox(height: 10),
-                              TextField(
-                                controller: _ruleDraft,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(hintText: 'Nhập nội dung quy định'),
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: _ruleTemplates
-                                    .map(
-                                      (r) => ActionChip(
-                                        label: Text(r, style: const TextStyle(fontSize: 12)),
-                                        onPressed: () => _addRuleLocally(r),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: FilledButton(
-                                  onPressed: () => _addRuleLocally(_ruleDraft.text),
-                                  child: const Text('Thêm quy định'),
-                                ),
-                              ),
-                            ],
-                          ],
+          ? Center(child: Text(_error!))
+          : RefreshIndicator(
+              onRefresh: _load,
+              color: const Color(0xFF7FB6FF),
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(hPad, 12, hPad, pad.bottom + 24),
+                children: [
+                  _modeSection(),
+                  _discoverySection(),
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    tileColor: _cardBg,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    title: const Text(
+                      'Giới hạn độ tuổi (18+)',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    value: _isAgeRestricted,
+                    onChanged: widget.canManage
+                        ? (v) => setState(() => _isAgeRestricted = v)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    tileColor: _cardBg,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    title: const Text(
+                      'Bật quy định máy chủ',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    value: _hasRules,
+                    onChanged: widget.canManage
+                        ? (v) => setState(() => _hasRules = v)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  _sectionCard(
+                    title: 'Quy định',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (allRules.isEmpty)
+                          const Text(
+                            'Chưa có quy định.',
+                            style: TextStyle(color: Color(0xFF8EA3CC)),
+                          ),
+                        for (var i = 0; i < allRules.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              '${i + 1}. ${allRules[i]}',
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ),
+                        if (widget.canManage) ...[
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _ruleDraft,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: const InputDecoration(
+                              hintText: 'Nhập nội dung quy định',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _ruleTemplates
+                                .map(
+                                  (r) => ActionChip(
+                                    label: Text(
+                                      r,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    onPressed: () => _addRuleLocally(r),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton(
+                              onPressed: () => _addRuleLocally(_ruleDraft.text),
+                              child: const Text('Thêm quy định'),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _sectionCard(
+                    title: 'Đơn đăng ký tham gia',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Bật đơn đăng ký',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          value: _joinEnabled,
+                          onChanged: widget.canManage
+                              ? (v) => setState(() => _joinEnabled = v)
+                              : null,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _sectionCard(
-                        title: 'Đơn đăng ký tham gia',
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Bật đơn đăng ký',
-                                  style: TextStyle(color: Colors.white)),
-                              value: _joinEnabled,
-                              onChanged: widget.canManage
-                                  ? (v) => setState(() => _joinEnabled = v)
-                                  : null,
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _questionTemplates
-                                  .map(
-                                    (q) => ActionChip(
-                                      label: Text(q, style: const TextStyle(fontSize: 12)),
-                                      onPressed: widget.canManage
-                                          ? () => setState(
-                                                () => _questions = [
-                                                  ..._questions,
-                                                  {
-                                                    'id': DateTime.now()
-                                                        .microsecondsSinceEpoch
-                                                        .toString(),
-                                                    'title': q,
-                                                    'type': 'short',
-                                                    'required': true,
-                                                    'options': <String>[],
-                                                  },
-                                                ],
-                                              )
-                                          : null,
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                            const SizedBox(height: 8),
-                            for (final q in _questions) ...[
-                              Container(
-                                margin: const EdgeInsets.only(top: 8),
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF152A52),
-                                  borderRadius: BorderRadius.circular(8),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _questionTemplates
+                              .map(
+                                (q) => ActionChip(
+                                  label: Text(
+                                    q,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  onPressed: widget.canManage
+                                      ? () => setState(
+                                          () => _questions = [
+                                            ..._questions,
+                                            {
+                                              'id': DateTime.now()
+                                                  .microsecondsSinceEpoch
+                                                  .toString(),
+                                              'title': q,
+                                              'type': 'short',
+                                              'required': true,
+                                              'options': <String>[],
+                                            },
+                                          ],
+                                        )
+                                      : null,
                                 ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            (q['title'] ?? '').toString(),
-                                            style: const TextStyle(color: Colors.white),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            (q['type'] ?? 'short').toString(),
-                                            style: const TextStyle(
-                                                color: Color(0xFF8EA3CC), fontSize: 12),
-                                          ),
-                                        ],
+                              )
+                              .toList(),
+                        ),
+                        const SizedBox(height: 8),
+                        for (final q in _questions) ...[
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF152A52),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        (q['title'] ?? '').toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
                                       ),
-                                    ),
-                                    if (widget.canManage) ...[
-                                      IconButton(
-                                        onPressed: () => _openAddQuestionDialog(existing: q),
-                                        icon: const Icon(Icons.edit, color: Colors.white70),
-                                      ),
-                                      IconButton(
-                                        onPressed: () => setState(() {
-                                          _questions = _questions
-                                              .where((x) =>
-                                                  x['id']?.toString() != q['id']?.toString())
-                                              .toList();
-                                        }),
-                                        icon: const Icon(Icons.delete_outline,
-                                            color: Colors.redAccent),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        (q['type'] ?? 'short').toString(),
+                                        style: const TextStyle(
+                                          color: Color(0xFF8EA3CC),
+                                          fontSize: 12,
+                                        ),
                                       ),
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                            if (widget.canManage) ...[
-                              const SizedBox(height: 8),
-                              FilledButton(
-                                onPressed: _openAddQuestionDialog,
-                                child: const Text('+ Thêm câu hỏi'),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
+                                if (widget.canManage) ...[
+                                  IconButton(
+                                    onPressed: () =>
+                                        _openAddQuestionDialog(existing: q),
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () => setState(() {
+                                      _questions = _questions
+                                          .where(
+                                            (x) =>
+                                                x['id']?.toString() !=
+                                                q['id']?.toString(),
+                                          )
+                                          .toList();
+                                    }),
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (widget.canManage) ...[
+                          const SizedBox(height: 8),
+                          FilledButton(
+                            onPressed: _openAddQuestionDialog,
+                            child: const Text('+ Thêm câu hỏi'),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _discoverySection() {
+    if (_accessMode != 'discoverable') return const SizedBox.shrink();
+    if (_discoveryLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    final d = _discovery;
+    if (d == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          'Không tải được điều kiện Khám phá.',
+          style: TextStyle(color: Colors.red.shade200),
+        ),
+      );
+    }
+    final eligible = d['eligible'] == true;
+    final checks = (d['checks'] is List) ? d['checks'] as List : const [];
+    return _sectionCard(
+      title: 'Khám phá — điều kiện',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ngưỡng thành viên / tuổi máy chủ đồng bộ với web '
+            '(${ServerAccessConstants.discoveryMinEvaluateMembers}, '
+            '${ServerAccessConstants.discoveryMinMembers}, '
+            '${ServerAccessConstants.discoveryMinAgeWeeks} tuần).',
+            style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            eligible
+                ? 'Hiện đạt đủ điều kiện tối thiểu (theo API).'
+                : 'Chưa đạt đủ điều kiện.',
+            style: TextStyle(
+              color: eligible
+                  ? const Color(0xFF00C48C)
+                  : const Color(0xFFFFB2BE),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final c in checks)
+            if (c is Map) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    c['passed'] == true
+                        ? Icons.check_circle_rounded
+                        : Icons.cancel_rounded,
+                    color: c['passed'] == true
+                        ? const Color(0xFF00C48C)
+                        : const Color(0xFFFF6B6B),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (c['label'] ?? '').toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          (c['description'] ?? '').toString(),
+                          style: const TextStyle(
+                            color: Color(0xFF8EA3CC),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+        ],
+      ),
     );
   }
 
@@ -548,13 +736,20 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: widget.canManage ? () => setState(() => _accessMode = m) : null,
+            onTap: widget.canManage
+                ? () {
+                    setState(() => _accessMode = m);
+                    unawaited(_refreshDiscoveryIfNeeded());
+                  }
+                : null,
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: sel ? const Color(0xFF5865F2) : const Color(0xFF21345D),
+                  color: sel
+                      ? const Color(0xFF5865F2)
+                      : const Color(0xFF21345D),
                   width: sel ? 2 : 1,
                 ),
               ),
@@ -566,19 +761,29 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title,
-                            style: const TextStyle(
-                                color: Colors.white, fontWeight: FontWeight.w700)),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         const SizedBox(height: 2),
-                        Text(desc,
-                            style: const TextStyle(
-                                color: Color(0xFF8EA3CC), fontSize: 13)),
+                        Text(
+                          desc,
+                          style: const TextStyle(
+                            color: Color(0xFF8EA3CC),
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   if (sel)
-                    const Icon(Icons.check_circle_rounded,
-                        color: Color(0xFF00C48C)),
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFF00C48C),
+                    ),
                 ],
               ),
             ),
@@ -590,17 +795,33 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Cách tham gia',
-            style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+        const Text(
+          'Cách tham gia',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+          ),
+        ),
         const SizedBox(height: 10),
-        tile('invite_only', 'Chỉ lời mời', 'Tham gia bằng link mời.',
-            Icons.lock_outline_rounded),
-        tile('apply', 'Đăng ký', 'Gửi đơn và chờ duyệt.',
-            Icons.assignment_outlined),
-        tile('discoverable', 'Khám phá',
-            'Có thể tìm thấy trên Khám phá nếu đủ điều kiện.',
-            Icons.public_rounded),
+        tile(
+          'invite_only',
+          'Chỉ lời mời',
+          'Tham gia bằng link mời.',
+          Icons.lock_outline_rounded,
+        ),
+        tile(
+          'apply',
+          'Đăng ký',
+          'Gửi đơn và chờ duyệt.',
+          Icons.assignment_outlined,
+        ),
+        tile(
+          'discoverable',
+          'Khám phá',
+          'Có thể tìm thấy trên Khám phá nếu đủ điều kiện.',
+          Icons.public_rounded,
+        ),
       ],
     );
   }
@@ -616,9 +837,14 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
+          ),
           const SizedBox(height: 12),
           child,
         ],

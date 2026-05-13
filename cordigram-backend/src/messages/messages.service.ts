@@ -23,8 +23,10 @@ import { UserServer } from '../access/user-server.schema';
 import { User } from '../users/user.schema';
 import {
   evaluateChannelChatGate,
+  evaluateMemberRulesAndApplyGate,
   normalizeServerVerificationLevel,
   type ChatGateBlockReason,
+  type ServerAccessModeForGate,
 } from './channel-chat-gate.util';
 import { MediaModerationService } from '../posts/media-moderation.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -296,7 +298,7 @@ export class MessagesService {
       ((await this.serverModel
         .findById(serverId)
         .select(
-          'ownerId members safetySettings isAgeRestricted isPublic accessMode',
+          'ownerId members safetySettings isAgeRestricted isPublic accessMode hasRules',
         )
         .lean()
         .exec()) as Record<string, unknown> | null);
@@ -346,7 +348,47 @@ export class MessagesService {
       Boolean((usDoc as any)?.ageRestrictedAcknowledged) ||
       legacyMemberNoUserServerRow;
 
-    const memberJoinedAt = rawMemberJoinedAt;
+    const accessModeRaw = (server as any)?.accessMode as
+      | ServerAccessModeForGate
+      | undefined;
+    const accessMode: ServerAccessModeForGate = accessModeRaw
+      ? accessModeRaw
+      : (server as any)?.isPublic
+        ? 'discoverable'
+        : 'invite_only';
+
+    const memberJoinedAt =
+      accessMode === 'apply' &&
+      (usDoc as any)?.status === 'accepted' &&
+      (usDoc as any)?.acceptedAt
+        ? new Date((usDoc as any).acceptedAt)
+        : rawMemberJoinedAt;
+
+    const hasRules = Boolean((server as any).hasRules);
+    let acceptedRulesEffective: boolean;
+    if (isBypass) {
+      acceptedRulesEffective = true;
+    } else if (usDoc) {
+      acceptedRulesEffective = Boolean((usDoc as any).acceptedRules);
+    } else if (rawMemberJoinedAt != null) {
+      acceptedRulesEffective = !hasRules;
+    } else {
+      acceptedRulesEffective = false;
+    }
+
+    const memberGate = evaluateMemberRulesAndApplyGate({
+      isBypass,
+      accessMode,
+      usStatus: (usDoc as any)?.status,
+      hasRules,
+      acceptedRulesEffective,
+    });
+    if (!memberGate.allowed) {
+      return {
+        allowed: false,
+        reason: memberGate.reason as ChatGateBlockReason,
+      };
+    }
 
     const verificationLevel = normalizeServerVerificationLevel(
       (server as any).safetySettings?.spamProtection?.verificationLevel,
@@ -365,16 +407,6 @@ export class MessagesService {
       isBypass,
     });
 
-    const accessModeRaw = (server as any)?.accessMode as
-      | 'discoverable'
-      | 'invite_only'
-      | 'apply'
-      | undefined;
-    const accessMode = accessModeRaw
-      ? accessModeRaw
-      : (server as any)?.isPublic
-        ? 'discoverable'
-        : 'invite_only';
     const applyAccepted =
       accessMode === 'apply' && (usDoc as any)?.status === 'accepted';
     if (!gate.allowed && gate.reason === 'verification' && applyAccepted) {

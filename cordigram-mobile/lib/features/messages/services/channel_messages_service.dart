@@ -76,6 +76,24 @@ class ChannelMessagesService {
     return ChannelMessage.fromJson(Map<String, dynamic>.from(raw));
   }
 
+  static Future<ChannelMessage?> sendWaveSticker(
+    String channelId, {
+    String? replyTo,
+    String? giphyId,
+  }) async {
+    final res = await ApiService.post(
+      '/channels/$channelId/messages/wave-sticker',
+      extraHeaders: _authHeaders,
+      body: <String, dynamic>{
+        if ((replyTo ?? '').isNotEmpty) 'replyTo': replyTo,
+        if ((giphyId ?? '').isNotEmpty) 'giphyId': giphyId,
+      },
+    );
+    final raw = res['message'] ?? res['data'] ?? res;
+    if (raw is! Map) return null;
+    return ChannelMessage.fromJson(Map<String, dynamic>.from(raw));
+  }
+
   static Future<void> markChannelRead(String channelId) async {
     await ApiService.post(
       '/channels/$channelId/messages/read',

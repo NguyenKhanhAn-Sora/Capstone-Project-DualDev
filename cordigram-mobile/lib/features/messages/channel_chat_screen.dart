@@ -16,10 +16,15 @@ import 'pinned_messages_screen.dart';
 import 'services/channel_messages_realtime_service.dart';
 import 'services/channel_messages_service.dart';
 import 'services/giphy_search_service.dart';
+import 'services/servers_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
 import 'services/server_media_service.dart';
 import 'search/message_search_sheet.dart';
+import 'widgets/gif_toolbar_icon.dart';
+import 'widgets/sticker_toolbar_icon.dart';
+import 'widgets/server_join_flow.dart';
+
 class ChannelChatScreen extends StatefulWidget {
   const ChannelChatScreen({
     super.key,
@@ -102,6 +107,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   bool _chatBlocked = false;
   String? _chatBlockReason;
   String? _error;
+  final Set<String> _wavingWelcomeIds = {};
   ChannelMessage? _replyingTo;
   StreamSubscription<ChannelMessage>? _newMessageSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
@@ -177,6 +183,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           isPinned: curr.isPinned,
           pinnedAt: curr.pinnedAt,
           replyTo: curr.replyTo,
+          senderAvatarUrl: curr.senderAvatarUrl,
+          stickerReplyWelcomeEnabled: curr.stickerReplyWelcomeEnabled,
         );
         final copied = [..._messages];
         copied[idx] = next;
@@ -199,7 +207,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         skip: 0,
       );
       final entries =
-          (envelope['messages'] ?? envelope['items'] ?? envelope['data']) as List?;
+          (envelope['messages'] ?? envelope['items'] ?? envelope['data'])
+              as List?;
       final loaded = (entries ?? const <dynamic>[])
           .whereType<Map>()
           .map((e) => ChannelMessage.fromJson(Map<String, dynamic>.from(e)))
@@ -218,6 +227,225 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String _formatWelcomeTimestamp(DateTime at) {
+    final now = DateTime.now();
+    final diff = now.difference(at);
+    if (diff.inSeconds < 45) return 'Vừa xong';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
+    if (diff.inHours < 24) return '${diff.inHours} giờ trước';
+    return '${at.day}/${at.month}/${at.year}';
+  }
+
+  String _blockedReasonLabel(String? reason) {
+    switch (reason) {
+      case 'rules':
+        return 'Bạn cần đọc và đồng ý quy định của máy chủ.';
+      case 'application_pending':
+        return 'Đơn đăng ký tham gia đang chờ duyệt.';
+      case 'application_rejected':
+        return 'Đơn đăng ký tham gia đã bị từ chối.';
+      case 'verification':
+        return 'Tài khoản chưa đủ điều kiện xác minh để chat.';
+      case 'age_under_18':
+        return 'Máy chủ giới hạn độ tuổi — bạn chưa đủ 18 tuổi.';
+      case 'age_ack':
+        return 'Cần xác nhận cảnh báo độ tuổi của máy chủ.';
+      default:
+        return '';
+    }
+  }
+
+  Future<void> _reloadEnvelopeOnly() async {
+    try {
+      final envelope = await ChannelMessagesService.getChannelMessagesEnvelope(
+        widget.channel.id,
+        limit: 60,
+        skip: 0,
+      );
+      final entries =
+          (envelope['messages'] ?? envelope['items'] ?? envelope['data'])
+              as List?;
+      final loaded = (entries ?? const <dynamic>[])
+          .whereType<Map>()
+          .map((e) => ChannelMessage.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _messages = loaded;
+        _chatBlocked = envelope['chatViewBlocked'] == true;
+        _chatBlockReason = envelope['chatBlockReason']?.toString();
+      });
+      _scrollToBottom();
+    } catch (_) {}
+  }
+
+  Future<void> _onAcceptRulesFromChannel() async {
+    try {
+      final settings =
+          await ServersService.getServerAccessSettings(widget.server.id);
+      if (!mounted) return;
+      final agreed =
+          await ServerJoinFlow.showRulesAgreementDialog(context, settings);
+      if (agreed != true || !mounted) return;
+      await ServersService.acceptServerRules(widget.server.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã đồng ý quy định máy chủ.')),
+      );
+      await _reloadEnvelopeOnly();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không cập nhật được: $e')),
+      );
+    }
+  }
+
+  Future<void> _sendWaveToWelcome(ChannelMessage welcomeMsg) async {
+    if (_chatBlocked) return;
+    if (!welcomeMsg.stickerReplyWelcomeEnabled) return;
+    final me = widget.currentUserId ?? '';
+    final isNewMember = me.isNotEmpty && welcomeMsg.senderId == me;
+    setState(() => _wavingWelcomeIds.add(welcomeMsg.id));
+    try {
+      final sticker = await GiphySearchService.getRandomWaveSticker();
+      final sent = await ChannelMessagesService.sendWaveSticker(
+        widget.channel.id,
+        replyTo: isNewMember ? null : welcomeMsg.id,
+        giphyId: sticker?.id,
+      );
+      if (sent != null && mounted) {
+        setState(() {
+          if (!_messages.any((m) => m.id == sent.id)) {
+            _messages = [..._messages, sent];
+          }
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không gửi được sticker vẫy tay: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _wavingWelcomeIds.remove(welcomeMsg.id));
+      }
+    }
+  }
+
+  String _chatBlockedBannerText() {
+    final hint = _blockedReasonLabel(_chatBlockReason);
+    if (hint.isNotEmpty) return hint;
+    final r = _chatBlockReason;
+    if (r != null && r.isNotEmpty) {
+      return 'Bạn chưa thể chat trong kênh này ($r).';
+    }
+    return 'Bạn chưa thể chat trong kênh này.';
+  }
+
+  Widget _buildWelcomeSystemRow(ChannelMessage msg) {
+    final displayName = msg.senderName.trim().isEmpty
+        ? 'Thành viên'
+        : msg.senderName.trim();
+    final waving = _wavingWelcomeIds.contains(msg.id);
+    final showWave = msg.stickerReplyWelcomeEnabled;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '→',
+              style: TextStyle(
+                color: Color(0xFF3BA55D),
+                fontSize: 20,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        height: 1.35,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: 'Rất vui được gặp bạn, $displayName!',
+                        ),
+                        TextSpan(
+                          text: '  ${_formatWelcomeTimestamp(msg.createdAt)}',
+                          style: const TextStyle(
+                            color: Color(0xFF949BA4),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (showWave) ...[
+                    const SizedBox(height: 8),
+                    Material(
+                      color: const Color(0xFF2B2D31),
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        onTap: waving ? null : () => _sendWaveToWelcome(msg),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (waving) ...[
+                                const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF949BA4),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Text(
+                                waving
+                                    ? 'Đang gửi…'
+                                    : '👋 Vẫy tay chào $displayName!',
+                                style: TextStyle(
+                                  color: waving
+                                      ? const Color(0xFF949BA4)
+                                      : Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _scrollToBottom() {
@@ -278,9 +506,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       await ChannelMessagesService.markChannelRead(widget.channel.id);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không gửi được tin nhắn: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Không gửi được tin nhắn: $e')));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -348,10 +576,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         final isVideo =
             mime.startsWith('video/') || rt == 'video' || rt.contains('video');
         final content = isVideo ? '🎬 [Video]: $url' : '📷 [Image]: $url';
-        await _sendChannelMessage(
-          content: content,
-          attachments: [url],
-        );
+        await _sendChannelMessage(content: content, attachments: [url]);
       }
     } catch (e) {
       if (!mounted) return;
@@ -374,8 +599,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.upload_file_rounded, color: Colors.white),
-                title: const Text('Upload file', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.upload_file_rounded,
+                  color: Colors.white,
+                ),
+                title: const Text(
+                  'Upload file',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickAndUploadMedia();
@@ -383,7 +614,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.poll_rounded, color: Colors.white),
-                title: const Text('Create poll', style: TextStyle(color: Colors.white)),
+                title: const Text(
+                  'Create poll',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showCreatePollDialog();
@@ -444,8 +678,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         onPressed: optionCtrls.length >= 10
                             ? null
                             : () => setLocal(
-                                  () => optionCtrls.add(TextEditingController()),
-                                ),
+                                () => optionCtrls.add(TextEditingController()),
+                              ),
                         icon: const Icon(Icons.add),
                         label: const Text('Thêm phương án'),
                       ),
@@ -455,7 +689,12 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                       dropdownColor: const Color(0xFF0A1737),
                       style: const TextStyle(color: Colors.white),
                       items: const [1, 3, 6, 12, 24, 48, 72, 168]
-                          .map((h) => DropdownMenuItem(value: h, child: Text('$h giờ')))
+                          .map(
+                            (h) => DropdownMenuItem(
+                              value: h,
+                              child: Text('$h giờ'),
+                            ),
+                          )
                           .toList(),
                       onChanged: (v) => setLocal(() => durationHours = v ?? 24),
                       decoration: const InputDecoration(
@@ -494,9 +733,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                       showDialog<void>(
                         context: context,
                         barrierDismissible: false,
-                        builder: (_) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
+                        builder: (_) =>
+                            const Center(child: CircularProgressIndicator()),
                       );
                       final pollId = await PollsApiService.createPoll(
                         question: q,
@@ -569,17 +807,21 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
               padding: const EdgeInsets.all(12),
               children: [
                 for (final group in groups) ...[
-                  Text(group.serverName, style: const TextStyle(color: Colors.white70)),
+                  Text(
+                    group.serverName,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
                   const SizedBox(height: 6),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: group.emojis.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 6,
-                      mainAxisSpacing: 6,
-                      crossAxisSpacing: 6,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 6,
+                          mainAxisSpacing: 6,
+                          crossAxisSpacing: 6,
+                        ),
                     itemBuilder: (_, index) {
                       final emoji = group.emojis[index];
                       return InkWell(
@@ -587,15 +829,21 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                             ? null
                             : () {
                                 _inputController.text += ':${emoji.name}:';
-                                _inputController.selection = TextSelection.collapsed(
-                                  offset: _inputController.text.length,
-                                );
-                                _serverEmojiMap[emoji.name.toLowerCase()] = emoji.imageUrl;
+                                _inputController.selection =
+                                    TextSelection.collapsed(
+                                      offset: _inputController.text.length,
+                                    );
+                                _serverEmojiMap[emoji.name.toLowerCase()] =
+                                    emoji.imageUrl;
                                 Navigator.pop(ctx);
                               },
                         child: Opacity(
                           opacity: group.locked ? 0.45 : 1,
-                          child: Image.network(emoji.imageUrl, width: 24, height: 24),
+                          child: Image.network(
+                            emoji.imageUrl,
+                            width: 24,
+                            height: 24,
+                          ),
                         ),
                       );
                     },
@@ -620,8 +868,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.tag_faces_rounded, color: Colors.white),
-                title: const Text('Unicode Emoji', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.tag_faces_rounded,
+                  color: Colors.white,
+                ),
+                title: const Text(
+                  'Unicode Emoji',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showUnicodeEmojiPicker();
@@ -632,7 +886,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                   Icons.emoji_emotions_outlined,
                   color: Colors.white,
                 ),
-                title: const Text('Server Emoji', style: TextStyle(color: Colors.white)),
+                title: const Text(
+                  'Server Emoji',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await _openServerEmojiPicker();
@@ -696,7 +953,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               controller: searchCtrl,
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
-                                hintText: stickers ? 'Tìm sticker…' : 'Tìm GIF…',
+                                hintText: stickers
+                                    ? 'Tìm sticker…'
+                                    : 'Tìm GIF…',
                               ),
                               onSubmitted: (_) => runSearch(),
                             ),
@@ -712,12 +971,13 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                       child: GridView.builder(
                         controller: scrollController,
                         padding: const EdgeInsets.all(8),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 1.1,
-                          crossAxisSpacing: 6,
-                          mainAxisSpacing: 6,
-                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 1.1,
+                              crossAxisSpacing: 6,
+                              mainAxisSpacing: 6,
+                            ),
                         itemCount: items.length,
                         itemBuilder: (_, i) {
                           final g = items[i];
@@ -726,7 +986,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               Navigator.pop(ctx);
                               await _sendChannelMessage(
                                 content: g.title.trim().isEmpty
-                                    ? (stickers ? 'Sent a sticker' : 'Sent a GIF')
+                                    ? (stickers
+                                          ? 'Sent a sticker'
+                                          : 'Sent a GIF')
                                     : g.title.trim(),
                                 type: stickers ? 'sticker' : 'gif',
                                 giphyId: g.id,
@@ -736,7 +998,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               borderRadius: BorderRadius.circular(8),
                               child: g.previewUrl.isEmpty
                                   ? Container(color: const Color(0xFF1F2D4D))
-                                  : Image.network(g.previewUrl, fit: BoxFit.cover),
+                                  : Image.network(
+                                      g.previewUrl,
+                                      fit: BoxFit.cover,
+                                    ),
                             ),
                           );
                         },
@@ -775,18 +1040,22 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
               padding: const EdgeInsets.all(12),
               children: [
                 for (final group in groups) ...[
-                  Text(group.serverName, style: const TextStyle(color: Colors.white70)),
+                  Text(
+                    group.serverName,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
                   const SizedBox(height: 6),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: group.stickers.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 6,
-                      crossAxisSpacing: 6,
-                      childAspectRatio: 1.15,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 6,
+                          crossAxisSpacing: 6,
+                          childAspectRatio: 1.15,
+                        ),
                     itemBuilder: (_, index) {
                       final sticker = group.stickers[index];
                       return InkWell(
@@ -806,7 +1075,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           opacity: group.locked ? 0.45 : 1,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(sticker.imageUrl, fit: BoxFit.cover),
+                            child: Image.network(
+                              sticker.imageUrl,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       );
@@ -831,16 +1103,22 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.gif_box_outlined, color: Colors.white),
-              title: const Text('Giphy Sticker', style: TextStyle(color: Colors.white)),
+              leading: const GifToolbarIcon(size: 22, color: Colors.white),
+              title: const Text(
+                'Giphy Sticker',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _openGiphyPicker(stickers: true);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.sticky_note_2_outlined, color: Colors.white),
-              title: const Text('Server Sticker', style: TextStyle(color: Colors.white)),
+              leading: const StickerToolbarIcon(size: 22, color: Colors.white),
+              title: const Text(
+                'Server Sticker',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () async {
                 Navigator.pop(ctx);
                 await _openServerStickerPicker();
@@ -883,7 +1161,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.add_reaction_outlined, color: Colors.white),
+              leading: const Icon(
+                Icons.add_reaction_outlined,
+                color: Colors.white,
+              ),
               title: const Text(
                 'Chọn emoji khác',
                 style: TextStyle(color: Colors.white),
@@ -905,7 +1186,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              leading: const Icon(
+                Icons.delete_outline,
+                color: Colors.redAccent,
+              ),
               title: const Text(
                 'Xóa tin nhắn',
                 style: TextStyle(color: Colors.redAccent),
@@ -1012,9 +1296,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể xóa tin nhắn: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Không thể xóa tin nhắn: $e')));
     }
   }
 
@@ -1052,9 +1336,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể ghim tin nhắn: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Không thể ghim tin nhắn: $e')));
     }
   }
 
@@ -1066,9 +1350,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0B1424),
-      builder: (ctx) => _VoiceRecordPanel(
-        onSend: _sendVoiceMessage,
-      ),
+      builder: (ctx) => _VoiceRecordPanel(onSend: _sendVoiceMessage),
     );
   }
 
@@ -1120,7 +1402,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   Widget _buildMessageContent(ChannelMessage message) {
     final text = message.content.trim();
     if (message.type == 'gif' && (message.giphyId ?? '').isNotEmpty) {
-      final gifUrl = 'https://media.giphy.com/media/${message.giphyId}/giphy.gif';
+      final gifUrl =
+          'https://media.giphy.com/media/${message.giphyId}/giphy.gif';
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: Image.network(
@@ -1138,7 +1421,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       final fromContent = text.startsWith('🎨 [Sticker]:')
           ? text.replaceFirst('🎨 [Sticker]:', '').trim()
           : '';
-      final fromAttach = message.attachments.isNotEmpty ? message.attachments.first : '';
+      final fromAttach = message.attachments.isNotEmpty
+          ? message.attachments.first
+          : '';
       final url = direct.isNotEmpty
           ? direct
           : (fromContent.isNotEmpty ? fromContent : fromAttach);
@@ -1167,7 +1452,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         message.attachments.first,
       );
       final lower = mediaUrl.toLowerCase();
-      final looksLikeImage = lower.contains('.png') ||
+      final looksLikeImage =
+          lower.contains('.png') ||
           lower.contains('.jpg') ||
           lower.contains('.jpeg') ||
           lower.contains('.webp') ||
@@ -1193,7 +1479,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     }
     if (text.startsWith('http://') || text.startsWith('https://')) {
       final lower = text.toLowerCase();
-      final looksLikeImage = lower.contains('.png') ||
+      final looksLikeImage =
+          lower.contains('.png') ||
           lower.contains('.jpg') ||
           lower.contains('.jpeg') ||
           lower.contains('.webp') ||
@@ -1223,7 +1510,12 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       final mediaUrl = text.substring(text.indexOf(':') + 1).trim();
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(mediaUrl, width: 180, height: 180, fit: BoxFit.cover),
+        child: Image.network(
+          mediaUrl,
+          width: 180,
+          height: 180,
+          fit: BoxFit.cover,
+        ),
       );
     }
     if (text.startsWith('📷 [Image]:') || text.startsWith('🎬 [Video]:')) {
@@ -1333,144 +1625,163 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                   )
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
+                    padding: const EdgeInsets.fromLTRB(12, 14, 12, 22),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
+                      if (msg.type == 'welcome') {
+                        return KeyedSubtree(
+                          key: _keyForChannelMessage(msg.id),
+                          child: _buildWelcomeSystemRow(msg),
+                        );
+                      }
                       final mine = _isMine(msg);
                       final hi = _highlightChannelMessageId == msg.id;
                       return KeyedSubtree(
                         key: _keyForChannelMessage(msg.id),
                         child: Align(
-                        alignment: mine
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: hi
-                              ? BoxDecoration(
-                                  borderRadius: BorderRadius.circular(14),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x664A90E2),
-                                      blurRadius: 12,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                )
-                              : null,
-                        child: GestureDetector(
-                          onLongPress: () => _showMessageActions(msg),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 9),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 9,
-                            ),
-                            constraints: BoxConstraints(
-                              maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-                            ),
-                            decoration: BoxDecoration(
-                              color: mine
-                                  ? const Color(0xFF1D63E9)
-                                  : const Color(0xFF112950),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (!mine)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text(
-                                    msg.senderName.isEmpty
-                                        ? 'Thành viên'
-                                        : msg.senderName,
-                                    style: const TextStyle(
-                                      color: Color(0xFFC3D4F7),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              if (msg.replyTo != null)
-                                Container(
-                                  width: double.infinity,
-                                  margin: const EdgeInsets.only(bottom: 6),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.14),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        msg.replyTo?.senderName?.isNotEmpty == true
-                                            ? msg.replyTo!.senderName!
-                                            : 'Đang trả lời',
-                                        style: const TextStyle(
-                                          color: Color(0xFFB6C2DC),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _replyPreviewText(msg.replyTo!),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                        ),
+                          alignment: mine
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: hi
+                                ? BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x664A90E2),
+                                        blurRadius: 12,
+                                        spreadRadius: 1,
                                       ),
                                     ],
-                                  ),
+                                  )
+                                : null,
+                            child: GestureDetector(
+                              onLongPress: () => _showMessageActions(msg),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 9),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 9,
                                 ),
-                              _buildMessageContent(msg),
-                              if (msg.reactions.isNotEmpty) ...[
-                                const SizedBox(height: 6),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  children: msg.reactions
-                                      .where((e) => e.emoji.isNotEmpty)
-                                      .map(
-                                        (r) => Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 7,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.16,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            '${r.emoji} ${r.count}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.sizeOf(context).width * 0.78,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: mine
+                                      ? const Color(0xFF1D63E9)
+                                      : const Color(0xFF112950),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!mine)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4,
+                                        ),
+                                        child: Text(
+                                          msg.senderName.isEmpty
+                                              ? 'Thành viên'
+                                              : msg.senderName,
+                                          style: const TextStyle(
+                                            color: Color(0xFFC3D4F7),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                      )
-                                      .toList(),
+                                      ),
+                                    if (msg.replyTo != null)
+                                      Container(
+                                        width: double.infinity,
+                                        margin: const EdgeInsets.only(
+                                          bottom: 6,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.14,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              msg
+                                                          .replyTo
+                                                          ?.senderName
+                                                          ?.isNotEmpty ==
+                                                      true
+                                                  ? msg.replyTo!.senderName!
+                                                  : 'Đang trả lời',
+                                              style: const TextStyle(
+                                                color: Color(0xFFB6C2DC),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _replyPreviewText(msg.replyTo!),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    _buildMessageContent(msg),
+                                    if (msg.reactions.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: msg.reactions
+                                            .where((e) => e.emoji.isNotEmpty)
+                                            .map(
+                                              (r) => Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 7,
+                                                      vertical: 3,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.16),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  '${r.emoji} ${r.count}',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                              ],
-                            ],
+                              ),
+                            ),
                           ),
-                        ),
-                        ),
-                        ),
                         ),
                       );
                     },
@@ -1479,13 +1790,28 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           if (_chatBlocked)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-              child: Text(
-                'Bạn chưa thể chat trong kênh này${(_chatBlockReason ?? '').isNotEmpty ? ' (${_chatBlockReason!})' : ''}.',
-                style: const TextStyle(
-                  color: Color(0xFFFFB2BE),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _chatBlockedBannerText(),
+                    style: const TextStyle(
+                      color: Color(0xFFFFB2BE),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (_chatBlockReason == 'rules') ...[
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      onPressed: _onAcceptRulesFromChannel,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF5865F2),
+                      ),
+                      child: const Text('Đọc và đồng ý quy định'),
+                    ),
+                  ],
+                ],
               ),
             ),
           SafeArea(
@@ -1497,7 +1823,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF17284A),
                       borderRadius: BorderRadius.circular(10),
@@ -1536,40 +1865,50 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         ),
                         IconButton(
                           onPressed: () => setState(() => _replyingTo = null),
-                          icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white70,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
-                  onPressed: _showPlusSheet,
-                  icon: const Icon(Icons.add, color: Color(0xFFB6C2DC), size: 26),
-                ),
-                Expanded(
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 44),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C3A5A),
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 44,
+                        ),
+                        onPressed: _showPlusSheet,
+                        icon: const Icon(
+                          Icons.add,
+                          color: Color(0xFFB6C2DC),
+                          size: 26,
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2C3A5A),
+                            borderRadius: BorderRadius.circular(22),
+                          ),
                           child: TextField(
                             controller: _inputController,
                             minLines: 1,
-                            maxLines: 4,
+                            maxLines: 6,
                             onSubmitted: (_) => _sendText(),
                             enabled: !_chatBlocked,
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
                             decoration: InputDecoration(
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(
@@ -1597,18 +1936,13 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
+                      ),
                       IconButton(
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 44,
+                        ),
                         onPressed: _openVoiceRecorder,
                         icon: const Icon(
                           Icons.mic_none_rounded,
@@ -1616,26 +1950,25 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           size: 24,
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => _openGiphyPicker(stickers: false),
-                        child: const Text(
-                          'GIF',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                          ),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 44,
                         ),
+                        tooltip: 'GIF',
+                        onPressed: () => _openGiphyPicker(stickers: false),
+                        icon: const GifToolbarIcon(size: 18),
                       ),
                       IconButton(
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
-                        onPressed: _showStickerPickerMenu,
-                        icon: const Icon(
-                          Icons.sticky_note_2_outlined,
-                          color: Color(0xFFB6C2DC),
-                          size: 22,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 44,
                         ),
+                        tooltip: 'Sticker',
+                        onPressed: _showStickerPickerMenu,
+                        icon: const StickerToolbarIcon(size: 20),
                       ),
                       Padding(
                         padding: const EdgeInsets.only(left: 2, bottom: 2),
@@ -1644,14 +1977,18 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           shape: const CircleBorder(),
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            onTap: (!_chatBlocked && !_sending) ? _sendText : null,
+                            onTap: (!_chatBlocked && !_sending)
+                                ? _sendText
+                                : null,
                             child: Padding(
                               padding: const EdgeInsets.all(8),
                               child: _sending
                                   ? const SizedBox(
                                       width: 16,
                                       height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : const Icon(
                                       Icons.send_rounded,
@@ -1662,9 +1999,6 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
                     ],
                   ),
                 ),
@@ -1703,7 +2037,8 @@ class _VoiceRecordPanelState extends State<_VoiceRecordPanel> {
   Future<void> _start() async {
     if (!await _recorder.hasPermission()) return;
     final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final path =
+        '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
     await _recorder.start(
       const RecordConfig(encoder: AudioEncoder.aacLc),
       path: path,
@@ -1881,7 +2216,10 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
               children: [
                 const Text(
                   'Tin nhắn thoại',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 LinearProgressIndicator(
@@ -1961,12 +2299,17 @@ class _PollMessageCardState extends State<_PollMessageCard> {
   Widget build(BuildContext context) {
     final data = _pollData;
     if (data == null) {
-      return const Text('Đang tải khảo sát...', style: TextStyle(color: Colors.white70));
+      return const Text(
+        'Đang tải khảo sát...',
+        style: TextStyle(color: Colors.white70),
+      );
     }
     final options = (data['options'] as List?)?.map((e) => '$e').toList() ?? [];
     final allowMultiple = data['allowMultipleAnswers'] == true;
     final results =
-        (data['results'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ??
+        (data['results'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
         const <Map<String, dynamic>>[];
     return Container(
       width: 280,
@@ -1990,8 +2333,9 @@ class _PollMessageCardState extends State<_PollMessageCard> {
           const SizedBox(height: 8),
           ...List.generate(options.length, (i) {
             if (_showResults) {
-              final percentage =
-                  (i < results.length) ? ((results[i]['percentage'] as num?)?.toDouble() ?? 0) : 0;
+              final percentage = (i < results.length)
+                  ? ((results[i]['percentage'] as num?)?.toDouble() ?? 0)
+                  : 0;
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
@@ -2007,7 +2351,10 @@ class _PollMessageCardState extends State<_PollMessageCard> {
                         ),
                         Text(
                           '${percentage.toStringAsFixed(0)}%',
-                          style: const TextStyle(color: Color(0xFFB5BAC1), fontSize: 12),
+                          style: const TextStyle(
+                            color: Color(0xFFB5BAC1),
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -2016,7 +2363,9 @@ class _PollMessageCardState extends State<_PollMessageCard> {
                       value: (percentage / 100).clamp(0, 1),
                       minHeight: 6,
                       backgroundColor: const Color(0xFF1E1F22),
-                      valueColor: const AlwaysStoppedAnimation(Color(0xFF6C5CE7)),
+                      valueColor: const AlwaysStoppedAnimation(
+                        Color(0xFF6C5CE7),
+                      ),
                     ),
                   ],
                 ),
@@ -2029,7 +2378,9 @@ class _PollMessageCardState extends State<_PollMessageCard> {
                       setState(() {
                         if (allowMultiple) {
                           if (_selectedOptions.contains(i)) {
-                            _selectedOptions = _selectedOptions.where((e) => e != i).toList();
+                            _selectedOptions = _selectedOptions
+                                .where((e) => e != i)
+                                .toList();
                           } else {
                             _selectedOptions = [..._selectedOptions, i];
                           }
@@ -2053,7 +2404,10 @@ class _PollMessageCardState extends State<_PollMessageCard> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(options[i], style: const TextStyle(color: Colors.white)),
+                      child: Text(
+                        options[i],
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     ),
                   ],
                 ),
@@ -2070,7 +2424,9 @@ class _PollMessageCardState extends State<_PollMessageCard> {
                 ),
               if (!_hasVoted && !_showResults)
                 FilledButton(
-                  onPressed: _selectedOptions.isEmpty || _submitting ? null : _vote,
+                  onPressed: _selectedOptions.isEmpty || _submitting
+                      ? null
+                      : _vote,
                   child: const Text('Bình chọn'),
                 ),
             ],

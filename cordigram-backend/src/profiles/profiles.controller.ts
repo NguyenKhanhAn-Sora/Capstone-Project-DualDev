@@ -165,12 +165,32 @@ export class ProfilesController {
       )
       .lean();
 
+    /** Chuẩn hóa ngày sinh — trong DB có thể là Date hoặc chuỗi ISO / yyyy-MM-dd. */
+    const birthdateIso = ((): string | null => {
+      const raw = (profile as { birthdate?: unknown }).birthdate;
+      if (raw == null) return null;
+      if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+        return raw.toISOString().slice(0, 10);
+      }
+      if (typeof raw === 'string') {
+        const s = raw.trim();
+        if (!s) return null;
+        const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+        if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+        const d = new Date(s);
+        if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+      }
+      return null;
+    })();
+
     return {
       id: profile._id?.toString?.() ?? (profile as { id?: string }).id,
       userId: profile.userId?.toString?.() ?? user.userId,
       displayName: profile.displayName,
       username: profile.username,
       avatarUrl: profile.avatarUrl,
+      /** Ngày sinh của chính user — chỉ trong GET me, phục vụ kiểm tra tuổi khi tham gia máy chủ NSFW. */
+      birthdate: birthdateIso,
       displayNameFontId: (profile as any).displayNameFontId ?? null,
       displayNameEffectId: (profile as any).displayNameEffectId ?? null,
       displayNamePrimaryHex: (profile as any).displayNamePrimaryHex ?? null,

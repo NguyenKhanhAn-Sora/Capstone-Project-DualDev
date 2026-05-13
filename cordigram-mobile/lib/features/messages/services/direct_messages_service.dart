@@ -7,6 +7,8 @@ import '../models/dm_message.dart';
 
 class DirectMessagesService {
   DirectMessagesService._();
+  static final Map<String, DateTime?> _dmMutedUntil = {};
+  static final Set<String> _dmMutedForever = {};
 
   static Future<Map<String, dynamic>> getMyMessagingProfile() async {
     try {
@@ -60,6 +62,42 @@ class DirectMessagesService {
         .whereType<Map>()
         .map((e) => DmConversation.fromJson(Map<String, dynamic>.from(e)))
         .toList();
+  }
+
+  static void setConversationMuted(
+    String peerUserId, {
+    Duration? duration,
+    bool forever = false,
+  }) {
+    if (peerUserId.trim().isEmpty) return;
+    if (forever) {
+      _dmMutedForever.add(peerUserId);
+      _dmMutedUntil.remove(peerUserId);
+      return;
+    }
+    if (duration == null) {
+      _dmMutedForever.remove(peerUserId);
+      _dmMutedUntil.remove(peerUserId);
+      return;
+    }
+    _dmMutedForever.remove(peerUserId);
+    _dmMutedUntil[peerUserId] = DateTime.now().add(duration);
+  }
+
+  static bool isConversationMuted(String peerUserId) {
+    if (_dmMutedForever.contains(peerUserId)) return true;
+    final until = _dmMutedUntil[peerUserId];
+    if (until == null) return false;
+    if (DateTime.now().isAfter(until)) {
+      _dmMutedUntil.remove(peerUserId);
+      return false;
+    }
+    return true;
+  }
+
+  /// True when the user chose "until I turn notifications back on" (not a timed mute).
+  static bool isConversationMutedForever(String peerUserId) {
+    return _dmMutedForever.contains(peerUserId);
   }
 
   static Future<List<DmMessage>> getConversationMessages(
@@ -328,6 +366,40 @@ class DirectMessagesService {
 
     final res = await ApiService.get(
       '/users/$userId/following',
+      extraHeaders: _authHeaders,
+    );
+
+    final list = (res['items'] is List)
+        ? (res['items'] as List)
+        : (res['data'] is List)
+        ? (res['data'] as List)
+        : const <dynamic>[];
+    return list
+        .whereType<Map>()
+        .map((item) {
+          final map = Map<String, dynamic>.from(item);
+          return DmConversation(
+            userId: (map['userId'] ?? map['_id'] ?? '').toString(),
+            displayName: (map['displayName'] ?? '').toString(),
+            username: (map['username'] ?? '').toString(),
+            lastMessage: '',
+            lastMessageAt: null,
+            unreadCount: 0,
+            avatarUrl: (map['avatarUrl'] ?? map['avatar'])?.toString(),
+            isOnline: map['isOnline'] == true,
+          );
+        })
+        .where((c) => c.userId.isNotEmpty)
+        .toList();
+  }
+
+  /// Same shape as [getFollowingAsConversations] for `/users/:id/followers` (web invite popup).
+  static Future<List<DmConversation>> getFollowersAsConversations() async {
+    final userId = _extractUserIdFromToken(AuthStorage.accessToken);
+    if (userId == null || userId.isEmpty) return const <DmConversation>[];
+
+    final res = await ApiService.get(
+      '/users/$userId/followers',
       extraHeaders: _authHeaders,
     );
 

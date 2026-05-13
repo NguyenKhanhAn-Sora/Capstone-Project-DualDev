@@ -12,7 +12,9 @@ import 'services/channel_messages_realtime_service.dart';
 import 'services/servers_service.dart';
 import 'services/voice_channel_session_controller.dart';
 import 'voice_channel_room_screen.dart';
+import 'server_join_applications_screen.dart';
 import 'widgets/channel_context_sheet.dart';
+import 'widgets/invite_to_server_sheet.dart';
 import 'widgets/server_context_sheet.dart';
 
 class ServerDetailScreen extends StatefulWidget {
@@ -54,6 +56,7 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   bool _openedInitialChannel = false;
   StreamSubscription<Map<String, dynamic>>? _serverRealtimeSub;
   bool _didAutoPopByRealtime = false;
+  int _joinAppPendingCount = 0;
 
   ServerSummary get _effectiveServer =>
       _serverOverride ?? widget.server;
@@ -160,6 +163,7 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
         _displayVoiceChannels = voiceDisplay;
         _permissions = perms;
       });
+      unawaited(_refreshJoinApplicationsBadge());
       _maybeOpenInitialTextChannel();
     } catch (e) {
       if (!mounted) return;
@@ -191,6 +195,45 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
       out.add(c);
     }
     return out;
+  }
+
+  Future<void> _refreshJoinApplicationsBadge() async {
+    if (!_permissions.canManageJoinApplications) {
+      if (mounted) setState(() => _joinAppPendingCount = 0);
+      return;
+    }
+    try {
+      final r = await ServersService.listJoinApplications(
+        widget.server.id,
+        'pending',
+      );
+      final owner = (widget.server.ownerId ?? '').trim();
+      var n = 0;
+      for (final e in r.items) {
+        final uid = (e['userId'] ?? '').toString().trim();
+        if (owner.isNotEmpty && uid == owner) continue;
+        n++;
+      }
+      if (!mounted) return;
+      setState(() => _joinAppPendingCount = n);
+    } catch (_) {
+      if (mounted) setState(() => _joinAppPendingCount = 0);
+    }
+  }
+
+  Future<void> _openInviteSheet() async {
+    if (!_permissions.canCreateInvite) return;
+    await InviteToServerSheet.show(context, _effectiveServer);
+  }
+
+  Future<void> _openJoinApplications() async {
+    if (!_permissions.canManageJoinApplications) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ServerJoinApplicationsScreen(server: _effectiveServer),
+      ),
+    );
+    if (mounted) await _refreshJoinApplicationsBadge();
   }
 
   Future<void> _openServerSheet() async {
@@ -389,6 +432,38 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
               icon: const Icon(Icons.more_vert_rounded),
               onPressed: _openServerSheet,
             ),
+            if (_permissions.canManageJoinApplications)
+              IconButton(
+                tooltip: 'Đơn tham gia / duyệt thành viên',
+                onPressed: _openJoinApplications,
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.people_alt_outlined),
+                    if (_joinAppPendingCount > 0)
+                      const Positioned(
+                        right: -2,
+                        top: -2,
+                        child: SizedBox(
+                          width: 8,
+                          height: 8,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Color(0xFFFF5C5C),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            if (_permissions.canCreateInvite)
+              IconButton(
+                tooltip: 'Mời vào máy chủ',
+                icon: const Icon(Icons.person_add_alt_1_outlined),
+                onPressed: _openInviteSheet,
+              ),
           ],
         ),
         body: _loading

@@ -7,8 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import '../../../core/config/app_config.dart';
 import 'call/dm_call_manager.dart';
 import 'messages_controller.dart';
@@ -18,6 +16,9 @@ import 'models/dm_message.dart';
 import 'models/message_thread.dart';
 import 'pinned_messages_screen.dart';
 import 'search/message_search_sheet.dart';
+import 'widgets/gif_toolbar_icon.dart';
+import 'widgets/sticker_toolbar_icon.dart';
+import 'widgets/server_join_flow.dart';
 import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
@@ -32,10 +33,15 @@ class MessageChatScreen extends StatefulWidget {
     super.key,
     required this.thread,
     required this.controller,
+    this.onOpenJoinedServer,
   });
 
   final MessageThread thread;
   final MessagesController controller;
+
+  /// After joining a server from an invite card, open that server (optional).
+  final Future<void> Function(String serverId, {String? channelId})?
+  onOpenJoinedServer;
 
   @override
   State<MessageChatScreen> createState() => _MessageChatScreenState();
@@ -43,9 +49,17 @@ class MessageChatScreen extends StatefulWidget {
 
 class _MessageChatScreenState extends State<MessageChatScreen> {
   static const Color _pageColor = Color(0xFF08183A);
-  static final RegExp _inviteRegExp = RegExp(
-    r'https?://(?:www\.)?cordigram\.com/invite/server/([a-fA-F0-9]{24})',
-  );
+  static RegExp? _inviteRegExpCache;
+
+  static RegExp _inviteRegExp() {
+    return _inviteRegExpCache ??= RegExp(
+      r'https?://(?:www\.)?'
+      '${RegExp.escape(Uri.parse(AppConfig.webBaseUrl).host)}'
+      r'/invite/server/([a-fA-F0-9]{24})(?:/([a-fA-F0-9]{24}))?',
+      caseSensitive: false,
+    );
+  }
+
   static final RegExp _serverEmojiTokenRegExp = RegExp(
     r':([a-zA-Z0-9_]{1,80}):',
   );
@@ -101,6 +115,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       ),
     );
   }
+
   @override
   void initState() {
     super.initState();
@@ -261,7 +276,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
             backgroundColor: const Color(0xFF0E2247),
             title: const Text(
               'Đang ở kênh thoại server',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             content: Text(
               'Bạn đang trong kênh ${voiceSession.channelName ?? 'thoại'}. '
@@ -357,7 +375,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     var allowMulti = false;
     var submitting = false;
 
-    Future<void> submitPoll(StateSetter setLocal, BuildContext dialogCtx) async {
+    Future<void> submitPoll(
+      StateSetter setLocal,
+      BuildContext dialogCtx,
+    ) async {
       final question = questionCtrl.text.trim();
       final validOptions = optionCtrls
           .map((e) => e.text.trim())
@@ -366,16 +387,16 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
 
       if (question.isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_t('poll.needQuestion'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_t('poll.needQuestion'))));
         return;
       }
       if (validOptions.length < 2) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_t('poll.need2Options'))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_t('poll.need2Options'))));
         return;
       }
       if (submitting) return;
@@ -402,9 +423,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
         );
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$e')));
         }
       } finally {
         if (mounted && Navigator.of(context).canPop()) {
@@ -449,7 +470,8 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                 maxLength: 120,
                                 style: const TextStyle(color: Colors.white),
                                 decoration: InputDecoration(
-                                  labelText: '${_t('poll.option')} ${index + 1}',
+                                  labelText:
+                                      '${_t('poll.option')} ${index + 1}',
                                   labelStyle: const TextStyle(
                                     color: Color(0xFFB6C2DC),
                                   ),
@@ -462,7 +484,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                     ? null
                                     : () {
                                         setLocal(() {
-                                          final ctrl = optionCtrls.removeAt(index);
+                                          final ctrl = optionCtrls.removeAt(
+                                            index,
+                                          );
                                           ctrl.dispose();
                                         });
                                       },
@@ -513,7 +537,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                       contentPadding: EdgeInsets.zero,
                       title: Text(
                         _t('poll.multi'),
-                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
                       ),
                       value: allowMulti,
                       onChanged: submitting
@@ -1073,8 +1100,8 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                               errorBuilder: (_, __, ___) => Container(
                                 color: const Color(0xFF1F2D4D),
                                 alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.sticky_note_2_outlined,
+                                child: const StickerToolbarIcon(
+                                  size: 28,
                                   color: Color(0xFFB6C2DC),
                                 ),
                               ),
@@ -1103,7 +1130,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.gif_box_outlined, color: Colors.white),
+              leading: const GifToolbarIcon(size: 22, color: Colors.white),
               title: const Text(
                 'Giphy Sticker',
                 style: TextStyle(color: Colors.white),
@@ -1114,10 +1141,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(
-                Icons.sticky_note_2_outlined,
-                color: Colors.white,
-              ),
+              leading: const StickerToolbarIcon(size: 22, color: Colors.white),
               title: const Text(
                 'Server Sticker',
                 style: TextStyle(color: Colors.white),
@@ -1178,10 +1202,23 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _MenuActionRow(
-                    title: 'Tắt thông báo tin nhắn',
+                    title:
+                        widget.controller.isConversationMuted(widget.thread.id)
+                        ? 'Mở lại thông báo'
+                        : 'Tắt thông báo đến khi tôi bật lại',
                     onTap: () async {
                       Navigator.of(dialogContext).pop();
-                      await _showMuteDurationMenu();
+                      if (widget.controller.isConversationMuted(
+                        widget.thread.id,
+                      )) {
+                        widget.controller.setConversationMuteDuration(
+                          widget.thread.id,
+                          duration: null,
+                          forever: false,
+                        );
+                      } else {
+                        await _showMuteDurationMenu();
+                      }
                     },
                   ),
                   _MenuActionRow(
@@ -1199,7 +1236,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                       } catch (_) {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Không thể cập nhật chặn')),
+                          const SnackBar(
+                            content: Text('Không thể cập nhật chặn'),
+                          ),
                         );
                       }
                     },
@@ -1214,16 +1253,38 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   }
 
   Future<void> _showMuteDurationMenu() async {
-    final currentlyMuted = widget.controller.isConversationMuted(widget.thread.id);
+    final currentlyMuted = widget.controller.isConversationMuted(
+      widget.thread.id,
+    );
     final opts = <({String label, Duration? duration, bool forever})>[
       if (currentlyMuted)
-        (label: 'Bật lại thông báo', duration: null, forever: false),
-      (label: 'Trong vòng 15 Phút', duration: const Duration(minutes: 15), forever: false),
-      (label: 'Trong vòng 1 Giờ', duration: const Duration(hours: 1), forever: false),
-      (label: 'Trong vòng 3 Giờ', duration: const Duration(hours: 3), forever: false),
-      (label: 'Trong vòng 8 Giờ', duration: const Duration(hours: 8), forever: false),
-      (label: 'Trong vòng 24 Giờ', duration: const Duration(hours: 24), forever: false),
-      (label: 'Cho đến khi bật lại', duration: null, forever: true),
+        (label: 'Bật thông báo trở lại', duration: null, forever: false),
+      (
+        label: 'Trong vòng 15 Phút',
+        duration: const Duration(minutes: 15),
+        forever: false,
+      ),
+      (
+        label: 'Trong vòng 1 Giờ',
+        duration: const Duration(hours: 1),
+        forever: false,
+      ),
+      (
+        label: 'Trong vòng 3 Giờ',
+        duration: const Duration(hours: 3),
+        forever: false,
+      ),
+      (
+        label: 'Trong vòng 8 Giờ',
+        duration: const Duration(hours: 8),
+        forever: false,
+      ),
+      (
+        label: 'Trong vòng 24 Giờ',
+        duration: const Duration(hours: 24),
+        forever: false,
+      ),
+      (label: 'Cho đến khi tôi bật lại', duration: null, forever: true),
     ];
     await showDialog<void>(
       context: context,
@@ -1240,6 +1301,22 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    currentlyMuted
+                        ? 'Thông báo đang tắt'
+                        : 'Tắt thông báo tin nhắn',
+                    style: const TextStyle(
+                      color: Color(0xFFB8C4E8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
               for (final item in opts)
                 InkWell(
                   onTap: () {
@@ -1252,7 +1329,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                   },
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
                     child: Text(
                       item.label,
                       style: const TextStyle(
@@ -1263,6 +1343,49 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                     ),
                   ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Visible strip when this DM is muted until the user turns notifications back on.
+  Widget _foreverMuteBanner(bool isBlocked) {
+    if (isBlocked ||
+        !widget.controller.isConversationMutedForever(widget.thread.id)) {
+      return const SizedBox.shrink();
+    }
+    return Material(
+      color: const Color(0xFF152547),
+      child: InkWell(
+        onTap: () {
+          widget.controller.setConversationMuteDuration(
+            widget.thread.id,
+            duration: null,
+            forever: false,
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.notifications_off_outlined,
+                size: 20,
+                color: Color(0xFFE8B84A),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Đang tắt thông báo đến khi bạn bật lại — chạm để mở lại',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -1304,7 +1427,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.add_reaction_outlined, color: Colors.white),
+                leading: const Icon(
+                  Icons.add_reaction_outlined,
+                  color: Colors.white,
+                ),
                 title: const Text(
                   'Chọn emoji khác',
                   style: TextStyle(color: Colors.white),
@@ -1315,7 +1441,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.push_pin_outlined, color: Colors.white),
+                leading: const Icon(
+                  Icons.push_pin_outlined,
+                  color: Colors.white,
+                ),
                 title: const Text(
                   'Ghim tin nhắn',
                   style: TextStyle(color: Colors.white),
@@ -1326,7 +1455,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.redAccent,
+                ),
                 title: const Text(
                   'Xóa tin nhắn',
                   style: TextStyle(color: Colors.redAccent),
@@ -1378,7 +1510,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                   );
                   if (!mounted) return;
                   setState(() {
-                    _messages = widget.controller.liveMessages(widget.thread.id);
+                    _messages = widget.controller.liveMessages(
+                      widget.thread.id,
+                    );
                   });
                 },
               ),
@@ -1407,9 +1541,8 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
             onPressed: () async {
               final pickedId = await Navigator.of(context).push<String>(
                 MaterialPageRoute(
-                  builder: (_) => PinnedMessagesScreen.dm(
-                    peerUserId: widget.thread.id,
-                  ),
+                  builder: (_) =>
+                      PinnedMessagesScreen.dm(peerUserId: widget.thread.id),
                 ),
               );
               if (!mounted || pickedId == null || pickedId.isEmpty) return;
@@ -1420,9 +1553,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể ghim tin nhắn: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Không thể ghim tin nhắn: $e')));
     }
   }
 
@@ -1485,10 +1618,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     final avatarUrl = (message.senderAvatarUrl ?? '').trim();
     final fallback = _senderNameForBubble(message);
     if (avatarUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 13,
-        backgroundImage: NetworkImage(avatarUrl),
-      );
+      return CircleAvatar(radius: 13, backgroundImage: NetworkImage(avatarUrl));
     }
     return CircleAvatar(
       radius: 13,
@@ -1511,13 +1641,20 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   }
 
   String? _extractInviteUrl(String text) {
-    final match = _inviteRegExp.firstMatch(text);
+    final match = _inviteRegExp().firstMatch(text);
     return match?.group(0);
   }
 
   String? _extractInviteServerId(String text) {
-    final match = _inviteRegExp.firstMatch(text);
+    final match = _inviteRegExp().firstMatch(text);
     return match?.group(1);
+  }
+
+  String? _extractInviteChannelId(String text) {
+    final match = _inviteRegExp().firstMatch(text);
+    final g2 = match?.group(2);
+    if (g2 == null || g2.isEmpty) return null;
+    return g2;
   }
 
   Widget _buildEmojiAwareText(String text) {
@@ -1578,15 +1715,12 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     final pollMatch = _pollRegExp.firstMatch(text);
     final inviteUrl = _extractInviteUrl(text);
     final inviteServerId = _extractInviteServerId(text);
+    final inviteChannelId = _extractInviteChannelId(text);
 
     if (pollMatch != null) {
       final pollId = pollMatch.group(1) ?? '';
       if (pollId.isNotEmpty) {
-        return _PollMessageCard(
-          pollId: pollId,
-          t: _t,
-          tf: _tf,
-        );
+        return _PollMessageCard(pollId: pollId, t: _t, tf: _tf);
       }
     }
 
@@ -1626,13 +1760,11 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     }
 
     if (inviteUrl != null && inviteServerId != null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(inviteUrl, style: const TextStyle(color: Color(0xFF62B4FF))),
-          const SizedBox(height: 6),
-          _ServerInviteCard(inviteUrl: inviteUrl, serverId: inviteServerId),
-        ],
+      return _ServerInviteCard(
+        inviteUrl: inviteUrl,
+        serverId: inviteServerId,
+        channelId: inviteChannelId,
+        onOpenServerInApp: widget.onOpenJoinedServer,
       );
     }
 
@@ -1739,12 +1871,16 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
           Column(
             children: [
               const Divider(height: 1, color: Color(0xFF233358)),
+              _foreverMuteBanner(isBlocked),
               Expanded(
                 child: isBlocked
                     ? Center(
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 20),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF1D2E52),
                             borderRadius: BorderRadius.circular(12),
@@ -1766,11 +1902,15 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                               FilledButton(
                                 onPressed: () async {
                                   try {
-                                    await widget.controller.unblockUser(widget.thread.id);
+                                    await widget.controller.unblockUser(
+                                      widget.thread.id,
+                                    );
                                   } catch (_) {
                                     if (!mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Không thể gỡ chặn')),
+                                      const SnackBar(
+                                        content: Text('Không thể gỡ chặn'),
+                                      ),
                                     );
                                   }
                                 },
@@ -1781,185 +1921,250 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                         ),
                       )
                     : _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : ListView.builder(
-                    reverse: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 12,
-                    ),
-                    itemCount: _messages.length,
-                    itemBuilder: (_, index) {
-                      final message = _messages[_messages.length - 1 - index];
-                      final isMine = myId != null
-                          ? message.senderId == myId
-                          : message.senderId != widget.thread.id;
-                      final hi = _highlightMessageId == message.id;
-                      return KeyedSubtree(
-                        key: _keyForMessage(message.id),
-                        child: Align(
-                        alignment: isMine
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: hi
-                              ? BoxDecoration(
-                                  borderRadius: BorderRadius.circular(14),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x664A90E2),
-                                      blurRadius: 12,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                )
-                              : null,
-                        child: Column(
-                          crossAxisAlignment: isMine
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                if (!isMine) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 6, bottom: 6),
-                                    child: _senderAvatarForBubble(message),
-                                  ),
-                                ],
-                                Flexible(
-                                  child: GestureDetector(
-                                    onLongPress: () => _showMessageActions(
-                                      message: message,
-                                      isMine: isMine,
-                                    ),
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(vertical: 4),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 8,
-                                      ),
-                                      constraints: BoxConstraints(
-                                        maxWidth: MediaQuery.sizeOf(context).width * 0.72,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isMine
-                                            ? const Color(0xFF2B3C66)
-                                            : const Color(0xFF1D2E52),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (!isMine)
-                                            Padding(
-                                              padding: const EdgeInsets.only(bottom: 4),
-                                              child: Text(
-                                                _senderNameForBubble(message),
-                                                style: const TextStyle(
-                                                  color: Color(0xFFC3D4F7),
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        reverse: true,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
+                        itemCount: _messages.length,
+                        itemBuilder: (_, index) {
+                          final message =
+                              _messages[_messages.length - 1 - index];
+                          final isMine = myId != null
+                              ? message.senderId == myId
+                              : message.senderId != widget.thread.id;
+                          final hi = _highlightMessageId == message.id;
+                          return KeyedSubtree(
+                            key: _keyForMessage(message.id),
+                            child: Align(
+                              alignment: isMine
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                decoration: hi
+                                    ? BoxDecoration(
+                                        borderRadius: BorderRadius.circular(14),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x664A90E2),
+                                            blurRadius: 12,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      )
+                                    : null,
+                                child: Column(
+                                  crossAxisAlignment: isMine
+                                      ? CrossAxisAlignment.end
+                                      : CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        if (!isMine) ...[
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: 6,
+                                              bottom: 6,
                                             ),
-                                          if (message.replyTo != null)
-                                            Container(
-                                              margin: const EdgeInsets.only(bottom: 6),
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 6,
+                                            child: _senderAvatarForBubble(
+                                              message,
+                                            ),
+                                          ),
+                                        ],
+                                        Flexible(
+                                          child: GestureDetector(
+                                            onLongPress: () =>
+                                                _showMessageActions(
+                                                  message: message,
+                                                  isMine: isMine,
+                                                ),
+                                            child: Container(
+                                              margin:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 4,
+                                                  ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 8,
+                                                  ),
+                                              constraints: BoxConstraints(
+                                                maxWidth:
+                                                    MediaQuery.sizeOf(
+                                                      context,
+                                                    ).width *
+                                                    0.72,
                                               ),
                                               decoration: BoxDecoration(
-                                                color: const Color(0x33232f4a),
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(
-                                                  color: const Color(0xFF44577F),
-                                                ),
+                                                color: isMine
+                                                    ? const Color(0xFF2B3C66)
+                                                    : const Color(0xFF1D2E52),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  Text(
-                                                    message.replyTo!.senderName ??
-                                                        message.replyTo!.senderId,
-                                                    style: const TextStyle(
-                                                      color: Color(0xFFB6C2DC),
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w700,
+                                                  if (!isMine)
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            bottom: 4,
+                                                          ),
+                                                      child: Text(
+                                                        _senderNameForBubble(
+                                                          message,
+                                                        ),
+                                                        style: const TextStyle(
+                                                          color: Color(
+                                                            0xFFC3D4F7,
+                                                          ),
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
                                                     ),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    _replyPreviewText(message.replyTo!),
-                                                    maxLines: 2,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      color: Colors.white70,
-                                                      fontSize: 12,
+                                                  if (message.replyTo != null)
+                                                    Container(
+                                                      margin:
+                                                          const EdgeInsets.only(
+                                                            bottom: 6,
+                                                          ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 6,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(
+                                                          0x33232f4a,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                        border: Border.all(
+                                                          color: const Color(
+                                                            0xFF44577F,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            message
+                                                                    .replyTo!
+                                                                    .senderName ??
+                                                                message
+                                                                    .replyTo!
+                                                                    .senderId,
+                                                            style:
+                                                                const TextStyle(
+                                                                  color: Color(
+                                                                    0xFFB6C2DC,
+                                                                  ),
+                                                                  fontSize: 11,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                ),
+                                                          ),
+                                                          const SizedBox(
+                                                            height: 2,
+                                                          ),
+                                                          Text(
+                                                            _replyPreviewText(
+                                                              message.replyTo!,
+                                                            ),
+                                                            maxLines: 2,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style:
+                                                                const TextStyle(
+                                                                  color: Colors
+                                                                      .white70,
+                                                                  fontSize: 12,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
-                                                  ),
+                                                  _buildMessageContent(message),
                                                 ],
                                               ),
                                             ),
-                                          _buildMessageContent(message),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (message.reactions.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Wrap(
-                                  spacing: 6,
-                                  children: message.reactions
-                                      .where((r) => r.emoji.isNotEmpty)
-                                      .map(
-                                        (r) => Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF1F2D4D),
-                                            borderRadius: BorderRadius.circular(999),
-                                          ),
-                                          child: Text(
-                                            '${r.emoji} ${r.count}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                            ),
                                           ),
                                         ),
-                                      )
-                                      .toList(),
+                                      ],
+                                    ),
+                                    if (message.reactions.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Wrap(
+                                          spacing: 6,
+                                          children: message.reactions
+                                              .where((r) => r.emoji.isNotEmpty)
+                                              .map(
+                                                (r) => Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 3,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                      0xFF1F2D4D,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          999,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    '${r.emoji} ${r.count}',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                        ),
+                                      ),
+                                    if (isMine)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 3,
+                                          right: 2,
+                                        ),
+                                        child: Text(
+                                          message.read ? 'Đã xem' : 'Đã gửi',
+                                          style: const TextStyle(
+                                            color: Color(0xFF9FB3DA),
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
-                            if (isMine)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 3, right: 2),
-                                child: Text(
-                                  message.read ? 'Đã xem' : 'Đã gửi',
-                                  style: const TextStyle(
-                                    color: Color(0xFF9FB3DA),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        ),
-                        ),
-                      );
-                    },
-                    ),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -1968,191 +2173,193 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       bottomNavigationBar: isBlocked
           ? null
           : SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_replyingTo != null)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF17284A),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF3A4F77)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_replyingTo != null)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF17284A),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF3A4F77)),
+                      ),
+                      child: Row(
                         children: [
-                          const Text(
-                            'Đang trả lời',
-                            style: TextStyle(
-                              color: Color(0xFFB6C2DC),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Đang trả lời',
+                                  style: TextStyle(
+                                    color: Color(0xFFB6C2DC),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _replyingTo!.content.isNotEmpty
+                                      ? _replyingTo!.content
+                                      : (_replyingTo!.type == 'voice'
+                                            ? '🔊 Tin nhắn thoại'
+                                            : 'Tin nhắn'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _replyingTo!.content.isNotEmpty
-                                ? _replyingTo!.content
-                                : (_replyingTo!.type == 'voice'
-                                      ? '🔊 Tin nhắn thoại'
-                                      : 'Tin nhắn'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                          IconButton(
+                            onPressed: () => setState(() => _replyingTo = null),
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Colors.white70,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => setState(() => _replyingTo = null),
-                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-            Padding(
-          padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
-                onPressed: _showPlusSheet,
-                icon: const Icon(Icons.add, color: Color(0xFFB6C2DC), size: 26),
-              ),
-              Expanded(
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2C3A5A),
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _inputController,
-                          minLines: 1,
-                          maxLines: 4,
-                          onSubmitted: (_) => _sendTextMessage(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 44,
                           ),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
+                          onPressed: _showPlusSheet,
+                          icon: const Icon(
+                            Icons.add,
+                            color: Color(0xFFB6C2DC),
+                            size: 26,
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 44),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2C3A5A),
+                              borderRadius: BorderRadius.circular(22),
                             ),
-                            hintText: 'Send a message…',
-                            hintStyle: const TextStyle(
-                              color: Color(0xFF8A98B8),
-                              fontSize: 14,
-                            ),
-                            border: InputBorder.none,
-                            suffixIcon: IconButton(
-                              padding: const EdgeInsets.only(right: 4),
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(
-                                Icons.tag_faces_rounded,
-                                color: Color(0xFFB6C2DC),
-                                size: 22,
+                            child: TextField(
+                              controller: _inputController,
+                              minLines: 1,
+                              maxLines: 6,
+                              onSubmitted: (_) => _sendTextMessage(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
                               ),
-                              onPressed: _showEmojiPicker,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 44,
-                      ),
-                      onPressed: _openVoiceRecorder,
-                      icon: const Icon(
-                        Icons.mic_none_rounded,
-                        color: Color(0xFFB6C2DC),
-                        size: 24,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => _openGiphyPicker(stickers: false),
-                      child: const Text(
-                        'GIF',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 44,
-                      ),
-                      onPressed: _showStickerPickerMenu,
-                      icon: const Icon(
-                        Icons.sticky_note_2_outlined,
-                        color: Color(0xFFB6C2DC),
-                        size: 22,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 2, bottom: 2),
-                      child: ListenableBuilder(
-                        listenable: _inputController,
-                        builder: (_, __) {
-                          final empty = _inputController.text.trim().isEmpty;
-                          return Material(
-                            color: const Color(0xFF6C5CE7),
-                            shape: const CircleBorder(),
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: empty ? null : _sendTextMessage,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Icon(
-                                  Icons.send_rounded,
-                                  size: 20,
-                                  color: empty ? Colors.white24 : Colors.white,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                hintText: 'Send a message…',
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF8A98B8),
+                                  fontSize: 14,
+                                ),
+                                border: InputBorder.none,
+                                suffixIcon: IconButton(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  constraints: const BoxConstraints(),
+                                  icon: const Icon(
+                                    Icons.tag_faces_rounded,
+                                    color: Color(0xFFB6C2DC),
+                                    size: 22,
+                                  ),
+                                  onPressed: _showEmojiPicker,
                                 ),
                               ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 44,
+                          ),
+                          onPressed: _openVoiceRecorder,
+                          icon: const Icon(
+                            Icons.mic_none_rounded,
+                            color: Color(0xFFB6C2DC),
+                            size: 24,
+                          ),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 44,
+                          ),
+                          tooltip: 'GIF',
+                          onPressed: () => _openGiphyPicker(stickers: false),
+                          icon: const GifToolbarIcon(size: 18),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 44,
+                          ),
+                          tooltip: 'Sticker',
+                          onPressed: _showStickerPickerMenu,
+                          icon: const StickerToolbarIcon(size: 20),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 2, bottom: 2),
+                          child: ListenableBuilder(
+                            listenable: _inputController,
+                            builder: (_, __) {
+                              final empty = _inputController.text
+                                  .trim()
+                                  .isEmpty;
+                              return Material(
+                                color: const Color(0xFF6C5CE7),
+                                shape: const CircleBorder(),
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: empty ? null : _sendTextMessage,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Icon(
+                                      Icons.send_rounded,
+                                      size: 20,
+                                      color: empty
+                                          ? Colors.white24
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-          ],
-        ),
-      ),
+            ),
     );
   }
 }
@@ -2375,7 +2582,10 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
               children: [
                 const Text(
                   'Tin nhắn thoại',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 LinearProgressIndicator(
@@ -2399,10 +2609,18 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
 }
 
 class _ServerInviteCard extends StatelessWidget {
-  const _ServerInviteCard({required this.serverId, required this.inviteUrl});
+  const _ServerInviteCard({
+    required this.serverId,
+    required this.inviteUrl,
+    this.channelId,
+    this.onOpenServerInApp,
+  });
 
   final String serverId;
   final String inviteUrl;
+  final String? channelId;
+  final Future<void> Function(String serverId, {String? channelId})?
+  onOpenServerInApp;
 
   @override
   Widget build(BuildContext context) {
@@ -2529,9 +2747,22 @@ class _ServerInviteCard extends StatelessWidget {
                           ),
                         ),
                         onPressed: () async {
-                          await launchUrl(Uri.parse(inviteUrl));
+                          await ServerJoinFlow.joinFromInvite(
+                            context,
+                            serverId: serverId,
+                            webFallbackUrl: inviteUrl,
+                            initialChannelId: channelId,
+                            presentationServerName: server.name,
+                            presentationAvatarUrl: server.avatarUrl,
+                            presentationMemberCount: server.memberCount,
+                            presentationOnlineCount: server.onlineCount,
+                            onNavigateToMessagesHome: () {
+                              if (context.mounted) Navigator.of(context).pop();
+                            },
+                            onOpenServerInApp: onOpenServerInApp,
+                          );
                         },
-                        child: const Text('Đi tới Máy chủ'),
+                        child: const Text('Tham gia máy chủ'),
                       ),
                     ),
                   ],
@@ -2624,9 +2855,9 @@ class _PollMessageCardState extends State<_PollMessageCard> {
       await _loadPoll();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.t('poll.voteError'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(widget.t('poll.voteError'))));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -2644,17 +2875,16 @@ class _PollMessageCardState extends State<_PollMessageCard> {
             style: const TextStyle(color: Colors.white70),
           ),
           if (_loadError != null)
-            TextButton(
-              onPressed: _loadPoll,
-              child: const Text('Retry'),
-            ),
+            TextButton(onPressed: _loadPoll, child: const Text('Retry')),
         ],
       );
     }
 
     final options = (data['options'] as List?)?.map((e) => '$e').toList() ?? [];
     final results =
-        (data['results'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ??
+        (data['results'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
         const <Map<String, dynamic>>[];
     final allowMultiple = data['allowMultipleAnswers'] == true;
     final votes = (data['uniqueVoters'] ?? 0).toString();
@@ -2681,7 +2911,9 @@ class _PollMessageCardState extends State<_PollMessageCard> {
           ),
           const SizedBox(height: 6),
           Text(
-            allowMultiple ? widget.t('poll.selectMany') : widget.t('poll.selectOne'),
+            allowMultiple
+                ? widget.t('poll.selectMany')
+                : widget.t('poll.selectOne'),
             style: const TextStyle(color: Color(0xFFB5BAC1), fontSize: 12),
           ),
           const SizedBox(height: 8),
@@ -2732,7 +2964,10 @@ class _PollMessageCardState extends State<_PollMessageCard> {
                       ),
                       Text(
                         '${percentage.toStringAsFixed(0)}%',
-                        style: const TextStyle(color: Color(0xFFB5BAC1), fontSize: 12),
+                        style: const TextStyle(
+                          color: Color(0xFFB5BAC1),
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -2743,7 +2978,9 @@ class _PollMessageCardState extends State<_PollMessageCard> {
                       value: (percentage / 100).clamp(0, 1),
                       minHeight: 6,
                       backgroundColor: const Color(0xFF1E1F22),
-                      valueColor: const AlwaysStoppedAnimation(Color(0xFF6C5CE7)),
+                      valueColor: const AlwaysStoppedAnimation(
+                        Color(0xFF6C5CE7),
+                      ),
                     ),
                   ),
                 ],
@@ -2755,8 +2992,14 @@ class _PollMessageCardState extends State<_PollMessageCard> {
             children: [
               Expanded(
                 child: Text(
-                  widget.tf('poll.votesHours', {'votes': votes, 'hours': hours}),
-                  style: const TextStyle(color: Color(0xFFB5BAC1), fontSize: 12),
+                  widget.tf('poll.votesHours', {
+                    'votes': votes,
+                    'hours': hours,
+                  }),
+                  style: const TextStyle(
+                    color: Color(0xFFB5BAC1),
+                    fontSize: 12,
+                  ),
                 ),
               ),
               if (!_showResults)
@@ -2766,13 +3009,18 @@ class _PollMessageCardState extends State<_PollMessageCard> {
                 ),
               if (!_hasVoted && !_showResults)
                 FilledButton(
-                  onPressed: _selectedOptions.isEmpty || _submitting ? null : _vote,
+                  onPressed: _selectedOptions.isEmpty || _submitting
+                      ? null
+                      : _vote,
                   child: Text(widget.t('poll.vote')),
                 ),
               if (_hasVoted)
                 Text(
                   '✓ ${widget.t('poll.voted')}',
-                  style: const TextStyle(color: Color(0xFF31C56F), fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFF31C56F),
+                    fontSize: 12,
+                  ),
                 ),
             ],
           ),

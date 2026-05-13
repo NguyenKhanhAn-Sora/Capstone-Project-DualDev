@@ -73,6 +73,122 @@ class ServersService {
     return Map<String, dynamic>.from(res);
   }
 
+  /// POST `/servers/:id/join` — same contract as cordigram-web `joinServer`.
+  static Future<Map<String, dynamic>> joinServer(
+    String serverId, {
+    bool? rulesAccepted,
+    String? nickname,
+    List<Map<String, dynamic>>? applicationAnswers,
+  }) async {
+    final body = <String, dynamic>{};
+    if (rulesAccepted != null) body['rulesAccepted'] = rulesAccepted;
+    if (nickname != null && nickname.trim().isNotEmpty) {
+      body['nickname'] = nickname.trim();
+    }
+    if (applicationAnswers != null) {
+      body['applicationAnswers'] = applicationAnswers;
+    }
+    final res = await ApiService.post(
+      '/servers/$serverId/join',
+      extraHeaders: _authHeaders,
+      body: body,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// GET `/servers/:id/access/my-status` — gate tuổi, quy định, đơn đăng ký, xác minh.
+  static Future<Map<String, dynamic>> getMyAccessStatus(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/access/my-status',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// POST `/servers/:id/access/accept-rules`
+  static Future<void> acceptServerRules(String serverId) async {
+    await ApiService.post(
+      '/servers/$serverId/access/accept-rules',
+      extraHeaders: _authHeaders,
+      body: const <String, dynamic>{},
+    );
+  }
+
+  static Future<Map<String, dynamic>> getDiscoveryEligibility(String serverId) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/discovery-eligibility',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// Nhãn hiển thị mặc định (tên / username) từ [GET /profiles/me].
+  static Future<String> getMyDefaultDisplayLabel() async {
+    try {
+      final res = await ApiService.get(
+        '/profiles/me',
+        extraHeaders: _authHeaders,
+      );
+      final dn = (res['displayName'] ?? '').toString().trim();
+      if (dn.isNotEmpty) return dn;
+      final un = (res['username'] ?? '').toString().trim();
+      return un.isNotEmpty ? un : 'Người dùng';
+    } catch (_) {
+      return 'Người dùng';
+    }
+  }
+
+  /// Tuổi đầy đủ từ [GET /profiles/me] (`birthdate` ISO yyyy-MM-dd hoặc ISO đầy đủ).
+  /// Null nếu chưa có ngày sinh hoặc không parse được.
+  static Future<int?> getMyAgeYearsFromProfile() async {
+    try {
+      final res = await ApiService.get(
+        '/profiles/me',
+        extraHeaders: _authHeaders,
+      );
+      final raw = res['birthdate']?.toString();
+      return ageYearsFromBirthdateString(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Parse tuổi (số năm đầy đủ) từ chuỗi ngày sinh — dùng chung cho gate tuổi.
+  static int? ageYearsFromBirthdateString(String? raw) {
+    if (raw == null) return null;
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+    DateTime? d = DateTime.tryParse(s);
+    d ??= _tryParseYmdPrefix(s);
+    if (d == null) return null;
+    final now = DateTime.now();
+    var age = now.year - d.year;
+    if (now.month < d.month ||
+        (now.month == d.month && now.day < d.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  static DateTime? _tryParseYmdPrefix(String s) {
+    final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(s.trim());
+    if (m == null) return null;
+    final y = int.tryParse(m.group(1)!);
+    final mo = int.tryParse(m.group(2)!);
+    final day = int.tryParse(m.group(3)!);
+    if (y == null || mo == null || day == null) return null;
+    if (mo < 1 || mo > 12 || day < 1 || day > 31) return null;
+    return DateTime(y, mo, day);
+  }
+
+  /// Sau khi đã [joinServer], xác nhận đã đọc cảnh báo máy chủ giới hạn độ tuổi (NSFW).
+  static Future<void> acknowledgeServerAgeRestriction(String serverId) async {
+    await ApiService.post(
+      '/servers/$serverId/access/acknowledge-age',
+      extraHeaders: _authHeaders,
+    );
+  }
+
   static Future<void> acceptServerInvite(String inviteId) async {
     await ApiService.post(
       '/server-invites/$inviteId/accept',
@@ -84,6 +200,74 @@ class ServersService {
     await ApiService.post(
       '/server-invites/$inviteId/decline',
       extraHeaders: _authHeaders,
+    );
+  }
+
+  /// POST `/server-invites` — same as cordigram-web `createServerInvite`.
+  static Future<Map<String, dynamic>> createServerInvite(
+    String serverId,
+    String toUserId,
+  ) async {
+    final res = await ApiService.post(
+      '/server-invites',
+      extraHeaders: _authHeaders,
+      body: {'serverId': serverId, 'toUserId': toUserId},
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// GET join-applications list (status: all | pending | rejected | approved).
+  static Future<({int pendingCount, List<Map<String, dynamic>> items})>
+      listJoinApplications(
+    String serverId,
+    String status,
+  ) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/access/join-applications?status=${Uri.encodeQueryComponent(status)}',
+      extraHeaders: _authHeaders,
+    );
+    final pendingRaw = res['pendingCount'];
+    final pendingCount = pendingRaw is num ? pendingRaw.toInt() : 0;
+    final raw = res['items'];
+    final items = raw is List
+        ? raw
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : <Map<String, dynamic>>[];
+    return (pendingCount: pendingCount, items: items);
+  }
+
+  static Future<Map<String, dynamic>> getJoinApplicationDetail(
+    String serverId,
+    String applicantUserId,
+  ) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/access/join-applications/${Uri.encodeComponent(applicantUserId)}',
+      extraHeaders: _authHeaders,
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  static Future<void> approveServerAccessUser(
+    String serverId,
+    String userId,
+  ) async {
+    await ApiService.post(
+      '/servers/$serverId/access/approve',
+      extraHeaders: _authHeaders,
+      body: {'userId': userId},
+    );
+  }
+
+  static Future<void> rejectServerAccessUser(
+    String serverId,
+    String userId,
+  ) async {
+    await ApiService.post(
+      '/servers/$serverId/access/reject',
+      extraHeaders: _authHeaders,
+      body: {'userId': userId},
     );
   }
 
@@ -194,7 +378,7 @@ class ServersService {
     return categories;
   }
 
-  /// GET `/servers/:id` — full server doc (profile, banner, traits).
+  /// GET `/servers/:id` — full server doc (profile, banner, traits, members for invite UI).
   static Future<Map<String, dynamic>> getServerById(String serverId) async {
     final res = await ApiService.get(
       '/servers/$serverId',

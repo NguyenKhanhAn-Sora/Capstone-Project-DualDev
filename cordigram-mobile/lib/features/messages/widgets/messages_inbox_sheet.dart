@@ -10,6 +10,7 @@ import '../services/direct_messages_realtime_service.dart';
 import '../services/direct_messages_service.dart';
 import '../services/inbox_service.dart';
 import '../services/servers_service.dart';
+import 'server_join_flow.dart';
 
 typedef InboxNavigateToChannel = Future<void> Function(
   String serverId,
@@ -297,44 +298,23 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
 
   Future<void> _acceptInvite(InboxServerInviteItem item) async {
     try {
-      final settings = await ServersService.getServerAccessSettings(item.serverId);
-      final mode = (settings['accessMode'] ?? '').toString();
-      if (mode == 'apply') {
-        if (!mounted) return;
-        await showDialog<void>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: _bg,
-            title: const Text('Đơn đăng ký', style: TextStyle(color: Colors.white)),
-            content: const Text(
-              'Máy chủ này yêu cầu gửi đơn tham gia. Hoàn tất trên phiên bản web (cordigram.com).',
-              style: TextStyle(color: Color(0xFFB8C8E8)),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Đóng'),
-              ),
-            ],
-          ),
-        );
-        try {
-          await InboxService.markSeen(sourceType: 'server_invite', sourceId: item.id);
-        } catch (_) {}
-        if (!mounted) return;
-        setState(() => _forYou.removeWhere((e) => e is InboxServerInviteItem && (e).id == item.id));
-        widget.onMarkSeen?.call();
-        widget.onClose?.call();
-        return;
-      }
-
-      await ServersService.acceptServerInvite(item.id);
-      await InboxService.markSeen(sourceType: 'server_invite', sourceId: item.id);
+      if (!mounted) return;
+      final ok = await ServerJoinFlow.joinFromInvite(
+        context,
+        serverId: item.serverId,
+        inboxInviteIdToAcceptAfterJoin: item.id,
+        presentationServerName: item.serverName,
+        presentationAvatarUrl: item.serverAvatarUrl,
+        onOpenServerInApp: (sid, {channelId}) => widget.onAcceptInvite(sid),
+      );
+      if (!ok || !mounted) return;
+      try {
+        await InboxService.markSeen(sourceType: 'server_invite', sourceId: item.id);
+      } catch (_) {}
       if (!mounted) return;
       setState(() => _forYou.removeWhere((e) => e is InboxServerInviteItem && (e).id == item.id));
       widget.onMarkSeen?.call();
       widget.onClose?.call();
-      await widget.onAcceptInvite(item.serverId);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

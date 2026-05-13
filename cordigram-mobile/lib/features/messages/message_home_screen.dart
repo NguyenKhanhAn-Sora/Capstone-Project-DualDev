@@ -23,7 +23,7 @@ import 'widgets/messages_inbox_sheet.dart';
 import 'widgets/message_thread_tile.dart';
 
 class MessageHomeScreen extends StatefulWidget {
-  const MessageHomeScreen({super.key}); 
+  const MessageHomeScreen({super.key});
 
   @override
   State<MessageHomeScreen> createState() => _MessageHomeScreenState();
@@ -171,7 +171,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       if (shouldSwitchToServer) {
         _isServerMode = true;
         _searchController.clear();
-        if (_serverListController.servers.isEmpty && !_serverListController.loading) {
+        if (_serverListController.servers.isEmpty &&
+            !_serverListController.loading) {
           _serverListController.loadServers();
         }
       } else if (shouldSwitchToDm) {
@@ -197,10 +198,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
         }
         if (server == null) return;
         final ch = channelId.trim();
-        await _openServer(
-          server,
-          initialTextChannelId: ch.isEmpty ? null : ch,
-        );
+        await _openServer(server, initialTextChannelId: ch.isEmpty ? null : ch);
       },
       onNavigateToDm: (userId, displayName, username, avatarUrl) {
         final thread = MessageThread(
@@ -218,6 +216,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       },
       onAcceptInvite: (serverId) async {
         await _serverListController.loadServers();
+        await _messagesController.refreshMyIdentity();
         if (!mounted) return;
         for (final s in _serverListController.servers) {
           if (s.id == serverId) {
@@ -377,19 +376,24 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                             try {
                               final upload = await MessagesMediaService.uploadFile(
                                 filePath: file.path,
-                                contentType: MessagesMediaService.resolveUploadContentType(
-                                  filePath: file.path,
-                                  hintedContentType: file.mimeType,
-                                ),
+                                contentType:
+                                    MessagesMediaService.resolveUploadContentType(
+                                      filePath: file.path,
+                                      hintedContentType: file.mimeType,
+                                    ),
                               );
-                              final url = MessagesMediaService.pickDisplayUrl(upload);
+                              final url = MessagesMediaService.pickDisplayUrl(
+                                upload,
+                              );
                               if (url.isNotEmpty) {
                                 setModalState(() => avatarUrl = url);
                               }
                             } catch (e) {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Upload ảnh thất bại: $e')),
+                                SnackBar(
+                                  content: Text('Upload ảnh thất bại: $e'),
+                                ),
                               );
                             } finally {
                               if (context.mounted) {
@@ -448,7 +452,10 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                     : step == 1
                     ? 'Thiết lập mục đích'
                     : 'Tuỳ chỉnh máy chủ',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               content: SingleChildScrollView(child: content),
               actions: [
@@ -476,14 +483,15 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                           if (name.isEmpty) return;
                           setModalState(() => creating = true);
                           try {
-                            final created = await _serverListController.createServer(
-                              name: name,
-                              description: descController.text.trim(),
-                              avatarUrl: avatarUrl,
-                              template: selectedTemplate,
-                              purpose: selectedPurpose,
-                              language: languageCode,
-                            );
+                            final created = await _serverListController
+                                .createServer(
+                                  name: name,
+                                  description: descController.text.trim(),
+                                  avatarUrl: avatarUrl,
+                                  template: selectedTemplate,
+                                  purpose: selectedPurpose,
+                                  language: languageCode,
+                                );
                             if (!context.mounted) return;
                             Navigator.of(dialogContext).pop();
                             if (created != null) {
@@ -523,8 +531,24 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
   void _openThread(MessageThread thread) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            MessageChatScreen(thread: thread, controller: _messagesController),
+        builder: (_) => MessageChatScreen(
+          thread: thread,
+          controller: _messagesController,
+          onOpenJoinedServer: (serverId, {channelId}) async {
+            await _serverListController.loadServers();
+            if (!mounted) return;
+            for (final s in _serverListController.servers) {
+              if (s.id == serverId) {
+                final ch = (channelId ?? '').trim();
+                await _openServer(
+                  s,
+                  initialTextChannelId: ch.isEmpty ? null : ch,
+                );
+                return;
+              }
+            }
+          },
+        ),
       ),
     );
   }
@@ -550,8 +574,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
         final text = ch
             .where(
               (c) =>
-                  c.isText &&
-                  (c.category ?? '').trim().toLowerCase() != 'info',
+                  c.isText && (c.category ?? '').trim().toLowerCase() != 'info',
             )
             .toList();
         final voice = ch.where((c) => c.isVoice).toList();
@@ -566,9 +589,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       }
     }
 
-    final quick = (await Future.wait(servers.map(loadQuick)))
-        .whereType<QuickSwitchServerData>()
-        .toList();
+    final quick = (await Future.wait(
+      servers.map(loadQuick),
+    )).whereType<QuickSwitchServerData>().toList();
     if (!mounted) return;
     await MessageSearchSheet.present(
       context,
@@ -592,8 +615,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
             return;
           }
           try {
-            final channels =
-                await ServersService.getServerChannels(chosenServer.id);
+            final channels = await ServersService.getServerChannels(
+              chosenServer.id,
+            );
             ServerChannel? ch;
             for (final c in channels) {
               if (c.id == channelId) {
@@ -639,7 +663,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       lastMessage: (server.description ?? '').trim(),
       lastActiveLabel: '',
       unreadCount: server.unreadCount,
-      avatarUrl: (server.avatarUrl ?? '').trim().isEmpty ? null : server.avatarUrl,
+      avatarUrl: (server.avatarUrl ?? '').trim().isEmpty
+          ? null
+          : server.avatarUrl,
       isOnline: true,
     );
   }
@@ -715,7 +741,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                         imageUrl: server.avatarUrl,
                         label: server.name,
                         unreadCount: server.unreadCount,
-                        selected: _serverListController.selectedServerId == server.id,
+                        selected:
+                            _serverListController.selectedServerId == server.id,
                         onTap: () => _openServer(server),
                       );
                     },
@@ -729,7 +756,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
         Expanded(
           child: ListView.separated(
             itemCount: servers.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: _lineColor),
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: _lineColor),
             itemBuilder: (context, index) {
               final server = servers[index];
               return MessageThreadTile(
@@ -763,325 +791,327 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
           FocusScope.of(context).unfocus();
         },
         child: Scaffold(
-        backgroundColor: _pageColor,
-        appBar: AppBar(
           backgroundColor: _pageColor,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          toolbarHeight: 52,
-          leadingWidth: 38,
-          leading: const Padding(
-            padding: EdgeInsets.only(left: 10),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: Image(
-                  image: AssetImage('assets/images/cordigram-logo.png'),
-                  fit: BoxFit.contain,
+          appBar: AppBar(
+            backgroundColor: _pageColor,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
+            toolbarHeight: 52,
+            leadingWidth: 38,
+            leading: const Padding(
+              padding: EdgeInsets.only(left: 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Image(
+                    image: AssetImage('assets/images/cordigram-logo.png'),
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
-          ),
-          titleSpacing: 2,
-          title: MessageFolderDropdown(
-            title: _headerTitle,
-            isExpanded: _isFolderExpanded,
-            onToggle: _toggleFolder,
-          ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    tooltip: 'Hộp thư',
-                    onPressed: _openInboxSheet,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 30,
-                      height: 30,
-                    ),
-                    padding: EdgeInsets.zero,
-                    splashRadius: 18,
-                    icon: const Icon(
-                      Icons.mail_outline_rounded,
-                      size: 21,
-                      color: Colors.white,
-                    ),
-                  ),
-                  if (_messagesController.inboxUnreadCount > 0)
-                    Positioned(
-                      right: -2,
-                      top: -2,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFF2A45),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+            titleSpacing: 2,
+            title: MessageFolderDropdown(
+              title: _headerTitle,
+              isExpanded: _isFolderExpanded,
+              onToggle: _toggleFolder,
             ),
-          ],
-        ),
-        body: Column(
-          children: [
-            if (_isFolderExpanded)
+            actions: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
-                child: MessageQuickMenuDropdown(
-                  items: _quickMenuItems,
-                  onSelected: _onQuickMenuTap,
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-              child: _isServerMode
-                  ? TextField(
-                      controller: _searchController,
-                      onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Tìm server...',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFFAFC0E2),
-                          fontSize: 13,
-                        ),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFAFC0E2),
-                            width: 1,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFAFC0E2),
-                            width: 1,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(
-                            color: Colors.white,
-                            width: 1.2,
-                          ),
-                        ),
+                padding: const EdgeInsets.only(right: 10),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      tooltip: 'Hộp thư',
+                      onPressed: _openInboxSheet,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 30,
+                        height: 30,
                       ),
-                    )
-                  : TextField(
-                      readOnly: true,
-                      onTap: _openGlobalMessageSearch,
-                      decoration: InputDecoration(
-                        hintText: 'Tìm hoặc bắt đầu cuộc trò chuyện',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFFAFC0E2),
-                          fontSize: 13,
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          color: Color(0xFFAFC0E2),
-                          size: 22,
-                        ),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 10,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFAFC0E2),
-                            width: 1,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFAFC0E2),
-                            width: 1,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFAFC0E2),
-                            width: 1,
-                          ),
-                        ),
+                      padding: EdgeInsets.zero,
+                      splashRadius: 18,
+                      icon: const Icon(
+                        Icons.mail_outline_rounded,
+                        size: 21,
+                        color: Colors.white,
                       ),
                     ),
-            ),
-            const Divider(height: 1, thickness: 1, color: _lineColor),
-            Expanded(
-              child: _isServerMode
-                  ? _buildServerModeBody(servers)
-                  : _messagesController.loadingThreads
-                  ? const Center(child: CircularProgressIndicator())
-                  : (_messagesController.threadsError != null)
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Text(
-                          _messagesController.threadsError!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Color(0xFFAFC0E2)),
+                    if (_messagesController.inboxUnreadCount > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFF2A45),
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                    )
-                  : threads.isEmpty
-                  ? Center(
-                      child: const Text(
-                        'No conversations found',
-                        style: TextStyle(
-                          color: Color(0xFFAFC0E2),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      itemCount: threads.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(height: 1, color: _lineColor),
-                      itemBuilder: (context, index) {
-                        final thread = threads[index];
-                        return MessageThreadTile(
-                          thread: thread,
-                          showActivityLabel: !_isServerMode,
-                          languageCode: _messagesController.languageCode,
-                          onTap: () => _openThread(thread),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: Container(
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: const BoxDecoration(
-            color: _pageColor,
-            border: Border(top: BorderSide(color: _lineColor)),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 10,
-                backgroundColor: const Color(0xFFDDDDDD),
-                backgroundImage: (_messagesController.myAvatarUrl ?? '').isNotEmpty
-                    ? NetworkImage(_messagesController.myAvatarUrl!)
-                    : null,
-                child: (_messagesController.myAvatarUrl ?? '').isNotEmpty
-                    ? null
-                    : Text(
-                        ((_messagesController.myDisplayName ??
-                                    _messagesController.myUsername ??
-                                    'U')
-                                .trim()
-                                .isNotEmpty
-                            ? (_messagesController.myDisplayName ??
-                                    _messagesController.myUsername ??
-                                    'U')
-                                .trim()
-                                .substring(0, 1)
-                                .toUpperCase()
-                            : 'U'),
-                        style: const TextStyle(
-                          color: Color(0xFF1B2A4A),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 6),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    (_messagesController.myUsername ?? '').isNotEmpty
-                        ? _messagesController.myUsername!
-                        : 'Username',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      height: 1.1,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.circle,
-                        size: 7,
-                        color: _messagesController.myOnline
-                            ? const Color(0xFF31C56F)
-                            : const Color(0xFF7E8CA8),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        (_messagesController.myDisplayName ?? '').isNotEmpty
-                            ? _messagesController.myDisplayName!
-                            : 'DisplayName',
-                        style: const TextStyle(
-                          color: Color(0xFF9AAFD5),
-                          fontSize: 9,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const Spacer(),
-              IconButton(
-                onPressed: () => unawaited(_toggleGlobalMic()),
-                iconSize: 16,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 26,
-                  height: 26,
-                ),
-                icon: Icon(
-                  _globalMicMuted
-                      ? Icons.mic_off_rounded
-                      : Icons.mic_none_rounded,
-                  color: _globalMicMuted
-                      ? const Color(0xFFFF5770)
-                      : const Color(0xFFB4C2DE),
-                ),
-              ),
-              IconButton(
-                onPressed: () => unawaited(_toggleGlobalSound()),
-                iconSize: 16,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 26,
-                  height: 26,
-                ),
-                icon: Icon(
-                  _globalSoundMuted
-                      ? Icons.headset_off_rounded
-                      : Icons.headset_rounded,
-                  color: _globalSoundMuted
-                      ? const Color(0xFFFF5770)
-                      : const Color(0xFFB4C2DE),
+                  ],
                 ),
               ),
             ],
           ),
+          body: Column(
+            children: [
+              if (_isFolderExpanded)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+                  child: MessageQuickMenuDropdown(
+                    items: _quickMenuItems,
+                    onSelected: _onQuickMenuTap,
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                child: _isServerMode
+                    ? TextField(
+                        controller: _searchController,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          hintText: 'Tìm server...',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFFAFC0E2),
+                            fontSize: 13,
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFAFC0E2),
+                              width: 1,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFAFC0E2),
+                              width: 1,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(
+                              color: Colors.white,
+                              width: 1.2,
+                            ),
+                          ),
+                        ),
+                      )
+                    : TextField(
+                        readOnly: true,
+                        onTap: _openGlobalMessageSearch,
+                        decoration: InputDecoration(
+                          hintText: 'Tìm hoặc bắt đầu cuộc trò chuyện',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFFAFC0E2),
+                            fontSize: 13,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: Color(0xFFAFC0E2),
+                            size: 22,
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFAFC0E2),
+                              width: 1,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFAFC0E2),
+                              width: 1,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFAFC0E2),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+              const Divider(height: 1, thickness: 1, color: _lineColor),
+              Expanded(
+                child: _isServerMode
+                    ? _buildServerModeBody(servers)
+                    : _messagesController.loadingThreads
+                    ? const Center(child: CircularProgressIndicator())
+                    : (_messagesController.threadsError != null)
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            _messagesController.threadsError!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Color(0xFFAFC0E2)),
+                          ),
+                        ),
+                      )
+                    : threads.isEmpty
+                    ? Center(
+                        child: const Text(
+                          'No conversations found',
+                          style: TextStyle(
+                            color: Color(0xFFAFC0E2),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: threads.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, color: _lineColor),
+                        itemBuilder: (context, index) {
+                          final thread = threads[index];
+                          return MessageThreadTile(
+                            thread: thread,
+                            showActivityLabel: !_isServerMode,
+                            languageCode: _messagesController.languageCode,
+                            onTap: () => _openThread(thread),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: const BoxDecoration(
+              color: _pageColor,
+              border: Border(top: BorderSide(color: _lineColor)),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 10,
+                  backgroundColor: const Color(0xFFDDDDDD),
+                  backgroundImage:
+                      (_messagesController.myAvatarUrl ?? '').isNotEmpty
+                      ? NetworkImage(_messagesController.myAvatarUrl!)
+                      : null,
+                  child: (_messagesController.myAvatarUrl ?? '').isNotEmpty
+                      ? null
+                      : Text(
+                          ((_messagesController.myDisplayName ??
+                                      _messagesController.myUsername ??
+                                      'U')
+                                  .trim()
+                                  .isNotEmpty
+                              ? (_messagesController.myDisplayName ??
+                                        _messagesController.myUsername ??
+                                        'U')
+                                    .trim()
+                                    .substring(0, 1)
+                                    .toUpperCase()
+                              : 'U'),
+                          style: const TextStyle(
+                            color: Color(0xFF1B2A4A),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 6),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (_messagesController.myUsername ?? '').isNotEmpty
+                          ? _messagesController.myUsername!
+                          : 'Username',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.1,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 7,
+                          color: _messagesController.myOnline
+                              ? const Color(0xFF31C56F)
+                              : const Color(0xFF7E8CA8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          (_messagesController.myDisplayName ?? '').isNotEmpty
+                              ? _messagesController.myDisplayName!
+                              : 'DisplayName',
+                          style: const TextStyle(
+                            color: Color(0xFF9AAFD5),
+                            fontSize: 9,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => unawaited(_toggleGlobalMic()),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 26,
+                    height: 26,
+                  ),
+                  icon: Icon(
+                    _globalMicMuted
+                        ? Icons.mic_off_rounded
+                        : Icons.mic_none_rounded,
+                    color: _globalMicMuted
+                        ? const Color(0xFFFF5770)
+                        : const Color(0xFFB4C2DE),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => unawaited(_toggleGlobalSound()),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 26,
+                    height: 26,
+                  ),
+                  icon: Icon(
+                    _globalSoundMuted
+                        ? Icons.headset_off_rounded
+                        : Icons.headset_rounded,
+                    color: _globalSoundMuted
+                        ? const Color(0xFFFF5770)
+                        : const Color(0xFFB4C2DE),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-      )),
+      ),
     );
   }
 }
@@ -1124,7 +1154,9 @@ class _ServerCircleButton extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: selected ? const Color(0xFF2D7EFF) : const Color(0xFF122A55),
+                color: selected
+                    ? const Color(0xFF2D7EFF)
+                    : const Color(0xFF122A55),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: selected ? Colors.white : const Color(0xFF2A3F69),

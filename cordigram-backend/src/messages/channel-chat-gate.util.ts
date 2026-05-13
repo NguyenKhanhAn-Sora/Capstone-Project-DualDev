@@ -1,4 +1,39 @@
-export type ChatGateBlockReason = 'verification' | 'age_under_18' | 'age_ack';
+export type ChatGateBlockReason =
+  | 'verification'
+  | 'age_under_18'
+  | 'age_ack'
+  | 'rules'
+  | 'application_pending'
+  | 'application_rejected';
+
+export type ServerAccessModeForGate =
+  | 'discoverable'
+  | 'invite_only'
+  | 'apply';
+
+/**
+ * Chặn xem/gửi chat khi chưa duyệt đơn / chưa đồng ý quy định (trước gate tuổi & xác minh).
+ */
+export function evaluateMemberRulesAndApplyGate(input: {
+  isBypass: boolean;
+  accessMode: ServerAccessModeForGate;
+  usStatus: string | null | undefined;
+  hasRules: boolean;
+  acceptedRulesEffective: boolean;
+}): { allowed: boolean; reason?: ChatGateBlockReason } {
+  if (input.isBypass) return { allowed: true };
+  const st = (input.usStatus || 'accepted').toString();
+  if (input.accessMode === 'apply') {
+    if (st === 'pending')
+      return { allowed: false, reason: 'application_pending' };
+    if (st === 'rejected')
+      return { allowed: false, reason: 'application_rejected' };
+  }
+  if (input.hasRules && !input.acceptedRulesEffective) {
+    return { allowed: false, reason: 'rules' };
+  }
+  return { allowed: true };
+}
 
 export type ServerVerificationLevel = 'none' | 'low' | 'medium' | 'high';
 

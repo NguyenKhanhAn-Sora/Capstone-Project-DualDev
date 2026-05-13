@@ -2070,7 +2070,13 @@ export async function createServerEvent(
 }
 
 // Messages
-export type ChatGateBlockReason = "verification" | "age_under_18" | "age_ack";
+export type ChatGateBlockReason =
+  | "verification"
+  | "age_under_18"
+  | "age_ack"
+  | "rules"
+  | "application_pending"
+  | "application_rejected";
 
 export async function createMessage(
   channelId: string,
