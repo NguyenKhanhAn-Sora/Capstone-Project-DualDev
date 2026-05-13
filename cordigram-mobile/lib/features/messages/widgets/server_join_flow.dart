@@ -1243,10 +1243,7 @@ class ServerJoinFlow {
           : customize.nicknameTrimmed.trim();
 
       if (mode == 'apply') {
-        if (hasRulesFlag) {
-          final agreed = await showRulesAgreementDialog(context, settings);
-          if (agreed != true || !context.mounted) return false;
-        }
+        // Giống web: nếu có đơn đăng ký — hỏi câu hỏi trước; quy định sau (trước khi POST join).
         Map<String, Map<String, String>>? answers;
         if (formEnabled) {
           for (final q in questions) {
@@ -1284,6 +1281,10 @@ class ServerJoinFlow {
               return false;
             }
           }
+        }
+        if (hasRulesFlag) {
+          final agreed = await showRulesAgreementDialog(context, settings);
+          if (agreed != true || !context.mounted) return false;
         }
         openLoad();
         if (!context.mounted) return false;

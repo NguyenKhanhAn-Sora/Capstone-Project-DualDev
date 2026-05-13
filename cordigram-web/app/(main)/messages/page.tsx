@@ -1581,8 +1581,6 @@ export default function MessagesPage() {
   // Access Control (server rules approval modal)
   const [myServerAccessStatus, setMyServerAccessStatus] =
     useState<serversApi.MyServerAccessStatus | null>(null);
-  const [showAcceptRulesModal, setShowAcceptRulesModal] = useState(false);
-  const [acceptRulesLoading, setAcceptRulesLoading] = useState(false);
   const [verificationRulesOpen, setVerificationRulesOpen] = useState(false);
   const [verificationAccessSettings, setVerificationAccessSettings] =
     useState<serversApi.ServerAccessSettings | null>(null);
@@ -3260,12 +3258,37 @@ export default function MessagesPage() {
     setServerSettingsPermissions(null);
   }, [selectedServer, servers]);
 
+  // Xóa trạng thái gate **trước paint** khi đổi server / thoát DM — tránh 1 frame banner/input
+  // dùng `myServerAccessStatus` của server trước (hiện "Hoàn thành" nhầm trên server khác).
+  useLayoutEffect(() => {
+    if (selectedDirectMessageFriend) {
+      setMyServerAccessStatus(null);
+      return;
+    }
+    if (!selectedServer) {
+      setMyServerAccessStatus(null);
+      return;
+    }
+    if (isAdminView && adminViewServerId && selectedServer === adminViewServerId) {
+      setMyServerAccessStatus({
+        chatViewBlocked: false,
+        chatBlockReason: null,
+        hasRules: false,
+        acceptedRules: true,
+        verificationLevel: "none",
+        verificationChecks: { emailVerified: true, accountOver5Min: true, memberOver10Min: true },
+        verificationWait: { waitAccountSec: 0, waitMemberSec: 0 },
+        showAgeRestrictedChannelNotice: false,
+      } as any);
+      return;
+    }
+    setMyServerAccessStatus(null);
+  }, [selectedServer, selectedDirectMessageFriend, isAdminView, adminViewServerId]);
+
   // Fetch "my access status" để biết có cần chấp nhận quy định hay không.
   useEffect(() => {
     if (!selectedServer || selectedDirectMessageFriend) {
       setMyServerAccessStatus(null);
-      setShowAcceptRulesModal(false);
-      setAcceptRulesLoading(false);
       return;
     }
 
@@ -3281,40 +3304,20 @@ export default function MessagesPage() {
         verificationWait: { waitAccountSec: 0, waitMemberSec: 0 },
         showAgeRestrictedChannelNotice: false,
       } as any);
-      setShowAcceptRulesModal(false);
       return;
     }
 
     let cancelled = false;
     setMyServerAccessStatus(null);
-    setShowAcceptRulesModal(false);
 
     (async () => {
       try {
         const status = await serversApi.getMyServerAccessStatus(selectedServer);
         if (cancelled) return;
         setMyServerAccessStatus(status);
-        const needsRules =
-          status.hasRules && !status.acceptedRules && !status.chatViewBlocked;
-        const applyAccepted =
-          status.accessMode === "apply" && status.status === "accepted";
-        if (needsRules && !applyAccepted) {
-          try {
-            const s = await serversApi.getServerAccessSettings(selectedServer);
-            if (cancelled) return;
-            setVerificationAccessSettings(s);
-            setVerificationRulesAgreed(false);
-            setShowAcceptRulesModal(true);
-          } catch {
-            if (!cancelled) setShowAcceptRulesModal(true);
-          }
-        } else {
-          setShowAcceptRulesModal(false);
-        }
       } catch {
         if (cancelled) return;
         setMyServerAccessStatus(null);
-        setShowAcceptRulesModal(false);
       }
     })();
 
@@ -3332,17 +3335,6 @@ export default function MessagesPage() {
       try {
         const status = await serversApi.getMyServerAccessStatus(selectedServer);
         setMyServerAccessStatus(status);
-        if (
-          status.hasRules &&
-          !status.acceptedRules &&
-          !status.chatViewBlocked &&
-          !(status.accessMode === "apply" && status.status === "accepted")
-        ) {
-          const s = await serversApi.getServerAccessSettings(selectedServer);
-          setVerificationAccessSettings(s);
-          setVerificationRulesAgreed(false);
-          setShowAcceptRulesModal(true);
-        }
       } catch {
         /* ignore */
       }
@@ -3357,7 +3349,7 @@ export default function MessagesPage() {
 
   // Cập nhật countdown / checklist xác minh trong modal; không tự đóng dialog (chỉ nút ×).
   useEffect(() => {
-    if ((!verificationRulesOpen && !showAcceptRulesModal) || !selectedServer || selectedDirectMessageFriend) return;
+    if (!verificationRulesOpen || !selectedServer || selectedDirectMessageFriend) return;
     const id = setInterval(async () => {
       try {
         const s = await serversApi.getMyServerAccessStatus(selectedServer);
@@ -3367,7 +3359,7 @@ export default function MessagesPage() {
       }
     }, 3000);
     return () => clearInterval(id);
-  }, [verificationRulesOpen, showAcceptRulesModal, selectedServer, selectedDirectMessageFriend]);
+  }, [verificationRulesOpen, selectedServer, selectedDirectMessageFriend]);
 
   useEffect(() => {
     setLocalWaitAccountSec(myServerAccessStatus?.verificationWait?.waitAccountSec ?? null);
@@ -4819,6 +4811,19 @@ export default function MessagesPage() {
     setShowGiphyPicker(false);
   }, [shouldBlockServerChatInput]);
 
+  // Đóng modal xác minh / quy định khi đã đủ điều kiện (ví dụ xong OTP hoặc hết thời gian chờ).
+  useEffect(() => {
+    if (!verificationRulesOpen || !selectedServer || selectedDirectMessageFriend) return;
+    if (shouldBlockServerChatInput) return;
+    setVerificationRulesOpen(false);
+    setVerificationAccessSettings(null);
+  }, [
+    verificationRulesOpen,
+    shouldBlockServerChatInput,
+    selectedServer,
+    selectedDirectMessageFriend,
+  ]);
+
   const handleSendMessage = async () => {
     if (shouldBlockServerChatInput) {
       void openVerificationRulesModal();
@@ -4915,24 +4920,6 @@ export default function MessagesPage() {
       setError(msg);
       if (!isSpamBlock) setMessageText(content);
       setTimeout(() => setError((prev) => (prev === msg ? null : prev)), 5000);
-    }
-  };
-
-  const handleAcceptServerRules = async () => {
-    if (!selectedServer) return;
-    setAcceptRulesLoading(true);
-    setError(null);
-    try {
-      await serversApi.acceptServerRules(selectedServer);
-      const status = await serversApi.getMyServerAccessStatus(selectedServer);
-      setMyServerAccessStatus(status);
-      setShowAcceptRulesModal(false);
-      const ch = selectedChannelRef.current;
-      if (ch) await loadMessages(ch);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể chấp nhận quy định");
-    } finally {
-      setAcceptRulesLoading(false);
     }
   };
 
@@ -5051,12 +5038,7 @@ export default function MessagesPage() {
       const status = await serversApi.getMyServerAccessStatus(selectedServer);
       setMyServerAccessStatus(status);
       if (status.hasRules && !status.acceptedRules) {
-        try {
-          const s = await serversApi.getServerAccessSettings(selectedServer);
-          setVerificationAccessSettings(s);
-          setVerificationRulesAgreed(false);
-        } catch { /* ignore */ }
-        setShowAcceptRulesModal(true);
+        void openVerificationRulesModal();
       }
       const ch = selectedChannelRef.current;
       if (ch) await loadMessages(ch);
@@ -10736,7 +10718,7 @@ export default function MessagesPage() {
         />
       )}
 
-      {(verificationRulesOpen || showAcceptRulesModal) &&
+      {verificationRulesOpen &&
         selectedServer &&
         !selectedDirectMessageFriend &&
         (() => {
@@ -10777,7 +10759,10 @@ export default function MessagesPage() {
             ? null
             : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 
-        const submitDisabled = verificationRulesSubmitting || Boolean(needsAgree && !verificationRulesAgreed);
+        const submitDisabled =
+          verificationRulesSubmitting ||
+          Boolean(needsAgree && !verificationRulesAgreed) ||
+          Boolean(!needsAgree && needsVerificationStep);
 
         return (
           <div
@@ -10877,7 +10862,6 @@ export default function MessagesPage() {
                     aria-label={t("chat.profile.close")}
                     onClick={() => {
                       setVerificationRulesOpen(false);
-                      setShowAcceptRulesModal(false);
                       setVerificationAccessSettings(null);
                     }}
                     style={{
