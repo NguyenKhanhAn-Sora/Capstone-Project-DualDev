@@ -20,11 +20,13 @@ import {
   getIvsIngest,
   joinLivestreamToken,
   listLiveLivestreams,
+  muteUserInLivestream,
   type LivestreamLatencyMode,
   type LivestreamItem,
   updateLivestream,
 } from "@/lib/livestream-api";
-import { fetchCurrentProfile, fetchProfileDetail, searchProfiles, type ProfileSearchItem } from "@/lib/api";
+import { blockUser, fetchCurrentProfile, fetchProfileDetail, searchProfiles, type ProfileSearchItem } from "@/lib/api";
+import ReportUserOverlay from "@/ui/report-user-overlay/ReportUserOverlay";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
   type LivestreamCameraPosition,
@@ -46,6 +48,7 @@ type LiveComment = {
   isHost: boolean;
   text: string;
   avatarUrl?: string;
+  isSystem?: boolean;
 };
 
 type LivestreamMetaPatch = {
@@ -86,6 +89,33 @@ type HistoryWireComment = {
   text: string;
   avatarUrl?: string;
 };
+
+function formatPauseDuration(minutes: number): string {
+  if (minutes >= 1440) return "1 day";
+  if (minutes >= 60) {
+    const h = minutes / 60;
+    return `${h} hour${h === 1 ? "" : "s"}`;
+  }
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
+type ModerationTarget = {
+  commentId: string;
+  authorId?: string;
+  authorHandle: string;
+};
+
+type PauseDuration = 5 | 10 | 15 | 30 | 60 | 1440;
+
+
+const PAUSE_OPTIONS: Array<{ value: PauseDuration; label: string }> = [
+  { value: 5, label: "5 minutes" },
+  { value: 10, label: "10 minutes" },
+  { value: 15, label: "15 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 60, label: "1 hour" },
+  { value: 1440, label: "1 day" },
+];
 
 
 function toHandle(raw?: string): string {
@@ -749,22 +779,56 @@ function FeedCardPreview({ streamId }: { streamId: string }) {
 
 function LiveComments({
   canComment,
+  isHost,
+  hostUserId,
   pinnedComment,
+  commentPaused: initialCommentPaused,
+  commentPausedUntil: initialPausedUntil,
   onMetaPatch,
   onTransportReset,
 }: {
   canComment: boolean;
+  isHost?: boolean;
+  hostUserId?: string;
   pinnedComment?: string;
+  commentPaused?: boolean;
+  commentPausedUntil?: string | null;
   onMetaPatch?: (patch: LivestreamMetaPatch) => void;
   onTransportReset?: (reason: string, err?: unknown) => void;
 }) {
   const room = useRoomContext();
+  const router = useRouter();
   const { localParticipant } = useLocalParticipant();
   const [comments, setComments] = useState<LiveComment[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [myAvatarUrl, setMyAvatarUrl] = useState("");
   const [showCommentEmojiPicker, setShowCommentEmojiPicker] = useState(false);
+  // Moderation state
+  const [hoveredCommentId, setHoveredCommentId] = useState<string | null>(null);
+  const [activeMenuCommentId, setActiveMenuCommentId] = useState<string | null>(null);
+  const [hiddenCommentIds, setHiddenCommentIds] = useState<Set<string>>(new Set());
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<ModerationTarget | null>(null);
+  // Report overlay
+  const [reportTarget, setReportTarget] = useState<ModerationTarget | null>(null);
+  // Block overlay
+  const [blockTarget, setBlockTarget] = useState<ModerationTarget | null>(null);
+  const [blocking, setBlocking] = useState(false);
+  const [blockError, setBlockError] = useState("");
+  // Pause overlay
+  const [pauseTarget, setPauseTarget] = useState<ModerationTarget | null>(null);
+  const [pauseDuration, setPauseDuration] = useState<PauseDuration>(5);
+  const [pausing, setPausing] = useState(false);
+  const [pauseError, setPauseError] = useState("");
+  // Viewer pause state (self muted by host)
+  const [commentPaused, setCommentPaused] = useState(Boolean(initialCommentPaused));
+  const [pausedUntil, setPausedUntil] = useState<Date | null>(
+    initialPausedUntil ? new Date(initialPausedUntil) : null,
+  );
+  const [pauseSecondsLeft, setPauseSecondsLeft] = useState(0);
   const commentEmojiRef = useRef<HTMLDivElement | null>(null);
   const commentInputRef = useRef<HTMLInputElement | null>(null);
   const seenCommentIdsRef = useRef<Set<string>>(new Set());
@@ -781,6 +845,32 @@ function LiveComments({
   const flushTimerRef = useRef<number | null>(null);
 
   const debugPrefix = "[LiveComments:viewer]";
+
+  // Countdown timer for viewer pause state
+  useEffect(() => {
+    if (!pausedUntil) { setCommentPaused(false); setPauseSecondsLeft(0); return; }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((pausedUntil.getTime() - Date.now()) / 1000));
+      setPauseSecondsLeft(left);
+      if (left === 0) { setCommentPaused(false); setPausedUntil(null); }
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [pausedUntil]);
+
+  // Close 3-dot menu on outside click
+  useEffect(() => {
+    if (!activeMenuCommentId) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenuCommentId(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [activeMenuCommentId]);
+
 
   useEffect(() => {
     onMetaPatchRef.current = onMetaPatch;
@@ -974,7 +1064,7 @@ function LiveComments({
       try {
         const text = new TextDecoder().decode(payload);
         const parsed = JSON.parse(text) as {
-          type?: "comment" | "meta_update" | "comment_history" | "comment_history_request";
+          type?: "comment" | "meta_update" | "comment_history" | "comment_history_request" | "comment_delete" | "user_pause" | "pause_notice";
           text?: string;
           author?: string;
           authorId?: string;
@@ -983,6 +1073,8 @@ function LiveComments({
           commentId?: string;
           isHost?: boolean;
           comments?: HistoryWireComment[];
+          userId?: string;
+          expiresAt?: string;
         };
 
 
@@ -1003,6 +1095,31 @@ function LiveComments({
 
         if (parsed.type === "comment_history_request") {
           void sendCommentHistoryToParticipant(participant as any);
+          return;
+        }
+
+        if (parsed.type === "comment_delete" && parsed.commentId) {
+          const id = parsed.commentId;
+          setComments((prev) => prev.filter((c) => c.id !== id));
+          return;
+        }
+
+        if (parsed.type === "pause_notice" && (parsed as any).noticeText) {
+          const noticeId = typeof (parsed as any).noticeId === "string" ? (parsed as any).noticeId : `sys-${Date.now()}`;
+          setComments((prev) => [
+            ...prev,
+            { id: noticeId, authorHandle: "", isHost: false, text: String((parsed as any).noticeText), isSystem: true },
+          ]);
+          return;
+        }
+
+        if (parsed.type === "user_pause" && parsed.userId && parsed.expiresAt) {
+          const myId = localParticipant.identity?.split("-")[0];
+          if (myId && myId === parsed.userId) {
+            const until = new Date(parsed.expiresAt);
+            setCommentPaused(true);
+            setPausedUntil(until);
+          }
           return;
         }
 
@@ -1086,6 +1203,86 @@ function LiveComments({
 
     void askForHistory();
   }, [localParticipant, onTransportReset, room, room.state]);
+
+  const publishControlPacket = useCallback(async (packet: Record<string, unknown>) => {
+    try {
+      const payload = new TextEncoder().encode(JSON.stringify(packet));
+      await localParticipant.publishData(payload, { reliable: true } as any);
+    } catch { /* ignore */ }
+  }, [localParticipant]);
+
+  const confirmDelete = useCallback(async (target: ModerationTarget) => {
+    setDeleteTarget(null);
+    setComments((prev) => prev.filter((c) => c.id !== target.commentId));
+    await publishControlPacket({ type: "comment_delete", commentId: target.commentId });
+  }, [publishControlPacket]);
+
+  const handleHideComment = useCallback((target: ModerationTarget) => {
+    setActiveMenuCommentId(null);
+    setHiddenCommentIds((prev) => new Set([...prev, target.commentId]));
+  }, []);
+
+  const openReportOverlay = useCallback((target: ModerationTarget) => {
+    setActiveMenuCommentId(null);
+    setReportTarget(target);
+  }, []);
+
+  const openBlockOverlay = useCallback((target: ModerationTarget) => {
+    setActiveMenuCommentId(null);
+    setBlockTarget(target);
+    setBlockError("");
+  }, []);
+
+  const confirmBlock = useCallback(async () => {
+    if (!blockTarget?.authorId) return;
+    const token = getStoredAccessToken();
+    if (!token) return;
+    setBlocking(true);
+    setBlockError("");
+    try {
+      await blockUser({ token, userId: blockTarget.authorId });
+      const blockedId = blockTarget.authorId;
+      if (hostUserId && blockedId === hostUserId) {
+        router.push("/");
+        return;
+      }
+      setBlockedUserIds((prev) => new Set([...prev, blockedId]));
+      setBlockTarget(null);
+    } catch (err) {
+      setBlockError(err instanceof Error ? err.message : "Failed to block user.");
+    } finally {
+      setBlocking(false);
+    }
+  }, [blockTarget, hostUserId, router]);
+
+  const openPauseOverlay = useCallback((target: ModerationTarget) => {
+    setActiveMenuCommentId(null);
+    setPauseTarget(target);
+    setPauseDuration(5);
+    setPauseError("");
+  }, []);
+
+  const confirmPause = useCallback(async () => {
+    if (!pauseTarget?.authorId) return;
+    setPausing(true);
+    setPauseError("");
+    try {
+      const result = await muteUserInLivestream({ userId: pauseTarget.authorId, durationMinutes: pauseDuration });
+      await publishControlPacket({ type: "user_pause", userId: pauseTarget.authorId, expiresAt: result.expiresAt });
+      const hostHandle = toHandle(localParticipant.name || localParticipant.identity);
+      const targetHandle = toHandle(pauseTarget.authorHandle);
+      const durationLabel = formatPauseDuration(pauseDuration);
+      const noticeId = `pause-notice-${Date.now()}`;
+      const noticeText = `${hostHandle} put ${targetHandle} on a ${durationLabel} timeout.`;
+      setComments((prev) => [...prev, { id: noticeId, authorHandle: "", isHost: false, text: noticeText, isSystem: true }]);
+      await publishControlPacket({ type: "pause_notice", noticeId, noticeText });
+      setPauseTarget(null);
+    } catch (err) {
+      setPauseError(err instanceof Error ? err.message : "Failed to pause user.");
+    } finally {
+      setPausing(false);
+    }
+  }, [pauseTarget, pauseDuration, publishControlPacket, localParticipant]);
 
   const onSend = async (contentOverride?: string) => {
     const content = (contentOverride ?? draft).trim();
@@ -1177,8 +1374,21 @@ function LiveComments({
       ) : null}
       <div className={`${hubStyles.commentList} ${!comments.length ? hubStyles.commentListEmpty : ""}`}>
         {!comments.length ? <p className={hubStyles.commentEmpty}>No comments yet.</p> : null}
-        {comments.map((item) => (
-          <div key={item.id} className={hubStyles.commentItem}>
+        {comments.filter((item) => !hiddenCommentIds.has(item.id) && !(item.authorId && blockedUserIds.has(item.authorId))).map((item) => {
+          if (item.isSystem) {
+            return (
+              <div key={item.id} className={hubStyles.commentItemSystem}>
+                <span className={hubStyles.commentSystemText}>{item.text}</span>
+              </div>
+            );
+          }
+          return (
+          <div
+            key={item.id}
+            className={hubStyles.commentItem}
+            onMouseEnter={() => setHoveredCommentId(item.id)}
+            onMouseLeave={() => setHoveredCommentId(null)}
+          >
             <Link
               href={item.authorId ? `/profile/${item.authorId}` : `/profile/${item.authorHandle.replace(/^@/, "")}`}
               className={hubStyles.commentAvatarLink}
@@ -1208,20 +1418,104 @@ function LiveComments({
                 {item.isHost ? (
                   <span className={hubStyles.commentHostBadge} title="Host" aria-label="Host">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path
-                        d="M4 7.5 8.5 12l3.5-5 3.5 5L20 7.5 18.5 17h-13L4 7.5Z"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                        strokeLinejoin="round"
-                      />
+                      <path d="M4 7.5 8.5 12l3.5-5 3.5 5L20 7.5 18.5 17h-13L4 7.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
                     </svg>
                   </span>
                 ) : null}
               </span>
               <span className={hubStyles.commentText}>{item.text}</span>
             </div>
+            {(() => {
+              const myAuthorId = localParticipant.identity?.split("-")[0] || "";
+              const isOwnComment = Boolean(myAuthorId && item.authorId === myAuthorId);
+              if (isOwnComment) return null;
+              const target = { commentId: item.id, authorId: item.authorId, authorHandle: item.authorHandle };
+              const menuVisible = hoveredCommentId === item.id || activeMenuCommentId === item.id;
+              if (isHost && !item.isHost) {
+                return (
+                  <div className={hubStyles.commentMenuWrap} ref={activeMenuCommentId === item.id ? menuRef : null}>
+                    <button
+                      type="button"
+                      className={`${hubStyles.commentMenuTrigger}${menuVisible ? ` ${hubStyles.commentMenuTriggerVisible}` : ""}`}
+                      onClick={() => setActiveMenuCommentId((prev) => prev === item.id ? null : item.id)}
+                      aria-label="Comment options"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                    </button>
+                    {activeMenuCommentId === item.id ? (
+                      <div className={hubStyles.commentMenu}>
+                        <Link
+                          href={item.authorId ? `/profile/${item.authorId}` : `/profile/${item.authorHandle.replace(/^@/, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={hubStyles.commentMenuItem}
+                          onClick={() => setActiveMenuCommentId(null)}
+                        >
+                          Go to profile
+                        </Link>
+                        <button type="button" className={hubStyles.commentMenuItem} onClick={() => handleHideComment(target)}>
+                          Hide this comment
+                        </button>
+                        <button type="button" className={`${hubStyles.commentMenuItem} ${hubStyles.commentMenuItemDanger}`} onClick={() => { setActiveMenuCommentId(null); setDeleteTarget(target); }}>
+                          Delete
+                        </button>
+                        <div className={hubStyles.commentMenuDivider} />
+                        <button type="button" className={hubStyles.commentMenuItem} onClick={() => openReportOverlay(target)}>
+                          Report this user
+                        </button>
+                        <button type="button" className={hubStyles.commentMenuItem} onClick={() => openPauseOverlay(target)}>
+                          Put user in a paused state
+                        </button>
+                        <button type="button" className={`${hubStyles.commentMenuItem} ${hubStyles.commentMenuItemDanger}`} onClick={() => openBlockOverlay(target)}>
+                          Block this user
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }
+              if (!isHost) {
+                return (
+                  <div className={hubStyles.commentMenuWrap} ref={activeMenuCommentId === item.id ? menuRef : null}>
+                    <button
+                      type="button"
+                      className={`${hubStyles.commentMenuTrigger}${menuVisible ? ` ${hubStyles.commentMenuTriggerVisible}` : ""}`}
+                      onClick={() => setActiveMenuCommentId((prev) => prev === item.id ? null : item.id)}
+                      aria-label="Comment options"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                    </button>
+                    {activeMenuCommentId === item.id ? (
+                      <div className={hubStyles.commentMenu}>
+                        <Link
+                          href={item.authorId ? `/profile/${item.authorId}` : `/profile/${item.authorHandle.replace(/^@/, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={hubStyles.commentMenuItem}
+                          onClick={() => setActiveMenuCommentId(null)}
+                        >
+                          Go to profile
+                        </Link>
+                        <button type="button" className={hubStyles.commentMenuItem} onClick={() => handleHideComment(target)}>
+                          Hide this comment
+                        </button>
+                        <div className={hubStyles.commentMenuDivider} />
+                        <button type="button" className={hubStyles.commentMenuItem} onClick={() => openReportOverlay(target)}>
+                          Report this user
+                        </button>
+                        <button type="button" className={`${hubStyles.commentMenuItem} ${hubStyles.commentMenuItemDanger}`} onClick={() => openBlockOverlay(target)}>
+                          Block this user
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <form
@@ -1237,9 +1531,13 @@ function LiveComments({
             ref={commentInputRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={canComment ? "Write a comment..." : "Comments disabled"}
+            placeholder={
+              commentPaused
+                ? `Paused ${pauseSecondsLeft > 0 ? `(${pauseSecondsLeft}s)` : ""}…`
+                : canComment ? "Write a comment..." : "Comments disabled"
+            }
             className={hubStyles.commentInput}
-            disabled={!canComment || sending}
+            disabled={!canComment || sending || commentPaused}
           />
 
           <div className={hubStyles.commentEmojiWrap} ref={commentEmojiRef}>
@@ -1288,7 +1586,7 @@ function LiveComments({
         <button
           type="submit"
           className={hubStyles.commentSend}
-          disabled={!canComment || sending || !draft.trim()}
+          disabled={!canComment || sending || !draft.trim() || commentPaused}
           aria-label="Send comment"
         >
           <svg
@@ -1310,6 +1608,81 @@ function LiveComments({
           </svg>
         </button>
       </form>
+
+      {/* ── Report overlay ── */}
+      <ReportUserOverlay
+        open={reportTarget !== null}
+        targetUserId={reportTarget?.authorId}
+        targetHandle={reportTarget?.authorHandle ?? ""}
+        onClose={() => setReportTarget(null)}
+      />
+
+      {/* ── Delete confirmation overlay ── */}
+      {deleteTarget ? (
+        <div className={hubStyles.modOverlay}>
+          <div className={hubStyles.modCard}>
+            <div className={hubStyles.modHeader}>
+              <p className={hubStyles.modTitle}>Delete comment?</p>
+              <button className={hubStyles.modClose} onClick={() => setDeleteTarget(null)} aria-label="Close">×</button>
+            </div>
+            <p className={hubStyles.modSub}>This will remove the comment for all viewers and cannot be undone.</p>
+            <div className={hubStyles.modActions}>
+              <button className={hubStyles.modBtnSecondary} onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button className={hubStyles.modBtnDanger} onClick={() => void confirmDelete(deleteTarget)}>Delete</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Block overlay ── */}
+      {blockTarget ? (
+        <div className={hubStyles.modOverlay}>
+          <div className={hubStyles.modCard}>
+            <div className={hubStyles.modHeader}>
+              <p className={hubStyles.modTitle}>Block {blockTarget.authorHandle}?</p>
+              <button className={hubStyles.modClose} onClick={() => setBlockTarget(null)} aria-label="Close">×</button>
+            </div>
+            <p className={hubStyles.modSub}>They will no longer be able to see your livestreams or interact with you.</p>
+            {blockError ? <p className={hubStyles.modError}>{blockError}</p> : null}
+            <div className={hubStyles.modActions}>
+              <button className={hubStyles.modBtnSecondary} onClick={() => setBlockTarget(null)}>Cancel</button>
+              <button className={`${hubStyles.modBtn} ${hubStyles.modBtnDanger}`} disabled={blocking} onClick={() => void confirmBlock()}>
+                {blocking ? "Blocking…" : "Block"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Pause overlay ── */}
+      {pauseTarget ? (
+        <div className={hubStyles.modOverlay}>
+          <div className={hubStyles.modCard}>
+            <div className={hubStyles.modHeader}>
+              <p className={hubStyles.modTitle}>Pause {pauseTarget.authorHandle}</p>
+              <button className={hubStyles.modClose} onClick={() => setPauseTarget(null)} aria-label="Close">×</button>
+            </div>
+            <p className={hubStyles.modSub}>Select how long to prevent this user from commenting in your livestreams.</p>
+            <div className={hubStyles.pauseGrid}>
+              {PAUSE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`${hubStyles.pauseOption}${pauseDuration === opt.value ? ` ${hubStyles.pauseOptionActive}` : ""}`}
+                  onClick={() => setPauseDuration(opt.value)}
+                >{opt.label}</button>
+              ))}
+            </div>
+            {pauseError ? <p className={hubStyles.modError}>{pauseError}</p> : null}
+            <div className={hubStyles.modActions}>
+              <button className={hubStyles.modBtnSecondary} onClick={() => setPauseTarget(null)}>Cancel</button>
+              <button className={hubStyles.modBtn} disabled={pausing} onClick={() => void confirmPause()}>
+                {pausing ? "Applying…" : "Pause user"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -2331,7 +2704,7 @@ function HostStreamAdminPanel({
           {success ? <p className={hubStyles.hostAdminSuccess}>{success}</p> : null}
         </div>
 
-        <aside className={hubStyles.hostAdminCameraPanel}>
+        {hostVideoMode === "screen-camera" ? (<aside className={hubStyles.hostAdminCameraPanel}>
           <p className={hubStyles.hostAdminCameraTitle}>Camera overlay</p>
 
           {hostVideoMode === "screen-camera" ? (
@@ -2412,7 +2785,7 @@ function HostStreamAdminPanel({
               Enable Screen + camera mode in Change share mode to customize overlay.
             </p>
           )}
-        </aside>
+        </aside>) : null}
       </div>
     </aside>
   );
@@ -2453,6 +2826,9 @@ export default function LivestreamHub({
   const [viewerTitleMentionMap, setViewerTitleMentionMap] = useState<Record<string, string>>({});
   const [livestreamEnded, setLivestreamEnded] = useState(false);
   const [showEndedModal, setShowEndedModal] = useState(false);
+  const [isBlockedByHost, setIsBlockedByHost] = useState(false);
+  const [commentPaused, setCommentPaused] = useState(false);
+  const [commentPausedUntil, setCommentPausedUntil] = useState<string | null>(null);
   const lastTransportResetAtRef = useRef(0);
   const wasViewerConnectedRef = useRef(false);
   const isHostSession = forceHost || role === "host";
@@ -2738,10 +3114,15 @@ export default function LivestreamHub({
         setJoinToken(response.token);
         setJoinUrl(response.url);
         setRole(response.role);
+        setCommentPaused(Boolean(response.commentPaused));
+        setCommentPausedUntil(response.commentPausedUntil ?? null);
+        setIsBlockedByHost(false);
         setMediaError("");
         setRoomConnected(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to join livestream.");
+        const msg = err instanceof Error ? err.message : "";
+        if (msg === "BLOCKED_BY_HOST") { setIsBlockedByHost(true); return; }
+        setError(msg || "Unable to join livestream.");
       } finally {
         setBusy(false);
       }
@@ -2826,7 +3207,20 @@ export default function LivestreamHub({
     <section className={hubStyles.wrap}>
       {error ? <p className={hubStyles.error}>{error}</p> : null}
 
-      {isViewerPage ? (
+      {isBlockedByHost ? (
+        <div className={hubStyles.blockedOverlay}>
+          <div className={hubStyles.blockedCard}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6"/>
+              <path d="M4.93 4.93l14.14 14.14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+            <p className={hubStyles.blockedTitle}>You can&apos;t view this livestream</p>
+            <p className={hubStyles.blockedSub}>The host has blocked you from viewing their content.</p>
+          </div>
+        </div>
+      ) : null}
+
+      {isViewerPage && !isBlockedByHost ? (
         <div className={hubStyles.viewerWrap}>
           {!joinToken || !joinUrl || !activeStreamMeta ? (
             <div className={hubStyles.viewerLoading}>Loading livestream...</div>
@@ -2893,7 +3287,11 @@ export default function LivestreamHub({
                   )}
                   <LiveComments
                     canComment={roomConnected}
+                    isHost={isHostSession}
+                    hostUserId={activeStreamMeta.hostUserId}
                     pinnedComment={activeStreamMeta.pinnedComment}
+                    commentPaused={commentPaused}
+                    commentPausedUntil={commentPausedUntil}
                     onTransportReset={resetViewerTransport}
                     onMetaPatch={(patch) => {
                       setActiveStreamMeta((prev) => {
@@ -2946,15 +3344,23 @@ export default function LivestreamHub({
                 return (
               <div className={hubStyles.viewerInfo}>
                 <div className={hubStyles.viewerHostRow}>
-                  <div className={hubStyles.viewerHostAvatar} aria-hidden>
+                  <Link
+                    href={`/profile/${activeStreamMeta.hostUserId}`}
+                    className={hubStyles.viewerHostAvatar}
+                    aria-label={`View ${toHandle(hostUsername)}'s profile`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     {hostAvatarUrl ? (
                       <img src={hostAvatarUrl} alt={`${toHandle(hostUsername)} avatar`} className={hubStyles.viewerHostAvatarImage} />
                     ) : (
                       getAvatarInitial(hostUsername)
                     )}
-                  </div>
+                  </Link>
                   <div className={hubStyles.viewerHostMetaWrap}>
-                    <p className={hubStyles.viewerHostName}>{toHandle(hostUsername)}</p>
+                    <Link href={`/profile/${activeStreamMeta.hostUserId}`} className={hubStyles.viewerHostNameLink} target="_blank" rel="noopener noreferrer">
+                      <p className={hubStyles.viewerHostName}>{toHandle(hostUsername)}</p>
+                    </Link>
                     <p className={hubStyles.viewerMeta}>Went live {formatLiveStartedAgo(activeStreamMeta.startedAt)}</p>
                   </div>
                 </div>

@@ -9,6 +9,9 @@ import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../home/home_screen.dart';
+import '../profile/profile_screen.dart';
+import '../profile/services/profile_service.dart';
+import '../report/report_user_sheet.dart';
 import 'livestream_create_service.dart';
 import 'livestream_pending_session.dart';
 
@@ -33,6 +36,8 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
 
   final List<_LiveComment> _comments = <_LiveComment>[];
   final Set<String> _seenCommentIds = <String>{};
+  final Set<String> _hiddenCommentIds = <String>{};
+  final Set<String> _blockedUserIds = <String>{};
 
   List<LivestreamItem> _liveItems = const [];
   LivestreamItem? _activeStream;
@@ -49,6 +54,10 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
   bool _joining = false;
   bool _roomConnected = false;
   bool _sendingComment = false;
+  bool _commentPaused = false;
+  DateTime? _pausedUntil;
+  int _pauseSecondsLeft = 0;
+  Timer? _pauseTimer;
   bool _startingHostMedia = false;
   bool _hostMediaStarted = false;
   bool _switchingCamera = false;
@@ -113,6 +122,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     _commentScrollCtrl.dispose();
     _listTimer?.cancel();
     _streamRefreshTimer?.cancel();
+    _pauseTimer?.cancel();
     unawaited(_disposeRoom());
     super.dispose();
   }
@@ -605,16 +615,56 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
       final isHost =
           payload['isHost'] == true ||
           (event.participant?.identity.contains('-host-') ?? false);
+      final authorId = ((payload['authorId'] as String?) ?? '').trim();
 
       _appendComment(
         _LiveComment(
           id: commentId.isEmpty ? _commentId() : commentId,
           author: author,
+          authorId: authorId.isEmpty ? null : authorId,
           text: text,
           isHost: isHost,
           avatarUrl: ((payload['avatarUrl'] as String?) ?? '').trim(),
         ),
       );
+      return;
+    }
+
+    if (type == 'comment_delete') {
+      final commentId = (payload['commentId'] as String?) ?? '';
+      if (commentId.isEmpty) return;
+      if (!mounted) return;
+      setState(() => _comments.removeWhere((c) => c.id == commentId));
+      return;
+    }
+
+    if (type == 'comment_hide') {
+      final commentId = (payload['commentId'] as String?) ?? '';
+      final hiddenBy = (payload['hiddenBy'] as String?) ?? '';
+      if (commentId.isEmpty) return;
+      // only apply if this packet was sent by the same account
+      if (_myUserId != null && hiddenBy == _myUserId) {
+        if (!mounted) return;
+        setState(() => _hiddenCommentIds.add(commentId));
+      }
+      return;
+    }
+
+    if (type == 'user_pause') {
+      final userId = (payload['userId'] as String?) ?? '';
+      final expiresAtRaw = (payload['expiresAt'] as String?) ?? '';
+      if (userId.isEmpty || userId != _myUserId) return;
+      final expiresAt = DateTime.tryParse(expiresAtRaw);
+      if (expiresAt == null || expiresAt.isBefore(DateTime.now())) return;
+      _startPauseCountdown(expiresAt);
+      return;
+    }
+
+    if (type == 'pause_notice') {
+      final noticeText = (payload['noticeText'] as String?) ?? '';
+      if (noticeText.isEmpty) return;
+      final noticeId = (payload['noticeId'] as String?) ?? 'sys-${DateTime.now().millisecondsSinceEpoch}';
+      _appendComment(_LiveComment(id: noticeId, author: '', text: noticeText, isHost: false, isSystem: true));
       return;
     }
 
@@ -625,12 +675,14 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
         final text = ((item['text'] as String?) ?? '').trim();
         if (text.isEmpty) continue;
 
+        final itemAuthorId = ((item['authorId'] as String?) ?? '').trim();
         _appendComment(
           _LiveComment(
             id: ((item['id'] as String?) ?? '').trim().isEmpty
                 ? _commentId()
                 : (item['id'] as String),
             author: ((item['authorHandle'] as String?) ?? 'Viewer').trim(),
+            authorId: itemAuthorId.isEmpty ? null : itemAuthorId,
             text: text,
             isHost: item['isHost'] == true,
             avatarUrl: ((item['avatarUrl'] as String?) ?? '').trim(),
@@ -724,10 +776,12 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     final payload = <String, dynamic>{
       'type': 'comment_history',
       'comments': _comments
+          .where((c) => !c.isSystem)
           .map(
             (c) => <String, dynamic>{
               'id': c.id,
               'authorHandle': c.author,
+              'authorId': c.authorId ?? '',
               'isHost': c.isHost,
               'text': c.text,
               'avatarUrl': c.avatarUrl,
@@ -747,7 +801,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
 
   Future<void> _sendComment() async {
     final text = _commentCtrl.text.trim();
-    if (text.isEmpty || _sendingComment || !_roomConnected) return;
+    if (text.isEmpty || _sendingComment || !_roomConnected || _commentPaused) return;
 
     final participant = _room?.localParticipant;
     if (participant == null) return;
@@ -756,6 +810,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     final draft = _LiveComment(
       id: id,
       author: _myParticipantName,
+      authorId: _myUserId,
       text: text,
       isHost: _isHostSession,
       avatarUrl: _myAvatarUrl,
@@ -776,6 +831,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
             'commentId': id,
             'text': text,
             'author': draft.author,
+            'authorId': _myUserId ?? '',
             'isHost': draft.isHost,
             'avatarUrl': draft.avatarUrl,
           }),
@@ -794,6 +850,225 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
 
   String _commentId() =>
       '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(999999)}';
+
+  // ── Control packet helpers ──────────────────────────────────────────────────
+
+  Future<void> _publishControlPacket(Map<String, dynamic> packet) async {
+    final participant = _room?.localParticipant;
+    if (participant == null) return;
+    try {
+      await participant.publishData(
+        utf8.encode(jsonEncode(packet)),
+        reliable: true,
+      );
+    } catch (_) {}
+  }
+
+  // ── Pause countdown ─────────────────────────────────────────────────────────
+
+  void _startPauseCountdown(DateTime until) {
+    _pauseTimer?.cancel();
+    setState(() {
+      _commentPaused = true;
+      _pausedUntil = until;
+    });
+    _pauseTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) { _pauseTimer?.cancel(); return; }
+      final deadline = _pausedUntil;
+      if (deadline == null) { _pauseTimer?.cancel(); return; }
+      final left = deadline.difference(DateTime.now()).inSeconds;
+      if (left <= 0) {
+        _pauseTimer?.cancel();
+        setState(() { _commentPaused = false; _pausedUntil = null; _pauseSecondsLeft = 0; });
+      } else {
+        setState(() => _pauseSecondsLeft = left);
+      }
+    });
+  }
+
+  String _formatPauseDuration(int minutes) {
+    if (minutes >= 1440) return '1 day';
+    if (minutes >= 60) {
+      final h = minutes ~/ 60;
+      return '$h hour${h == 1 ? '' : 's'}';
+    }
+    return '$minutes minute${minutes == 1 ? '' : 's'}';
+  }
+
+  // ── Moderation actions ──────────────────────────────────────────────────────
+
+  Future<void> _deleteComment(_LiveComment comment) async {
+    setState(() => _comments.removeWhere((c) => c.id == comment.id));
+    await _publishControlPacket({'type': 'comment_delete', 'commentId': comment.id});
+    // sync to same-account sessions
+    await _publishControlPacket({'type': 'comment_hide', 'commentId': comment.id, 'hiddenBy': _myUserId ?? ''});
+  }
+
+  Future<void> _hideComment(_LiveComment comment) async {
+    setState(() => _hiddenCommentIds.add(comment.id));
+    // sync hide to same-account sessions on other devices
+    await _publishControlPacket({'type': 'comment_hide', 'commentId': comment.id, 'hiddenBy': _myUserId ?? ''});
+  }
+
+  Future<void> _muteUser(_LiveComment comment, int durationMinutes) async {
+    final authorId = comment.authorId;
+    if (authorId == null || authorId.isEmpty) return;
+    final token = AuthStorage.accessToken;
+    if (token == null) return;
+    try {
+      final resp = await ApiService.post(
+        '/livestreams/mute-user',
+        body: {'userId': authorId, 'durationMinutes': durationMinutes},
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      final expiresAt = resp['expiresAt'] as String?;
+      await _publishControlPacket({
+        'type': 'user_pause',
+        'userId': authorId,
+        'expiresAt': expiresAt ?? '',
+      });
+      // pause notice to all viewers
+      final hostHandle = _myParticipantName.startsWith('@') ? _myParticipantName : '@$_myParticipantName';
+      final targetHandle = comment.author.startsWith('@') ? comment.author : '@${comment.author}';
+      final durationLabel = _formatPauseDuration(durationMinutes);
+      final noticeId = 'pause-notice-${DateTime.now().millisecondsSinceEpoch}';
+      final noticeText = '$hostHandle put $targetHandle on a $durationLabel timeout.';
+      final sysComment = _LiveComment(id: noticeId, author: '', text: noticeText, isHost: false, isSystem: true);
+      _appendComment(sysComment);
+      await _publishControlPacket({'type': 'pause_notice', 'noticeId': noticeId, 'noticeText': noticeText});
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Failed to pause user.');
+    }
+  }
+
+  Future<void> _blockUserFromLive(_LiveComment comment) async {
+    final authorId = comment.authorId;
+    if (authorId == null || authorId.isEmpty) return;
+    // Block the host → leave the stream
+    final isHost = _activeStream?.hostUserId == authorId;
+    try {
+      await ProfileService.blockUser(authorId);
+      if (isHost) {
+        // kicked out — go home
+        if (!mounted) return;
+        setState(() => _leftVoluntarily = true);
+        await _disposeRoom();
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (_) => false,
+        );
+        return;
+      }
+      setState(() => _blockedUserIds.add(authorId));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Failed to block user.');
+    }
+  }
+
+  // ── Comment long-press menu ─────────────────────────────────────────────────
+
+  void _showCommentMenu(BuildContext ctx, _LiveComment comment) {
+    final isOwnComment = _myUserId != null && comment.authorId == _myUserId;
+    if (isOwnComment || comment.isSystem) return;
+
+    final token = AuthStorage.accessToken;
+    final authHeader = token != null ? {'Authorization': 'Bearer $token'} : <String, String>{};
+
+    showModalBottomSheet<void>(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CommentMenuSheet(
+        comment: comment,
+        isHostSession: _isHostSession,
+        onGoToProfile: comment.authorId != null
+            ? () {
+                Navigator.of(ctx).pop();
+                Navigator.of(ctx).push(MaterialPageRoute(
+                  builder: (_) => ProfileScreen(userId: comment.authorId!),
+                ));
+              }
+            : null,
+        onHide: () {
+          Navigator.of(ctx).pop();
+          _hideComment(comment);
+        },
+        onDelete: _isHostSession
+            ? () {
+                Navigator.of(ctx).pop();
+                _confirmDelete(ctx, comment);
+              }
+            : null,
+        onReport: comment.authorId != null
+            ? () async {
+                Navigator.of(ctx).pop();
+                await showReportUserSheet(ctx, userId: comment.authorId!, authHeader: authHeader);
+              }
+            : null,
+        onPause: _isHostSession
+            ? () {
+                Navigator.of(ctx).pop();
+                _showPauseSheet(ctx, comment);
+              }
+            : null,
+        onBlock: () {
+          Navigator.of(ctx).pop();
+          _confirmBlock(ctx, comment);
+        },
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext ctx, _LiveComment comment) {
+    showDialog<void>(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete comment?'),
+        content: const Text('This will remove the comment for all viewers and cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () { Navigator.of(ctx).pop(); unawaited(_deleteComment(comment)); },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPauseSheet(BuildContext ctx, _LiveComment comment) {
+    const durations = [5, 10, 15, 30, 60, 1440];
+    showModalBottomSheet<void>(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PauseDurationSheet(
+        authorHandle: comment.author,
+        durations: durations,
+        formatDuration: _formatPauseDuration,
+        onSelect: (minutes) {
+          Navigator.of(ctx).pop();
+          unawaited(_muteUser(comment, minutes));
+        },
+      ),
+    );
+  }
+
+  void _confirmBlock(BuildContext ctx, _LiveComment comment) {
+    showDialog<void>(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: Text('Block ${comment.author}?'),
+        content: const Text('They will no longer be able to see your content or interact with you.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () { Navigator.of(ctx).pop(); unawaited(_blockUserFromLive(comment)); },
+            child: const Text('Block', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _openHostMenu() async {
     final stream = _activeStream;
@@ -1520,16 +1795,19 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                     Expanded(
                       child: TextField(
                         controller: _commentCtrl,
+                        enabled: !_commentPaused,
                         style: const TextStyle(color: Colors.white),
                         minLines: 1,
                         maxLines: 2,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _sendComment(),
-                        decoration: const InputDecoration(
-                          hintText: 'Comment on this live...',
-                          hintStyle: TextStyle(color: Colors.white70),
+                        decoration: InputDecoration(
+                          hintText: _commentPaused
+                              ? 'Paused${_pauseSecondsLeft > 0 ? ' (${_pauseSecondsLeft}s)' : ''}…'
+                              : 'Comment on this live...',
+                          hintStyle: const TextStyle(color: Colors.white70),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
+                          contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 8,
                           ),
@@ -1537,12 +1815,12 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                       ),
                     ),
                     IconButton(
-                      onPressed: (_sendingComment || !_roomConnected)
+                      onPressed: (_sendingComment || !_roomConnected || _commentPaused)
                           ? null
                           : _sendComment,
                       icon: Icon(
                         Icons.send_rounded,
-                        color: (_sendingComment || !_roomConnected)
+                        color: (_sendingComment || !_roomConnected || _commentPaused)
                             ? Colors.white30
                             : Colors.white,
                       ),
@@ -1662,9 +1940,12 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
   }
 
   Widget _buildCommentOverlay() {
-    if (_comments.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final visible = _comments.where((c) =>
+      !_hiddenCommentIds.contains(c.id) &&
+      !(c.authorId != null && _blockedUserIds.contains(c.authorId)),
+    ).toList();
+
+    if (visible.isEmpty) return const SizedBox.shrink();
 
     final maxHeight = MediaQuery.of(context).size.height * 0.34;
     return ConstrainedBox(
@@ -1673,76 +1954,101 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
         controller: _commentScrollCtrl,
         padding: EdgeInsets.zero,
         reverse: true,
-        itemCount: _comments.length,
+        itemCount: visible.length,
         itemBuilder: (context, index) {
-          final item = _comments[_comments.length - 1 - index];
+          final item = visible[visible.length - 1 - index];
+
+          // System message (pause notice etc.)
+          if (item.isSystem) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0EA5E9).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF0EA5E9).withValues(alpha: 0.25)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Text(
+                  item.text,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final isOwnComment = _myUserId != null && item.authorId == _myUserId;
           final avatarUrl = item.avatarUrl?.trim();
           final showAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.38),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white24),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 13,
-                    backgroundColor: Colors.white24,
-                    backgroundImage: showAvatar
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: showAvatar
-                        ? null
-                        : Text(
-                            _avatarInitial(item.author),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: item.author,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (item.isHost)
-                            const WidgetSpan(
-                              alignment: PlaceholderAlignment.middle,
-                              child: Padding(
-                                padding: EdgeInsets.only(left: 4, right: 4),
-                                child: Icon(
-                                  Icons.workspace_premium_rounded,
-                                  size: 14,
-                                  color: Color(0xFFFFD166),
-                                ),
+            child: GestureDetector(
+              onLongPress: isOwnComment ? null : () => _showCommentMenu(context, item),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.38),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white24),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: Colors.white24,
+                      backgroundImage: showAvatar ? NetworkImage(avatarUrl) : null,
+                      child: showAvatar
+                          ? null
+                          : Text(
+                              _avatarInitial(item.author),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
                               ),
                             ),
-                          TextSpan(
-                            text: ' ${item.text}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              height: 1.25,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: item.author,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                        ],
+                            if (item.isHost)
+                              const WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: Padding(
+                                  padding: EdgeInsets.only(left: 4, right: 4),
+                                  child: Icon(
+                                    Icons.workspace_premium_rounded,
+                                    size: 14,
+                                    color: Color(0xFFFFD166),
+                                  ),
+                                ),
+                              ),
+                            TextSpan(
+                              text: ' ${item.text}',
+                              style: const TextStyle(color: Colors.white, height: 1.25),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -1758,18 +2064,159 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
   }
 }
 
+// ── Comment menu bottom sheet ─────────────────────────────────────────────────
+
+class _CommentMenuSheet extends StatelessWidget {
+  const _CommentMenuSheet({
+    required this.comment,
+    required this.isHostSession,
+    this.onGoToProfile,
+    required this.onHide,
+    this.onDelete,
+    this.onReport,
+    this.onPause,
+    required this.onBlock,
+  });
+
+  final _LiveComment comment;
+  final bool isHostSession;
+  final VoidCallback? onGoToProfile;
+  final VoidCallback onHide;
+  final VoidCallback? onDelete;
+  final VoidCallback? onReport;
+  final VoidCallback? onPause;
+  final VoidCallback onBlock;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E2330),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            child: Text(
+              comment.author,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          if (onGoToProfile != null)
+            _menuTile(Icons.person_outline_rounded, 'Go to profile', onGoToProfile!),
+          _menuTile(Icons.visibility_off_outlined, 'Hide this comment', onHide),
+          if (onDelete != null)
+            _menuTile(Icons.delete_outline_rounded, 'Delete', onDelete!, danger: true),
+          if (onDelete != null || onReport != null || onPause != null)
+            const Divider(color: Colors.white12, height: 1),
+          if (onReport != null)
+            _menuTile(Icons.flag_outlined, 'Report this user', onReport!),
+          if (onPause != null)
+            _menuTile(Icons.pause_circle_outline_rounded, 'Put user in a paused state', onPause!),
+          _menuTile(Icons.block_rounded, 'Block this user', onBlock, danger: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuTile(IconData icon, String label, VoidCallback onTap, {bool danger = false}) {
+    final color = danger ? const Color(0xFFEF4444) : Colors.white;
+    return ListTile(
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(label, style: TextStyle(color: color, fontSize: 15)),
+      onTap: onTap,
+      dense: true,
+    );
+  }
+}
+
+// ── Pause duration sheet ──────────────────────────────────────────────────────
+
+class _PauseDurationSheet extends StatelessWidget {
+  const _PauseDurationSheet({
+    required this.authorHandle,
+    required this.durations,
+    required this.formatDuration,
+    required this.onSelect,
+  });
+
+  final String authorHandle;
+  final List<int> durations;
+  final String Function(int) formatDuration;
+  final void Function(int) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E2330),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            child: Text(
+              'Pause $authorHandle for…',
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          ...durations.map(
+            (d) => ListTile(
+              title: Text(formatDuration(d), style: const TextStyle(color: Colors.white, fontSize: 15)),
+              onTap: () => onSelect(d),
+              dense: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Comment model ─────────────────────────────────────────────────────────────
+
 class _LiveComment {
   const _LiveComment({
     required this.id,
     required this.author,
     required this.text,
     required this.isHost,
+    this.authorId,
     this.avatarUrl,
+    this.isSystem = false,
   });
 
   final String id;
   final String author;
+  final String? authorId;
   final String text;
   final bool isHost;
   final String? avatarUrl;
+  final bool isSystem;
 }

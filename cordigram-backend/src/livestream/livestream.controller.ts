@@ -13,6 +13,7 @@ import { LivestreamService } from './livestream.service';
 import { CreateLivestreamDto } from './dto/create-livestream.dto';
 import { JoinLivestreamDto } from './dto/join-livestream.dto';
 import { UpdateLivestreamDto } from './dto/update-livestream.dto';
+import { MuteUserDto } from './dto/mute-user.dto';
 
 @Controller('livestreams')
 @UseGuards(JwtAuthGuard)
@@ -30,6 +31,19 @@ export class LivestreamController {
     @CurrentUser() user: { userId: string },
   ) {
     return this.livestreamService.create(user.userId, dto);
+  }
+
+  // Static routes must be declared before parameterized routes.
+  @Post('mute-user')
+  async muteUser(
+    @Body() dto: MuteUserDto,
+    @CurrentUser() user: { userId: string },
+  ) {
+    return this.livestreamService.muteUser(
+      user.userId,
+      dto.userId,
+      dto.durationMinutes,
+    );
   }
 
   @Post(':id/join-token')

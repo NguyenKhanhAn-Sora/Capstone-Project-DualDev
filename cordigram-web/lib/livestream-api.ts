@@ -42,6 +42,8 @@ export type JoinLivestreamResponse = {
   url: string;
   stream: LivestreamItem;
   role: "host" | "viewer";
+  commentPaused?: boolean;
+  commentPausedUntil?: string | null;
 };
 
 function getToken() {
@@ -173,6 +175,23 @@ export function endLivestreamBeacon(streamId: string): void {
     },
     keepalive: true,
   }).catch(() => undefined);
+}
+
+export async function muteUserInLivestream(payload: {
+  userId: string;
+  durationMinutes: 5 | 10 | 15 | 30 | 60 | 1440;
+}): Promise<{ expiresAt: string }> {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/livestreams/mute-user`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<{ expiresAt: string }>(response, "Failed to mute user.");
 }
 
 export async function getIvsIngest(streamId: string): Promise<IvsIngestResponse> {

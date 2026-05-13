@@ -1,0 +1,337 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  z-index: 120;
+  padding: 18px;
+}
+
+.overlayVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.overlayClosing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.card {
+  width: min(920px, 96vw);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.3);
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: cardIn 200ms ease forwards;
+}
+
+.cardClosing {
+  animation: cardOut 180ms ease forwards;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+@keyframes cardOut {
+  from { opacity: 1; transform: translateY(0)   scale(1);    }
+  to   { opacity: 0; transform: translateY(8px) scale(0.97); }
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 6px;
+  color: var(--color-text);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.sub {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.closeBtn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.closeBtn:hover {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border-color: var(--color-primary);
+}
+
+/* ── Two-column report grid ── */
+
+.reportGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 12px;
+  min-height: 0;
+}
+
+.categoryGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.categoryCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.categoryCard:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-primary);
+  background: rgba(14, 165, 233, 0.06);
+}
+
+.categoryCardActive {
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.categoryDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Reason panel ── */
+
+.reasonPanel {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reasonHeader {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.reasonList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reasonRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text);
+  text-align: left;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+
+.reasonRow:hover {
+  background: var(--color-surface);
+}
+
+.reasonRowActive {
+  border-color: var(--color-primary);
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.reasonRadio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 100ms ease;
+}
+
+.reasonRowActive .reasonRadio {
+  border-color: var(--color-primary);
+}
+
+.reasonRadioDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.reasonPlaceholder {
+  padding: 10px 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+/* ── Note textarea ── */
+
+.noteLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.noteInput {
+  width: 100%;
+  min-height: 72px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 8px 10px;
+  font-size: 13px;
+  resize: vertical;
+  line-height: 1.4;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.noteInput:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.noteInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ── Error & actions ── */
+
+.error {
+  margin: 0;
+  color: #f87171;
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btnSecondary,
+.btnPrimary {
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.btnSecondary:hover,
+.btnPrimary:hover {
+  transform: translateY(-1px);
+}
+
+.btnSecondary {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btnPrimary {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: #fff;
+  border: none;
+}
+
+.btnPrimary:disabled,
+.btnSecondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Done state ── */
+
+.doneWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 640px) {
+  .reportGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 16px;
+    gap: 12px;
+  }
+}

@@ -15,6 +15,8 @@ import { Profile } from '../profiles/profile.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ConfigService } from '../config/config.service';
 import { IvsService } from './ivs.service';
+import { Block } from '../users/block.schema';
+import { LivestreamMuteService } from './livestream-mute.service';
 
 const MAX_CONCURRENT_LIVESTREAMS = 5;
 const MAX_VIEWERS_PER_ROOM = 30;
@@ -32,10 +34,13 @@ export class LivestreamService {
     private readonly livestreamModel: Model<Livestream>,
     @InjectModel(Profile.name)
     private readonly profileModel: Model<Profile>,
+    @InjectModel(Block.name)
+    private readonly blockModel: Model<Block>,
     private readonly livekitService: LivekitService,
     private readonly ivsService: IvsService,
     private readonly notificationsService: NotificationsService,
     private readonly configService: ConfigService,
+    private readonly muteService: LivestreamMuteService,
   ) {}
 
   private toResponse(
@@ -353,6 +358,17 @@ export class LivestreamService {
       throw new ForbiddenException('Only the host can publish this livestream');
     }
 
+    // Block check: if host has blocked this viewer, deny entry.
+    if (!isHost) {
+      const isBlocked = await this.blockModel.exists({
+        blockerId: new Types.ObjectId(stream.hostUserId.toString()),
+        blockedId: new Types.ObjectId(user.userId),
+      });
+      if (isBlocked) {
+        throw new ForbiddenException('BLOCKED_BY_HOST');
+      }
+    }
+
     const participants = await this.livekitService.getParticipantCount(
       stream.roomName,
     );
@@ -393,6 +409,20 @@ export class LivestreamService {
       .select('username avatarUrl')
       .lean();
 
+    // Mute check: viewer may be paused from commenting in this host's live.
+    let commentPaused = false;
+    let commentPausedUntil: string | null = null;
+    if (!isHost && !isPreview) {
+      const muteStatus = await this.muteService.isMuted(
+        stream.hostUserId.toString(),
+        user.userId,
+      );
+      if (muteStatus.muted && muteStatus.expiresAt) {
+        commentPaused = true;
+        commentPausedUntil = muteStatus.expiresAt.toISOString();
+      }
+    }
+
     return {
       token,
       url: this.livekitService.getPublicUrl(),
@@ -401,7 +431,18 @@ export class LivestreamService {
         avatarUrl: hostProfile?.avatarUrl || this.DEFAULT_AVATAR_URL,
       }),
       role,
+      commentPaused,
+      commentPausedUntil,
     };
+  }
+
+  async muteUser(
+    hostId: string,
+    userId: string,
+    durationMinutes: number,
+  ): Promise<{ expiresAt: string }> {
+    const result = await this.muteService.mute(hostId, userId, durationMinutes);
+    return { expiresAt: result.expiresAt.toISOString() };
   }
 
   async getById(streamId: string) {

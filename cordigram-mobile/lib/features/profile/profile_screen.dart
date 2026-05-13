@@ -3096,25 +3096,42 @@ class _LiveNowBadge extends StatefulWidget {
 }
 
 class _LiveNowBadgeState extends State<_LiveNowBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _pulse;
+    with TickerProviderStateMixin {
+  late final AnimationController _dotCtrl;
+  late final AnimationController _shadowCtrl;
+  late final Animation<double> _dotOpacity;
+  late final Animation<double> _shadowSpread;
+  late final Animation<double> _shadowAlpha;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    // Dot blink: 1.2s ease-in-out, matches web liveDotBlink
+    _dotCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.55, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    _dotOpacity = Tween<double>(begin: 0.25, end: 1.0).animate(
+      CurvedAnimation(parent: _dotCtrl, curve: Curves.easeInOut),
+    );
+
+    // Shadow pulse: 2s, matches web livePulse (box-shadow expanding ripple)
+    _shadowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+    _shadowSpread = Tween<double>(begin: 0, end: 6).animate(
+      CurvedAnimation(parent: _shadowCtrl, curve: Curves.easeInOut),
+    );
+    _shadowAlpha = Tween<double>(begin: 0.45, end: 0).animate(
+      CurvedAnimation(parent: _shadowCtrl, curve: Curves.easeInOut),
     );
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _dotCtrl.dispose();
+    _shadowCtrl.dispose();
     super.dispose();
   }
 
@@ -3122,30 +3139,32 @@ class _LiveNowBadgeState extends State<_LiveNowBadge>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFEF4444).withValues(alpha: 0.4),
-              blurRadius: 8,
-              spreadRadius: 0,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_dotOpacity, _shadowSpread]),
+        builder: (_, __) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedBuilder(
-              animation: _pulse,
-              builder: (_, __) => Opacity(
-                opacity: _pulse.value,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFEF4444).withValues(
+                  alpha: _shadowAlpha.value,
+                ),
+                blurRadius: 0,
+                spreadRadius: _shadowSpread.value,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Opacity(
+                opacity: _dotOpacity.value,
                 child: Container(
                   width: 7,
                   height: 7,
@@ -3155,18 +3174,18 @@ class _LiveNowBadgeState extends State<_LiveNowBadge>
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 5),
-            const Text(
-              'LIVE NOW',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
+              const SizedBox(width: 5),
+              const Text(
+                'LIVE NOW',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -37,7 +37,10 @@ class AppConfig {
   /// 2) `--dart-define=NEXT_PUBLIC_GIPHY_API_KEY=...` (Next.js name)
   /// 3) Root `.env` asset: `NEXT_PUBLIC_GIPHY_API_KEY` or `GIPHY_API_KEY` (loaded in `main()`).
   static String get giphyApiKey {
-    const fromDefine = String.fromEnvironment('GIPHY_API_KEY', defaultValue: '');
+    const fromDefine = String.fromEnvironment(
+      'GIPHY_API_KEY',
+      defaultValue: '',
+    );
     if (fromDefine.isNotEmpty) return fromDefine;
     const fromDefineNext = String.fromEnvironment(
       'NEXT_PUBLIC_GIPHY_API_KEY',

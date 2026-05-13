@@ -22,7 +22,6 @@ import {
   fetchProfileDetail,
   blockUser,
   followUser,
-  reportUser,
   unfollowUser,
   fetchUserPosts,
   fetchUserReels,
@@ -33,11 +32,13 @@ import {
   uploadProfileAvatar,
   type FollowListItem,
 } from "@/lib/api";
+import ReportUserOverlay from "@/ui/report-user-overlay/ReportUserOverlay";
 import {
   listLiveLivestreams,
   type LivestreamItem,
 } from "@/lib/livestream-api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { getCachedProfile, setCachedProfile, invalidateCachedProfile } from "@/lib/profile-cache";
 import {
   emitCurrentProfileUpdated,
   NOTIFICATION_RECEIVED_EVENT,
@@ -117,77 +118,6 @@ const getUserIdFromToken = (token: string | null): string | undefined => {
     return undefined;
   }
 };
-
-type UserReportCategory = {
-  key: "abuse" | "violence" | "misinfo" | "spam" | "privacy" | "other";
-  label: string;
-  accent: string;
-  reasons: Array<{ key: string; label: string }>;
-};
-
-const USER_REPORT_GROUPS: UserReportCategory[] = [
-  {
-    key: "abuse",
-    label: "Harassment / Hate",
-    accent: "#f59e0b",
-    reasons: [
-      { key: "harassment", label: "Harassment or bullying" },
-      { key: "hate_speech", label: "Hate speech or slurs" },
-      {
-        key: "offensive_discrimination",
-        label: "Offensive discrimination",
-      },
-    ],
-  },
-  {
-    key: "violence",
-    label: "Threats / Safety",
-    accent: "#ef4444",
-    reasons: [
-      { key: "violence_threats", label: "Violence or physical threats" },
-      { key: "graphic_violence", label: "Graphic violence" },
-      { key: "self_harm", label: "Encouraging self-harm" },
-      { key: "extremism", label: "Extremism or terrorism" },
-    ],
-  },
-  {
-    key: "misinfo",
-    label: "Impersonation / Misleading",
-    accent: "#22c55e",
-    reasons: [
-      { key: "impersonation", label: "Pretending to be someone else" },
-      { key: "fake_news", label: "Fake news or misinformation" },
-    ],
-  },
-  {
-    key: "spam",
-    label: "Spam / Scam",
-    accent: "#14b8a6",
-    reasons: [
-      { key: "spam", label: "Spam or mass mentions" },
-      { key: "financial_scam", label: "Scam or fraud" },
-      { key: "unsolicited_ads", label: "Unwanted promotions" },
-    ],
-  },
-  {
-    key: "privacy",
-    label: "Privacy violation",
-    accent: "#06b6d4",
-    reasons: [
-      { key: "doxxing", label: "Sharing private information" },
-      {
-        key: "nonconsensual_intimate",
-        label: "Non-consensual intimate content",
-      },
-    ],
-  },
-  {
-    key: "other",
-    label: "Other",
-    accent: "#94a3b8",
-    reasons: [{ key: "other", label: "Other reason" }],
-  },
-];
 
 const REPORT_MODAL_MS = 200;
 const DEFAULT_AVATAR_URL =
@@ -304,14 +234,6 @@ export default function ProfileLayout({
   );
   const [privateView, setPrivateView] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportCategory, setReportCategory] = useState<
-    UserReportCategory["key"] | null
-  >(null);
-  const [reportReason, setReportReason] = useState<string | null>(null);
-  const [reportNote, setReportNote] = useState("");
-  const [reportError, setReportError] = useState("");
-  const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [reportClosing, setReportClosing] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [aboutClosing, setAboutClosing] = useState(false);
   const [followersOpen, setFollowersOpen] = useState(false);
@@ -319,7 +241,6 @@ export default function ProfileLayout({
   const [followersTab, setFollowersTab] =
     useState<FollowersOverlayTab>("followers");
   const [authoredCount, setAuthoredCount] = useState<number | null>(null);
-  const reportHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aboutHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const followersHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -340,10 +261,6 @@ export default function ProfileLayout({
   const [avatarError, setAvatarError] = useState("");
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [activeStream, setActiveStream] = useState<LivestreamItem | null>(null);
-  const selectedReportGroup = useMemo(
-    () => USER_REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory],
-  );
   const isAdminPreviewMode = Boolean(searchParams.get("admin_preview"));
   const isOwner = profile && viewerId && profile.userId === viewerId;
   const isFollower = Boolean(profile?.isFollowing);
@@ -396,6 +313,13 @@ export default function ProfileLayout({
     tabsRef.current = tabs;
   }, [tabs]);
 
+  // Sync any profile state change (edit, avatar, follow, etc.) back to cache
+  useEffect(() => {
+    if (profile && profileId) {
+      setCachedProfile(profileId, profile);
+    }
+  }, [profile, profileId]);
+
   useEffect(() => {
     setTabs({
       posts: createEmptyTab(),
@@ -420,10 +344,19 @@ export default function ProfileLayout({
     setPrivateView(false);
     setViewerId(getUserIdFromToken(token));
 
-    setLoading(true);
+    const cachedProfile = getCachedProfile(profileId);
+    if (cachedProfile) {
+      setProfile(cachedProfile);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setError("");
     fetchProfileDetail({ token: token ?? undefined, id: profileId })
-      .then((data) => setProfile(data))
+      .then((data) => {
+        setCachedProfile(profileId, data);
+        setProfile(data);
+      })
       .catch((err: unknown) => {
         const maybeStatus =
           typeof err === "object" && err && "status" in err
@@ -445,16 +378,24 @@ export default function ProfileLayout({
           lowered.includes("block") ||
           (maybeStatus === 403 && !isPrivate);
         if (isPrivate) {
+          // Invalidate cache if profile became private
+          invalidateCachedProfile(profileId);
+          setProfile(null);
           setPrivateView(true);
           setError("");
         } else if (isBlocked) {
+          invalidateCachedProfile(profileId);
+          setProfile(null);
           setBlockedView(true);
           if (isUnavailable) {
             setBlockedMessage("This account is currently unavailable.");
           }
           setError("");
         } else {
-          setError(message || "Unable to load profile");
+          // Keep showing cached data if fetch fails (network issue, etc.)
+          if (!cachedProfile) {
+            setError(message || "Unable to load profile");
+          }
         }
       })
       .finally(() => setLoading(false));
@@ -731,18 +672,9 @@ export default function ProfileLayout({
 
   useEffect(() => {
     return () => {
-      if (toastTimer.current) {
-        clearTimeout(toastTimer.current);
-      }
-      if (reportHideTimer.current) {
-        clearTimeout(reportHideTimer.current);
-      }
-      if (aboutHideTimer.current) {
-        clearTimeout(aboutHideTimer.current);
-      }
-      if (followersHideTimer.current) {
-        clearTimeout(followersHideTimer.current);
-      }
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      if (aboutHideTimer.current) clearTimeout(aboutHideTimer.current);
+      if (followersHideTimer.current) clearTimeout(followersHideTimer.current);
     };
   }, []);
 
@@ -962,19 +894,9 @@ export default function ProfileLayout({
   };
 
   const openReportModal = () => {
-    if (reportHideTimer.current) {
-      clearTimeout(reportHideTimer.current);
-    }
-    if (!profile) {
-      setMenuOpen(false);
-      return;
-    }
+    if (!profile) { setMenuOpen(false); return; }
     const token = getStoredAccessToken();
-    if (!token) {
-      showLoginOverlay();
-      setMenuOpen(false);
-      return;
-    }
+    if (!token) { showLoginOverlay(); setMenuOpen(false); return; }
     if (viewerId && profile.userId === viewerId) {
       showToast("You cannot report yourself");
       setMenuOpen(false);
@@ -982,61 +904,6 @@ export default function ProfileLayout({
     }
     setMenuOpen(false);
     setReportOpen(true);
-    setReportClosing(false);
-    setReportCategory(null);
-    setReportReason(null);
-    setReportNote("");
-    setReportError("");
-    setReportSubmitting(false);
-  };
-
-  const closeReportModal = () => {
-    if (reportHideTimer.current) {
-      clearTimeout(reportHideTimer.current);
-    }
-    setReportClosing(true);
-    reportHideTimer.current = setTimeout(() => {
-      setReportOpen(false);
-      setReportCategory(null);
-      setReportReason(null);
-      setReportNote("");
-      setReportError("");
-      setReportSubmitting(false);
-      setReportClosing(false);
-    }, REPORT_MODAL_MS);
-  };
-
-  const submitReport = async () => {
-    if (!profile || !reportCategory || !reportReason) {
-      setReportError("Please select a reason");
-      return;
-    }
-    const token = getStoredAccessToken();
-    if (!token) {
-      setReportError("Session expired. Please sign in again.");
-      return;
-    }
-    setReportSubmitting(true);
-    setReportError("");
-    try {
-      await reportUser({
-        token,
-        userId: profile.userId,
-        category: reportCategory,
-        reason: reportReason,
-        note: reportNote.trim() || undefined,
-      });
-      closeReportModal();
-      showToast("Report submitted");
-    } catch (err) {
-      const message =
-        typeof err === "object" && err && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Could not submit report";
-      setReportError(message || "Could not submit report");
-    } finally {
-      setReportSubmitting(false);
-    }
   };
 
   const handleMenuSelect = (key: string) => {
@@ -1801,145 +1668,12 @@ export default function ProfileLayout({
           </div>
         </div>
       ) : null}
-      {reportOpen ? (
-        <div
-          className={`${styles.modalOverlay} ${
-            reportClosing ? styles.modalOverlayClosing : styles.modalOverlayOpen
-          }`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeReportModal}
-        >
-          <div
-            className={`${styles.modalCard} ${styles.reportCard} ${
-              reportClosing ? styles.modalCardClosing : styles.modalCardOpen
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalHeader}>
-              <div>
-                <h3 className={styles.modalTitle}>Report this account</h3>
-                <p className={styles.modalBody}>
-                  {`Reporting @${profile?.username}. Please choose the closest reason.`}
-                </p>
-              </div>
-              <button
-                className={styles.closeBtn}
-                aria-label="Close"
-                onClick={closeReportModal}
-              />
-            </div>
-
-            <div className={styles.reportGrid}>
-              <div className={styles.categoryGrid}>
-                {USER_REPORT_GROUPS.map((group) => {
-                  const isActive = reportCategory === group.key;
-                  return (
-                    <button
-                      key={group.key}
-                      type="button"
-                      className={`${styles.categoryCard} ${
-                        isActive ? styles.categoryCardActive : ""
-                      }`}
-                      style={{
-                        borderColor: isActive ? group.accent : undefined,
-                        boxShadow: isActive
-                          ? `0 0 0 1px ${group.accent}`
-                          : undefined,
-                      }}
-                      onClick={() => {
-                        setReportCategory(group.key);
-                        setReportReason(
-                          group.reasons.length === 1
-                            ? group.reasons[0].key
-                            : null,
-                        );
-                      }}
-                    >
-                      <span
-                        className={styles.categoryDot}
-                        style={{ background: group.accent }}
-                        aria-hidden
-                      />
-                      <span className={styles.categoryLabel}>
-                        {group.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={styles.reasonPanel}>
-                <div className={styles.reasonHeader}>
-                  Select a specific reason
-                </div>
-                {selectedReportGroup ? (
-                  <div className={styles.reasonList}>
-                    {selectedReportGroup.reasons.map((r) => {
-                      const checked = reportReason === r.key;
-                      return (
-                        <button
-                          key={r.key}
-                          type="button"
-                          className={`${styles.reasonRow} ${
-                            checked ? styles.reasonRowActive : ""
-                          }`}
-                          onClick={() => setReportReason(r.key)}
-                        >
-                          <span
-                            className={styles.reasonRadio}
-                            aria-checked={checked}
-                          >
-                            {checked ? (
-                              <span className={styles.reasonRadioDot} />
-                            ) : null}
-                          </span>
-                          <span>{r.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={styles.reasonPlaceholder}>
-                    Pick a category first.
-                  </div>
-                )}
-
-                <label className={styles.noteLabel}>
-                  Additional notes (optional)
-                  <textarea
-                    className={styles.noteInput}
-                    placeholder="Add brief context if needed..."
-                    value={reportNote}
-                    onChange={(e) => setReportNote(e.target.value)}
-                    maxLength={500}
-                  />
-                </label>
-                {reportError ? (
-                  <div className={styles.inlineError}>{reportError}</div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className={styles.modalActions}>
-              <button
-                className={styles.modalSecondary}
-                onClick={closeReportModal}
-                disabled={reportSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.modalPrimary}
-                onClick={submitReport}
-                disabled={!reportReason || reportSubmitting}
-              >
-                {reportSubmitting ? "Submitting..." : "Submit report"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ReportUserOverlay
+        open={reportOpen}
+        targetUserId={profile?.userId}
+        targetHandle={profile?.username ?? ""}
+        onClose={() => setReportOpen(false)}
+      />
       {!isOwner && profile && canViewAbout && (aboutOpen || aboutClosing)
         ? (() => {
             const p = profile!;
