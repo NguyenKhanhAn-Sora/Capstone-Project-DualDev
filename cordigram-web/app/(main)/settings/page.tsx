@@ -427,6 +427,31 @@ const ActivityIcon = ({ type }: { type: ActivityType }) => {
   return <IconComment />;
 };
 
+function EyeToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className={styles.iconButton}
+      onClick={onToggle}
+      aria-label={show ? "Hide" : "Show"}
+    >
+      <svg viewBox="0 0 24 24">
+        {show ? (
+          <>
+            <path d="M17.94 17.94A10 10 0 0 1 12 20C5 20 1 12 1 12a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9 9 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24 4.24" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          </>
+        ) : (
+          <>
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
+}
+
 export default function SettingsPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
@@ -434,6 +459,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const tSystem = useTranslations("settings.system");
+  const tDevices = useTranslations("settings.devices");
   const [activeKey, setActiveKey] = useState<string>("account");
   const [showChangeEmail, setShowChangeEmail] = useState(false);
   const [step, setStep] = useState<
@@ -476,6 +502,7 @@ export default function SettingsPage() {
   const [passwordChangedAt, setPasswordChangedAt] = useState<string | null>(
     null,
   );
+  const [hasPassword, setHasPassword] = useState(true);
   const [passwordStatusLoading, setPasswordStatusLoading] = useState(false);
   const [passkeyStep, setPasskeyStep] = useState<
     "password" | "otp" | "form" | "done"
@@ -496,6 +523,13 @@ export default function SettingsPage() {
   const [hasPasskey, setHasPasskey] = useState(false);
   const [passkeyStatusLoading, setPasskeyStatusLoading] = useState(false);
   const [showCurrentPasskey, setShowCurrentPasskey] = useState(false);
+  const [showEmailPassword, setShowEmailPassword] = useState(false);
+  const [showPasswordCurrent, setShowPasswordCurrent] = useState(false);
+  const [showPasswordNew, setShowPasswordNew] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [showPasskeyPassword, setShowPasskeyPassword] = useState(false);
+  const [showPasskeyNew, setShowPasskeyNew] = useState(false);
+  const [showPasskeyConfirm, setShowPasskeyConfirm] = useState(false);
   const [passkeyEnabled, setPasskeyEnabled] = useState(false);
   const [passkeyToggleSubmitting, setPasskeyToggleSubmitting] = useState(false);
   const [passkeyToggleError, setPasskeyToggleError] = useState<string | null>(
@@ -822,7 +856,10 @@ export default function SettingsPage() {
       setPasswordStatusLoading(true);
       try {
         const res = await fetchPasswordChangeStatus({ token });
-        if (active) setPasswordChangedAt(res.lastChangedAt ?? null);
+        if (active) {
+          setPasswordChangedAt(res.lastChangedAt ?? null);
+          setHasPassword(res.hasPassword);
+        }
       } catch (_err) {
         if (active) setPasswordChangedAt(null);
       } finally {
@@ -1451,7 +1488,7 @@ export default function SettingsPage() {
   };
 
   const resetPasskeyFlow = () => {
-    setPasskeyStep("password");
+    setPasskeyStep(hasPassword ? "password" : "otp");
     setPasskeyPassword("");
     setPasskeyOtp("");
     setPasskeyCurrent("");
@@ -1678,6 +1715,9 @@ export default function SettingsPage() {
   const openChangeEmail = () => {
     resetFlow();
     setShowChangeEmail(true);
+    if (!hasPassword) {
+      setStep("current-otp");
+    }
   };
 
   const openChangePassword = async () => {
@@ -1816,6 +1856,22 @@ export default function SettingsPage() {
     };
   }, [showLoginDevices, token]);
 
+  useEffect(() => {
+    if (!showLoginDevices || !token) return;
+    const interval = setInterval(async () => {
+      const deviceId =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem("cordigramDeviceId")
+          : null;
+      try {
+        const res: LoginDevicesResponse = await fetchLoginDevices({ token, deviceId });
+        setLoginDevices(res.devices ?? []);
+        setLoginDevicesCurrent(res.currentDeviceIdHash ?? null);
+      } catch (_err) {}
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [showLoginDevices, token]);
+
   const resolveDeviceName = (device: LoginDeviceItem) => {
     if (device.deviceInfo?.trim()) return device.deviceInfo.trim();
     const parts = [device.browser, device.os].filter(Boolean);
@@ -1823,9 +1879,11 @@ export default function SettingsPage() {
     return device.deviceType ? `${device.deviceType} device` : "Unknown device";
   };
 
-  const resolveDeviceTime = (device: LoginDeviceItem) => {
+  const resolveDeviceTime = (device: LoginDeviceItem, isCurrent: boolean) => {
+    if (isCurrent) return null;
+    if (device.isActive) return null;
     const value = device.lastSeenAt ?? device.firstSeenAt ?? null;
-    return value ? `Last active ${formatRelativeTime(value)}.` : "";
+    return value ? tDevices("lastActive", { time: formatRelativeTime(value) }) : null;
   };
 
   const hasOtherLoginDevices = Boolean(
@@ -1888,7 +1946,12 @@ export default function SettingsPage() {
       return;
     }
     if (passkeyStep === "otp") {
-      setPasskeyStep("password");
+      if (hasPassword) {
+        setPasskeyStep("password");
+      } else {
+        setShowPasskeyFlow(false);
+        resetPasskeyFlow();
+      }
       return;
     }
     if (passkeyStep === "form") {
@@ -1904,7 +1967,7 @@ export default function SettingsPage() {
   const handleRequestPasskeyOtp = async () => {
     setPasskeyError(null);
     setPasskeySuccess(null);
-    if (!passkeyPassword.trim()) {
+    if (hasPassword && !passkeyPassword.trim()) {
       setPasskeyError("Please enter your current password.");
       return;
     }
@@ -1916,7 +1979,7 @@ export default function SettingsPage() {
     try {
       const res = await requestPasskeyOtp({
         token,
-        password: passkeyPassword,
+        password: hasPassword ? passkeyPassword : undefined,
       });
       setPasskeyExpiresSec(res.expiresSec);
       setPasskeyCooldown(60);
@@ -2104,7 +2167,7 @@ export default function SettingsPage() {
   const handleConfirmPasswordChange = async () => {
     setPasswordError(null);
     setPasswordSuccess(null);
-    if (!passwordCurrent.trim()) {
+    if (hasPassword && !passwordCurrent.trim()) {
       setPasswordError("Please enter your current password.");
       return;
     }
@@ -2112,7 +2175,7 @@ export default function SettingsPage() {
       setPasswordError("Please enter a new password.");
       return;
     }
-    if (passwordNew === passwordCurrent) {
+    if (hasPassword && passwordNew === passwordCurrent) {
       setPasswordError(
         "New password must be different from your current password.",
       );
@@ -2136,7 +2199,7 @@ export default function SettingsPage() {
     try {
       await confirmPasswordChange({
         token,
-        currentPassword: passwordCurrent,
+        currentPassword: hasPassword ? passwordCurrent : undefined,
         newPassword: passwordNew,
       });
       setPasswordChangedAt(new Date().toISOString());
@@ -2203,7 +2266,7 @@ export default function SettingsPage() {
   const handleRequestCurrentOtp = async () => {
     setError(null);
     setSuccess(null);
-    if (!password.trim()) {
+    if (hasPassword && !password.trim()) {
       setError("Please enter your current password.");
       return;
     }
@@ -2213,7 +2276,10 @@ export default function SettingsPage() {
     }
     setSubmitting(true);
     try {
-      const res = await requestChangeEmailCurrentOtp({ token, password });
+      const res = await requestChangeEmailCurrentOtp({
+        token,
+        password: hasPassword ? password : undefined,
+      });
       setCurrentExpiresSec(res.expiresSec);
       setCurrentCooldown(60);
       setStep("current-otp");
@@ -2501,11 +2567,11 @@ export default function SettingsPage() {
                         {step === "password"
                           ? "Step 1 · Verify password"
                           : step === "current-otp"
-                            ? "Step 2 · Current email OTP"
+                            ? hasPassword ? "Step 2 · Current email OTP" : "Step 1 · Current email OTP"
                             : step === "new-email"
-                              ? "Step 3 · Enter new email"
+                              ? hasPassword ? "Step 3 · Enter new email" : "Step 2 · Enter new email"
                               : step === "new-otp"
-                                ? "Step 4 · New email OTP"
+                                ? hasPassword ? "Step 4 · New email OTP" : "Step 3 · New email OTP"
                                 : "Completed"}
                       </span>
                     </div>
@@ -2515,14 +2581,20 @@ export default function SettingsPage() {
                         <div className={styles.form}>
                           <label className={styles.label}>
                             Current password
-                            <input
-                              className={styles.input}
-                              type="password"
-                              autoComplete="current-password"
-                              placeholder="Enter your password"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                            />
+                            <div className={styles.inputGroup}>
+                              <input
+                                className={`${styles.input} ${styles.inputWithIcon}`}
+                                type={showEmailPassword ? "text" : "password"}
+                                autoComplete="current-password"
+                                placeholder="Enter your password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                              />
+                              <EyeToggle
+                                show={showEmailPassword}
+                                onToggle={() => setShowEmailPassword((p) => !p)}
+                              />
+                            </div>
                           </label>
                           <p className={styles.hint}>
                             We’ll send a 6-digit OTP to your current email.
@@ -3200,7 +3272,7 @@ export default function SettingsPage() {
                           {passwordStep === "otp"
                             ? "Step 1 · Email OTP"
                             : passwordStep === "form"
-                              ? "Step 2 · Update password"
+                              ? hasPassword ? "Step 2 · Change password" : "Step 2 · Set password"
                               : "Completed"}
                         </span>
                       </div>
@@ -3223,42 +3295,62 @@ export default function SettingsPage() {
                       {passwordStep === "form" ? (
                         <div className={styles.stepContent} key="pw-form">
                           <div className={styles.form}>
-                            <label className={styles.label}>
-                              Current password
-                              <input
-                                className={styles.input}
-                                type="password"
-                                autoComplete="current-password"
-                                placeholder="Enter current password"
-                                value={passwordCurrent}
-                                onChange={(e) =>
-                                  setPasswordCurrent(e.target.value)
-                                }
-                              />
-                            </label>
+                            {hasPassword ? (
+                              <label className={styles.label}>
+                                Current password
+                                <div className={styles.inputGroup}>
+                                  <input
+                                    className={`${styles.input} ${styles.inputWithIcon}`}
+                                    type={showPasswordCurrent ? "text" : "password"}
+                                    autoComplete="current-password"
+                                    placeholder="Enter current password"
+                                    value={passwordCurrent}
+                                    onChange={(e) =>
+                                      setPasswordCurrent(e.target.value)
+                                    }
+                                  />
+                                  <EyeToggle
+                                    show={showPasswordCurrent}
+                                    onToggle={() => setShowPasswordCurrent((p) => !p)}
+                                  />
+                                </div>
+                              </label>
+                            ) : null}
                             <label className={styles.label}>
                               New password
-                              <input
-                                className={styles.input}
-                                type="password"
-                                autoComplete="new-password"
-                                placeholder="Create a new password"
-                                value={passwordNew}
-                                onChange={(e) => setPasswordNew(e.target.value)}
-                              />
+                              <div className={styles.inputGroup}>
+                                <input
+                                  className={`${styles.input} ${styles.inputWithIcon}`}
+                                  type={showPasswordNew ? "text" : "password"}
+                                  autoComplete="new-password"
+                                  placeholder="Create a new password"
+                                  value={passwordNew}
+                                  onChange={(e) => setPasswordNew(e.target.value)}
+                                />
+                                <EyeToggle
+                                  show={showPasswordNew}
+                                  onToggle={() => setShowPasswordNew((p) => !p)}
+                                />
+                              </div>
                             </label>
                             <label className={styles.label}>
                               Confirm new password
-                              <input
-                                className={styles.input}
-                                type="password"
-                                autoComplete="new-password"
-                                placeholder="Re-enter new password"
-                                value={passwordConfirm}
-                                onChange={(e) =>
-                                  setPasswordConfirm(e.target.value)
-                                }
-                              />
+                              <div className={styles.inputGroup}>
+                                <input
+                                  className={`${styles.input} ${styles.inputWithIcon}`}
+                                  type={showPasswordConfirm ? "text" : "password"}
+                                  autoComplete="new-password"
+                                  placeholder="Re-enter new password"
+                                  value={passwordConfirm}
+                                  onChange={(e) =>
+                                    setPasswordConfirm(e.target.value)
+                                  }
+                                />
+                                <EyeToggle
+                                  show={showPasswordConfirm}
+                                  onToggle={() => setShowPasswordConfirm((p) => !p)}
+                                />
+                              </div>
                             </label>
                             <p className={styles.hint}>
                               Password must be at least 8 characters and include
@@ -3478,11 +3570,11 @@ export default function SettingsPage() {
                           {passkeyStep === "password"
                             ? "Step 1 · Verify password"
                             : passkeyStep === "otp"
-                              ? "Step 2 · Email OTP"
+                              ? hasPassword ? "Step 2 · Email OTP" : "Step 1 · Email OTP"
                               : passkeyStep === "form"
                                 ? hasPasskey
-                                  ? "Step 3 · Change passkey"
-                                  : "Step 3 · Set passkey"
+                                  ? hasPassword ? "Step 3 · Change passkey" : "Step 2 · Change passkey"
+                                  : hasPassword ? "Step 3 · Set passkey" : "Step 2 · Set passkey"
                                 : "Completed"}
                         </span>
                       </div>
@@ -3492,16 +3584,22 @@ export default function SettingsPage() {
                           <div className={styles.form}>
                             <label className={styles.label}>
                               Current password
-                              <input
-                                className={styles.input}
-                                type="password"
-                                autoComplete="current-password"
-                                placeholder="Enter your password"
-                                value={passkeyPassword}
-                                onChange={(e) =>
-                                  setPasskeyPassword(e.target.value)
-                                }
-                              />
+                              <div className={styles.inputGroup}>
+                                <input
+                                  className={`${styles.input} ${styles.inputWithIcon}`}
+                                  type={showPasskeyPassword ? "text" : "password"}
+                                  autoComplete="current-password"
+                                  placeholder="Enter your password"
+                                  value={passkeyPassword}
+                                  onChange={(e) =>
+                                    setPasskeyPassword(e.target.value)
+                                  }
+                                />
+                                <EyeToggle
+                                  show={showPasskeyPassword}
+                                  onToggle={() => setShowPasskeyPassword((p) => !p)}
+                                />
+                              </div>
                             </label>
                             <p className={styles.hint}>
                               We’ll send a 6-digit OTP to confirm your passkey
@@ -3554,57 +3652,56 @@ export default function SettingsPage() {
                                     value={passkeyCurrent}
                                     readOnly
                                   />
-                                  <button
-                                    type="button"
-                                    className={styles.iconButton}
-                                    onClick={() =>
-                                      setShowCurrentPasskey((prev) => !prev)
-                                    }
-                                    aria-label={
-                                      showCurrentPasskey
-                                        ? "Hide passkey"
-                                        : "Show passkey"
-                                    }
-                                  >
-                                    <svg viewBox="0 0 24 24">
-                                      <path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6-10-6-10-6Z" />
-                                      <circle cx="12" cy="12" r="3" />
-                                    </svg>
-                                  </button>
+                                  <EyeToggle
+                                    show={showCurrentPasskey}
+                                    onToggle={() => setShowCurrentPasskey((p) => !p)}
+                                  />
                                 </div>
                               </label>
                             ) : null}
                             <label className={styles.label}>
                               New passkey
-                              <input
-                                className={styles.input}
-                                type="password"
-                                inputMode="numeric"
-                                maxLength={6}
-                                placeholder="Enter 6-digit passkey"
-                                value={passkeyNew}
-                                onChange={(e) =>
-                                  setPasskeyNew(
-                                    normalizeDigits(e.target.value, 6),
-                                  )
-                                }
-                              />
+                              <div className={styles.inputGroup}>
+                                <input
+                                  className={`${styles.input} ${styles.inputWithIcon}`}
+                                  type={showPasskeyNew ? "text" : "password"}
+                                  inputMode="numeric"
+                                  maxLength={6}
+                                  placeholder="Enter 6-digit passkey"
+                                  value={passkeyNew}
+                                  onChange={(e) =>
+                                    setPasskeyNew(
+                                      normalizeDigits(e.target.value, 6),
+                                    )
+                                  }
+                                />
+                                <EyeToggle
+                                  show={showPasskeyNew}
+                                  onToggle={() => setShowPasskeyNew((p) => !p)}
+                                />
+                              </div>
                             </label>
                             <label className={styles.label}>
                               Confirm passkey
-                              <input
-                                className={styles.input}
-                                type="password"
-                                inputMode="numeric"
-                                maxLength={6}
-                                placeholder="Re-enter passkey"
-                                value={passkeyConfirm}
-                                onChange={(e) =>
-                                  setPasskeyConfirm(
-                                    normalizeDigits(e.target.value, 6),
-                                  )
-                                }
-                              />
+                              <div className={styles.inputGroup}>
+                                <input
+                                  className={`${styles.input} ${styles.inputWithIcon}`}
+                                  type={showPasskeyConfirm ? "text" : "password"}
+                                  inputMode="numeric"
+                                  maxLength={6}
+                                  placeholder="Re-enter passkey"
+                                  value={passkeyConfirm}
+                                  onChange={(e) =>
+                                    setPasskeyConfirm(
+                                      normalizeDigits(e.target.value, 6),
+                                    )
+                                  }
+                                />
+                                <EyeToggle
+                                  show={showPasskeyConfirm}
+                                  onToggle={() => setShowPasskeyConfirm((p) => !p)}
+                                />
+                              </div>
                             </label>
                             <p className={styles.hint}>
                               Passkey must be exactly 6 digits.
@@ -4715,26 +4812,36 @@ export default function SettingsPage() {
                                 ? device.location
                                 : "Ho Chi Minh, Vietnam"}
                             </p>
-                            <p className={styles.deviceMeta}>
-                              {resolveDeviceTime(device)}
-                            </p>
-                            {isCurrent ? (
-                              <span className={styles.deviceBadge}>
-                                This device
-                              </span>
-                            ) : null}
-                            {!isCurrent ? (
-                              <button
-                                type="button"
-                                className={styles.deviceLogout}
-                                onClick={() => {
-                                  setLogoutError(null);
-                                  setLogoutTarget(device);
-                                }}
-                              >
-                                Log out
-                              </button>
-                            ) : null}
+                            {(() => {
+                              const timeLabel = resolveDeviceTime(device, isCurrent);
+                              return timeLabel ? (
+                                <p className={styles.deviceMeta}>{timeLabel}</p>
+                              ) : null;
+                            })()}
+                            <div className={styles.deviceBadgeRow}>
+                              {isCurrent ? (
+                                <span className={styles.deviceBadge}>
+                                  {tDevices("thisDevice")}
+                                </span>
+                              ) : null}
+                              {!isCurrent && device.isActive ? (
+                                <span className={styles.deviceBadgeOnline}>
+                                  {tDevices("activeNow")}
+                                </span>
+                              ) : null}
+                              {!isCurrent ? (
+                                <button
+                                  type="button"
+                                  className={styles.deviceLogout}
+                                  onClick={() => {
+                                    setLogoutError(null);
+                                    setLogoutTarget(device);
+                                  }}
+                                >
+                                  Log out
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       );

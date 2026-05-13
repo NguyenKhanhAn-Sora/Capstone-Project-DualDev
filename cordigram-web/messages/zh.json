@@ -1,5 +1,10 @@
 {
   "settings": {
+    "devices": {
+      "thisDevice": "此设备",
+      "activeNow": "正在活跃",
+      "lastActive": "{time}前活跃。"
+    },
     "system": {
       "title": "系统",
       "description": "请选择您的语言和主题偏好。",

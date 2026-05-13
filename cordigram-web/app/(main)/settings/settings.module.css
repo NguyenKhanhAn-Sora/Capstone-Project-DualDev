@@ -524,6 +524,14 @@
   color: var(--color-text);
 }
 
+.deviceBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
 .deviceBadge {
   font-size: 12px;
   font-weight: 700;
@@ -533,6 +541,23 @@
   border-radius: 999px;
   border: 1px solid rgba(88, 135, 255, 0.3);
   width: fit-content;
+}
+
+.deviceBadgeOnline {
+  font-size: 12px;
+  font-weight: 700;
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  width: fit-content;
+}
+
+[data-theme="dark"] .deviceBadgeOnline {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.3);
 }
 
 .deviceLogout {

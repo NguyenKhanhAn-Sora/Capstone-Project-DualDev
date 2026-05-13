@@ -45,6 +45,13 @@ class NotificationDeletedEvent {
   final int unreadCount;
 }
 
+class ForceLogoutEvent {
+  const ForceLogoutEvent({required this.reason, required this.at});
+
+  final String reason;
+  final String at;
+}
+
 class NotificationRealtimeService {
   NotificationRealtimeService._();
 
@@ -59,6 +66,8 @@ class NotificationRealtimeService {
       StreamController<NotificationStateEvent>.broadcast();
   static final StreamController<NotificationDeletedEvent> _deletedController =
       StreamController<NotificationDeletedEvent>.broadcast();
+  static final StreamController<ForceLogoutEvent> _forceLogoutController =
+      StreamController<ForceLogoutEvent>.broadcast();
 
   static Stream<NotificationRealtimeEvent> get events => _controller.stream;
   static Stream<NotificationSeenEvent> get seenEvents => _seenController.stream;
@@ -66,6 +75,8 @@ class NotificationRealtimeService {
       _stateController.stream;
   static Stream<NotificationDeletedEvent> get deletedEvents =>
       _deletedController.stream;
+  static Stream<ForceLogoutEvent> get forceLogoutEvents =>
+      _forceLogoutController.stream;
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -78,6 +89,7 @@ class NotificationRealtimeService {
 
     _token = token;
     final uri = '${AppConfig.apiBaseUrl}/notifications';
+    final deviceId = AuthStorage.deviceId;
 
     final socket = io.io(uri, <String, dynamic>{
       'transports': ['websocket'],
@@ -86,6 +98,7 @@ class NotificationRealtimeService {
       'reconnectionAttempts': -1,
       'auth': {'token': token},
       'extraHeaders': {'Authorization': 'Bearer $token'},
+      if (deviceId != null && deviceId.isNotEmpty) 'query': {'deviceId': deviceId},
     });
 
     socket.on('notification:new', (payload) {
@@ -155,6 +168,15 @@ class NotificationRealtimeService {
       );
     });
 
+    socket.on('auth:force_logout', (payload) {
+      final reason =
+          (payload is Map ? payload['reason'] as String? : null) ?? 'session_revoked';
+      final at =
+          (payload is Map ? payload['at'] as String? : null) ??
+          DateTime.now().toIso8601String();
+      _forceLogoutController.add(ForceLogoutEvent(reason: reason, at: at));
+    });
+
     socket.connect();
     _socket = socket;
   }
@@ -166,6 +188,7 @@ class NotificationRealtimeService {
       socket.off('notification:seen');
       socket.off('notification:state');
       socket.off('notification:deleted');
+      socket.off('auth:force_logout');
       socket.disconnect();
       socket.dispose();
     }

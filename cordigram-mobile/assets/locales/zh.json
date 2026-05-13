@@ -313,6 +313,7 @@
         "loadingDevices": "正在加载设备...",
         "noDevicesFound": "未找到登录设备。",
         "currentDevice": "当前设备",
+        "activeNow": "正在活跃",
         "logOut": "退出登录",
         "loggingOut": "退出登录中...",
         "logOutAllOthers": "退出所有其他设备",

@@ -1,11 +1,11 @@
-import { IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
+import { IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 export class ConfirmChangePasswordDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  currentPassword!: string;
+  currentPassword?: string;
 
   @IsString()
   @MinLength(8)

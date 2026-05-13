@@ -92,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   StreamSubscription<NotificationSeenEvent>? _notificationSeenSub;
   StreamSubscription<NotificationStateEvent>? _notificationStateSub;
   StreamSubscription<NotificationDeletedEvent>? _notificationDeletedSub;
+  StreamSubscription<ForceLogoutEvent>? _forceLogoutSub;
   static const Set<String> _realtimeNotificationTypes = {
     'post_like',
     'post_comment',
@@ -238,6 +239,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _notificationSeenSub?.cancel();
     _notificationStateSub?.cancel();
     _notificationDeletedSub?.cancel();
+    _forceLogoutSub?.cancel();
     NotificationRealtimeService.disconnect();
     _scrollController.dispose();
     super.dispose();
@@ -438,6 +440,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       setState(() {
         _notifUnread = (_notifUnread - 1).clamp(0, 999);
       });
+    });
+
+    _forceLogoutSub?.cancel();
+    _forceLogoutSub = NotificationRealtimeService.forceLogoutEvents.listen((_) {
+      if (!mounted) return;
+      _logout();
     });
   }
 

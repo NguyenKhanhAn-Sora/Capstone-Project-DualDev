@@ -248,14 +248,15 @@ class ProfileService {
   }
 
   /// Step 1: verify password and request OTP to current email.
+  /// [password] is omitted for accounts without a password (Google OAuth).
   static Future<Map<String, dynamic>> requestChangeEmailCurrentOtp({
-    required String password,
+    String? password,
   }) async {
     final token = AuthStorage.accessToken;
     if (token == null) throw const ApiException('Not authenticated');
     return ApiService.post(
       '/users/email-change/request-current-otp',
-      body: {'password': password},
+      body: {if (password != null && password.isNotEmpty) 'password': password},
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
   }
@@ -346,15 +347,20 @@ class ProfileService {
   }
 
   /// Confirm password change after OTP verification.
+  /// [currentPassword] is omitted for accounts without a password (Google OAuth).
   static Future<Map<String, dynamic>> confirmPasswordChange({
-    required String currentPassword,
+    String? currentPassword,
     required String newPassword,
   }) async {
     final token = AuthStorage.accessToken;
     if (token == null) throw const ApiException('Not authenticated');
     return ApiService.post(
       '/users/password-change/confirm',
-      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+      body: {
+        if (currentPassword != null && currentPassword.isNotEmpty)
+          'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
   }
@@ -530,14 +536,15 @@ class ProfileService {
   }
 
   /// Request passkey OTP (password confirmation step).
+  /// [password] is omitted for accounts without a password (Google OAuth).
   static Future<Map<String, dynamic>> requestPasskeyOtp({
-    required String password,
+    String? password,
   }) async {
     final token = AuthStorage.accessToken;
     if (token == null) throw const ApiException('Not authenticated');
     return ApiService.post(
       '/users/passkey/request-otp',
-      body: {'password': password},
+      body: {if (password != null && password.isNotEmpty) 'password': password},
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
   }

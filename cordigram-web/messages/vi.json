@@ -1,5 +1,10 @@
 {
   "settings": {
+    "devices": {
+      "thisDevice": "Thiết bị này",
+      "activeNow": "Đang hoạt động",
+      "lastActive": "Hoạt động {time} trước."
+    },
     "system": {
       "title": "Hệ thống",
       "description": "Chọn ngôn ngữ và giao diện hiển thị.",

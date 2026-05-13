@@ -60,6 +60,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       if (!active) {
         throw new UnauthorizedException('Device session revoked');
       }
+      this.usersService
+        .touchDeviceLastSeen({ userId: payload.sub, deviceId })
+        .catch(() => {});
     }
 
     const user = await this.usersService.releaseAccountLimitIfExpired(

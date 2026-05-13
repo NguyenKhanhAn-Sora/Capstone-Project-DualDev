@@ -174,6 +174,13 @@ export class NotificationsService {
     } satisfies ForceLogoutPayload);
   }
 
+  emitForceLogoutToDevice(deviceIdHash: string, reason: ForceLogoutPayload['reason']) {
+    this.gateway.emitToDevice(deviceIdHash, 'auth:force_logout', {
+      reason,
+      at: new Date().toISOString(),
+    } satisfies ForceLogoutPayload);
+  }
+
   private async canEmitNotification(userId: string): Promise<boolean> {
     const user = await this.userModel
       .findById(userId)
