@@ -611,6 +611,35 @@ export class ServersController {
     );
   }
 
+  @Patch(':id/access/rules/:ruleId')
+  async patchAccessRule(
+    @Param('id') serverId: string,
+    @Param('ruleId') ruleId: string,
+    @Body() body: { content: string },
+    @Request() req: any,
+  ) {
+    if (!body?.content) throw new BadRequestException('content is required');
+    return this.serverAccessService.updateRule(
+      serverId,
+      req.user.userId,
+      ruleId,
+      body.content,
+    );
+  }
+
+  @Delete(':id/access/rules/:ruleId')
+  async deleteAccessRule(
+    @Param('id') serverId: string,
+    @Param('ruleId') ruleId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.deleteRule(
+      serverId,
+      req.user.userId,
+      ruleId,
+    );
+  }
+
   @Get(':id/access/join-form')
   async getJoinApplicationForm(
     @Param('id') serverId: string,

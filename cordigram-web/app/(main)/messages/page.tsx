@@ -1424,6 +1424,8 @@ export default function MessagesPage() {
   serversRef.current = servers;
   const selectedServerRef = useRef(selectedServer);
   selectedServerRef.current = selectedServer;
+  /** Tránh dùng `currentServerPermissions` của server trước khi GET my-permissions xong (gây 403 join-applications + UI sai). */
+  const prevSelectedServerForMyPermsRef = useRef<string | null>(null);
   const [infoChannels, setInfoChannels] = useState<serversApi.Channel[]>([]);
   const [textChannels, setTextChannels] = useState<serversApi.Channel[]>([]);
   const [voiceChannels, setVoiceChannels] = useState<serversApi.Channel[]>([]);
@@ -4792,9 +4794,6 @@ export default function MessagesPage() {
     setReplyingTo(message);
   };
 
-  const serverAccessStatusPending =
-    Boolean(selectedServer && !selectedDirectMessageFriend && myServerAccessStatus === null);
-
   const mustCompleteServerVerification =
     Boolean(
       selectedServer &&
@@ -4807,8 +4806,7 @@ export default function MessagesPage() {
   const shouldBlockServerChatInput = Boolean(
     selectedServer &&
       !selectedDirectMessageFriend &&
-      (serverAccessStatusPending ||
-        myServerAccessStatus?.chatViewBlocked === true ||
+      (myServerAccessStatus?.chatViewBlocked === true ||
         (myServerAccessStatus?.hasRules === true &&
           !myServerAccessStatus?.acceptedRules) ||
         mustCompleteServerVerification),
@@ -6976,12 +6974,18 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!selectedServer || !token) {
+      prevSelectedServerForMyPermsRef.current = null;
       setCurrentServerPermissions(null);
       return;
     }
     if (isAdminView && adminViewServerId && selectedServer === adminViewServerId) {
+      prevSelectedServerForMyPermsRef.current = selectedServer;
       setCurrentServerPermissions(null);
       return;
+    }
+    if (prevSelectedServerForMyPermsRef.current !== selectedServer) {
+      prevSelectedServerForMyPermsRef.current = selectedServer;
+      setCurrentServerPermissions(null);
     }
     let cancelled = false;
     serversApi
@@ -6995,7 +6999,7 @@ export default function MessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedServer, token]);
+  }, [selectedServer, token, isAdminView, adminViewServerId]);
 
   useEffect(() => {
     if (!currentUserId || !selectedServer) return;
@@ -10738,7 +10742,7 @@ export default function MessagesPage() {
         (() => {
         const srv = currentServer;
         const hasRulesContent = (verificationAccessSettings?.rules?.length ?? 0) > 0;
-        const rulesAccepted = myServerAccessStatus?.acceptedRules !== false;
+        const rulesAccepted = Boolean(myServerAccessStatus?.acceptedRules);
         const needsRulesStep = verificationAccessSettings?.hasRules && hasRulesContent && !rulesAccepted;
         const needsAgree = needsRulesStep;
 

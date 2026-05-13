@@ -2751,6 +2751,46 @@ export async function addServerAccessRule(serverId: string, content: string): Pr
   return response.json();
 }
 
+export async function updateServerAccessRule(
+  serverId: string,
+  ruleId: string,
+  content: string,
+): Promise<ServerAccessRule> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/access/rules/${encodeURIComponent(ruleId)}`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ content }),
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không cập nhật được quy định");
+  }
+
+  return response.json();
+}
+
+export async function deleteServerAccessRule(
+  serverId: string,
+  ruleId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/access/rules/${encodeURIComponent(ruleId)}`,
+    {
+      method: "DELETE",
+      headers: getHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không xóa được quy định");
+  }
+}
+
 export async function getMyServerAccessStatus(serverId: string): Promise<MyServerAccessStatus> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/my-status`, {
     headers: getHeaders(),

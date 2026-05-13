@@ -117,6 +117,9 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
   const [showShortModal, setShowShortModal] = useState(false);
   const [showParagraphModal, setShowParagraphModal] = useState(false);
   const [showMultipleModal, setShowMultipleModal] = useState(false);
+  const [showEditRuleModal, setShowEditRuleModal] = useState(false);
+  const [editingRule, setEditingRule] = useState<RuleRow | null>(null);
+  const [editRuleDraft, setEditRuleDraft] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
   const [draftOptions, setDraftOptions] = useState<string[]>([""]);
   const [discoveryChecks, setDiscoveryChecks] = useState<serversApi.DiscoveryCheck[]>([]);
@@ -145,7 +148,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
   };
 
   const fetchSettings = async () => {
-    const s = await (serversApi as any).getServerAccessSettings(serverId);
+    const s = await serversApi.getServerAccessSettings(serverId);
     const settings = s as ServerAccessSettings;
     setAccessMode(settings.accessMode); setIsAgeRestricted(settings.isAgeRestricted);
     setHasRules(settings.hasRules); setRules(settings.rules || []);
@@ -156,6 +159,26 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
     setInitialHasRules(settings.hasRules);
     setInitialJoinFormEnabled(Boolean(settings.joinApplicationForm?.enabled));
     setInitialJoinFormQuestions(settings.joinApplicationForm?.questions || []);
+  };
+
+  /** Lưu Age Restricted / Server Rules nếu user đã tick nhưng chưa bấm "Lưu thay đổi" — tránh refetch làm mất chọn. */
+  const persistAccessTogglesIfDirty = async () => {
+    if (!canEdit) return;
+    if (
+      isAgeRestricted === initialIsAgeRestricted &&
+      hasRules === initialHasRules
+    ) {
+      return;
+    }
+    await serversApi.updateServerAccessSettings(serverId, {
+      isAgeRestricted,
+      hasRules,
+    });
+  };
+
+  const refreshAfterRuleMutation = async () => {
+    await persistAccessTogglesIfDirty();
+    await fetchSettings();
   };
 
   useEffect(() => {
@@ -197,12 +220,12 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
     setSaving(true);
     setError(null);
     try {
-      await (serversApi as any).updateServerAccessSettings(serverId, {
+      await serversApi.updateServerAccessSettings(serverId, {
         accessMode,
         isAgeRestricted,
         hasRules,
       });
-      await (serversApi as any).updateJoinApplicationForm(serverId, {
+      await serversApi.updateJoinApplicationForm(serverId, {
         enabled: joinFormEnabled,
         questions: normalizeJoinQuestions(joinFormQuestions),
       });
@@ -218,7 +241,11 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
     if (!canEdit || !hasRules) return;
     const content = ruleContent.trim(); if (!content) return;
     setSaving(true); setError(null);
-    try { await (serversApi as any).addServerAccessRule(serverId, content); setRuleContent(""); await fetchSettings(); }
+    try {
+      await serversApi.addServerAccessRule(serverId, content);
+      setRuleContent("");
+      await refreshAfterRuleMutation();
+    }
     catch (e) { setError(e instanceof Error ? e.message : t("chat.serverAccess.addRuleError")); }
     finally { setSaving(false); }
   };
@@ -254,9 +281,58 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
   };
 
   const addRuleFromTemplate = async (content: string) => {
-    setRuleContent(content);
-    try { await (serversApi as any).addServerAccessRule(serverId, content); setRuleContent(""); await fetchSettings(); }
-    catch (e) { setError(e instanceof Error ? e.message : t("chat.serverAccess.addRuleError")); }
+    if (!canEdit || !hasRules) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await serversApi.addServerAccessRule(serverId, content);
+      setRuleContent("");
+      await refreshAfterRuleMutation();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("chat.serverAccess.addRuleError"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditRule = (r: RuleRow) => {
+    setEditingRule(r);
+    setEditRuleDraft(r.content);
+    setShowEditRuleModal(true);
+  };
+
+  const handleSaveEditedRule = async () => {
+    if (!canEdit || !editingRule) return;
+    const trimmed = editRuleDraft.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await serversApi.updateServerAccessRule(serverId, editingRule.id, trimmed);
+      setShowEditRuleModal(false);
+      setEditingRule(null);
+      setEditRuleDraft("");
+      await fetchSettings();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("chat.serverAccess.updateRuleError"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    if (!canEdit) return;
+    if (!window.confirm(t("chat.serverAccess.ruleDeleteConfirm"))) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await serversApi.deleteServerAccessRule(serverId, ruleId);
+      await fetchSettings();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("chat.serverAccess.deleteRuleError"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <div style={{ color: "var(--color-panel-text-muted)" }}>{t("chat.serverAccess.loading")}</div>;
@@ -378,7 +454,27 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
             ) : rules.map((r, idx) => (
               <div key={r.id} className={styles.ruleItem}>
                 <div className={styles.ruleIndex}>{idx + 1}</div>
-                <div className={styles.ruleContent}>{r.content}</div>
+                <div className={styles.ruleBody}>
+                  <div className={styles.ruleContent}>{r.content}</div>
+                  <div className={styles.ruleActions}>
+                    <button
+                      type="button"
+                      className={styles.linkBtn}
+                      disabled={!canEdit || saving}
+                      onClick={() => openEditRule(r)}
+                    >
+                      {t("chat.serverAccess.editRule")}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.linkBtn} ${styles.dangerLink}`}
+                      disabled={!canEdit || saving}
+                      onClick={() => void handleDeleteRule(r.id)}
+                    >
+                      {t("chat.serverAccess.deleteRule")}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -485,6 +581,52 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
                   const q: JoinFormQuestion = { id: editingQuestion?.id ?? uid(), title: draftTitle.trim(), type: showShortModal ? "short" : "paragraph", required: true, options: [] };
                   void upsertQuestion(q); setShowShortModal(false); setShowParagraphModal(false);
                 }}>
+                {t("chat.serverAccess.modalSave")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditRuleModal && editingRule && (
+        <div className={styles.modalOverlay} onClick={() => { if (!saving) { setShowEditRuleModal(false); setEditingRule(null); } }}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalTitleRow}>
+              <h3 className={styles.modalTitle}>{t("chat.serverAccess.ruleEditTitle")}</h3>
+              <button
+                type="button"
+                className={styles.closeBtn}
+                disabled={saving}
+                onClick={() => { setShowEditRuleModal(false); setEditingRule(null); }}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <textarea
+                className={styles.ruleEditTextarea}
+                rows={5}
+                value={editRuleDraft}
+                onChange={(e) => setEditRuleDraft(e.target.value)}
+                placeholder={t("chat.serverAccess.rulesPlaceholder")}
+              />
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                disabled={saving}
+                onClick={() => { setShowEditRuleModal(false); setEditingRule(null); }}
+              >
+                {t("chat.serverAccess.modalCancel")}
+              </button>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={saving || !editRuleDraft.trim()}
+                onClick={() => void handleSaveEditedRule()}
+              >
                 {t("chat.serverAccess.modalSave")}
               </button>
             </div>

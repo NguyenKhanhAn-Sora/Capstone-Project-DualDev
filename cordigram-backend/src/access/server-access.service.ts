@@ -878,7 +878,94 @@ export class ServerAccessService {
       content: trimmed,
     }).save();
 
+    const prevHasRules = Boolean((server as any).hasRules);
+    if (!prevHasRules) {
+      (server as any).hasRules = true;
+      await server.save();
+      await this.userServerModel.updateMany(
+        { serverId: new Types.ObjectId(serverId) },
+        { $set: { acceptedRules: true } },
+      );
+    }
+
     return { id: String(rule._id), content: rule.content };
+  }
+
+  async updateRule(
+    serverId: string,
+    requesterUserId: string,
+    ruleId: string,
+    content: string,
+  ): Promise<{ id: string; content: string }> {
+    const server = await this.serversService.getServerById(serverId);
+    const isOwner = String(server.ownerId) === String(requesterUserId);
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới có thể sửa quy định',
+      );
+    }
+    const trimmed = (content ?? '').trim();
+    if (!trimmed) {
+      throw new BadRequestException('Nội dung quy định không được rỗng');
+    }
+    const rid = new Types.ObjectId(ruleId);
+    const updated = await this.ruleModel
+      .findOneAndUpdate(
+        { _id: rid, serverId: new Types.ObjectId(serverId) },
+        { $set: { content: trimmed } },
+        { new: true },
+      )
+      .lean()
+      .exec();
+    if (!updated) {
+      throw new NotFoundException('Không tìm thấy quy định');
+    }
+    return { id: String((updated as any)._id), content: (updated as any).content };
+  }
+
+  async deleteRule(
+    serverId: string,
+    requesterUserId: string,
+    ruleId: string,
+  ): Promise<{ ok: boolean }> {
+    const server = await this.serversService.getServerById(serverId);
+    const isOwner = String(server.ownerId) === String(requesterUserId);
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới có thể xóa quy định',
+      );
+    }
+    const rid = new Types.ObjectId(ruleId);
+    const res = await this.ruleModel.deleteOne({
+      _id: rid,
+      serverId: new Types.ObjectId(serverId),
+    });
+    if (res.deletedCount === 0) {
+      throw new NotFoundException('Không tìm thấy quy định');
+    }
+    const remaining = await this.ruleModel.countDocuments({
+      serverId: new Types.ObjectId(serverId),
+    });
+    const serverOid = new Types.ObjectId(serverId);
+    if (remaining === 0) {
+      (server as any).hasRules = false;
+      await server.save();
+      await this.userServerModel.updateMany(
+        { serverId: serverOid },
+        { $set: { acceptedRules: true } },
+      );
+    }
+    return { ok: true };
   }
 
   async getMyStatus(
