@@ -57,6 +57,8 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   StreamSubscription<Map<String, dynamic>>? _serverRealtimeSub;
   bool _didAutoPopByRealtime = false;
   int _joinAppPendingCount = 0;
+  /// Giống web: apply + pending → không mở kênh; chỉ hiện màn chờ / rút đơn.
+  bool _applyGatePending = false;
 
   ServerSummary get _effectiveServer =>
       _serverOverride ?? widget.server;
@@ -65,7 +67,14 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   void initState() {
     super.initState();
     _serverRealtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
-      _onServerRealtimeEvent,
+      (payload) {
+        final ev = (payload['event'] ?? '').toString();
+        if (ev == 'join-application-updated') {
+          _onJoinApplicationUpdated(payload);
+          return;
+        }
+        _onServerRealtimeEvent(payload);
+      },
     );
     _loadChannels();
   }
@@ -128,6 +137,73 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
     }
   }
 
+  void _onJoinApplicationUpdated(Map<String, dynamic> payload) {
+    final sid = (payload['serverId'] ?? '').toString();
+    if (sid.isEmpty || sid != widget.server.id) return;
+    final uid = (payload['userId'] ?? '').toString();
+    final my = (widget.currentUserId ?? '').trim();
+    if (my.isEmpty || uid != my) return;
+    final st = (payload['status'] ?? '').toString();
+    if (st == 'accepted') {
+      if (mounted) {
+        setState(() => _applyGatePending = false);
+        _loadChannels();
+      }
+      return;
+    }
+    if (st == 'rejected') {
+      unawaited(_exitRejectedApplication());
+      return;
+    }
+    if (st == 'withdrawn' && mounted) {
+      Navigator.of(context).pop('apply_withdrawn');
+    }
+  }
+
+  Future<void> _resolveApplyGate() async {
+    try {
+      final access = await ServersService.getMyAccessStatus(widget.server.id);
+      if (!mounted) return;
+      final mode = (access['accessMode'] ?? '').toString();
+      final st = (access['status'] ?? '').toString();
+      final pending = mode == 'apply' && st == 'pending';
+      final rejected = mode == 'apply' && st == 'rejected';
+      if (rejected) {
+        await _exitRejectedApplication();
+        return;
+      }
+      setState(() {
+        _applyGatePending = pending;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _applyGatePending = false);
+      }
+    }
+  }
+
+  Future<void> _exitRejectedApplication() async {
+    try {
+      await ServersService.leaveServer(widget.server.id);
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context).pop('join_rejected');
+  }
+
+  Future<void> _onWithdrawApplyPressed() async {
+    try {
+      await ServersService.withdrawMyJoinApplication(widget.server.id);
+      if (!mounted) return;
+      Navigator.of(context).pop('apply_withdrawn');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e')),
+        );
+      }
+    }
+  }
+
   Future<void> _loadChannels() async {
     setState(() {
       _loading = true;
@@ -164,7 +240,11 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
         _permissions = perms;
       });
       unawaited(_refreshJoinApplicationsBadge());
-      _maybeOpenInitialTextChannel();
+      await _resolveApplyGate();
+      if (!mounted) return;
+      if (!_applyGatePending) {
+        _maybeOpenInitialTextChannel();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
@@ -383,6 +463,62 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
     );
   }
 
+  Widget _buildApplyPendingBody() {
+    return RefreshIndicator(
+      onRefresh: _loadChannels,
+      color: const Color(0xFFF23BA9),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              '⏳',
+              style: TextStyle(fontSize: 40),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _effectiveServer.name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFFF2F3F5),
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Đơn đăng ký của bạn đang chờ chủ máy chủ hoặc quản trị viên duyệt. '
+              'Bạn sẽ vào chat sau khi được chấp nhận.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFFB5BAC1),
+                fontSize: 14,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _onWithdrawApplyPressed,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFed4245),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text(
+                  'Rút đơn đăng ký',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   ServerChannel? _pickChatChannelForQuickReturn() {
     if (_allTextChannels.isEmpty) return null;
     if ((_lastOpenedTextChannelId ?? '').isNotEmpty) {
@@ -479,6 +615,8 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                   ),
                 ),
               )
+            : _applyGatePending
+            ? _buildApplyPendingBody()
             : RefreshIndicator(
                 onRefresh: _loadChannels,
                 child: ListView(

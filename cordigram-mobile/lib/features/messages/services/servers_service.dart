@@ -114,6 +114,15 @@ class ServersService {
     );
   }
 
+  /// POST `/servers/:id/access/withdraw` — rút đơn khi đang chờ duyệt (cordigram-web).
+  static Future<void> withdrawMyJoinApplication(String serverId) async {
+    await ApiService.post(
+      '/servers/$serverId/access/withdraw',
+      extraHeaders: _authHeaders,
+      body: const <String, dynamic>{},
+    );
+  }
+
   static Future<Map<String, dynamic>> getDiscoveryEligibility(String serverId) async {
     final res = await ApiService.get(
       '/servers/$serverId/discovery-eligibility',
@@ -235,6 +244,29 @@ class ServersService {
       '/servers/$serverId/access/acknowledge-age',
       extraHeaders: _authHeaders,
     );
+  }
+
+  /// POST `/servers/:id/access/request-email-otp` — cordigram-web `requestServerEmailOtp`.
+  static Future<Map<String, dynamic>> requestServerEmailOtp(String serverId) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/access/request-email-otp',
+      extraHeaders: _authHeaders,
+      body: const <String, dynamic>{},
+    );
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// POST `/servers/:id/access/verify-email-otp` — cordigram-web `verifyServerEmailOtp`.
+  static Future<Map<String, dynamic>> verifyServerEmailOtp(
+    String serverId,
+    String code,
+  ) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/access/verify-email-otp',
+      extraHeaders: _authHeaders,
+      body: {'code': code.trim()},
+    );
+    return Map<String, dynamic>.from(res);
   }
 
   static Future<void> acceptServerInvite(String inviteId) async {

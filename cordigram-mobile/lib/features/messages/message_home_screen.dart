@@ -253,7 +253,10 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       ),
     );
     if (!mounted) return;
-    if (hubResult == 'deleted' || hubResult == 'left') {
+    if (hubResult == 'deleted' ||
+        hubResult == 'left' ||
+        hubResult == 'join_rejected' ||
+        hubResult == 'apply_withdrawn') {
       unawaited(_serverListController.loadServers());
     }
   }

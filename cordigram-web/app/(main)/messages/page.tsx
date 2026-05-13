@@ -1366,6 +1366,23 @@ function mapReplyToMessage(raw: any): UIMessage["replyToMessage"] {
   };
 }
 
+/** Đồng bộ logic `passesVerificationLevels` — backend có thể trả `chatViewBlocked: false` cho đơn apply đã duyệt dù chưa đủ OTP/thời gian. */
+function isServerAccessVerificationSatisfied(
+  s: serversApi.MyServerAccessStatus | null | undefined,
+): boolean {
+  if (!s) return false;
+  const lvl = s.verificationLevel ?? "none";
+  if (lvl === "none") return true;
+  const c = s.verificationChecks;
+  if (!c) return false;
+  if (lvl === "low") return Boolean(c.emailVerified);
+  if (lvl === "medium") return Boolean(c.emailVerified && c.accountOver5Min);
+  if (lvl === "high") {
+    return Boolean(c.emailVerified && c.accountOver5Min && c.memberOver10Min);
+  }
+  return true;
+}
+
 export default function MessagesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -3336,25 +3353,16 @@ export default function MessagesPage() {
     myServerAccessStatus?.verificationLevel,
   ]);
 
+  // Cập nhật countdown / checklist xác minh trong modal; không tự đóng dialog (chỉ nút ×).
   useEffect(() => {
     if ((!verificationRulesOpen && !showAcceptRulesModal) || !selectedServer || selectedDirectMessageFriend) return;
     const id = setInterval(async () => {
       try {
         const s = await serversApi.getMyServerAccessStatus(selectedServer);
         setMyServerAccessStatus(s);
-        const applyAccepted =
-          s.accessMode === "apply" && s.status === "accepted";
-        const stillBlocked = applyAccepted
-          ? false
-          : s.chatViewBlocked || (s.hasRules && !s.acceptedRules);
-        if (!stillBlocked) {
-          setVerificationRulesOpen(false);
-          setShowAcceptRulesModal(false);
-          setVerificationAccessSettings(null);
-          const ch = selectedChannelRef.current;
-          if (ch) await loadMessages(ch);
-        }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }, 3000);
     return () => clearInterval(id);
   }, [verificationRulesOpen, showAcceptRulesModal, selectedServer, selectedDirectMessageFriend]);
@@ -4784,22 +4792,26 @@ export default function MessagesPage() {
     setReplyingTo(message);
   };
 
-  /**
-   * Apply + accepted: backend bỏ chặn khi lý do duy nhất là "verification" (chờ email / 5 phút / 10 phút).
-   * Không áp dụng cho age_ack: vẫn cần bấm "Tiếp tục" (ack API) dù đã đủ 18 — trùng với createMessage 403.
-   */
-  const applyAcceptedSkipsVerificationBlockOnly =
-    myServerAccessStatus?.accessMode === "apply" &&
-    myServerAccessStatus.status === "accepted" &&
-    myServerAccessStatus?.chatBlockReason === "verification";
+  const serverAccessStatusPending =
+    Boolean(selectedServer && !selectedDirectMessageFriend && myServerAccessStatus === null);
 
+  const mustCompleteServerVerification =
+    Boolean(
+      selectedServer &&
+        !selectedDirectMessageFriend &&
+        myServerAccessStatus &&
+        !isServerAccessVerificationSatisfied(myServerAccessStatus),
+    );
+
+  /** Không dựa vào `chatViewBlocked` một mình: với đơn apply đã duyệt backend có thể trả false dù chưa xong xác minh. */
   const shouldBlockServerChatInput = Boolean(
     selectedServer &&
       !selectedDirectMessageFriend &&
-      !applyAcceptedSkipsVerificationBlockOnly &&
-      (myServerAccessStatus?.chatViewBlocked === true ||
+      (serverAccessStatusPending ||
+        myServerAccessStatus?.chatViewBlocked === true ||
         (myServerAccessStatus?.hasRules === true &&
-          !myServerAccessStatus?.acceptedRules)),
+          !myServerAccessStatus?.acceptedRules) ||
+        mustCompleteServerVerification),
   );
 
   useEffect(() => {
@@ -4808,12 +4820,6 @@ export default function MessagesPage() {
     setShowPlusMenu(false);
     setShowGiphyPicker(false);
   }, [shouldBlockServerChatInput]);
-
-  useEffect(() => {
-    if (!applyAcceptedSkipsVerificationBlockOnly) return;
-    setVerificationRulesOpen(false);
-    setShowAcceptRulesModal(false);
-  }, [applyAcceptedSkipsVerificationBlockOnly]);
 
   const handleSendMessage = async () => {
     if (shouldBlockServerChatInput) {
@@ -5023,18 +5029,13 @@ export default function MessagesPage() {
       }
       const status = await serversApi.getMyServerAccessStatus(selectedServer);
       setMyServerAccessStatus(status);
-      const applyAccepted =
-        status.accessMode === "apply" && status.status === "accepted";
-      const stillBlocked =
-        applyAccepted && status.chatBlockReason === "verification"
-          ? false
-          : status.chatViewBlocked || (status.hasRules && !status.acceptedRules);
-      if (!stillBlocked) {
-        setVerificationRulesOpen(false);
-        setVerificationAccessSettings(null);
-        setShowAcceptRulesModal(false);
-        const ch = selectedChannelRef.current;
-        if (ch) await loadMessages(ch);
+      const ch = selectedChannelRef.current;
+      if (ch) {
+        try {
+          await loadMessages(ch);
+        } catch {
+          /* ignore */
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không hoàn thành được");
@@ -5051,12 +5052,7 @@ export default function MessagesPage() {
       await serversApi.acknowledgeServerAgeRestriction(selectedServer);
       const status = await serversApi.getMyServerAccessStatus(selectedServer);
       setMyServerAccessStatus(status);
-      if (
-        status.hasRules &&
-        !status.acceptedRules &&
-        !status.chatViewBlocked &&
-        !(status.accessMode === "apply" && status.status === "accepted")
-      ) {
+      if (status.hasRules && !status.acceptedRules) {
         try {
           const s = await serversApi.getServerAccessSettings(selectedServer);
           setVerificationAccessSettings(s);
@@ -7211,6 +7207,13 @@ export default function MessagesPage() {
             setServers(normalizeServers(list));
           })
           .catch(() => undefined);
+        const sid = String(d.serverId ?? "");
+        if (sid && selectedServerRef.current === sid) {
+          void serversApi
+            .getMyServerAccessStatus(sid)
+            .then(setMyServerAccessStatus)
+            .catch(() => undefined);
+        }
       }
     };
 
@@ -8669,6 +8672,10 @@ export default function MessagesPage() {
                     await loadServers();
                     setShowExploreView(false);
                     setSelectedServer(serverId);
+                    void serversApi
+                      .getMyServerAccessStatus(serverId)
+                      .then(setMyServerAccessStatus)
+                      .catch(() => undefined);
                   } catch (e) {
                     showNoticePopup(
                       e instanceof Error
@@ -10728,7 +10735,6 @@ export default function MessagesPage() {
       {(verificationRulesOpen || showAcceptRulesModal) &&
         selectedServer &&
         !selectedDirectMessageFriend &&
-        !applyAcceptedSkipsVerificationBlockOnly &&
         (() => {
         const srv = currentServer;
         const hasRulesContent = (verificationAccessSettings?.rules?.length ?? 0) > 0;
@@ -11201,6 +11207,10 @@ export default function MessagesPage() {
             await loadServers();
             setSelectedServer(serverId);
             setSelectedChannel(null);
+            void serversApi
+              .getMyServerAccessStatus(serverId)
+              .then(setMyServerAccessStatus)
+              .catch(() => undefined);
           }}
           onApplyToJoinBeforeAccept={async (serverId, _inviteId) => {
             const opened = await openApplyJoinModalIfNeeded(serverId);
@@ -11577,6 +11587,12 @@ export default function MessagesPage() {
               if (opened) return;
               await serversApi.joinServer(selectedServer);
               await loadServers();
+              if (selectedServer) {
+                void serversApi
+                  .getMyServerAccessStatus(selectedServer)
+                  .then(setMyServerAccessStatus)
+                  .catch(() => undefined);
+              }
             }}
             onEditChannel={handleEditChannel}
             onDeleteChannel={handleDeleteChannel}

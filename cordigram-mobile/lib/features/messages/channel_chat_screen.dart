@@ -16,14 +16,13 @@ import 'pinned_messages_screen.dart';
 import 'services/channel_messages_realtime_service.dart';
 import 'services/channel_messages_service.dart';
 import 'services/giphy_search_service.dart';
-import 'services/servers_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
 import 'services/server_media_service.dart';
 import 'search/message_search_sheet.dart';
+import 'widgets/channel_chat_gate_sheet.dart';
 import 'widgets/gif_toolbar_icon.dart';
 import 'widgets/sticker_toolbar_icon.dart';
-import 'widgets/server_join_flow.dart';
 
 class ChannelChatScreen extends StatefulWidget {
   const ChannelChatScreen({
@@ -281,26 +280,21 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     } catch (_) {}
   }
 
-  Future<void> _onAcceptRulesFromChannel() async {
-    try {
-      final settings =
-          await ServersService.getServerAccessSettings(widget.server.id);
-      if (!mounted) return;
-      final agreed =
-          await ServerJoinFlow.showRulesAgreementDialog(context, settings);
-      if (agreed != true || !mounted) return;
-      await ServersService.acceptServerRules(widget.server.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã đồng ý quy định máy chủ.')),
-      );
-      await _reloadEnvelopeOnly();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không cập nhật được: $e')),
-      );
-    }
+  bool _canCompleteGateStepsInChannel() {
+    final r = _chatBlockReason;
+    return r == 'rules' || r == 'verification' || r == 'age_ack';
+  }
+
+  Future<void> _openChannelGateSheet() async {
+    await showChannelChatGateSheet(
+      context,
+      serverId: widget.server.id,
+      serverName: widget.server.name,
+      serverAvatarUrl: widget.server.avatarUrl,
+      onGateUpdated: () {
+        unawaited(_reloadEnvelopeOnly());
+      },
+    );
   }
 
   Future<void> _sendWaveToWelcome(ChannelMessage welcomeMsg) async {
@@ -338,6 +332,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   }
 
   String _chatBlockedBannerText() {
+    if (_canCompleteGateStepsInChannel()) {
+      return 'Bạn phải hoàn thành thêm một vài bước nữa trước khi có thể trò chuyện trong máy chủ này';
+    }
     final hint = _blockedReasonLabel(_chatBlockReason);
     if (hint.isNotEmpty) return hint;
     final r = _chatBlockReason;
@@ -381,9 +378,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         height: 1.35,
                       ),
                       children: [
-                        TextSpan(
-                          text: 'Rất vui được gặp bạn, $displayName!',
-                        ),
+                        TextSpan(text: 'Rất vui được gặp bạn, $displayName!'),
                         TextSpan(
                           text: '  ${_formatWelcomeTimestamp(msg.createdAt)}',
                           style: const TextStyle(
@@ -1793,24 +1788,37 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    _chatBlockedBannerText(),
-                    style: const TextStyle(
-                      color: Color(0xFFFFB2BE),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (_chatBlockReason == 'rules') ...[
-                    const SizedBox(height: 8),
-                    FilledButton(
-                      onPressed: _onAcceptRulesFromChannel,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF5865F2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _chatBlockedBannerText(),
+                          style: const TextStyle(
+                            color: Color(0xFFFFB2BE),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                      child: const Text('Đọc và đồng ý quy định'),
-                    ),
-                  ],
+                      if (_canCompleteGateStepsInChannel()) ...[
+                        const SizedBox(width: 10),
+                        FilledButton(
+                          onPressed: _openChannelGateSheet,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF5865F2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Hoàn thành'),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),

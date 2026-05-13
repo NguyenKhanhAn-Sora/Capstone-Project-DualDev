@@ -107,6 +107,42 @@ class ServerJoinFlow {
     return out;
   }
 
+  /// Gộp GET join-form + form trong access/settings (giống web: đủ câu khi một nguồn thiếu hoặc lệch id).
+  static List<Map<String, dynamic>> _mergeQuestionLists(
+    List<Map<String, dynamic>> apiQs,
+    List<Map<String, dynamic>> embQs,
+  ) {
+    if (embQs.isEmpty) return apiQs;
+    if (apiQs.isEmpty) return embQs;
+    final byApiId = <String, Map<String, dynamic>>{};
+    for (final q in apiQs) {
+      final id = (q['id'] ?? '').toString().trim();
+      if (id.isNotEmpty) {
+        byApiId[id] = q;
+      }
+    }
+    final merged = <Map<String, dynamic>>[];
+    for (final e in embQs) {
+      final id = (e['id'] ?? '').toString().trim();
+      if (id.isNotEmpty && byApiId.containsKey(id)) {
+        merged.add(Map<String, dynamic>.from(byApiId[id]!));
+      } else {
+        merged.add(Map<String, dynamic>.from(e));
+      }
+    }
+    for (final q in apiQs) {
+      final id = (q['id'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      final exists = merged.any(
+        (m) => (m['id'] ?? '').toString().trim() == id,
+      );
+      if (!exists) {
+        merged.add(Map<String, dynamic>.from(q));
+      }
+    }
+    return merged;
+  }
+
   /// Ưu tiên GET `/access/join-form` (đủ câu hỏi, đã chuẩn hóa); fallback form nhúng trong `/access/settings`.
   static Future<Map<String, dynamic>> _loadJoinForm(
     String serverId,
@@ -120,18 +156,46 @@ class ServerJoinFlow {
     } catch (_) {
       fromApi = null;
     }
-    final embedded = settings['joinApplicationForm'];
+    final embeddedRaw = settings['joinApplicationForm'];
+    Map<String, dynamic>? embedded;
+    if (embeddedRaw is Map) {
+      embedded = Map<String, dynamic>.from(embeddedRaw);
+      embedded['questions'] = _coerceQuestions(embedded['questions']);
+    }
+
+    if (fromApi != null && embedded != null) {
+      final apiList = <Map<String, dynamic>>[];
+      final aq = fromApi['questions'];
+      if (aq is List) {
+        for (final e in aq) {
+          if (e is Map) {
+            apiList.add(Map<String, dynamic>.from(e));
+          }
+        }
+      }
+      final embList = <Map<String, dynamic>>[];
+      final eq = embedded['questions'];
+      if (eq is List) {
+        for (final e in eq) {
+          if (e is Map) {
+            embList.add(Map<String, dynamic>.from(e));
+          }
+        }
+      }
+      final mergedQs = _mergeQuestionLists(apiList, embList);
+      final embEnabled = embedded['enabled'] == true;
+      final enabled = fromApi['enabled'] == true || embEnabled;
+      return {'enabled': enabled, 'questions': mergedQs};
+    }
     if (fromApi != null) {
-      final embEnabled = embedded is Map && embedded['enabled'] == true;
+      final embEnabled = embeddedRaw is Map && embeddedRaw['enabled'] == true;
       if (embEnabled && fromApi['enabled'] != true) {
-        fromApi = {...fromApi, 'enabled': true};
+        return {...fromApi, 'enabled': true};
       }
       return fromApi;
     }
-    if (embedded is Map<String, dynamic>) {
-      final m = Map<String, dynamic>.from(embedded);
-      m['questions'] = _coerceQuestions(m['questions']);
-      return m;
+    if (embedded != null) {
+      return embedded;
     }
     return {'enabled': false, 'questions': <dynamic>[]};
   }
@@ -232,13 +296,10 @@ class ServerJoinFlow {
     String? serverName,
     String? serverAvatarUrl,
   }) async {
-    final ctrls = <String, TextEditingController>{};
-    final selected = <String, String>{};
-    for (final q in questions) {
-      final id = (q['id'] ?? '').toString().trim();
-      if (id.isEmpty) continue;
-      ctrls[id] = TextEditingController();
-    }
+    final textCtrls = List<TextEditingController>.generate(
+      questions.length,
+      (_) => TextEditingController(),
+    );
 
     final result = await showModalBottomSheet<Map<String, Map<String, String>>>(
       context: context,
@@ -249,6 +310,7 @@ class ServerJoinFlow {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
+        final mcPick = <int, String>{};
         final bottomInset = MediaQuery.paddingOf(ctx).bottom;
         final viewInsets = MediaQuery.viewInsetsOf(ctx).bottom;
         return Padding(
@@ -370,9 +432,10 @@ class ServerJoinFlow {
                                   style: TextStyle(color: Color(0xFFB5BAC1)),
                                 ),
                               ),
-                            for (final q in questions) ...[
+                            for (var qi = 0; qi < questions.length; qi++) ...[
                               Builder(
                                 builder: (_) {
+                                  final q = questions[qi];
                                   final id = (q['id'] ?? '').toString().trim();
                                   final title = (q['title'] ?? '')
                                       .toString()
@@ -435,7 +498,7 @@ class ServerJoinFlow {
                                           if (opts.isEmpty) {
                                             return <Widget>[
                                               TextField(
-                                                controller: ctrls[id],
+                                                controller: textCtrls[qi],
                                                 style: const TextStyle(
                                                   color: Colors.white,
                                                 ),
@@ -480,15 +543,15 @@ class ServerJoinFlow {
                                                         ),
                                                         value: o,
                                                         groupValue:
-                                                            selected[id]
-                                                                    ?.isNotEmpty ==
-                                                                true
-                                                            ? selected[id]
-                                                            : null,
+                                                            (mcPick[qi]
+                                                                        ?.isNotEmpty ==
+                                                                    true)
+                                                                ? mcPick[qi]
+                                                                : null,
                                                         onChanged: (v) =>
                                                             setLocal(
                                                               () =>
-                                                                  selected[id] =
+                                                                  mcPick[qi] =
                                                                       v ?? '',
                                                             ),
                                                       ),
@@ -500,7 +563,7 @@ class ServerJoinFlow {
                                         })()
                                       else ...[
                                         TextField(
-                                          controller: ctrls[id],
+                                          controller: textCtrls[qi],
                                           maxLines: type == 'paragraph' ? 5 : 1,
                                           style: const TextStyle(
                                             color: Colors.white,
@@ -532,7 +595,8 @@ class ServerJoinFlow {
                         child: FilledButton(
                           onPressed: () {
                             final out = <String, Map<String, String>>{};
-                            for (final q in questions) {
+                            for (var qi = 0; qi < questions.length; qi++) {
+                              final q = questions[qi];
                               final id = (q['id'] ?? '').toString().trim();
                               if (id.isEmpty) continue;
                               final type = (q['type'] ?? 'short').toString();
@@ -540,12 +604,16 @@ class ServerJoinFlow {
                                   ((q['options'] is List) &&
                                       (q['options'] as List).isNotEmpty)) {
                                 out[id] = {
-                                  'selectedOption': selected[id] ?? '',
+                                  'selectedOption': mcPick[qi] ?? '',
                                 };
                               } else if (type == 'multiple_choice') {
-                                out[id] = {'text': ctrls[id]?.text ?? ''};
+                                out[id] = {
+                                  'text': textCtrls[qi].text,
+                                };
                               } else {
-                                out[id] = {'text': ctrls[id]?.text ?? ''};
+                                out[id] = {
+                                  'text': textCtrls[qi].text,
+                                };
                               }
                             }
                             Navigator.pop(ctx, out);
@@ -563,7 +631,7 @@ class ServerJoinFlow {
       },
     );
 
-    for (final c in ctrls.values) {
+    for (final c in textCtrls) {
       c.dispose();
     }
     return result;

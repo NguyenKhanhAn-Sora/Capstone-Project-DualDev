@@ -100,6 +100,13 @@ class ChannelMessagesRealtimeService {
       _serverRealtimeController.add(mapped);
     });
 
+    socket.on('join-application-updated', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'join-application-updated';
+      _serverRealtimeController.add(mapped);
+    });
+
     socket.on('connect', (_) {
       for (final id in _joinedChannelIds) {
         _emitJoinChannel(id);
