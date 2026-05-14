@@ -1451,7 +1451,14 @@
       "payWithStripe": "Stripeで支払う",
       "paymentVerified": "支払いの確認に成功しました。",
       "paymentNotConfirmed": "支払いが確認されませんでした。再試行してください。",
-      "errorCheckout": "チェックアウトセッションを開始できませんでした。"
+      "errorCheckout": "チェックアウトセッションを開始できませんでした。",
+      "objectiveAwareness": "認知度向上",
+      "objectiveTraffic": "トラフィック",
+      "objectiveEngagement": "エンゲージメント",
+      "objectiveLeads": "リード獲得",
+      "objectiveSales": "売上",
+      "objectiveMessages": "メッセージ",
+      "invoiceDurationValue": "{days}日間 • {price}"
     },
     "payment": {
       "appBar": "支払い状態",

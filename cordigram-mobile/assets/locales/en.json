@@ -1543,7 +1543,14 @@
       "payWithStripe": "Pay with Stripe",
       "paymentVerified": "Payment verified successfully.",
       "paymentNotConfirmed": "Payment not confirmed. Please try again.",
-      "errorCheckout": "Failed to start checkout session."
+      "errorCheckout": "Failed to start checkout session.",
+      "objectiveAwareness": "Awareness",
+      "objectiveTraffic": "Traffic",
+      "objectiveEngagement": "Engagement",
+      "objectiveLeads": "Leads",
+      "objectiveSales": "Sales",
+      "objectiveMessages": "Messages",
+      "invoiceDurationValue": "{days} days • {price}"
     },
     "payment": {
       "appBar": "Payment status",

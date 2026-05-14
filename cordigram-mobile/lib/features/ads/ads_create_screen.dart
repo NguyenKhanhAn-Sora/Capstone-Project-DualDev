@@ -11,6 +11,7 @@ import '../../core/config/app_config.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import 'ads_dashboard_screen.dart';
 import 'ads_payment_status_screen.dart';
 import 'ads_service.dart';
@@ -269,6 +270,18 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
   String _objectiveValue(_Objective v) => v.name;
   String _adFormatValue(_AdFormat v) => v.name;
 
+  String _objectiveLabel(_Objective v) {
+    final lc = LanguageController.instance;
+    switch (v) {
+      case _Objective.awareness: return lc.t('ads.create.objectiveAwareness');
+      case _Objective.traffic:   return lc.t('ads.create.objectiveTraffic');
+      case _Objective.engagement: return lc.t('ads.create.objectiveEngagement');
+      case _Objective.leads:     return lc.t('ads.create.objectiveLeads');
+      case _Objective.sales:     return lc.t('ads.create.objectiveSales');
+      case _Objective.messages:  return lc.t('ads.create.objectiveMessages');
+    }
+  }
+
   String _ctaValue(_Cta value) {
     switch (value) {
       case _Cta.learnMore:
@@ -320,7 +333,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
 
   Future<void> _replaceAndUploadPickedMedia(List<File> files) async {
     if (files.isEmpty) {
-      setState(() => _error = 'Please select media first.');
+      setState(() => _error = LanguageController.instance.t('ads.create.validationSelectMedia'));
       return;
     }
 
@@ -349,7 +362,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Upload failed. Please try again.';
+        _error = LanguageController.instance.t('ads.create.uploadError');
         _uploading = false;
       });
     }
@@ -371,15 +384,15 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
     final u = _destinationCtrl.text.trim();
 
     if (p.isEmpty) {
-      setState(() => _error = 'Primary text is required.');
+      setState(() => _error = LanguageController.instance.t('ads.create.validationPrimaryText'));
       return false;
     }
     if (h.isEmpty) {
-      setState(() => _error = 'Headline is required.');
+      setState(() => _error = LanguageController.instance.t('ads.create.validationHeadline'));
       return false;
     }
     if (u.isEmpty) {
-      setState(() => _error = 'Destination URL is required.');
+      setState(() => _error = LanguageController.instance.t('ads.create.validationDestinationUrl'));
       return false;
     }
 
@@ -388,13 +401,13 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
         parsed != null && (parsed.scheme == 'http' || parsed.scheme == 'https');
     if (!ok) {
       setState(
-        () => _error = 'Destination URL must start with http:// or https://.',
+        () => _error = LanguageController.instance.t('ads.create.validationDestinationUrlFormat'),
       );
       return false;
     }
 
     if (_uploadedMedia.isEmpty) {
-      setState(() => _error = 'Please upload media before payment.');
+      setState(() => _error = LanguageController.instance.t('ads.create.validationMediaRequired'));
       return false;
     }
 
@@ -485,9 +498,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
       if (!mounted) return;
       if (result == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Payment verified successfully.'),
-            backgroundColor: Color(0xFF1E7F54),
+          SnackBar(
+            content: Text(LanguageController.instance.t('ads.create.paymentVerified')),
+            backgroundColor: const Color(0xFF1E7F54),
           ),
         );
         await Navigator.of(context).pushAndRemoveUntil(
@@ -496,9 +509,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Payment not confirmed. Please try again.'),
-            backgroundColor: Color(0xFF8B2D34),
+          SnackBar(
+            content: Text(LanguageController.instance.t('ads.create.paymentNotConfirmed')),
+            backgroundColor: const Color(0xFF8B2D34),
           ),
         );
       }
@@ -507,7 +520,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
       setState(() => _error = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Failed to start checkout session.');
+      setState(() => _error = LanguageController.instance.t('ads.create.errorCheckout'));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -547,10 +560,10 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Confirm Payment',
-                            style: TextStyle(
+                            LanguageController.instance.t('ads.create.paymentDialogTitle'),
+                            style: const TextStyle(
                               color: Color(0xFFE8ECF8),
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
@@ -576,9 +589,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'You will be redirected to Stripe Checkout to complete payment.',
-                      style: TextStyle(color: Color(0xFFA9B9D4), fontSize: 13),
+                    Text(
+                      LanguageController.instance.t('ads.create.paymentDialogBody'),
+                      style: const TextStyle(color: Color(0xFFA9B9D4), fontSize: 13),
                     ),
                     const SizedBox(height: 12),
                     Container(
@@ -594,22 +607,21 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       child: Column(
                         children: [
                           _InvoiceLine(
-                            label: 'Boost package',
+                            label: LanguageController.instance.t('ads.create.invoiceBoost'),
                             value:
                                 '${_selectedBoost.title} • ${_formatVndSymbol(_selectedBoost.price)}',
                           ),
                           const SizedBox(height: 6),
                           _InvoiceLine(
-                            label: 'Duration package',
-                            value:
-                                '${_selectedDuration.days} days • ${_formatVndSymbol(_selectedDuration.price)}',
+                            label: LanguageController.instance.t('ads.create.invoiceDuration'),
+                            value: LanguageController.instance.t('ads.create.invoiceDurationValue', {'days': _selectedDuration.days, 'price': _formatVndSymbol(_selectedDuration.price)}),
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 10),
                             child: Divider(color: Color(0xFF2A5D87), height: 1),
                           ),
                           _InvoiceLine(
-                            label: 'Total',
+                            label: LanguageController.instance.t('ads.create.invoiceTotal'),
                             value: _formatVndSymbol(_totalBudget),
                             emphasis: true,
                           ),
@@ -642,15 +654,15 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                                   height: 1.3,
                                 ),
                                 children: [
-                                  const TextSpan(text: 'I agree to the '),
+                                  TextSpan(text: '${LanguageController.instance.t('ads.create.termsAgree')} '),
                                   WidgetSpan(
                                     alignment: PlaceholderAlignment.baseline,
                                     baseline: TextBaseline.alphabetic,
                                     child: GestureDetector(
                                       onTap: _openTermsPage,
-                                      child: const Text(
-                                        'Term',
-                                        style: TextStyle(
+                                      child: Text(
+                                        LanguageController.instance.t('ads.create.termsTerm'),
+                                        style: const TextStyle(
                                           color: Color(0xFF7FD8FF),
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
@@ -660,9 +672,8 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                                       ),
                                     ),
                                   ),
-                                  const TextSpan(
-                                    text:
-                                        ' and advertising rules of Cordigram.',
+                                  TextSpan(
+                                    text: ' ${LanguageController.instance.t('ads.create.termsAnd')}',
                                   ),
                                 ],
                               ),
@@ -694,9 +705,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                               ),
                             ),
                           ),
-                          child: const Text(
-                            'Back',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                          child: Text(
+                            LanguageController.instance.t('ads.create.backBtn'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -717,9 +728,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'Pay with Stripe',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                          child: Text(
+                            LanguageController.instance.t('ads.create.payWithStripe'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                       ],
@@ -750,7 +761,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: scheme.onSurface),
         title: Text(
-          'Create Ad Campaign',
+          LanguageController.instance.t('ads.create.appBar'),
           style: TextStyle(color: scheme.onSurface),
         ),
       ),
@@ -763,14 +774,14 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _Heading('Objective'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionObjective')),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: _Objective.values
                           .map(
                             (v) => _SelectablePill(
-                              label: _capitalize(v.name),
+                              label: _objectiveLabel(v),
                               selected: _objective == v,
                               onTap: () => setState(() => _objective = v),
                             ),
@@ -778,31 +789,31 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                           .toList(),
                     ),
                     const SizedBox(height: 14),
-                    const _Heading('Campaign name'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionCampaignName')),
                     _Input(controller: _campaignNameCtrl),
                     const SizedBox(height: 14),
                     const SizedBox(height: 14),
-                    const _Heading('Primary text'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionPrimaryText')),
                     _Input(
                       controller: _primaryTextCtrl,
                       minLines: 3,
                       maxLines: 6,
                     ),
                     const SizedBox(height: 12),
-                    const _Heading('Headline'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionHeadline')),
                     _Input(controller: _headlineCtrl),
                     const SizedBox(height: 12),
-                    const _Heading('Description'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionDescription')),
                     _Input(
                       controller: _descriptionCtrl,
                       minLines: 2,
                       maxLines: 4,
                     ),
                     const SizedBox(height: 12),
-                    const _Heading('Destination URL'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionDestinationUrl')),
                     _Input(controller: _destinationCtrl),
                     const SizedBox(height: 12),
-                    const _Heading('CTA'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionCta')),
                     DropdownButtonFormField<_Cta>(
                       value: _cta,
                       decoration: _fieldDecoration(context),
@@ -821,12 +832,12 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       },
                     ),
                     const SizedBox(height: 14),
-                    const _Heading('Ad format'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionAdFormat')),
                     Row(
                       children: [
                         Expanded(
                           child: _FormatTab(
-                            label: 'Single image',
+                            label: LanguageController.instance.t('ads.create.formatSingleImage'),
                             selected: _adFormat == _AdFormat.single,
                             onTap: () {
                               setState(() {
@@ -840,7 +851,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _FormatTab(
-                            label: 'Carousel',
+                            label: LanguageController.instance.t('ads.create.formatCarousel'),
                             selected: _adFormat == _AdFormat.carousel,
                             onTap: () {
                               setState(() {
@@ -854,7 +865,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _FormatTab(
-                            label: 'Video',
+                            label: LanguageController.instance.t('ads.create.formatVideo'),
                             selected: _adFormat == _AdFormat.video,
                             onTap: () {
                               setState(() {
@@ -890,12 +901,14 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                                 ),
                               )
                             : const Icon(Icons.photo_library_outlined),
-                        label: Text(_uploading ? 'Uploading...' : 'Pick media'),
+                        label: Text(_uploading
+                            ? LanguageController.instance.t('ads.create.uploading')
+                            : LanguageController.instance.t('ads.create.pickMedia')),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Selected: ${_pickedFiles.length} • Uploaded: ${_uploadedMedia.length}',
+                      LanguageController.instance.t('ads.create.mediaCounter', {'picked': _pickedFiles.length, 'uploaded': _uploadedMedia.length}),
                       style: TextStyle(color: textSecondary, fontSize: 12),
                     ),
                     if (_pickedFiles.isNotEmpty) ...[
@@ -961,7 +974,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       ),
                     ],
                     const SizedBox(height: 14),
-                    const _Heading('Ad preview'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionAdPreview')),
                     _AdPreviewCard(
                       campaignName: _campaignNameCtrl.text.trim(),
                       displayName: _previewDisplayName,
@@ -987,17 +1000,17 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _Heading('Targeting & budget'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionTargeting')),
                     const SizedBox(height: 8),
-                    const _Heading('Location'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionLocation')),
                     DropdownButtonFormField<String>(
                       value: _countryOptions.contains(_locationCtrl.text.trim())
                           ? _locationCtrl.text.trim()
                           : null,
                       decoration: _fieldDecoration(context).copyWith(
                         hintText: _countriesLoading
-                            ? 'Loading countries...'
-                            : 'Select location',
+                            ? LanguageController.instance.t('ads.create.loadingCountries')
+                            : LanguageController.instance.t('ads.create.selectLocation'),
                       ),
                       dropdownColor: tokens.panelMuted,
                       style: TextStyle(color: tokens.text),
@@ -1020,17 +1033,17 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Popular countries loaded from global API (same logic as web).',
+                      LanguageController.instance.t('ads.create.locationHint'),
                       style: TextStyle(color: textSecondary, fontSize: 11.5),
                     ),
                     const SizedBox(height: 12),
-                    const _Heading('Interests'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionInterests')),
                     Row(
                       children: [
                         Expanded(
                           child: _Input(
                             controller: _interestCtrl,
-                            hint: 'Add interest',
+                            hint: LanguageController.instance.t('ads.create.addInterestHint'),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1060,7 +1073,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                               vertical: 11,
                             ),
                           ),
-                          child: const Text('Add'),
+                          child: Text(LanguageController.instance.t('ads.create.addBtn')),
                         ),
                       ],
                     ),
@@ -1086,7 +1099,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                           .toList(),
                     ),
                     const SizedBox(height: 12),
-                    const _Heading('Age range'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionAgeRange')),
                     Row(
                       children: [
                         Expanded(
@@ -1130,21 +1143,21 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    const _Heading('Boost package'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionBoostPackage')),
                     Column(
                       children: _boosts
                           .map(
                             (b) => _PackageOptionCard(
                               title: b.title,
                               subtitle: b.id == 'light'
-                                  ? 'Best for first campaign'
+                                  ? LanguageController.instance.t('ads.create.boostSubtitleLight')
                                   : b.id == 'standard'
-                                  ? 'Balanced delivery and cost'
-                                  : 'Max visibility in high competition',
+                                  ? LanguageController.instance.t('ads.create.boostSubtitleStandard')
+                                  : LanguageController.instance.t('ads.create.boostSubtitleStrong'),
                               priceLabel: _formatVnd(b.price),
                               selected: _boostId == b.id,
                               highlight: b.id == 'standard'
-                                  ? 'Most chosen'
+                                  ? LanguageController.instance.t('ads.create.boostHighlight')
                                   : null,
                               onTap: () => setState(() => _boostId = b.id),
                             ),
@@ -1152,7 +1165,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                           .toList(),
                     ),
                     const SizedBox(height: 12),
-                    const _Heading('Duration package'),
+                    _Heading(LanguageController.instance.t('ads.create.sectionDurationPackage')),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -1177,7 +1190,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                         border: Border.all(color: tokens.panelBorder),
                       ),
                       child: Text(
-                        'Total budget: ${_formatVnd(_totalBudget)}',
+                        LanguageController.instance.t('ads.create.totalBudget', {'amount': _formatVnd(_totalBudget)}),
                         style: TextStyle(
                           color: textPrimary,
                           fontWeight: FontWeight.w700,
@@ -1214,9 +1227,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text(
-                          'Pay with Stripe',
-                          style: TextStyle(fontWeight: FontWeight.w700),
+                      : Text(
+                          LanguageController.instance.t('ads.create.payWithStripe'),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                 ),
               ),
@@ -1336,11 +1349,6 @@ class _Input extends StatelessWidget {
       ),
     );
   }
-}
-
-String _capitalize(String value) {
-  if (value.isEmpty) return value;
-  return '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
 String _formatVnd(int value) {
@@ -1635,7 +1643,7 @@ class _DurationOptionChip extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$days days',
+              LanguageController.instance.t('ads.detail.dayCount', {'count': days}),
               style: TextStyle(color: tokens.text, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 2),

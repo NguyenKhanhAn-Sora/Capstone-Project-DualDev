@@ -1493,7 +1493,14 @@
       "payWithStripe": "通过Stripe付款",
       "paymentVerified": "支付验证成功。",
       "paymentNotConfirmed": "付款未确认。请重试。",
-      "errorCheckout": "无法开始结账会话。"
+      "errorCheckout": "无法开始结账会话。",
+      "objectiveAwareness": "品牌认知",
+      "objectiveTraffic": "流量",
+      "objectiveEngagement": "互动",
+      "objectiveLeads": "潜在客户",
+      "objectiveSales": "销售",
+      "objectiveMessages": "消息",
+      "invoiceDurationValue": "{days}天 • {price}"
     },
     "payment": {
       "appBar": "付款状态",

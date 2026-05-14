@@ -1452,7 +1452,14 @@
       "payWithStripe": "Thanh toán qua Stripe",
       "paymentVerified": "Xác minh thanh toán thành công.",
       "paymentNotConfirmed": "Chưa xác nhận thanh toán. Vui lòng thử lại.",
-      "errorCheckout": "Không thể bắt đầu phiên thanh toán."
+      "errorCheckout": "Không thể bắt đầu phiên thanh toán.",
+      "objectiveAwareness": "Nhận diện thương hiệu",
+      "objectiveTraffic": "Lưu lượng truy cập",
+      "objectiveEngagement": "Tương tác",
+      "objectiveLeads": "Thu hút khách hàng tiềm năng",
+      "objectiveSales": "Doanh thu",
+      "objectiveMessages": "Tin nhắn",
+      "invoiceDurationValue": "{days} ngày • {price}"
     },
     "payment": {
       "appBar": "Trạng thái thanh toán",

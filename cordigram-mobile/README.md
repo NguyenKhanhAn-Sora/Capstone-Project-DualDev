@@ -27,7 +27,13 @@ flutter run --dart-define=API_BASE_URL=http://localhost:9999
 flutter run --dart-define=API_BASE_URL=https://api.cordigram.com
 
 5. Build apk cordigram-mobile:
-flutter build apk --release --build-number=2 --build-name=1.0.1
+tăng version trong pubspec.ya,l lên ở dòng thứ 19
+sau đó flutter pub get
+sau đó chạy build: flutter build apk --release --build-number=2 --build-name=1.0.1
+sau đó push lên github
+sau đó tạo release mới trên github với tag là version mới, sau đó đưa file .apk trong build -> app -> ouputs -> flutter-apk vào release rồi lưu lại
+sau đó vào render.com sửa lại .env của backend và deploy lại
+=> vào app tự động update lên bản mới
 
 
 ## Phone Setup Required
