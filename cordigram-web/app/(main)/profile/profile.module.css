@@ -1421,9 +1421,54 @@
 
 .navRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   gap: 8px;
   margin-top: 16px;
+}
+
+.navItemWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navItemAction {
+  position: absolute;
+  top: 50%;
+  right: 25px;
+  transform: translateY(-60%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.navItemAction > * {
+  pointer-events: auto;
+}
+
+.navManageBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  padding: 0;
+}
+
+.navManageBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-title-primary);
+}
+
+:global([data-theme="light"]) .navManageBtn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-title-primary);
 }
 
 .navItem {
@@ -1574,6 +1619,183 @@
     transform: translateY(8px) scale(0.98);
   }
 }
+
+/* ── Manage mode ─────────────────────────────────────────── */
+
+.manageBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+:global([data-theme="light"]) .manageBar {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+
+.manageBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.manageBarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manageBtnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-title-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.manageBtnGhost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-1px);
+}
+
+.manageBtnGhost:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+:global([data-theme="light"]) .manageBtnGhost {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-title-primary);
+}
+
+:global([data-theme="light"]) .manageBtnGhost:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+}
+
+.manageBtnDanger {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+}
+
+.manageBtnDanger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
+}
+
+:global([data-theme="light"]) .manageBtnDanger {
+  background: #fff1f2;
+  border-color: #fca5a5;
+  color: #e11d48;
+}
+
+.manageBtnPin {
+  border-color: rgba(109, 220, 255, 0.35);
+  background: rgba(109, 220, 255, 0.07);
+  color: #6ddcff;
+}
+
+.manageBtnPin:hover:not(:disabled) {
+  background: rgba(109, 220, 255, 0.14) !important;
+  border-color: rgba(109, 220, 255, 0.55) !important;
+}
+
+:global([data-theme="light"]) .manageBtnPin {
+  background: #eff8ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.manageCount {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.tileManageOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  pointer-events: none;
+  transition: background 120ms ease;
+}
+
+.tileSelected .tileManageOverlay {
+  background: rgba(109, 220, 255, 0.18);
+}
+
+.tileCheckWrap {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  background: rgba(10, 15, 28, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.tileSelected .tileCheckWrap {
+  border-color: #6ddcff;
+  background: #6ddcff;
+}
+
+.tileCheckMark {
+  display: none;
+  width: 12px;
+  height: 12px;
+  color: #0a0f1c;
+}
+
+.tileSelected .tileCheckMark {
+  display: block;
+}
+
+.pinnedBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(8, 12, 24, 0.72);
+  color: #6ddcff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+:global([data-theme="light"]) .pinnedBadge {
+  background: rgba(15, 22, 41, 0.7);
+}
+
+
+/* ── End manage mode ──────────────────────────────────────── */
 
 @media (max-width: 640px) {
   .card {

@@ -1,7 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   Post,
   Query,
@@ -150,5 +153,37 @@ export class ReelsController {
     const parsedDuration =
       typeof durationMs === 'string' ? Number(durationMs) : durationMs;
     return this.postsService.view(user.userId, reelId, parsedDuration);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('batch')
+  @HttpCode(200)
+  async batchDelete(
+    @Req() req: Request,
+    @Body('ids') ids: string[] | undefined,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) throw new UnauthorizedException();
+    if (!Array.isArray(ids) || !ids.length)
+      throw new BadRequestException('ids must be a non-empty array');
+    return this.postsService.bulkDeletePosts(user.userId, ids);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/pin')
+  @HttpCode(200)
+  async pinReel(@Req() req: Request, @Param('id') reelId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) throw new UnauthorizedException();
+    return this.postsService.pinPost(user.userId, reelId, 'reel');
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/pin')
+  @HttpCode(200)
+  async unpinReel(@Req() req: Request, @Param('id') reelId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) throw new UnauthorizedException();
+    return this.postsService.unpinPost(user.userId, reelId);
   }
 }

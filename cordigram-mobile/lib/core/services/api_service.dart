@@ -185,6 +185,24 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  // ── DELETE with JSON body, returns decoded Map ──
+  static Future<Map<String, dynamic>> deleteWithBody(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? extraHeaders,
+  }) async {
+    final deviceHeaders = await _deviceHeaders();
+    final response = await _client
+        .delete(
+          _uri(path),
+          headers: {..._baseHeaders, ...deviceHeaders, ...?extraHeaders},
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(const Duration(seconds: 15));
+
+    return _handleResponse(response);
+  }
+
   // ── POST multipart/form-data, returns decoded Map ──
   static Future<Map<String, dynamic>> postMultipart(
     String path, {

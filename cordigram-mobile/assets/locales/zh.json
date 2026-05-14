@@ -1607,5 +1607,25 @@
     "errorCannotSend": "现在无法发送报告。",
     "errorWaitBefore": "请等待后再发送下一条报告。",
     "errorRetry": "现在无法发送报告。请重试。"
+  },
+  "profilePage": {
+    "manage": {
+      "cancel": "取消",
+      "pin": "置顶",
+      "unpin": "取消置顶",
+      "deleteBtn": "删除 ({count})",
+      "selectedCount": "已选 {count}/{total}",
+      "pinnedBadge": "已置顶",
+      "pinLimitError": "最多可置顶{max}条帖子。当前已置顶{current}条，还可置顶{remaining}条。",
+      "pinReelLimitError": "最多可置顶{max}条视频。当前已置顶{current}条，还可置顶{remaining}条。",
+      "pinFailed": "置顶失败，请重试。",
+      "deletePostTitle": "删除所选帖子？",
+      "deleteReelTitle": "删除所选视频？",
+      "deletePostBody": "您将删除{count}条帖子，此操作无法撤销。",
+      "deleteReelBody": "您将删除{count}条视频，此操作无法撤销。",
+      "deleting": "删除中…",
+      "noPostsYet": "暂无帖子。",
+      "noReelsYet": "暂无视频。"
+    }
   }
 }

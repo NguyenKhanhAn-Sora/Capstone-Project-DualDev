@@ -20,6 +20,7 @@ type ProfileContextValue = {
   viewerId?: string;
   tabs?: ProfileTabsState;
   prefetchTab?: (key: ProfileTabKey) => void;
+  setTabBarAction?: (node: ReactNode) => void;
 };
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);

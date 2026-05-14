@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/config/app_theme.dart';
+import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/language_controller.dart';
 import '../post/post_detail_screen.dart';
@@ -245,6 +246,14 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isOwnerProfile = false;
   LivestreamItem? _activeLivestream;
 
+  // ── Manage mode state ─────────────────────────────────────────────────────
+  bool _isManageMode = false;
+  String _manageTabKey = '';
+  final Set<String> _selectedIds = {};
+  bool _manageIsBusy = false;
+  String _managePinError = '';
+  bool _showDeleteConfirm = false;
+
   // ── Tab state ──────────────────────────────────────────────────────────────
   late TabController _tabController;
   static const List<String> _ownerTabKeys = [
@@ -355,7 +364,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _onTabChanged() {
-    if (!_tabController.indexIsChanging) setState(() {});
+    if (!_tabController.indexIsChanging) {
+      if (_isManageMode) _exitManageMode();
+      setState(() {});
+    }
   }
 
   @override
@@ -842,6 +854,418 @@ class _ProfileScreenState extends State<ProfileScreen>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // ── Manage mode helpers ───────────────────────────────────────────────────
+
+  List<Map<String, dynamic>> _sortItems(List<Map<String, dynamic>> items) {
+    final sorted = List<Map<String, dynamic>>.from(items);
+    sorted.sort((a, b) {
+      final aPinned = a['pinnedAt'] as String?;
+      final bPinned = b['pinnedAt'] as String?;
+      if (aPinned != null && bPinned != null) return bPinned.compareTo(aPinned);
+      if (aPinned != null) return -1;
+      if (bPinned != null) return 1;
+      final aCreated = a['createdAt'] as String? ?? '';
+      final bCreated = b['createdAt'] as String? ?? '';
+      return bCreated.compareTo(aCreated);
+    });
+    return sorted;
+  }
+
+  void _enterManageMode(String tabKey, String itemId) {
+    setState(() {
+      _isManageMode = true;
+      _manageTabKey = tabKey;
+      _selectedIds.clear();
+      _selectedIds.add(itemId);
+      _managePinError = '';
+      _showDeleteConfirm = false;
+    });
+  }
+
+  void _exitManageMode() {
+    setState(() {
+      _isManageMode = false;
+      _manageTabKey = '';
+      _selectedIds.clear();
+      _managePinError = '';
+      _showDeleteConfirm = false;
+      _manageIsBusy = false;
+    });
+  }
+
+  void _toggleSelectItem(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+      _managePinError = '';
+    });
+  }
+
+  String _t(String key, [Map<String, String>? vars]) {
+    var s = LanguageController.instance.t(key);
+    vars?.forEach((k, v) => s = s.replaceAll('{$k}', v));
+    return s;
+  }
+
+  Future<void> _handlePinToggle() async {
+    final key = _manageTabKey;
+    final items = _tabItems[key]!;
+    final pinnedIds =
+        items
+            .where((i) => (i['pinnedAt'] as String?) != null)
+            .map((i) => i['id'] as String? ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet();
+
+    final toPin =
+        _selectedIds.where((id) => !pinnedIds.contains(id)).toList();
+    final toUnpin =
+        _selectedIds.where((id) => pinnedIds.contains(id)).toList();
+
+    final newPinnedCount =
+        pinnedIds.length - toUnpin.length + toPin.length;
+    if (newPinnedCount > 3) {
+      final current = pinnedIds.length;
+      final remaining = 3 - (pinnedIds.length - toUnpin.length);
+      final errorKey = key == 'reels'
+          ? 'profilePage.manage.pinReelLimitError'
+          : 'profilePage.manage.pinLimitError';
+      setState(() {
+        _managePinError = _t(errorKey, {
+          'max': '3',
+          'current': current.toString(),
+          'remaining': remaining.clamp(0, 3).toString(),
+        });
+      });
+      return;
+    }
+
+    setState(() {
+      _manageIsBusy = true;
+      _managePinError = '';
+    });
+
+    try {
+      final auth = _authHeader();
+      if (auth == null) return;
+
+      for (final id in toPin) {
+        if (key == 'posts') {
+          await ApiService.post('/posts/$id/pin', extraHeaders: auth);
+        } else {
+          await ApiService.post('/reels/$id/pin', extraHeaders: auth);
+        }
+      }
+      for (final id in toUnpin) {
+        if (key == 'posts') {
+          await ApiService.delete('/posts/$id/pin', extraHeaders: auth);
+        } else {
+          await ApiService.delete('/reels/$id/pin', extraHeaders: auth);
+        }
+      }
+
+      if (!mounted) return;
+      final now = DateTime.now().toIso8601String();
+      setState(() {
+        _tabItems[key] = _sortItems(
+          _tabItems[key]!.map((item) {
+            final id = item['id'] as String? ?? '';
+            if (toPin.contains(id)) return {...item, 'pinnedAt': now};
+            if (toUnpin.contains(id)) {
+              final updated = Map<String, dynamic>.from(item);
+              updated.remove('pinnedAt');
+              return updated;
+            }
+            return item;
+          }).toList(),
+        );
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+        () => _managePinError = _t('profilePage.manage.pinFailed'),
+      );
+    } finally {
+      if (mounted) setState(() => _manageIsBusy = false);
+    }
+  }
+
+  Future<void> _handleBulkDelete() async {
+    final key = _manageTabKey;
+    final ids = _selectedIds.toList();
+
+    setState(() {
+      _manageIsBusy = true;
+      _showDeleteConfirm = false;
+    });
+
+    try {
+      final auth = _authHeader();
+      if (auth == null) return;
+
+      if (key == 'posts') {
+        await ApiService.deleteWithBody(
+          '/posts/batch',
+          body: {'ids': ids},
+          extraHeaders: auth,
+        );
+      } else {
+        await ApiService.deleteWithBody(
+          '/reels/batch',
+          body: {'ids': ids},
+          extraHeaders: auth,
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _tabItems[key] = _tabItems[key]!
+            .where((item) => !ids.contains(item['id'] as String?))
+            .toList();
+      });
+      _exitManageMode();
+    } catch (e) {
+      if (!mounted) return;
+      _showToast(_t('common.tryAgain'));
+      setState(() => _manageIsBusy = false);
+    }
+  }
+
+  Widget _buildManageBar() {
+    final key = _manageTabKey;
+    final items = _tabItems[key]!;
+    final count = _selectedIds.length;
+    final total = items.length;
+    final pinnedIds =
+        items
+            .where((i) => (i['pinnedAt'] as String?) != null)
+            .map((i) => i['id'] as String? ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet();
+
+    final allSelectedPinned =
+        count > 0 && _selectedIds.every((id) => pinnedIds.contains(id));
+    final pinLabel = allSelectedPinned
+        ? _t('profilePage.manage.unpin')
+        : _t('profilePage.manage.pin');
+
+    if (_showDeleteConfirm) {
+      final isReels = key == 'reels';
+      final titleKey = isReels
+          ? 'profilePage.manage.deleteReelTitle'
+          : 'profilePage.manage.deletePostTitle';
+      final bodyKey = isReels
+          ? 'profilePage.manage.deleteReelBody'
+          : 'profilePage.manage.deletePostBody';
+
+      return Container(
+        color: Colors.black.withValues(alpha: 0.6),
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A2333),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(16)),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _t(titleKey),
+                style: const TextStyle(
+                  color: Color(0xFFE8ECF8),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _t(bodyKey, {'count': count.toString()}),
+                style: const TextStyle(
+                  color: Color(0xFF9BAECF),
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _manageIsBusy
+                          ? null
+                          : () =>
+                              setState(() => _showDeleteConfirm = false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF9BAECF),
+                        side: const BorderSide(color: Color(0xFF2E3F5C)),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: Text(_t('profilePage.manage.cancel')),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed:
+                          _manageIsBusy ? null : _handleBulkDelete,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: _manageIsBusy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              _t('profilePage.manage.deleteBtn',
+                                  {'count': count.toString()}),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 28),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_managePinError.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _managePinError,
+                style: const TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          Row(
+            children: [
+              Text(
+                _t('profilePage.manage.selectedCount', {
+                  'count': count.toString(),
+                  'total': total.toString(),
+                }),
+                style: const TextStyle(
+                  color: Color(0xFF9BAECF),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              OutlinedButton(
+                onPressed: _manageIsBusy ? null : _handlePinToggle,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF7BD8FF),
+                  side: const BorderSide(color: Color(0xFF7BD8FF)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  pinLabel,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: count == 0
+                    ? null
+                    : () => setState(() => _showDeleteConfirm = true),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFEF4444),
+                  side: BorderSide(
+                    color: count == 0
+                        ? const Color(0xFF2E3F5C)
+                        : const Color(0xFFEF4444),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  _t('profilePage.manage.deleteBtn',
+                      {'count': count.toString()}),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: _manageIsBusy ? null : _exitManageMode,
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF9BAECF),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  _t('profilePage.manage.cancel'),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openFollowSheet(ProfileDetail p, FollowTab tab) {
     showFollowListSheet(
       context,
@@ -1158,7 +1582,18 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       return Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
-        body: _buildBody(),
+        body: Stack(
+          children: [
+            _buildBody(),
+            if (_isManageMode)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildManageBar(),
+              ),
+          ],
+        ),
       );
     } catch (e) {
       return Scaffold(
@@ -1256,9 +1691,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     final loaded = _tabLoaded[key]!;
     final error = _tabError[key]!;
 
-    const emptyTexts = {
-      'posts': 'No posts yet.',
-      'reels': 'No reels yet.',
+    final emptyTexts = {
+      'posts': _t('profilePage.manage.noPostsYet'),
+      'reels': _t('profilePage.manage.noReelsYet'),
       'saved': 'No saved items yet.',
       'repost': 'No reposts yet.',
     };
@@ -1313,15 +1748,33 @@ class _ProfileScreenState extends State<ProfileScreen>
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 
+    final isManageTab =
+        isOwner && _isManageMode && _manageTabKey == key;
+    final canManage = isOwner && (key == 'posts' || key == 'reels');
+
     // Grid
     return SliverGrid(
       gridDelegate: gridDelegate,
       delegate: SliverChildBuilderDelegate(
-        (context, i) => _GridTile(
-          item: items[i],
-          showRepostBadge: key == 'repost',
-          onTap: () => _navigateToItem(items[i], i),
-        ),
+        (context, i) {
+          final item = items[i];
+          final id = item['id'] as String? ?? '';
+          final isPinned = (item['pinnedAt'] as String?) != null;
+          return _GridTile(
+            item: item,
+            showRepostBadge: key == 'repost',
+            onTap: isManageTab
+                ? () => _toggleSelectItem(id)
+                : () => _navigateToItem(item, i),
+            onLongPress: canManage && !_isManageMode
+                ? () => _enterManageMode(key, id)
+                : null,
+            manageMode: isManageTab,
+            isSelected: isManageTab && _selectedIds.contains(id),
+            isPinned: isPinned,
+            pinnedBadgeLabel: _t('profilePage.manage.pinnedBadge'),
+          );
+        },
         childCount: items.length,
       ),
     );
@@ -2832,11 +3285,21 @@ class _GridTile extends StatefulWidget {
     required this.item,
     required this.onTap,
     this.showRepostBadge = false,
+    this.onLongPress,
+    this.manageMode = false,
+    this.isSelected = false,
+    this.isPinned = false,
+    this.pinnedBadgeLabel = 'Pinned',
   });
 
   final Map<String, dynamic> item;
   final VoidCallback onTap;
   final bool showRepostBadge;
+  final VoidCallback? onLongPress;
+  final bool manageMode;
+  final bool isSelected;
+  final bool isPinned;
+  final String pinnedBadgeLabel;
 
   @override
   State<_GridTile> createState() => _GridTileState();
@@ -2972,6 +3435,7 @@ class _GridTileState extends State<_GridTile> {
 
     return GestureDetector(
       onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -2986,8 +3450,8 @@ class _GridTileState extends State<_GridTile> {
           else
             const ColoredBox(color: Color(0xFF1A2740)),
 
-          // Video play indicator (top-right)
-          if (isVideo)
+          // Video play indicator (top-right) — hidden in manage mode
+          if (isVideo && !widget.manageMode)
             const Positioned(
               top: 6,
               right: 6,
@@ -3006,7 +3470,70 @@ class _GridTileState extends State<_GridTile> {
               child: Icon(Icons.repeat, color: Colors.white70, size: 16),
             ),
 
-          // Views count (bottom-left)
+          // Pinned badge (bottom-left) — shown outside manage mode
+          if (widget.isPinned && !widget.manageMode)
+            Positioned(
+              bottom: 4,
+              left: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 5,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F1F3B).withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.push_pin_rounded,
+                      color: Color(0xFF7BD8FF),
+                      size: 9,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      widget.pinnedBadgeLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF7BD8FF),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Views count (bottom-left) — hidden when pinned badge shows
+          if (views != null && !widget.isPinned && !widget.manageMode)
+            Positioned(
+              bottom: 4,
+              left: 4,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.visibility,
+                    color: Colors.white,
+                    size: 12,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    _formatCount(views),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      shadows: [Shadow(blurRadius: 3, color: Colors.black54)],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Moderation blur overlay
           if (showRevealOverlay)
             Positioned.fill(
               child: Container(
@@ -3060,25 +3587,68 @@ class _GridTileState extends State<_GridTile> {
                 ),
               ),
             ),
-          if (views != null)
+
+          // Manage mode: selection overlay
+          if (widget.manageMode)
+            Positioned.fill(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                color: widget.isSelected
+                    ? const Color(0xFF7BD8FF).withValues(alpha: 0.25)
+                    : Colors.black.withValues(alpha: 0.30),
+              ),
+            ),
+
+          // Manage mode: pinned badge (top-left in manage mode)
+          if (widget.manageMode && widget.isPinned)
             Positioned(
-              bottom: 4,
-              left: 4,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.visibility, color: Colors.white, size: 12),
-                  const SizedBox(width: 2),
-                  Text(
-                    _formatCount(views),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      shadows: [Shadow(blurRadius: 3, color: Colors.black54)],
-                    ),
+              top: 5,
+              left: 5,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F1F3B).withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Icon(
+                  Icons.push_pin_rounded,
+                  color: Color(0xFF7BD8FF),
+                  size: 10,
+                ),
+              ),
+            ),
+
+          // Manage mode: checkmark (top-right)
+          if (widget.manageMode)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.isSelected
+                      ? const Color(0xFF7BD8FF)
+                      : Colors.transparent,
+                  border: Border.all(
+                    color: widget.isSelected
+                        ? const Color(0xFF7BD8FF)
+                        : Colors.white.withValues(alpha: 0.8),
+                    width: 2,
                   ),
-                ],
+                ),
+                child: widget.isSelected
+                    ? const Icon(
+                        Icons.check_rounded,
+                        color: Color(0xFF0F1F3B),
+                        size: 14,
+                      )
+                    : null,
               ),
             ),
         ],

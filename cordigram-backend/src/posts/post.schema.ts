@@ -170,6 +170,9 @@ export class Post extends Document {
   moderationState?: ModerationState;
 
   @Prop({ type: Date, default: null })
+  pinnedAt?: Date | null;
+
+  @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 
   @Prop({ type: Boolean, default: false, index: true })

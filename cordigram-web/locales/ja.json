@@ -1763,5 +1763,28 @@
     "errorUnignore": "無視を解除できませんでした。",
     "ariaShowMemberSince": "参加日の表示を切り替え",
     "ariaSharePresence": "ステータスの共有を切り替え"
+  },
+  "profilePage": {
+    "manage": {
+      "openBtn": "管理",
+      "cancel": "キャンセル",
+      "pin": "ピン留め",
+      "unpin": "ピン解除",
+      "pinOrUnpin": "ピン留め / 解除",
+      "deleteBtn": "削除 ({count})",
+      "selectedCount": "{count}/{total} 件選択中",
+      "pinnedBadge": "ピン",
+      "pinLimitError": "最大{max}件しかピン留めできません。現在{current}件ピン留め中。あと{remaining}件追加できます。",
+      "pinReelLimitError": "最大{max}件のリールしかピン留めできません。現在{current}件ピン留め中。あと{remaining}件追加できます。",
+      "pinFailed": "ピン留めできませんでした。もう一度お試しください。",
+      "deletePostTitle": "選択した投稿を削除しますか？",
+      "deleteReelTitle": "選択したリールを削除しますか？",
+      "deletePostBody": "{count}件の投稿を削除しようとしています。この操作は元に戻せません。",
+      "deleteReelBody": "{count}件のリールを削除しようとしています。この操作は元に戻せません。",
+      "deleting": "削除中…",
+      "noPostsYet": "まだ投稿がありません。",
+      "noReelsYet": "まだリールがありません。"
+    }
+  }
   }
 }

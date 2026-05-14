@@ -1565,5 +1565,25 @@
       "errorLoad": "Failed to load payment status.",
       "errorTimeout": "Verification timeout after 15 minutes. Payment is cancelled on app flow."
     }
+  },
+  "profilePage": {
+    "manage": {
+      "cancel": "Cancel",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "deleteBtn": "Delete ({count})",
+      "selectedCount": "{count}/{total} selected",
+      "pinnedBadge": "Pinned",
+      "pinLimitError": "Can only pin up to {max} posts. {current} already pinned, {remaining} more available.",
+      "pinReelLimitError": "Can only pin up to {max} reels. {current} already pinned, {remaining} more available.",
+      "pinFailed": "Failed to pin. Please try again.",
+      "deletePostTitle": "Delete selected posts?",
+      "deleteReelTitle": "Delete selected reels?",
+      "deletePostBody": "You are deleting {count} post(s). This action cannot be undone.",
+      "deleteReelBody": "You are deleting {count} reel(s). This action cannot be undone.",
+      "deleting": "Deleting…",
+      "noPostsYet": "No posts yet.",
+      "noReelsYet": "No reels yet."
+    }
   }
 }

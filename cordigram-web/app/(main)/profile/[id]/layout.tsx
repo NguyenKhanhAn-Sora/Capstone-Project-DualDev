@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
+import React, {
   ChangeEvent,
   useCallback,
   useEffect,
@@ -219,6 +219,7 @@ export default function ProfileLayout({
   const [profile, setProfile] = useState<ProfileDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [tabBarAction, setTabBarAction] = useState<React.ReactNode>(null);
   const [followLoading, setFollowLoading] = useState(false);
   const [viewerId, setViewerId] = useState<string | undefined>();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1191,7 +1192,7 @@ export default function ProfileLayout({
           ) : error ? (
             <div className={styles.errorBox}>{error}</div>
           ) : profile ? (
-            <ProfileProvider value={{ profile, viewerId, tabs, prefetchTab }}>
+            <ProfileProvider value={{ profile, viewerId, tabs, prefetchTab, setTabBarAction }}>
               <div className={styles.header}>
                 {isOwner ? (
                   <button
@@ -1408,24 +1409,29 @@ export default function ProfileLayout({
               ) : null}
 
               <div className={styles.navRow}>
-                {navItems.map((item) => (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    prefetch
-                    scroll={false}
-                    className={`${styles.navItem} ${
-                      activeKey === item.key ? styles.navItemActive : ""
-                    }`}
-                  >
-                    <span className={styles.navItemContent}>
-                      <span className={styles.navIcon} aria-hidden>
-                        {renderNavIcon(item.key)}
-                      </span>
-                      <span className={styles.navLabel}>{item.label}</span>
-                    </span>
-                  </Link>
-                ))}
+                {navItems.map((item) => {
+                  const isActive = activeKey === item.key;
+                  return (
+                    <div key={item.key} className={styles.navItemWrap}>
+                      <Link
+                        href={item.href}
+                        prefetch
+                        scroll={false}
+                        className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                      >
+                        <span className={styles.navItemContent}>
+                          <span className={styles.navIcon} aria-hidden>
+                            {renderNavIcon(item.key)}
+                          </span>
+                          <span className={styles.navLabel}>{item.label}</span>
+                        </span>
+                      </Link>
+                      {isActive && tabBarAction ? (
+                        <div className={styles.navItemAction}>{tabBarAction}</div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
 
               {children}
