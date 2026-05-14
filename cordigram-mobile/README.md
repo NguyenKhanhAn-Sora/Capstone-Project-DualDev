@@ -26,6 +26,10 @@ C:\Users\admin\AppData\Local\Android\Sdk\platform-tools\adb.exe reverse tcp:9999
 flutter run --dart-define=API_BASE_URL=http://localhost:9999
 flutter run --dart-define=API_BASE_URL=https://api.cordigram.com
 
+5. Build apk cordigram-mobile:
+flutter build apk --release --build-number=2 --build-name=1.0.1
+
+
 ## Phone Setup Required
 
 1. Enable Developer options.
