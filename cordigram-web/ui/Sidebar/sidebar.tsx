@@ -29,6 +29,7 @@ import {
 } from "@/lib/events";
 import { useTheme } from "@/component/theme-provider";
 import { useLanguage, SUPPORTED_LANGUAGE_CODES, type LanguageCode } from "@/component/language-provider";
+import { useNavigationGuard } from "@/context/navigation-guard-context";
 import SearchOverlay from "@/ui/search-overlay/search-overlay";
 import NotificationsOverlay from "@/ui/notifications-overlay/notifications-overlay";
 import { clearStoredAccessToken, getStoredAccessToken, isAccessTokenValid } from "@/lib/auth";
@@ -97,9 +98,28 @@ export default function Sidebar() {
   const { language, setLanguage } = useLanguage();
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement | null>(null);
+  const { getGuard } = useNavigationGuard();
+
+  const handleGuardedNav = useCallback(
+    (href: string, e: React.MouseEvent) => {
+      const guard = getGuard();
+      if (guard) {
+        e.preventDefault();
+        guard(href);
+      }
+    },
+    [getGuard],
+  );
+
   const clearSessionAndGoHome = useCallback(
     (event?: React.MouseEvent<HTMLAnchorElement>) => {
       event?.preventDefault();
+
+      const guard = getGuard();
+      if (guard) {
+        guard("/");
+        return;
+      }
 
       if (typeof window !== "undefined") {
         try {
@@ -115,7 +135,7 @@ export default function Sidebar() {
 
       router.push("/");
     },
-    [router],
+    [router, getGuard],
   );
 
   useEffect(() => {
@@ -534,7 +554,7 @@ export default function Sidebar() {
                 key={key}
                 href={href}
                 className={styles.item}
-                onClick={key === "home" ? clearSessionAndGoHome : undefined}
+                onClick={key === "home" ? clearSessionAndGoHome : (e) => handleGuardedNav(href, e)}
               >
                 <span className={styles.icon}>
                   {hasAvatar ? (

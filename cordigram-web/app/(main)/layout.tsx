@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import GlobalDmIncomingCalls from "@/components/GlobalDmIncomingCalls";
 import { PostUploadProvider } from "@/context/post-upload-context";
 import { GuestAuthProvider } from "@/context/guest-auth-context";
+import { NavigationGuardProvider } from "@/context/navigation-guard-context";
 
 export default function MainLayout({
   children,
@@ -17,6 +18,7 @@ export default function MainLayout({
   const isMessagesPage = pathname?.startsWith("/messages");
 
   return (
+    <NavigationGuardProvider>
     <PostUploadProvider>
       <GuestAuthProvider>
         <GlobalDmIncomingCalls />
@@ -33,5 +35,6 @@ export default function MainLayout({
         )}
       </GuestAuthProvider>
     </PostUploadProvider>
+    </NavigationGuardProvider>
   );
 }

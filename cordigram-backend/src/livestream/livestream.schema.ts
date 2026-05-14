@@ -75,6 +75,9 @@ export class Livestream extends Document {
 
   @Prop({ type: Date, default: null })
   endedAt: Date | null;
+
+  @Prop({ type: Date, default: null, index: true })
+  lastHeartbeatAt: Date | null;
 }
 
 export const LivestreamSchema = SchemaFactory.createForClass(Livestream);

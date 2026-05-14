@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Livestream } from './livestream.schema';
@@ -286,7 +287,25 @@ export class LivestreamService {
       .findOne({ hostUserId: new Types.ObjectId(userId), status: 'live' })
       .exec();
     if (activeByHost) {
-      throw new BadRequestException('You already have an active livestream');
+      // Allow creating if the existing stream is a ghost (heartbeat stopped 90s ago)
+      const staleThreshold = new Date(Date.now() - 90_000);
+      const isGhost =
+        activeByHost.lastHeartbeatAt !== null &&
+        activeByHost.lastHeartbeatAt < staleThreshold;
+      if (!isGhost) {
+        throw new BadRequestException('You already have an active livestream');
+      }
+      // Auto-end the ghost stream before creating a new one
+      this.logger.log(
+        `Auto-ending ghost stream ${activeByHost._id.toString()} before creating new one for host ${userId}`,
+      );
+      activeByHost.status = 'ended';
+      activeByHost.endedAt = new Date();
+      await activeByHost.save();
+      if ((activeByHost.provider ?? 'livekit') === 'ivs') {
+        await this.ivsService.deleteChannelSafe(activeByHost.ivsChannelArn);
+      }
+      await this.livekitService.deleteRoomSafe(activeByHost.roomName);
     }
 
     const activeCount = await this.countLiveRooms();
@@ -606,5 +625,54 @@ export class LivestreamService {
     await this.livekitService.deleteRoomSafe(stream.roomName);
 
     return { ok: true };
+  }
+
+  async heartbeat(streamId: string, userId: string) {
+    const stream = await this.getLiveStreamOrThrow(streamId);
+    if (stream.hostUserId.toString() !== userId) {
+      throw new ForbiddenException('Only the host can send heartbeats');
+    }
+    stream.lastHeartbeatAt = new Date();
+    await stream.save();
+    return { ok: true };
+  }
+
+  // Auto-end livestreams whose host went offline without ending them.
+  // A stream is considered ghost when it has had a heartbeat registered at
+  // least once but no heartbeat has arrived in the past 90 seconds.
+  @Cron(CronExpression.EVERY_MINUTE)
+  async cleanupGhostStreams() {
+    const staleThreshold = new Date(Date.now() - 90_000);
+    const ghosts = await this.livestreamModel
+      .find({
+        status: 'live',
+        lastHeartbeatAt: { $ne: null, $lt: staleThreshold },
+      })
+      .exec();
+
+    if (!ghosts.length) return;
+
+    this.logger.log(`Cleaning up ${ghosts.length} ghost livestream(s)`);
+
+    await Promise.all(
+      ghosts.map(async (stream) => {
+        try {
+          stream.status = 'ended';
+          stream.endedAt = new Date();
+          await stream.save();
+          if ((stream.provider ?? 'livekit') === 'ivs') {
+            await this.ivsService.deleteChannelSafe(stream.ivsChannelArn);
+          }
+          await this.livekitService.deleteRoomSafe(stream.roomName);
+          this.logger.log(
+            `Auto-ended ghost stream ${stream._id.toString()} (host ${stream.hostUserId.toString()})`,
+          );
+        } catch (err) {
+          this.logger.error(
+            `Failed to auto-end ghost stream ${stream._id.toString()}: ${String(err)}`,
+          );
+        }
+      }),
+    );
   }
 }

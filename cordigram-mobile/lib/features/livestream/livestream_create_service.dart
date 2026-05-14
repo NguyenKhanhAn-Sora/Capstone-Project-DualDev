@@ -396,4 +396,17 @@ class LivestreamCreateService {
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
   }
+
+  static Future<void> sendHeartbeat(String streamId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) return;
+    try {
+      await ApiService.post(
+        '/livestreams/${Uri.encodeComponent(streamId)}/heartbeat',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+    } catch (_) {
+      // Heartbeat is fire-and-forget; ignore errors
+    }
+  }
 }
