@@ -1769,5 +1769,28 @@
     "errorUnignore": "Không gỡ được.",
     "ariaShowMemberSince": "Bật tắt ngày tham gia",
     "ariaSharePresence": "Bật tắt trạng thái"
+  },
+  "profilePage": {
+    "manage": {
+      "openBtn": "Quản lý",
+      "cancel": "Huỷ",
+      "pin": "Ghim",
+      "unpin": "Bỏ ghim",
+      "pinOrUnpin": "Ghim / Bỏ ghim",
+      "deleteBtn": "Xoá ({count})",
+      "selectedCount": "Đã chọn {count}/{total}",
+      "pinnedBadge": "Ghim",
+      "pinLimitError": "Chỉ được ghim tối đa {max} bài. Hiện có {current} bài đã ghim, bạn chỉ có thể ghim thêm {remaining} bài nữa.",
+      "pinReelLimitError": "Chỉ được ghim tối đa {max} reel. Hiện có {current} reel đã ghim, bạn chỉ có thể ghim thêm {remaining} reel nữa.",
+      "pinFailed": "Không thể ghim. Vui lòng thử lại.",
+      "deletePostTitle": "Xoá bài đã chọn?",
+      "deleteReelTitle": "Xoá reel đã chọn?",
+      "deletePostBody": "Bạn đang xoá {count} bài viết. Hành động này không thể hoàn tác.",
+      "deleteReelBody": "Bạn đang xoá {count} reel. Hành động này không thể hoàn tác.",
+      "deleting": "Đang xoá…",
+      "noPostsYet": "Chưa có bài viết.",
+      "noReelsYet": "Chưa có reel."
+    }
+  }
   }
 }

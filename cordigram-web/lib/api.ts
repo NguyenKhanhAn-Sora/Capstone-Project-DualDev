@@ -285,6 +285,7 @@ export type CreatePostResponse = {
   repostOfAuthorIsCreatorVerified?: boolean;
   serverId?: string | null;
   channelId?: string | null;
+  pinnedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -495,6 +496,74 @@ export async function deletePost(opts: {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function pinPost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ pinned: boolean }> {
+  return apiFetch<{ pinned: boolean }>({
+    path: `/posts/${opts.postId}/pin`,
+    method: "POST",
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function unpinPost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ pinned: boolean }> {
+  return apiFetch<{ pinned: boolean }>({
+    path: `/posts/${opts.postId}/pin`,
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function bulkDeletePosts(opts: {
+  token: string;
+  ids: string[];
+}): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>({
+    path: "/posts/batch",
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${opts.token}` },
+    body: JSON.stringify({ ids: opts.ids }),
+  });
+}
+
+export async function pinReel(opts: {
+  token: string;
+  reelId: string;
+}): Promise<{ pinned: boolean }> {
+  return apiFetch<{ pinned: boolean }>({
+    path: `/reels/${opts.reelId}/pin`,
+    method: "POST",
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function unpinReel(opts: {
+  token: string;
+  reelId: string;
+}): Promise<{ pinned: boolean }> {
+  return apiFetch<{ pinned: boolean }>({
+    path: `/reels/${opts.reelId}/pin`,
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function bulkDeleteReels(opts: {
+  token: string;
+  ids: string[];
+}): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>({
+    path: "/reels/batch",
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${opts.token}` },
+    body: JSON.stringify({ ids: opts.ids }),
   });
 }
 

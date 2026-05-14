@@ -1573,5 +1573,25 @@
     "errorCannotSend": "Không thể gửi báo cáo lúc này.",
     "errorWaitBefore": "Vui lòng chờ trước khi gửi báo cáo tiếp theo.",
     "errorRetry": "Không thể gửi báo cáo lúc này. Vui lòng thử lại."
+  },
+  "profilePage": {
+    "manage": {
+      "cancel": "Hủy",
+      "pin": "Ghim",
+      "unpin": "Bỏ ghim",
+      "deleteBtn": "Xóa ({count})",
+      "selectedCount": "Đã chọn {count}/{total}",
+      "pinnedBadge": "Đã ghim",
+      "pinLimitError": "Chỉ có thể ghim tối đa {max} bài viết. Đã ghim {current}, còn có thể ghim thêm {remaining}.",
+      "pinReelLimitError": "Chỉ có thể ghim tối đa {max} reel. Đã ghim {current}, còn có thể ghim thêm {remaining}.",
+      "pinFailed": "Ghim thất bại. Vui lòng thử lại.",
+      "deletePostTitle": "Xóa bài viết đã chọn?",
+      "deleteReelTitle": "Xóa reel đã chọn?",
+      "deletePostBody": "Bạn đang xóa {count} bài viết. Hành động này không thể hoàn tác.",
+      "deleteReelBody": "Bạn đang xóa {count} reel. Hành động này không thể hoàn tác.",
+      "deleting": "Đang xóa…",
+      "noPostsYet": "Chưa có bài viết nào.",
+      "noReelsYet": "Chưa có reel nào."
+    }
   }
 }

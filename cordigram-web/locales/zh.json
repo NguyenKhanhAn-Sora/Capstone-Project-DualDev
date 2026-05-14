@@ -1769,5 +1769,28 @@
     "errorUnignore": "无法取消屏蔽。",
     "ariaShowMemberSince": "切换加入日期显示",
     "ariaSharePresence": "切换在线状态共享"
+  },
+  "profilePage": {
+    "manage": {
+      "openBtn": "管理",
+      "cancel": "取消",
+      "pin": "置顶",
+      "unpin": "取消置顶",
+      "pinOrUnpin": "置顶 / 取消",
+      "deleteBtn": "删除 ({count})",
+      "selectedCount": "已选 {count}/{total}",
+      "pinnedBadge": "置顶",
+      "pinLimitError": "最多只能置顶{max}条。当前已置顶{current}条，还可以再置顶{remaining}条。",
+      "pinReelLimitError": "最多只能置顶{max}个视频。当前已置顶{current}个，还可以再置顶{remaining}个。",
+      "pinFailed": "置顶失败，请重试。",
+      "deletePostTitle": "删除所选帖子？",
+      "deleteReelTitle": "删除所选视频？",
+      "deletePostBody": "您正在删除 {count} 条帖子，此操作无法撤销。",
+      "deleteReelBody": "您正在删除 {count} 个视频，此操作无法撤销。",
+      "deleting": "删除中…",
+      "noPostsYet": "暂无帖子。",
+      "noReelsYet": "暂无视频。"
+    }
+  }
   }
 }

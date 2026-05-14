@@ -1572,5 +1572,25 @@
     "errorCannotSend": "今すぐレポートを送信できません。",
     "errorWaitBefore": "次のレポートを送信する前にお待ちください。",
     "errorRetry": "今すぐレポートを送信できません。再試行してください。"
+  },
+  "profilePage": {
+    "manage": {
+      "cancel": "キャンセル",
+      "pin": "固定",
+      "unpin": "固定解除",
+      "deleteBtn": "削除 ({count})",
+      "selectedCount": "{count}/{total} 件選択中",
+      "pinnedBadge": "固定済み",
+      "pinLimitError": "投稿は最大{max}件まで固定できます。現在{current}件固定中、あと{remaining}件固定可能。",
+      "pinReelLimitError": "リールは最大{max}件まで固定できます。現在{current}件固定中、あと{remaining}件固定可能。",
+      "pinFailed": "固定に失敗しました。もう一度お試しください。",
+      "deletePostTitle": "選択した投稿を削除しますか？",
+      "deleteReelTitle": "選択したリールを削除しますか？",
+      "deletePostBody": "{count}件の投稿を削除します。この操作は元に戻せません。",
+      "deleteReelBody": "{count}件のリールを削除します。この操作は元に戻せません。",
+      "deleting": "削除中…",
+      "noPostsYet": "まだ投稿がありません。",
+      "noReelsYet": "まだリールがありません。"
+    }
   }
 }

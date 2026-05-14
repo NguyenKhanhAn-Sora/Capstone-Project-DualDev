@@ -743,6 +743,99 @@ export class PostsService {
     return { deleted: true };
   }
 
+  async pinPost(userId: string, postId: string, kind: PostKind) {
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectId = this.asObjectId(postId, 'postId');
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId kind pinnedAt')
+      .lean();
+
+    if (!post) throw new NotFoundException('Post not found');
+    if (!post.authorId.equals(userObjectId))
+      throw new ForbiddenException('Only the author can pin this post');
+    if (post.kind !== kind)
+      throw new BadRequestException('Post kind mismatch');
+
+    const pinnedCount = await this.postModel.countDocuments({
+      authorId: userObjectId,
+      kind,
+      pinnedAt: { $ne: null },
+      deletedAt: null,
+    });
+
+    if (pinnedCount >= 3)
+      throw new BadRequestException(`Cannot pin more than 3 ${kind}s at once`);
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: { pinnedAt: new Date() } })
+      .exec();
+
+    return { pinned: true };
+  }
+
+  async unpinPost(userId: string, postId: string) {
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectId = this.asObjectId(postId, 'postId');
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId')
+      .lean();
+
+    if (!post) throw new NotFoundException('Post not found');
+    if (!post.authorId.equals(userObjectId))
+      throw new ForbiddenException('Only the author can unpin this post');
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $unset: { pinnedAt: '' } })
+      .exec();
+
+    return { pinned: false };
+  }
+
+  async bulkDeletePosts(userId: string, ids: string[]) {
+    if (!ids.length) return { deleted: 0 };
+
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectIds = ids
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    if (!postObjectIds.length) return { deleted: 0 };
+
+    const posts = await this.postModel
+      .find({
+        _id: { $in: postObjectIds },
+        authorId: userObjectId,
+        deletedAt: null,
+      })
+      .select('hashtags')
+      .lean();
+
+    const validIds = posts.map((p) => p._id);
+    if (!validIds.length) return { deleted: 0 };
+
+    const result = await this.postModel
+      .updateMany(
+        { _id: { $in: validIds }, deletedAt: null },
+        { $set: { deletedAt: new Date() } },
+      )
+      .exec();
+
+    await this.postInteractionModel
+      .deleteMany({ postId: { $in: validIds } })
+      .exec();
+
+    const allHashtags = posts.flatMap((p) => p.hashtags ?? []);
+    if (allHashtags.length) {
+      await this.decrementHashtags(allHashtags);
+    }
+
+    return { deleted: result.modifiedCount };
+  }
+
   private normalizeHashtags(tags: string[]): string[] {
     return Array.from(
       new Set(
@@ -959,6 +1052,7 @@ export class PostsService {
       repostSourceMedia: repostSourcePost?.media ?? null,
       repostSourceKind: repostSourcePost?.kind ?? null,
       primaryVideoDurationMs: doc.primaryVideoDurationMs ?? null,
+      pinnedAt: doc.pinnedAt ?? null,
       flags: {
         liked: userFlags?.liked ?? false,
         saved: userFlags?.saved ?? false,
@@ -3412,7 +3506,7 @@ export class PostsService {
         deletedAt: null,
         publishedAt: { $ne: null },
       })
-      .sort({ createdAt: -1 })
+      .sort({ pinnedAt: -1, createdAt: -1 })
       .limit(limit)
       .lean();
 
@@ -3473,7 +3567,7 @@ export class PostsService {
         deletedAt: null,
         publishedAt: { $ne: null },
       })
-      .sort({ createdAt: -1 })
+      .sort({ pinnedAt: -1, createdAt: -1 })
       .limit(limit)
       .lean();
 

@@ -111,6 +111,20 @@ export class PostsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Delete('batch')
+  @HttpCode(200)
+  async batchDelete(
+    @Req() req: Request,
+    @Body('ids') ids: string[] | undefined,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) throw new UnauthorizedException();
+    if (!Array.isArray(ids) || !ids.length)
+      throw new BadRequestException('ids must be a non-empty array');
+    return this.postsService.bulkDeletePosts(user.userId, ids);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async remove(@Req() req: Request, @Param('id') postId: string) {
     const user = req.user as AuthenticatedUser | undefined;
@@ -118,6 +132,24 @@ export class PostsController {
       throw new UnauthorizedException();
     }
     return this.postsService.delete(user.userId, postId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/pin')
+  @HttpCode(200)
+  async pinPost(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) throw new UnauthorizedException();
+    return this.postsService.pinPost(user.userId, postId, 'post');
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/pin')
+  @HttpCode(200)
+  async unpinPost(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) throw new UnauthorizedException();
+    return this.postsService.unpinPost(user.userId, postId);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
