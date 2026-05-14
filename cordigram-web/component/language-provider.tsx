@@ -48,10 +48,10 @@ const STORAGE_KEY_LANGUAGE = "cordigram-language";
 type Dict = Record<string, unknown>;
 
 const DICTS: Record<LanguageCode, Dict> = {
-  vi: vi as Dict,
-  en: en as Dict,
-  ja: ja as Dict,
-  zh: zh as Dict,
+  vi: vi as unknown as Dict,
+  en: en as unknown as Dict,
+  ja: ja as unknown as Dict,
+  zh: zh as unknown as Dict,
 };
 
 function getByPath(obj: Dict, path: string): unknown {
