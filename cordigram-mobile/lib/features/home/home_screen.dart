@@ -43,6 +43,7 @@ import 'widgets/people_you_may_know.dart';
 import 'widgets/upload_progress_banner.dart';
 import '../../core/services/language_controller.dart';
 import '../../core/services/post_upload_controller.dart';
+import '../../core/services/app_update_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -140,6 +141,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _startNotificationRealtime();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_consumePendingDmCallFromPush());
+      unawaited(AppUpdateService.checkForUpdate(context));
     });
   }
 

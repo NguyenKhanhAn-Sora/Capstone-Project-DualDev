@@ -64,6 +64,8 @@ dependencies:
   audioplayers: ^6.6.0
   diacritic: ^0.1.6
   quick_actions: ^1.0.8
+  package_info_plus: ^8.0.0
+  open_file: ^3.3.2
 
 dev_dependencies:
   flutter_test:
