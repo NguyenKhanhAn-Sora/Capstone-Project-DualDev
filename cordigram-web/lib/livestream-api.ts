@@ -177,6 +177,17 @@ export function endLivestreamBeacon(streamId: string): void {
   }).catch(() => undefined);
 }
 
+export function sendLivestreamHeartbeat(streamId: string): void {
+  const token = getToken();
+  fetch(`${API_BASE}/livestreams/${streamId}/heartbeat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  }).catch(() => undefined);
+}
+
 export async function muteUserInLivestream(payload: {
   userId: string;
   durationMinutes: 5 | 10 | 15 | 30 | 60 | 1440;

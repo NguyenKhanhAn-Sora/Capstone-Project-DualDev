@@ -21,6 +21,7 @@ import {
   joinLivestreamToken,
   listLiveLivestreams,
   muteUserInLivestream,
+  sendLivestreamHeartbeat,
   type LivestreamLatencyMode,
   type LivestreamItem,
   updateLivestream,
@@ -40,6 +41,7 @@ import {
   getPendingScreenShareStream,
 } from "@/lib/livestream-screen-share-cache";
 import hubStyles from "./livestream-hub.module.css";
+import { useNavigationGuard } from "@/context/navigation-guard-context";
 
 type LiveComment = {
   id: string;
@@ -2831,7 +2833,10 @@ export default function LivestreamHub({
   const [commentPausedUntil, setCommentPausedUntil] = useState<string | null>(null);
   const lastTransportResetAtRef = useRef(0);
   const wasViewerConnectedRef = useRef(false);
+  const origPushStateRef = useRef<typeof window.history.pushState | null>(null);
+  const [pendingNavDest, setPendingNavDest] = useState<string | null>(null);
   const isHostSession = forceHost || role === "host";
+  const { registerGuard, unregisterGuard } = useNavigationGuard();
 
   const loadHostProfileByUserId = useCallback(
     async (hostUserId: string, fallbackName: string) => {
@@ -2884,6 +2889,45 @@ export default function LivestreamHub({
       endStream();
     };
   }, [isHostSession, activeStreamMeta?.id]);
+
+  // Send heartbeats every 30s so the backend can detect abrupt disconnections
+  useEffect(() => {
+    if (!isHostSession || !activeStreamMeta?.id) return;
+    const streamId = activeStreamMeta.id;
+    sendLivestreamHeartbeat(streamId);
+    const interval = window.setInterval(() => sendLivestreamHeartbeat(streamId), 30_000);
+    return () => window.clearInterval(interval);
+  }, [isHostSession, activeStreamMeta?.id]);
+
+  // Intercept all navigation attempts while host is live (back button + sidebar links)
+  useEffect(() => {
+    if (!isHostSession || !activeStreamMeta?.id) return;
+
+    // Register with context so Sidebar can intercept link clicks before navigation
+    registerGuard((dest: string) => {
+      setPendingNavDest(dest);
+      setEndOverlayOpen(true);
+      setEndOverlayClosing(false);
+    });
+
+    // Also trap browser back/forward button via history manipulation
+    const orig = window.history.pushState.bind(window.history);
+    origPushStateRef.current = orig;
+    orig(null, '', window.location.href);
+    const handlePopState = () => {
+      orig(null, '', window.location.href);
+      setPendingNavDest(null);
+      setEndOverlayOpen(true);
+      setEndOverlayClosing(false);
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      unregisterGuard();
+      origPushStateRef.current = null;
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isHostSession, activeStreamMeta?.id, registerGuard, unregisterGuard]);
 
   // Track viewer connection and show modal only when viewer was connected and then disconnected
   useEffect(() => {
@@ -3181,6 +3225,7 @@ export default function LivestreamHub({
   );
 
   const closeEndOverlay = useCallback(() => {
+    setPendingNavDest(null);
     setEndOverlayClosing(true);
     window.setTimeout(() => {
       setEndOverlayOpen(false);
@@ -3195,13 +3240,15 @@ export default function LivestreamHub({
       setEndingLive(true);
       setError("");
       await endLivestream(activeStreamMeta.id);
-      router.push("/create");
+      unregisterGuard();
+      origPushStateRef.current = null;
+      router.push(pendingNavDest ?? "/create");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to end livestream.");
     } finally {
       setEndingLive(false);
     }
-  }, [activeStreamMeta?.id, router]);
+  }, [activeStreamMeta?.id, pendingNavDest, router, unregisterGuard]);
 
   return (
     <section className={hubStyles.wrap}>

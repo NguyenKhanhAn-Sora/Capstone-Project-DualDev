@@ -46,6 +46,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
   EventsListener<RoomEvent>? _roomListener;
   Timer? _listTimer;
   Timer? _streamRefreshTimer;
+  Timer? _heartbeatTimer;
 
   VideoTrack? _stageTrack;
   LocalVideoTrack? _localPublishedVideoTrack;
@@ -122,6 +123,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     _commentScrollCtrl.dispose();
     _listTimer?.cancel();
     _streamRefreshTimer?.cancel();
+    _heartbeatTimer?.cancel();
     _pauseTimer?.cancel();
     unawaited(_disposeRoom());
     super.dispose();
@@ -313,6 +315,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
 
         if (_isHostSession) {
           await _startHostMediaIfNeeded();
+          _startHeartbeatTimer(join.stream.id);
         } else {
           await _requestCommentHistory();
         }
@@ -363,9 +366,19 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     room.addListener(_pickStageTrack);
   }
 
+  void _startHeartbeatTimer(String streamId) {
+    _heartbeatTimer?.cancel();
+    unawaited(LivestreamCreateService.sendHeartbeat(streamId));
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      unawaited(LivestreamCreateService.sendHeartbeat(streamId));
+    });
+  }
+
   Future<void> _disposeRoom() async {
     _streamRefreshTimer?.cancel();
     _streamRefreshTimer = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
 
     final room = _room;
     final listener = _roomListener;
@@ -1370,6 +1383,10 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
   }
 
   Future<void> _leaveStream() async {
+    if (_isHostSession) {
+      await _confirmEndLivestream();
+      return;
+    }
     _leftVoluntarily = true;
     if (_hostDirectMode) {
       await _disposeRoom();
@@ -1686,6 +1703,62 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                       ],
                     ),
                   ),
+                  if (!_isHostSession) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ProfileScreen(userId: stream.hostUserId),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircleAvatar(
+                              radius: 12,
+                              backgroundColor: Colors.white24,
+                              backgroundImage:
+                                  (stream.hostAvatarUrl?.isNotEmpty == true)
+                                      ? NetworkImage(stream.hostAvatarUrl!)
+                                      : null,
+                              child: (stream.hostAvatarUrl?.isNotEmpty != true)
+                                  ? Text(
+                                      _avatarInitial(stream.hostName),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '@${stream.hostUsername ?? stream.hostName}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   if (_isHostSession)
                     Container(
@@ -2000,20 +2073,31 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 13,
-                      backgroundColor: Colors.white24,
-                      backgroundImage: showAvatar ? NetworkImage(avatarUrl) : null,
-                      child: showAvatar
-                          ? null
-                          : Text(
-                              _avatarInitial(item.author),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11,
+                    GestureDetector(
+                      onTap: item.authorId != null
+                          ? () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      ProfileScreen(userId: item.authorId!),
+                                ),
+                              )
+                          : null,
+                      child: CircleAvatar(
+                        radius: 13,
+                        backgroundColor: Colors.white24,
+                        backgroundImage:
+                            showAvatar ? NetworkImage(avatarUrl) : null,
+                        child: showAvatar
+                            ? null
+                            : Text(
+                                _avatarInitial(item.author),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                ),
                               ),
-                            ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(

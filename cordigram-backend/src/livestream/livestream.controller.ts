@@ -92,4 +92,12 @@ export class LivestreamController {
   ) {
     return this.livestreamService.end(streamId, user.userId);
   }
+
+  @Post(':id/heartbeat')
+  async heartbeat(
+    @Param('id') streamId: string,
+    @CurrentUser() user: { userId: string },
+  ) {
+    return this.livestreamService.heartbeat(streamId, user.userId);
+  }
 }
