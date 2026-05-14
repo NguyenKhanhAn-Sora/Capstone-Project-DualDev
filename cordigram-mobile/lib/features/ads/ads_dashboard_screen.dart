@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 import 'ads_campaigns_screen.dart';
 import 'ads_campaign_detail_screen.dart';
 import 'ads_create_screen.dart';
@@ -55,7 +56,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load ads dashboard.';
+        _error = LanguageController.instance.t('ads.dashboard.errorLoad');
         _loading = false;
       });
     }
@@ -197,7 +198,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: scheme.onSurface),
-        title: Text('Ads Dashboard', style: TextStyle(color: scheme.onSurface)),
+        title: Text(LanguageController.instance.t('ads.dashboard.appBar'), style: TextStyle(color: scheme.onSurface)),
         actions: [
           IconButton(
             onPressed: _loading ? null : _loadDashboard,
@@ -211,9 +212,9 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
               backgroundColor: accent,
               foregroundColor: scheme.onPrimary,
               icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'Create new ad',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              label: Text(
+                LanguageController.instance.t('ads.dashboard.createNew'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             )
           : null,
@@ -260,7 +261,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                   ),
                                   SizedBox(width: 10),
                                   Text(
-                                    'No ads yet',
+                                    LanguageController.instance.t('ads.dashboard.emptyTitle'),
                                     style: TextStyle(
                                       color: textPrimary,
                                       fontSize: 22,
@@ -338,7 +339,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '7-day impressions trend',
+                                LanguageController.instance.t('ads.dashboard.chartTitle'),
                                 style: TextStyle(
                                   color: textPrimary,
                                   fontSize: 16,
@@ -347,7 +348,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Track ad delivery and CTA clicks over the last 7 days.',
+                                LanguageController.instance.t('ads.dashboard.chartSubtitle'),
                                 style: TextStyle(
                                   color: textSecondary,
                                   fontSize: 12.5,
@@ -418,7 +419,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Active campaigns',
+                                LanguageController.instance.t('ads.dashboard.activeCampaigns'),
                                 style: TextStyle(
                                   color: textPrimary,
                                   fontSize: 16,
@@ -455,8 +456,8 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                       tapTargetSize:
                                           MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                    child: const Text(
-                                      'View all',
+                                    child: Text(
+                                      LanguageController.instance.t('ads.dashboard.viewAll'),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -467,7 +468,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                               const SizedBox(height: 12),
                               if (activePreview.isEmpty)
                                 Text(
-                                  'No active campaigns right now.',
+                                  LanguageController.instance.t('ads.dashboard.noActiveCampaigns'),
                                   style: TextStyle(color: textSecondary),
                                 )
                               else
@@ -550,7 +551,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                                 children: [
                                                   Expanded(
                                                     child: _StatSmall(
-                                                      label: 'Spent (VND)',
+                                                      label: LanguageController.instance.t('ads.metrics.spentVnd'),
                                                       value: _intFmt(
                                                         item.spent,
                                                       ),
@@ -558,7 +559,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                                   ),
                                                   Expanded(
                                                     child: _StatSmall(
-                                                      label: 'Impr.',
+                                                      label: LanguageController.instance.t('ads.metrics.impr'),
                                                       value: _intFmt(
                                                         item.impressions,
                                                       ),
@@ -566,13 +567,13 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                                   ),
                                                   Expanded(
                                                     child: _StatSmall(
-                                                      label: 'CTR',
+                                                      label: LanguageController.instance.t('ads.metrics.ctr'),
                                                       value: _pct(item.ctr),
                                                     ),
                                                   ),
                                                   Expanded(
                                                     child: _StatSmall(
-                                                      label: 'Clicks',
+                                                      label: LanguageController.instance.t('ads.metrics.clicksLabel'),
                                                       value: _intFmt(
                                                         item.clicks,
                                                       ),
@@ -624,24 +625,24 @@ class _MetricGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       children: [
         _MetricCard(
-          label: 'Total budget',
+          label: LanguageController.instance.t('ads.metrics.totalBudget'),
           value: money(summary.totalBudget),
-          hint: 'Spent: ${money(summary.totalSpent)}',
+          hint: LanguageController.instance.t('ads.metrics.spent', {'value': money(summary.totalSpent)}),
         ),
         _MetricCard(
-          label: 'Impressions',
+          label: LanguageController.instance.t('ads.metrics.impressions'),
           value: intFmt(summary.impressions),
-          hint: 'Reach: ${intFmt(summary.reach)}',
+          hint: LanguageController.instance.t('ads.metrics.reach', {'value': intFmt(summary.reach)}),
         ),
         _MetricCard(
-          label: 'Average CTR',
+          label: LanguageController.instance.t('ads.metrics.averageCtr'),
           value: pct(summary.ctr),
-          hint: 'Clicks: ${intFmt(summary.clicks)}',
+          hint: LanguageController.instance.t('ads.metrics.clicks', {'value': intFmt(summary.clicks)}),
         ),
         _MetricCard(
-          label: 'Active campaigns',
+          label: LanguageController.instance.t('ads.metrics.activeCampaigns'),
           value: summary.activeCount.toString(),
-          hint: 'Live campaigns currently running',
+          hint: LanguageController.instance.t('ads.metrics.liveCampaigns'),
         ),
       ],
     );

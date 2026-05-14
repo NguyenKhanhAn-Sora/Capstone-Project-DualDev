@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 import 'ads_service.dart';
 
 AppSemanticColors _appTokens(BuildContext context) {
@@ -131,7 +132,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
         setState(() {
           _status = result;
           _uiState = _PaymentUiState.failed;
-          _error = 'Payment session expired. Please create a new checkout.';
+          _error = LanguageController.instance.t('ads.payment.errorExpired');
         });
         return;
       }
@@ -149,7 +150,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load payment status.';
+        _error = LanguageController.instance.t('ads.payment.errorLoad');
       });
     }
   }
@@ -161,8 +162,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
     setState(() {
       _remainingSeconds = 0;
       _uiState = _PaymentUiState.timedOut;
-      _error =
-          'Verification timeout after 15 minutes. Payment is cancelled on app flow.';
+      _error = LanguageController.instance.t('ads.payment.errorTimeout');
     });
 
     if (_returnScheduled) return;
@@ -197,7 +197,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: scheme.onSurface),
         title: Text(
-          'Payment status',
+          LanguageController.instance.t('ads.payment.appBar'),
           style: TextStyle(color: scheme.onSurface),
         ),
       ),
@@ -234,12 +234,12 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                     const SizedBox(width: 10),
                     Text(
                       _uiState == _PaymentUiState.success
-                          ? 'Payment successful'
+                          ? LanguageController.instance.t('ads.payment.titleSuccess')
                           : _uiState == _PaymentUiState.failed
-                          ? 'Payment failed'
+                          ? LanguageController.instance.t('ads.payment.titleFailed')
                           : _uiState == _PaymentUiState.timedOut
-                          ? 'Verification timed out'
-                          : 'Checkout returned',
+                          ? LanguageController.instance.t('ads.payment.titleTimedOut')
+                          : LanguageController.instance.t('ads.payment.titleVerifying'),
                       style: TextStyle(
                         color: textPrimary,
                         fontSize: 18,
@@ -251,10 +251,10 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _uiState == _PaymentUiState.success
-                      ? 'Your Stripe payment has been confirmed.'
+                      ? LanguageController.instance.t('ads.payment.subtitleSuccess')
                       : _uiState == _PaymentUiState.timedOut
-                      ? 'No success signal was detected within 15 minutes. Returning to Ads...'
-                      : 'We are verifying your Stripe payment. This can take a few seconds.',
+                      ? LanguageController.instance.t('ads.payment.subtitleTimedOut')
+                      : LanguageController.instance.t('ads.payment.subtitleVerifying'),
                   style: TextStyle(color: textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 16),
@@ -272,7 +272,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Text(
-                      'Auto-cancel in: ${_formatRemaining(_remainingSeconds)}',
+                      LanguageController.instance.t('ads.payment.autoCancel', {'time': _formatRemaining(_remainingSeconds)}),
                       style: const TextStyle(
                         color: Color(0xFFF4B35E),
                         fontSize: 13,
@@ -283,13 +283,13 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                 if (_error != null)
                   Text(_error!, style: TextStyle(color: scheme.error)),
                 if (_status != null) ...[
-                  _DetailRow(label: 'Session ID', value: _status!.id),
+                  _DetailRow(label: LanguageController.instance.t('ads.payment.labelSessionId'), value: _status!.id),
                   _DetailRow(
-                    label: 'Payment status',
+                    label: LanguageController.instance.t('ads.payment.labelPaymentStatus'),
                     value: _status!.paymentStatus ?? 'unknown',
                   ),
                   _DetailRow(
-                    label: 'Amount',
+                    label: LanguageController.instance.t('ads.payment.labelAmount'),
                     value:
                         '${(_status!.amountTotal ?? 0).toString()} ${(_status!.currency ?? '').toUpperCase()}',
                   ),
@@ -313,10 +313,10 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                     ),
                     child: Text(
                       _uiState == _PaymentUiState.verifying
-                          ? 'Refresh status'
+                          ? LanguageController.instance.t('ads.payment.btnRefresh')
                           : _uiState == _PaymentUiState.success
-                          ? 'Back to Ads Dashboard'
-                          : 'Back to Ads',
+                          ? LanguageController.instance.t('ads.payment.btnBackDashboard')
+                          : LanguageController.instance.t('ads.payment.btnBackAds'),
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),

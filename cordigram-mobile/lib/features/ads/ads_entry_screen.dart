@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 import 'ads_create_screen.dart';
 import 'ads_dashboard_screen.dart';
 import 'ads_service.dart';
@@ -54,7 +55,7 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Unable to load ads data.';
+        _error = LanguageController.instance.t('ads.entry.errorLoad');
         _loading = false;
       });
     }
@@ -87,7 +88,7 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: scheme.onSurface),
-        title: Text('Ads', style: TextStyle(color: scheme.onSurface)),
+        title: Text(LanguageController.instance.t('ads.entry.appBar'), style: TextStyle(color: scheme.onSurface)),
       ),
       body: SafeArea(
         child: _loading
@@ -122,7 +123,7 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        _hasCreatedAds ? 'Create another ad' : 'No ads yet',
+                        _hasCreatedAds ? LanguageController.instance.t('ads.entry.titleHasAds') : LanguageController.instance.t('ads.entry.titleNoAds'),
                         style: TextStyle(
                           color: textPrimary,
                           fontSize: 22,
@@ -132,8 +133,8 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _hasCreatedAds
-                            ? 'Build a new campaign with your objective, media, audience, and Stripe payment.'
-                            : 'Start your first ad campaign. Choose objective, budget package, upload creative, then pay securely with Stripe.',
+                            ? LanguageController.instance.t('ads.entry.subtitleHasAds')
+                            : LanguageController.instance.t('ads.entry.subtitleNoAds'),
                         style: TextStyle(
                           color: textSecondary,
                           fontSize: 14,
@@ -147,17 +148,15 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                       const SizedBox(height: 18),
                       _ChecklistTile(
                         icon: Icons.track_changes_outlined,
-                        text:
-                            'Goal: awareness, traffic, engagement, leads, sales, or messages',
+                        text: LanguageController.instance.t('ads.entry.checklistGoal'),
                       ),
                       _ChecklistTile(
                         icon: Icons.payments_outlined,
-                        text: 'Budget package + duration package pricing',
+                        text: LanguageController.instance.t('ads.entry.checklistBudget'),
                       ),
                       _ChecklistTile(
                         icon: Icons.auto_awesome_outlined,
-                        text:
-                            'Creative media with headline, description, and CTA',
+                        text: LanguageController.instance.t('ads.entry.checklistCreative'),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
@@ -174,8 +173,8 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                           ),
                           child: Text(
                             _hasCreatedAds
-                                ? 'Create new ad'
-                                : 'Create your first ad',
+                                ? LanguageController.instance.t('ads.entry.btnCreate')
+                                : LanguageController.instance.t('ads.entry.btnCreateFirst'),
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 import 'ads_payment_status_screen.dart';
 import 'ads_service.dart';
 
@@ -126,12 +127,6 @@ class _DurationPackage {
 }
 
 class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
-  static const Map<String, String> _boostLabel = {
-    'light': 'Light Boost',
-    'standard': 'Standard Boost',
-    'strong': 'Strong Boost',
-  };
-
   static const List<_BoostPackage> _boostPackages = [
     _BoostPackage(
       id: 'light',
@@ -232,7 +227,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load campaign details.';
+        _error = LanguageController.instance.t('ads.detail.errorLoad');
         _loading = false;
       });
     }
@@ -253,25 +248,27 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
   String _pct(double value) => '${value.toStringAsFixed(2)}%';
 
   String _statusLabel(String status) {
+    final lc = LanguageController.instance;
     switch (status) {
       case 'active':
-        return 'Active';
+        return lc.t('ads.status.active');
       case 'hidden':
-        return 'Hidden';
+        return lc.t('ads.status.hidden');
       case 'paused':
-        return 'Paused';
+        return lc.t('ads.status.paused');
       case 'canceled':
-        return 'Canceled';
+        return lc.t('ads.status.canceled');
       default:
-        return 'Completed';
+        return lc.t('ads.status.completed');
     }
   }
 
   String _hiddenReasonLabel(String? reason) {
-    if (reason == null || reason.isEmpty) return 'Visible';
-    if (reason == 'paused') return 'Hidden manually';
-    if (reason == 'canceled') return 'Canceled manually';
-    if (reason == 'expired') return 'Expired';
+    final lc = LanguageController.instance;
+    if (reason == null || reason.isEmpty) return lc.t('ads.detail.hiddenReasonVisible');
+    if (reason == 'paused') return lc.t('ads.detail.hiddenReasonHidden');
+    if (reason == 'canceled') return lc.t('ads.detail.hiddenReasonCanceled');
+    if (reason == 'expired') return lc.t('ads.detail.hiddenReasonExpired');
     return reason;
   }
 
@@ -424,7 +421,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     if (uniqueViews > _mediaEditLockUniqueViews) {
       setState(() {
         _editError =
-            'Media cannot be edited after unique views exceed $_mediaEditLockUniqueViews.';
+            LanguageController.instance.t('ads.detail.errorMediaLocked', {'n': _mediaEditLockUniqueViews});
       });
       return;
     }
@@ -455,7 +452,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
       final remaining = math.max(maxMedia - draft.mediaUrls.length, 0);
       if (remaining <= 0) {
         setState(() {
-          _editError = 'Media limit reached for current ad format.';
+          _editError = LanguageController.instance.t('ads.detail.errorMediaLimit');
         });
         return;
       }
@@ -487,7 +484,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
       });
     } catch (_) {
       setState(() {
-        _editError = 'Failed to upload media.';
+        _editError = LanguageController.instance.t('ads.detail.errorUploadMedia');
       });
     } finally {
       if (mounted) {
@@ -507,7 +504,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     if (uniqueViews > _mediaEditLockUniqueViews) {
       setState(() {
         _editError =
-            'Media cannot be edited after unique views exceed $_mediaEditLockUniqueViews.';
+            LanguageController.instance.t('ads.detail.errorMediaLocked', {'n': _mediaEditLockUniqueViews});
       });
       return;
     }
@@ -561,7 +558,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
       setState(() {
         _detail = updated;
         _editOpen = false;
-        _success = 'Campaign details updated successfully.';
+        _success = LanguageController.instance.t('ads.detail.successUpdate');
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -571,7 +568,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _editError = 'Failed to save campaign details.';
+        _editError = LanguageController.instance.t('ads.detail.errorSaveDetails');
       });
     } finally {
       if (mounted) {
@@ -619,7 +616,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     final upgradeTotalCost = boostUpgradeDelta + durationUpgradeCost;
     if (upgradeTotalCost <= 0) {
       setState(() {
-        _upgradeError = 'Please select an upgrade package before checkout.';
+        _upgradeError = LanguageController.instance.t('ads.detail.errorUpgradeSelect');
       });
       return;
     }
@@ -645,7 +642,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
       final checkoutUrl = (session.url ?? '').trim();
       if (checkoutUrl.isEmpty || session.id.trim().isEmpty) {
         setState(() {
-          _upgradeError = 'Unable to create Stripe checkout session.';
+          _upgradeError = LanguageController.instance.t('ads.detail.errorUpgradeCheckout');
         });
         return;
       }
@@ -669,7 +666,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
       if (!mounted) return;
       if (paid == true) {
         setState(() {
-          _success = 'Upgrade payment completed. Campaign details refreshed.';
+          _success = LanguageController.instance.t('ads.detail.successUpgradePayment');
         });
         await _load();
       }
@@ -681,7 +678,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _upgradeError = 'Failed to start checkout session.';
+        _upgradeError = LanguageController.instance.t('ads.detail.errorStartCheckout');
       });
     } finally {
       if (mounted) {
@@ -699,10 +696,8 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     if (action == 'resume_campaign' &&
         detail.actions.requiresExtendBeforeResume) {
       setState(() {
-        _error =
-            'This campaign has expired. Please purchase an extension package before reopening.';
-        _upgradeError =
-            'Select an extension package, complete payment, then reopen the campaign.';
+        _error = LanguageController.instance.t('ads.detail.expiredError');
+        _upgradeError = LanguageController.instance.t('ads.detail.expiredUpgradeError');
         _success = null;
       });
       return;
@@ -723,8 +718,8 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
       setState(() {
         _detail = updated;
         _success = action == 'pause_campaign'
-            ? 'Campaign has been hidden successfully.'
-            : 'Campaign has been reopened successfully.';
+            ? LanguageController.instance.t('ads.detail.successHide')
+            : LanguageController.instance.t('ads.detail.successReopen');
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -735,14 +730,13 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
               r'expired|extend',
               caseSensitive: false,
             ).hasMatch(e.message)) {
-          _upgradeError =
-              'Please extend campaign days first, then reopen the campaign.';
+          _upgradeError = LanguageController.instance.t('ads.detail.resumeUpgradeError');
         }
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to update campaign.';
+        _error = LanguageController.instance.t('ads.detail.errorUpdate');
       });
     } finally {
       if (mounted) {
@@ -750,6 +744,33 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
           _saving = false;
         });
       }
+    }
+  }
+
+  String _boostTitle(String id) {
+    final lc = LanguageController.instance;
+    switch (id) {
+      case 'light': return lc.t('ads.detail.boostLightTitle');
+      case 'strong': return lc.t('ads.detail.boostStrongTitle');
+      default: return lc.t('ads.detail.boostStandardTitle');
+    }
+  }
+
+  String _boostLevel(String id) {
+    final lc = LanguageController.instance;
+    switch (id) {
+      case 'light': return lc.t('ads.detail.boostLightLevel');
+      case 'strong': return lc.t('ads.detail.boostStrongLevel');
+      default: return lc.t('ads.detail.boostStandardLevel');
+    }
+  }
+
+  String _boostHighlight(String id) {
+    final lc = LanguageController.instance;
+    switch (id) {
+      case 'light': return lc.t('ads.detail.boostLightHighlight');
+      case 'strong': return lc.t('ads.detail.boostStrongHighlight');
+      default: return lc.t('ads.detail.boostStandardHighlight');
     }
   }
 
@@ -776,7 +797,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
               onPressed: _saving
                   ? null
                   : () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
+              child: Text(LanguageController.instance.t('ads.detail.cancelBtn')),
             ),
             FilledButton(
               onPressed: _saving
@@ -814,10 +835,10 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: isVideo
-                        ? const Center(
+                        ? Center(
                             child: Text(
-                              'Video preview is not enabled in lightbox yet.',
-                              style: TextStyle(color: Color(0xFFE8ECF8)),
+                              LanguageController.instance.t('ads.detail.videoPreviewUnavailable'),
+                              style: const TextStyle(color: Color(0xFFE8ECF8)),
                             ),
                           )
                         : Image.network(
@@ -876,7 +897,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: scheme.onSurface),
-        title: Text('Ad Details', style: TextStyle(color: scheme.onSurface)),
+        title: Text(LanguageController.instance.t('ads.detail.appBar'), style: TextStyle(color: scheme.onSurface)),
       ),
       body: SafeArea(
         child: _loading
@@ -886,7 +907,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
             : detail == null
             ? Center(
                 child: Text(
-                  _error ?? 'Campaign not found.',
+                  _error ?? LanguageController.instance.t('ads.detail.campaignNotFound'),
                   style: TextStyle(color: scheme.error),
                 ),
               )
@@ -967,19 +988,19 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               physics: const NeverScrollableScrollPhysics(),
                               children: [
                                 _MetricCard(
-                                  label: 'Spent',
+                                  label: LanguageController.instance.t('ads.detail.metricSpent'),
                                   value: _money(detail.spent),
                                 ),
                                 _MetricCard(
-                                  label: 'Impressions',
+                                  label: LanguageController.instance.t('ads.detail.metricImpressions'),
                                   value: _intFmt(detail.impressions),
                                 ),
                                 _MetricCard(
-                                  label: 'Clicks',
+                                  label: LanguageController.instance.t('ads.detail.metricClicks'),
                                   value: _intFmt(detail.clicks),
                                 ),
                                 _MetricCard(
-                                  label: 'CTR',
+                                  label: LanguageController.instance.t('ads.detail.metricCtr'),
                                   value: _pct(detail.ctr),
                                 ),
                               ],
@@ -989,7 +1010,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                       _SectionCard(
-                        title: 'Performance Breakdown',
+                        title: LanguageController.instance.t('ads.detail.sectionPerformance'),
                         child: GridView.count(
                           crossAxisCount: 2,
                           crossAxisSpacing: 8,
@@ -999,68 +1020,66 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                           physics: const NeverScrollableScrollPhysics(),
                           children: [
                             _BreakdownItem(
-                              label: 'Reach',
+                              label: LanguageController.instance.t('ads.detail.metricReach'),
                               value: _intFmt(detail.reach),
                             ),
                             _BreakdownItem(
-                              label: 'Views',
+                              label: LanguageController.instance.t('ads.detail.metricViews'),
                               value: _intFmt(detail.views),
                             ),
                             _BreakdownItem(
-                              label: 'Engagements',
+                              label: LanguageController.instance.t('ads.detail.metricEngagements'),
                               value: _intFmt(detail.engagements),
                             ),
                             _BreakdownItem(
-                              label: 'Engagement rate',
+                              label: LanguageController.instance.t('ads.detail.metricEngagementRate'),
                               value: _pct(detail.engagementRate),
                             ),
                             _BreakdownItem(
-                              label: 'Avg dwell',
+                              label: LanguageController.instance.t('ads.detail.metricAvgDwell'),
                               value:
                                   '${_intFmt(detail.averageDwellMs.round())} ms',
                             ),
                             _BreakdownItem(
-                              label: 'Budget usage',
+                              label: LanguageController.instance.t('ads.detail.metricBudgetUsage'),
                               value: detail.budget > 0
                                   ? _pct((detail.spent / detail.budget) * 100)
-                                  : 'N/A',
+                                  : LanguageController.instance.t('ads.detail.notAvailable'),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 12),
                       _SectionCard(
-                        title: 'Campaign Configuration',
+                        title: LanguageController.instance.t('ads.detail.sectionConfig'),
                         child: Column(
                           children: [
                             _DetailRow(
-                              label: 'Objective',
+                              label: LanguageController.instance.t('ads.detail.configObjective'),
                               value: detail.objective.isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.objective,
                             ),
                             _DetailRow(
-                              label: 'Ad format',
+                              label: LanguageController.instance.t('ads.detail.configAdFormat'),
                               value: detail.adFormat.isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.adFormat,
                             ),
                             _DetailRow(
-                              label: 'Boost package',
-                              value:
-                                  _boostLabel[detail.boostPackageId] ??
-                                  (detail.boostPackageId.isEmpty
-                                      ? 'N/A'
-                                      : detail.boostPackageId),
+                              label: LanguageController.instance.t('ads.detail.configBoostPackage'),
+                              value: detail.boostPackageId.isEmpty
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
+                                  : _boostTitle(detail.boostPackageId),
                             ),
                             _DetailRow(
-                              label: 'Duration days',
+                              label: LanguageController.instance.t('ads.detail.configDurationDays'),
                               value: detail.durationDays > 0
-                                  ? '${detail.durationDays} days'
-                                  : 'N/A',
+                                  ? LanguageController.instance.t('ads.detail.configDurationValue', {'count': detail.durationDays})
+                                  : LanguageController.instance.t('ads.detail.notAvailable'),
                             ),
                             _DetailRow(
-                              label: 'Delivery state reason',
+                              label: LanguageController.instance.t('ads.detail.configDeliveryState'),
                               value: _hiddenReasonLabel(detail.hiddenReason),
                             ),
                             if (detail.status == 'canceled' &&
@@ -1068,35 +1087,34 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                     .trim()
                                     .isNotEmpty)
                               _DetailRow(
-                                label: 'Admin cancellation reason',
+                                label: LanguageController.instance.t('ads.detail.configAdminCancel'),
                                 value: detail.adminCancelReason!.trim(),
                               ),
                             Builder(
                               builder: (_) {
                                 final t = _timeline(detail);
                                 return _DetailRow(
-                                  label: 'Elapsed / total',
-                                  value: '${t.elapsed} / ${t.total} days',
+                                  label: LanguageController.instance.t('ads.detail.configElapsed'),
+                                  value: LanguageController.instance.t('ads.detail.configElapsedValue', {'elapsed': t.elapsed, 'total': t.total}),
                                 );
                               },
                             ),
                             _DetailRow(
-                              label: 'Reactions split',
-                              value:
-                                  '${_intFmt(detail.likes)} likes · ${_intFmt(detail.comments)} comments · ${_intFmt(detail.reposts)} reposts',
+                              label: LanguageController.instance.t('ads.detail.configReactions'),
+                              value: LanguageController.instance.t('ads.detail.configReactionsValue', {'likes': _intFmt(detail.likes), 'comments': _intFmt(detail.comments), 'reposts': _intFmt(detail.reposts)}),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 12),
                       _SectionCard(
-                        title: 'Ad Creative & Audience',
+                        title: LanguageController.instance.t('ads.detail.sectionCreative'),
                         action: ElevatedButton.icon(
                           onPressed: _openEdit,
                           icon: const Icon(Icons.edit_rounded, size: 18),
-                          label: const Text(
-                            'Edit',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                          label: Text(
+                            LanguageController.instance.t('ads.detail.editBtn'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF4AA3E4),
@@ -1113,59 +1131,59 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                         child: Column(
                           children: [
                             _DetailRow(
-                              label: 'Primary text',
+                              label: LanguageController.instance.t('ads.detail.creativeText'),
                               value: detail.primaryText.trim().isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.primaryText.trim(),
                             ),
                             _DetailRow(
-                              label: 'Headline',
+                              label: LanguageController.instance.t('ads.detail.creativeHeadline'),
                               value: detail.headline.trim().isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.headline.trim(),
                             ),
                             _DetailRow(
-                              label: 'Description',
+                              label: LanguageController.instance.t('ads.detail.creativeDescription'),
                               value: detail.adDescription.trim().isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.adDescription.trim(),
                             ),
                             _DetailRow(
-                              label: 'CTA button',
+                              label: LanguageController.instance.t('ads.detail.creativeCta'),
                               value: detail.cta.trim().isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.cta.trim(),
                             ),
                             _DetailRow(
-                              label: 'Destination URL',
+                              label: LanguageController.instance.t('ads.detail.creativeUrl'),
                               value: detail.destinationUrl.trim().isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.destinationUrl.trim(),
                             ),
                             _DetailRow(
-                              label: 'Location targeting',
+                              label: LanguageController.instance.t('ads.detail.creativeLocation'),
                               value: detail.locationText.trim().isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.locationText.trim(),
                             ),
                             _DetailRow(
-                              label: 'Age targeting',
+                              label: LanguageController.instance.t('ads.detail.creativeAge'),
                               value:
                                   detail.ageMin != null && detail.ageMax != null
                                   ? '${detail.ageMin} - ${detail.ageMax}'
-                                  : 'N/A',
+                                  : LanguageController.instance.t('ads.detail.notAvailable'),
                             ),
                             _DetailRow(
-                              label: 'Interests',
+                              label: LanguageController.instance.t('ads.detail.creativeInterests'),
                               value: detail.interests.isEmpty
-                                  ? 'N/A'
+                                  ? LanguageController.instance.t('ads.detail.notAvailable')
                                   : detail.interests.join(' · '),
                             ),
                             const SizedBox(height: 8),
                             Align(
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                'Creative Media',
+                                LanguageController.instance.t('ads.detail.mediaTitle'),
                                 style: TextStyle(
                                   color: textSecondary,
                                   fontSize: 12,
@@ -1176,7 +1194,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                             const SizedBox(height: 8),
                             if (detail.mediaUrls.isEmpty)
                               Text(
-                                'No media available for this campaign.',
+                                LanguageController.instance.t('ads.detail.noMedia'),
                                 style: TextStyle(color: textSecondary),
                               )
                             else
@@ -1237,12 +1255,12 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                       _SectionCard(
-                        title: 'Campaign Actions',
+                        title: LanguageController.instance.t('ads.detail.sectionActions'),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Upgrade boost and extend duration, then manage lifecycle state.',
+                              LanguageController.instance.t('ads.detail.actionsSubtitle'),
                               style: TextStyle(
                                 color: textSecondary,
                                 fontSize: 13,
@@ -1250,7 +1268,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              '1. Boost strength',
+                              LanguageController.instance.t('ads.detail.boostStrength'),
                               style: TextStyle(
                                 color: textPrimary,
                                 fontWeight: FontWeight.w700,
@@ -1269,14 +1287,14 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                 final selected =
                                     item.id == _selectedBoostUpgradeId;
                                 return _ActionPackageOptionCard(
-                                  title: item.title,
+                                  title: _boostTitle(item.id),
                                   subtitle: isDowngrade
-                                      ? 'Not available for downgrade'
-                                      : item.level,
+                                      ? LanguageController.instance.t('ads.detail.notAvailableDowngrade')
+                                      : _boostLevel(item.id),
                                   priceLabel: _money(item.price),
                                   selected: selected,
                                   disabled: disabled,
-                                  highlight: item.highlight,
+                                  highlight: _boostHighlight(item.id),
                                   onTap: () {
                                     setState(() {
                                       _selectedBoostUpgradeId = item.id;
@@ -1288,7 +1306,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              '2. Extend campaign days',
+                              LanguageController.instance.t('ads.detail.extendDays'),
                               style: TextStyle(
                                 color: textPrimary,
                                 fontWeight: FontWeight.w700,
@@ -1307,8 +1325,8 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                     !detail.actions.canExtend;
                                 return _ActionDurationOptionChip(
                                   label: item.days > 0
-                                      ? '${item.days} days'
-                                      : 'No extension',
+                                      ? LanguageController.instance.t('ads.detail.dayCount', {'count': item.days})
+                                      : LanguageController.instance.t('ads.detail.noExtension'),
                                   priceLabel: _money(item.price),
                                   selected: active,
                                   disabled: disabled,
@@ -1333,23 +1351,23 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               child: Column(
                                 children: [
                                   _DetailRow(
-                                    label: 'Current boost',
-                                    value: currentBoostPackage.title,
+                                    label: LanguageController.instance.t('ads.detail.upgradeCurrentBoost'),
+                                    value: _boostTitle(currentBoostPackage.id),
                                   ),
                                   _DetailRow(
-                                    label: 'Boost upgrade difference',
+                                    label: LanguageController.instance.t('ads.detail.upgradeBoostDiff'),
                                     value: _money(boostUpgradeDelta),
                                   ),
                                   _DetailRow(
-                                    label: 'Extend days package',
+                                    label: LanguageController.instance.t('ads.detail.upgradeExtendDays'),
                                     value: _money(durationUpgradeCost),
                                   ),
                                   _DetailRow(
-                                    label: 'Need to pay now',
+                                    label: LanguageController.instance.t('ads.detail.upgradeNeedToPay'),
                                     value: _money(upgradeTotalCost),
                                   ),
                                   _DetailRow(
-                                    label: 'New total budget',
+                                    label: LanguageController.instance.t('ads.detail.upgradeNewBudget'),
                                     value: _money(projectedBudget),
                                   ),
                                 ],
@@ -1380,8 +1398,8 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                 ),
                                 child: Text(
                                   _creatingUpgradeCheckout
-                                      ? 'Creating checkout...'
-                                      : 'Pay with Stripe',
+                                      ? LanguageController.instance.t('ads.detail.creatingCheckout')
+                                      : LanguageController.instance.t('ads.detail.payWithStripe'),
                                 ),
                               ),
                             ),
@@ -1389,7 +1407,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                             Divider(color: tokens.panelBorder, height: 1),
                             const SizedBox(height: 14),
                             Text(
-                              'Lifecycle Management',
+                              LanguageController.instance.t('ads.detail.lifecycleTitle'),
                               style: TextStyle(
                                 color: textPrimary,
                                 fontWeight: FontWeight.w700,
@@ -1397,7 +1415,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Hide the campaign temporarily or reopen it when delivery should resume.',
+                              LanguageController.instance.t('ads.detail.lifecycleSubtitle'),
                               style: TextStyle(
                                 color: textSecondary,
                                 fontSize: 13,
@@ -1413,10 +1431,9 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                           ? null
                                           : () => _confirmLifecycleAction(
                                               action: 'pause_campaign',
-                                              title: 'Hide this campaign?',
-                                              body:
-                                                  'All reposts of this ads post will be removed. Before removal, all repost likes and views will be merged into the original ads post.',
-                                              confirmLabel: 'Confirm hide',
+                                              title: LanguageController.instance.t('ads.detail.hideDialogTitle'),
+                                              body: LanguageController.instance.t('ads.detail.hideDialogBody'),
+                                              confirmLabel: LanguageController.instance.t('ads.detail.hideDialogConfirm'),
                                             ),
                                       style: OutlinedButton.styleFrom(
                                         side: BorderSide(
@@ -1424,7 +1441,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                         ),
                                         foregroundColor: tokens.text,
                                       ),
-                                      child: const Text('Hide Campaign'),
+                                      child: Text(LanguageController.instance.t('ads.detail.hideCampaign')),
                                     ),
                                   ),
                                 if (detail.actions.canPause &&
@@ -1438,20 +1455,17 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                           ? null
                                           : () => _confirmLifecycleAction(
                                               action: 'resume_campaign',
-                                              title: 'Reopen this campaign?',
-                                              body:
-                                                  detail
-                                                      .actions
-                                                      .requiresExtendBeforeResume
-                                                  ? 'This campaign has expired. Purchase an extension package first, then confirm reopen.'
-                                                  : 'The campaign will resume delivery with the latest settings.',
-                                              confirmLabel: 'Confirm reopen',
+                                              title: LanguageController.instance.t('ads.detail.reopenDialogTitle'),
+                                              body: detail.actions.requiresExtendBeforeResume
+                                                  ? LanguageController.instance.t('ads.detail.reopenDialogBodyExpired')
+                                                  : LanguageController.instance.t('ads.detail.reopenDialogBody'),
+                                              confirmLabel: LanguageController.instance.t('ads.detail.reopenDialogConfirm'),
                                             ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: accent,
                                         foregroundColor: scheme.onPrimary,
                                       ),
-                                      child: const Text('Reopen Campaign'),
+                                      child: Text(LanguageController.instance.t('ads.detail.reopenCampaign')),
                                     ),
                                   ),
                               ],
@@ -1760,7 +1774,7 @@ class _EditBottomSheet extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Edit Campaign Details',
+                      LanguageController.instance.t('ads.detail.editTitle'),
                       style: TextStyle(
                         color: textPrimary,
                         fontSize: 18,
@@ -1775,7 +1789,7 @@ class _EditBottomSheet extends StatelessWidget {
                 ],
               ),
               _EditField(
-                label: 'Campaign name',
+                label: LanguageController.instance.t('ads.detail.editCampaignName'),
                 child: TextField(
                   controller: TextEditingController(text: draft.campaignName)
                     ..selection = TextSelection.fromPosition(
@@ -1788,8 +1802,8 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Objective',
-                helper: 'Objective is locked after campaign creation.',
+                label: LanguageController.instance.t('ads.detail.editObjective'),
+                helper: LanguageController.instance.t('ads.detail.editObjectiveLocked'),
                 child: _SelectPillRow(
                   values: const [
                     'awareness',
@@ -1806,8 +1820,8 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Ad format',
-                helper: 'Ad format is locked after campaign creation.',
+                label: LanguageController.instance.t('ads.detail.editAdFormat'),
+                helper: LanguageController.instance.t('ads.detail.editAdFormatLocked'),
                 child: _SelectPillRow(
                   values: const ['single', 'carousel', 'video'],
                   selected: draft.adFormat,
@@ -1823,7 +1837,7 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Primary text',
+                label: LanguageController.instance.t('ads.detail.editPrimaryText'),
                 child: TextField(
                   controller: TextEditingController(text: draft.primaryText)
                     ..selection = TextSelection.fromPosition(
@@ -1838,7 +1852,7 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Headline',
+                label: LanguageController.instance.t('ads.detail.editHeadline'),
                 child: TextField(
                   controller: TextEditingController(text: draft.headline)
                     ..selection = TextSelection.fromPosition(
@@ -1850,7 +1864,7 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'CTA',
+                label: LanguageController.instance.t('ads.detail.editCta'),
                 child: _SelectPillRow(
                   values: const [
                     'Shop Now',
@@ -1866,7 +1880,7 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Description',
+                label: LanguageController.instance.t('ads.detail.editDescription'),
                 child: TextField(
                   controller: TextEditingController(text: draft.adDescription)
                     ..selection = TextSelection.fromPosition(
@@ -1879,7 +1893,7 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Destination URL',
+                label: LanguageController.instance.t('ads.detail.editDestinationUrl'),
                 child: TextField(
                   controller: TextEditingController(text: draft.destinationUrl)
                     ..selection = TextSelection.fromPosition(
@@ -1892,8 +1906,8 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Location',
-                helper: 'Location cannot be edited after ad creation.',
+                label: LanguageController.instance.t('ads.detail.editLocation'),
+                helper: LanguageController.instance.t('ads.detail.editLocationLocked'),
                 child: TextField(
                   enabled: false,
                   controller: TextEditingController(text: draft.locationText),
@@ -1902,8 +1916,8 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Age range',
-                helper: 'Age range cannot be edited after ad creation.',
+                label: LanguageController.instance.t('ads.detail.editAgeRange'),
+                helper: LanguageController.instance.t('ads.detail.editAgeRangeLocked'),
                 child: Row(
                   children: [
                     Expanded(
@@ -1916,7 +1930,7 @@ class _EditBottomSheet extends StatelessWidget {
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('to', style: TextStyle(color: textSecondary)),
+                      child: Text(LanguageController.instance.t('ads.detail.editAgeTo'), style: TextStyle(color: textSecondary)),
                     ),
                     Expanded(
                       child: TextField(
@@ -1930,7 +1944,7 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Interests',
+                label: LanguageController.instance.t('ads.detail.editInterests'),
                 child: Column(
                   children: [
                     Row(
@@ -1941,7 +1955,7 @@ class _EditBottomSheet extends StatelessWidget {
                             style: TextStyle(color: textPrimary),
                             decoration: _editInputDecoration(
                               context,
-                              hint: 'Type interest and click Add',
+                              hint: LanguageController.instance.t('ads.detail.editInterestHint'),
                             ),
                           ),
                         ),
@@ -1959,7 +1973,7 @@ class _EditBottomSheet extends StatelessWidget {
                               vertical: 11,
                             ),
                           ),
-                          child: const Text('Add'),
+                          child: Text(LanguageController.instance.t('ads.detail.editAdd')),
                         ),
                       ],
                     ),
@@ -1984,9 +1998,9 @@ class _EditBottomSheet extends StatelessWidget {
                 ),
               ),
               _EditField(
-                label: 'Creative media',
+                label: LanguageController.instance.t('ads.detail.editCreativeMedia'),
                 helper: mediaEditLocked
-                    ? 'Media is locked because unique views exceeded 100.'
+                    ? LanguageController.instance.t('ads.detail.editMediaLocked')
                     : null,
                 child: Column(
                   children: [
@@ -2009,7 +2023,9 @@ class _EditBottomSheet extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          uploadingMedia ? 'Uploading...' : 'Choose files',
+                          uploadingMedia
+                              ? LanguageController.instance.t('ads.detail.editUploading')
+                              : LanguageController.instance.t('ads.detail.editChooseFiles'),
                         ),
                       ),
                     ),
@@ -2064,7 +2080,7 @@ class _EditBottomSheet extends StatelessWidget {
                                         horizontal: 8,
                                       ),
                                     ),
-                                    child: const Text('Remove'),
+                                    child: Text(LanguageController.instance.t('ads.detail.editRemove')),
                                   ),
                                 ],
                               ),
@@ -2094,7 +2110,7 @@ class _EditBottomSheet extends StatelessWidget {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: const Text('Cancel'),
+                      child: Text(LanguageController.instance.t('ads.detail.editCancel')),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2111,7 +2127,9 @@ class _EditBottomSheet extends StatelessWidget {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: Text(loading ? 'Saving...' : 'Save changes'),
+                      child: Text(loading
+                          ? LanguageController.instance.t('ads.detail.editSaving')
+                          : LanguageController.instance.t('ads.detail.editSaveChanges')),
                     ),
                   ),
                 ],

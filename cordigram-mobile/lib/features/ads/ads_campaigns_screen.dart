@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/language_controller.dart';
 import 'ads_campaign_detail_screen.dart';
 import 'ads_service.dart';
 
@@ -69,7 +70,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load campaigns.';
+        _error = LanguageController.instance.t('ads.campaigns.errorLoad');
         _loading = false;
       });
     }
@@ -135,30 +136,32 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
   }
 
   String _statusFilterLabel(_CampaignStatusFilter value) {
+    final lc = LanguageController.instance;
     switch (value) {
       case _CampaignStatusFilter.all:
-        return 'All status';
+        return lc.t('ads.campaigns.statusAll');
       case _CampaignStatusFilter.active:
-        return 'Active';
+        return lc.t('ads.campaigns.statusActive');
       case _CampaignStatusFilter.hidden:
-        return 'Hidden';
+        return lc.t('ads.campaigns.statusHidden');
       case _CampaignStatusFilter.canceled:
-        return 'Canceled';
+        return lc.t('ads.campaigns.statusCanceled');
       case _CampaignStatusFilter.completed:
-        return 'Completed';
+        return lc.t('ads.campaigns.statusCompleted');
     }
   }
 
   String _sortLabel(_CampaignSort value) {
+    final lc = LanguageController.instance;
     switch (value) {
       case _CampaignSort.newest:
-        return 'Newest';
+        return lc.t('ads.campaigns.sortNewest');
       case _CampaignSort.oldest:
-        return 'Oldest';
+        return lc.t('ads.campaigns.sortOldest');
       case _CampaignSort.spent:
-        return 'Highest spent';
+        return lc.t('ads.campaigns.sortHighestSpent');
       case _CampaignSort.ctr:
-        return 'Highest CTR';
+        return lc.t('ads.campaigns.sortHighestCtr');
     }
   }
 
@@ -324,7 +327,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: scheme.onSurface),
         title: Text(
-          'All Ad Campaigns',
+          LanguageController.instance.t('ads.campaigns.appBar'),
           style: TextStyle(color: scheme.onSurface),
         ),
       ),
@@ -358,14 +361,14 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         children: [
-                          _StatCard(label: 'Total campaigns', value: '$total'),
-                          _StatCard(label: 'Active', value: '$active'),
+                          _StatCard(label: LanguageController.instance.t('ads.campaigns.totalCampaigns'), value: '$total'),
+                          _StatCard(label: LanguageController.instance.t('ads.campaigns.active'), value: '$active'),
                           _StatCard(
-                            label: 'Total spent',
+                            label: LanguageController.instance.t('ads.campaigns.totalSpent'),
                             value: _money(totalSpent),
                           ),
                           _StatCard(
-                            label: 'Total impressions',
+                            label: LanguageController.instance.t('ads.campaigns.totalImpressions'),
                             value: _intFmt(totalImpressions),
                           ),
                         ],
@@ -385,7 +388,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                               controller: _searchCtrl,
                               onChanged: (_) => setState(() {}),
                               decoration: InputDecoration(
-                                hintText: 'Search campaign name...',
+                                hintText: LanguageController.instance.t('ads.campaigns.searchPlaceholder'),
                                 hintStyle: TextStyle(color: textSecondary),
                                 filled: true,
                                 fillColor: tokens.panel,
@@ -413,7 +416,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                               children: [
                                 Expanded(
                                   child: _PickerButton(
-                                    label: 'Status',
+                                    label: LanguageController.instance.t('ads.campaigns.filterStatus'),
                                     value: _statusFilterLabel(_statusFilter),
                                     onTap: () async {
                                       final value =
@@ -426,7 +429,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                                 _SimpleSheet<
                                                   _CampaignStatusFilter
                                                 >(
-                                                  title: 'Status filter',
+                                                  title: LanguageController.instance.t('ads.campaigns.sheetStatusFilter'),
                                                   selected: _statusFilter,
                                                   items: _CampaignStatusFilter
                                                       .values
@@ -450,7 +453,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: _PickerButton(
-                                    label: 'Sort by',
+                                    label: LanguageController.instance.t('ads.campaigns.filterSort'),
                                     value: _sortLabel(_sortBy),
                                     onTap: () async {
                                       final value =
@@ -461,7 +464,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                             backgroundColor: tokens.panel,
                                             builder: (_) =>
                                                 _SimpleSheet<_CampaignSort>(
-                                                  title: 'Sort campaigns',
+                                                  title: LanguageController.instance.t('ads.campaigns.sheetSortCampaigns'),
                                                   selected: _sortBy,
                                                   items: _CampaignSort.values
                                                       .map(
@@ -485,7 +488,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                               children: [
                                 Expanded(
                                   child: _PickerButton(
-                                    label: 'From',
+                                    label: LanguageController.instance.t('ads.campaigns.filterFrom'),
                                     value: _dateText(_dateFrom),
                                     onTap: _pickFromDate,
                                   ),
@@ -493,7 +496,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: _PickerButton(
-                                    label: 'To',
+                                    label: LanguageController.instance.t('ads.campaigns.filterTo'),
                                     value: _dateText(_dateTo),
                                     onTap: _pickToDate,
                                   ),
@@ -504,7 +507,9 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                             Row(
                               children: [
                                 Text(
-                                  '${campaigns.length} result${campaigns.length == 1 ? '' : 's'}',
+                                  campaigns.length == 1
+                                      ? LanguageController.instance.t('ads.campaigns.resultCount', {'count': campaigns.length})
+                                      : LanguageController.instance.t('ads.campaigns.resultCountPlural', {'count': campaigns.length}),
                                   style: TextStyle(
                                     color: textSecondary,
                                     fontSize: 12.5,
@@ -518,7 +523,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: tokens.primary,
                                   ),
-                                  child: const Text('Clear'),
+                                  child: Text(LanguageController.instance.t('ads.campaigns.clear')),
                                 ),
                               ],
                             ),
@@ -530,7 +535,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                         Padding(
                           padding: EdgeInsets.symmetric(vertical: 18),
                           child: Text(
-                            'No campaigns match your filters.',
+                            LanguageController.instance.t('ads.campaigns.noMatch'),
                             style: TextStyle(color: textSecondary),
                           ),
                         )
@@ -603,7 +608,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      'Start: ${_dateLite(item.startsAt)}   End: ${_dateLite(item.expiresAt)}',
+                                      '${LanguageController.instance.t('ads.campaigns.cardStart', {'date': _dateLite(item.startsAt)})}   ${LanguageController.instance.t('ads.campaigns.cardEnd', {'date': _dateLite(item.expiresAt)})}',
                                       style: TextStyle(
                                         color: textSecondary,
                                         fontSize: 12,
@@ -614,25 +619,25 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                       children: [
                                         Expanded(
                                           child: _MiniMetric(
-                                            label: 'Spent (VND)',
+                                            label: LanguageController.instance.t('ads.metrics.spentVnd'),
                                             value: _intFmt(item.spent),
                                           ),
                                         ),
                                         Expanded(
                                           child: _MiniMetric(
-                                            label: 'Impr.',
+                                            label: LanguageController.instance.t('ads.metrics.impr'),
                                             value: _intFmt(item.impressions),
                                           ),
                                         ),
                                         Expanded(
                                           child: _MiniMetric(
-                                            label: 'CTR',
+                                            label: LanguageController.instance.t('ads.metrics.ctr'),
                                             value: _pct(item.ctr),
                                           ),
                                         ),
                                         Expanded(
                                           child: _MiniMetric(
-                                            label: 'Clicks',
+                                            label: LanguageController.instance.t('ads.metrics.clicksLabel'),
                                             value: _intFmt(item.clicks),
                                           ),
                                         ),
@@ -644,7 +649,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                       Padding(
                                         padding: const EdgeInsets.only(top: 8),
                                         child: Text(
-                                          'Admin reason: ${item.adminCancelReason!.trim()}',
+                                          LanguageController.instance.t('ads.campaigns.adminReason', {'reason': item.adminCancelReason!.trim()}),
                                           style: TextStyle(
                                             color: textSecondary,
                                             fontSize: 12,
