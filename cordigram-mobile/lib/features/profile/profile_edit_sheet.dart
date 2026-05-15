@@ -14,17 +14,18 @@ import 'services/profile_service.dart';
 final _usernameRegex = RegExp(r'^[a-z0-9_.]{3,30}$');
 
 String? _validateDisplayName(String name) {
+  final lc = LanguageController.instance;
   final trimmed = name.trim();
-  if (trimmed.isEmpty) return 'Display name is required.';
+  if (trimmed.isEmpty) return lc.t('profile.editSheet.errorDisplayNameRequired');
   if (trimmed.length < 3 || trimmed.length > 30) {
-    return 'At least 3 and maximum 30 characters.';
+    return lc.t('profile.editSheet.errorDisplayNameTooShort');
   }
   final condensed = trimmed.replaceAll(' ', '');
   if (condensed.length < 3) {
-    return 'Display name needs at least 3 letters after removing spaces.';
+    return lc.t('profile.editSheet.errorDisplayNameTooShort');
   }
   if (!RegExp(r'^[\p{L}\s]+$', unicode: true).hasMatch(trimmed)) {
-    return 'Display name can only contain letters and spaces.';
+    return lc.t('profile.editSheet.errorDisplayNameInvalid');
   }
   return null;
 }
@@ -222,8 +223,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     if (!_usernameRegex.hasMatch(trimmed)) {
       setState(() {
         _usernameAvailable = false;
-        _usernameError =
-            'Username can only include lowercase letters, numbers, underscores, and dots (3-30 chars).';
+        _usernameError = LanguageController.instance.t('profile.editSheet.errorUsernameFormat');
         _checkingUsername = false;
       });
       return;
@@ -245,7 +245,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
         setState(() {
           _checkingUsername = false;
           _usernameAvailable = available;
-          _usernameError = available ? null : 'Username already taken.';
+          _usernameError = available ? null : LanguageController.instance.t('profile.editSheet.errorUsernameTaken');
         });
       } catch (_) {
         if (!mounted) return;
@@ -445,21 +445,21 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
   }
 
   String _formatBirthdate(DateTime dt) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    final lc = LanguageController.instance;
+    final monthKeys = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    final month = lc.t('profile.months.${monthKeys[dt.month - 1]}');
+    return '$month ${dt.day}, ${dt.year}';
+  }
+
+  String _genderLabel(String code) {
+    final lc = LanguageController.instance;
+    switch (code) {
+      case 'male': return lc.t('profile.gender.male');
+      case 'female': return lc.t('profile.gender.female');
+      case 'other': return lc.t('profile.gender.other');
+      case 'prefer_not_to_say': return lc.t('profile.gender.preferNot');
+      default: return code;
+    }
   }
 
   // -- Gender picker ----------------------------------------------------------
@@ -493,7 +493,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: Text(
-                'Select Gender',
+                LanguageController.instance.t('profile.editSheet.selectGenderTitle'),
                 style: TextStyle(
                   color: _textPrimary,
                   fontSize: 16,
@@ -505,7 +505,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
               final selected = _gender == g.$1;
               return ListTile(
                 title: Text(
-                  g.$2,
+                  _genderLabel(g.$1),
                   style: TextStyle(
                     color: selected ? _accent : _textPrimary,
                     fontSize: 15,
@@ -535,16 +535,17 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     final dnError = _validateDisplayName(_displayNameCtrl.text);
     if (dnError != null) return dnError;
 
+    final lc = LanguageController.instance;
     final username = _usernameCtrl.text.trim();
     if (!_usernameRegex.hasMatch(username)) {
-      return 'Username can only include lowercase letters, numbers, underscores, and dots (3-30 chars).';
+      return lc.t('profile.editSheet.errorUsernameFormat');
     }
-    if (_usernameAvailable == false) return 'Username already taken.';
+    if (_usernameAvailable == false) return lc.t('profile.editSheet.errorUsernameTaken');
 
-    if (_bioCtrl.text.length > 300) return 'Bio cannot exceed 300 characters.';
+    if (_bioCtrl.text.length > 300) return lc.t('profile.editSheet.errorBioTooLong');
 
     if (_birthdate != null && _birthdate!.isAfter(DateTime.now())) {
-      return 'Birthday cannot be in the future.';
+      return lc.t('profile.editSheet.errorBirthdayFuture');
     }
     return null;
   }
@@ -643,7 +644,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Edit Profile', // sheet title – not in i18n keys list
+                    lc.t('profile.editSheet.title'),
                     style: TextStyle(
                       color: _textPrimary,
                       fontSize: 18,
@@ -689,7 +690,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                   children: [
                     _buildField(
                       label: lc.t('profile.editSheet.displayName'),
-                      hint: 'Your full name',
+                      hint: lc.t('profile.editSheet.hintDisplayName'),
                       controller: _displayNameCtrl,
                       maxLength: 30,
                     ),
@@ -862,7 +863,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Username'),
+        _fieldLabel(LanguageController.instance.t('profile.editSheet.username')),
         TextField(
           controller: _usernameCtrl,
           maxLength: 30,
@@ -870,7 +871,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           style: TextStyle(color: _textPrimary, fontSize: 14),
           decoration:
               _baseDecoration(
-                hint: 'e.g. john_doe',
+                hint: LanguageController.instance.t('profile.editSheet.hintUsername'),
                 suffix: suffix,
                 borderColor: borderColor,
               ).copyWith(
@@ -896,14 +897,14 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Bio', counter: '${_bioCtrl.text.length}/300'),
+        _fieldLabel(LanguageController.instance.t('profile.editSheet.bio'), counter: '${_bioCtrl.text.length}/300'),
         TextField(
           controller: _bioCtrl,
           maxLines: 4,
           onChanged: (_) => setState(() {}),
           style: TextStyle(color: _textPrimary, fontSize: 14),
           decoration: _baseDecoration(
-            hint: 'Tell people a little about yourself...',
+            hint: LanguageController.instance.t('profile.editSheet.hintBio'),
             borderColor: bioLen > 300 ? _danger : null,
           ),
         ),
@@ -912,17 +913,13 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
   }
 
   Widget _buildGenderField() {
-    String displayLabel = '';
-    if (_gender != null) {
-      displayLabel = _kGenderOptions
-          .firstWhere((g) => g.$1 == _gender, orElse: () => ('', _gender!))
-          .$2;
-    }
+    final lc = LanguageController.instance;
+    final displayLabel = _gender != null ? _genderLabel(_gender!) : '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Gender'),
+        _fieldLabel(lc.t('profile.editSheet.gender')),
         GestureDetector(
           onTap: _showGenderPicker,
           child: Container(
@@ -936,7 +933,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
               children: [
                 Expanded(
                   child: Text(
-                    displayLabel.isEmpty ? 'Select gender' : displayLabel,
+                    displayLabel.isEmpty ? lc.t('profile.editSheet.selectGender') : displayLabel,
                     style: TextStyle(
                       color: displayLabel.isEmpty
                           ? _textSecondary.withValues(alpha: 0.5)
@@ -962,7 +959,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Birthday'),
+        _fieldLabel(LanguageController.instance.t('profile.editSheet.birthday')),
         GestureDetector(
           onTap: _pickBirthdate,
           child: Container(
@@ -978,7 +975,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                   child: Text(
                     _birthdate != null
                         ? _formatBirthdate(_birthdate!)
-                        : 'Select birthday',
+                        : LanguageController.instance.t('profile.editSheet.selectBirthday'),
                     style: TextStyle(
                       color: _birthdate != null
                           ? _textPrimary
@@ -1004,7 +1001,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Location'),
+        _fieldLabel(LanguageController.instance.t('profile.editSheet.location')),
         TextField(
           controller: _locationCtrl,
           maxLength: 200,
@@ -1012,7 +1009,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           onChanged: _onLocationChanged,
           decoration:
               _baseDecoration(
-                hint: 'Where are you based?',
+                hint: LanguageController.instance.t('profile.editSheet.hintLocation'),
                 suffix: _locationLoading
                     ? Padding(
                         padding: const EdgeInsets.all(12),
@@ -1053,7 +1050,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Workplace'),
+        _fieldLabel(LanguageController.instance.t('profile.editSheet.workplace')),
         TextField(
           controller: _workplaceCtrl,
           maxLength: 100,
@@ -1061,7 +1058,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           onChanged: _onWorkplaceChanged,
           decoration:
               _baseDecoration(
-                hint: 'Company or employer',
+                hint: LanguageController.instance.t('profile.editSheet.hintWorkplace'),
                 suffix: _workplaceLoading
                     ? Padding(
                         padding: const EdgeInsets.all(12),

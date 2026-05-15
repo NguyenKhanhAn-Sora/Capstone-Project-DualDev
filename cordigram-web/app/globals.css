@@ -299,6 +299,8 @@
 html,
 body {
   height: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 body {
@@ -319,6 +321,39 @@ body {
   flex: 1;
   height: 100vh;
   overflow-y: auto;
+}
+
+/* ── Mobile responsive layout ────────────────────────────────────── */
+@media (max-width: 767px) {
+  .app-shell {
+    flex-direction: column;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .mobile-page {
+    height: auto !important;
+    min-height: calc(100dvh - 56px - 60px);
+    overflow-y: visible;
+    /* bottom padding accounts for fixed bottom nav + safe area */
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+
+  /* Messages page wrapper on mobile: fills height below top bar */
+  .messages-mobile-wrapper {
+    flex: 1;
+    height: calc(100dvh - 56px);
+    overflow: hidden;
+  }
+
+}
+
+/* On desktop, messages wrapper is transparent */
+.messages-mobile-wrapper {
+  flex: 1;
+  height: 100vh;
+  overflow: hidden;
 }
 
 ::-webkit-scrollbar {

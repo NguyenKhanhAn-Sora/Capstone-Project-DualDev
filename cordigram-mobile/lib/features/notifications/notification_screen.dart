@@ -10,24 +10,26 @@ import '../reels/reels_screen.dart';
 import 'models/app_notification_item.dart';
 import 'services/notification_realtime_service.dart';
 import 'services/notification_service.dart';
+import '../../core/services/language_controller.dart';
 
 enum _NotificationTab { all, like, comment, mentions, follow, system }
 
 extension _NotificationTabLabel on _NotificationTab {
   String get label {
+    final lc = LanguageController.instance;
     switch (this) {
       case _NotificationTab.all:
-        return 'All activity';
+        return lc.t('notifications.tabs.allActivity');
       case _NotificationTab.like:
-        return 'Likes';
+        return lc.t('notifications.tabs.likes');
       case _NotificationTab.comment:
-        return 'Comments';
+        return lc.t('notifications.tabs.comments');
       case _NotificationTab.mentions:
-        return 'Mentions';
+        return lc.t('notifications.tabs.mentions');
       case _NotificationTab.follow:
-        return 'Followers';
+        return lc.t('notifications.tabs.followers');
       case _NotificationTab.system:
-        return 'System';
+        return lc.t('notifications.tabs.system');
     }
   }
 }
@@ -193,7 +195,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       setState(() => _error = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Unable to load notifications.');
+      setState(() => _error = LanguageController.instance.t('notifications.loadError'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -340,87 +342,89 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   String _relativeTime(String value) {
+    final lc = LanguageController.instance;
     final dt = DateTime.tryParse(value)?.toLocal();
     if (dt == null) return '';
     final diff = DateTime.now().difference(dt);
-    if (diff.inSeconds < 60) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} min';
-    if (diff.inHours < 24) return '${diff.inHours} hours';
-    if (diff.inDays < 7) return '${diff.inDays} days';
+    if (diff.inSeconds < 60) return lc.t('notifications.justNow');
+    if (diff.inMinutes < 60) return lc.t('notifications.minAgo', {'n': diff.inMinutes.toString()});
+    if (diff.inHours < 24) return lc.t('notifications.hoursAgo', {'n': diff.inHours.toString()});
+    if (diff.inDays < 7) return lc.t('notifications.daysAgo', {'n': diff.inDays.toString()});
     final weeks = (diff.inDays / 7).floor();
-    if (weeks < 5) return '$weeks weeks';
+    if (weeks < 5) return lc.t('notifications.weeksAgo', {'n': weeks.toString()});
     final months = (diff.inDays / 30).floor();
-    if (months < 12) return '$months months';
+    if (months < 12) return lc.t('notifications.monthsAgo', {'n': months.toString()});
     final years = (diff.inDays / 365).floor();
-    return '$years years';
+    return lc.t('notifications.yearsAgo', {'n': years.toString()});
   }
 
   String _displayName(NotificationActor actor) {
     if (actor.username.trim().isNotEmpty) return '@${actor.username.trim()}';
     if (actor.displayName.trim().isNotEmpty) return actor.displayName.trim();
-    return 'Someone';
+    return LanguageController.instance.t('notifications.someone');
   }
 
   String _message(AppNotificationItem item) {
+    final lc = LanguageController.instance;
     final name = _displayName(item.actor);
     if (item.type == 'post_like') {
       final n = (item.likeCount - 1).clamp(0, 999);
-      final target = item.postKind == 'reel' ? 'reel' : 'post';
+      final target = item.postKind == 'reel' ? lc.t('notifications.targetReel') : lc.t('notifications.targetPost');
       return n > 0
-          ? '$name and $n others liked your $target'
-          : '$name liked your $target';
+          ? lc.t('notifications.msgPostLikeMultiple', {'name': name, 'n': n.toString(), 'target': target})
+          : lc.t('notifications.msgPostLikeSingle', {'name': name, 'target': target});
     }
     if (item.type == 'post_comment') {
       final n = (item.commentCount - 1).clamp(0, 999);
-      final target = item.postKind == 'reel' ? 'reel' : 'post';
+      final target = item.postKind == 'reel' ? lc.t('notifications.targetReel') : lc.t('notifications.targetPost');
       return n > 0
-          ? '$name and $n others commented on your $target'
-          : '$name commented on your $target';
+          ? lc.t('notifications.msgPostCommentMultiple', {'name': name, 'n': n.toString(), 'target': target})
+          : lc.t('notifications.msgPostCommentSingle', {'name': name, 'target': target});
     }
     if (item.type == 'comment_like') {
       final n = (item.likeCount - 1).clamp(0, 999);
       return n > 0
-          ? '$name and $n others liked your comment'
-          : '$name liked your comment';
+          ? lc.t('notifications.msgCommentLikeMultiple', {'name': name, 'n': n.toString()})
+          : lc.t('notifications.msgCommentLikeSingle', {'name': name});
     }
     if (item.type == 'comment_reply') {
       final n = (item.commentCount - 1).clamp(0, 999);
       return n > 0
-          ? '$name and $n others replied to your comment'
-          : '$name replied to your comment';
+          ? lc.t('notifications.msgCommentReplyMultiple', {'name': name, 'n': n.toString()})
+          : lc.t('notifications.msgCommentReplySingle', {'name': name});
     }
     if (item.type == 'post_mention') {
-      final source = item.mentionSource == 'comment' ? 'comment' : 'post';
-      return '$name mentioned you in a $source';
+      final source = item.mentionSource == 'comment' ? lc.t('notifications.targetComment') : lc.t('notifications.targetPost');
+      return lc.t('notifications.msgMention', {'name': name, 'target': source});
     }
     if (item.type == 'follow') {
-      return '$name followed you';
+      return lc.t('notifications.msgFollow', {'name': name});
     }
     if (item.type == 'login_alert') {
-      return "You're signing in on a new device";
+      return lc.t('notifications.msgLoginAlert');
     }
     if (item.type == 'post_moderation') {
-      final target = item.postKind == 'reel' ? 'reel' : 'post';
+      final target = item.postKind == 'reel' ? lc.t('notifications.targetReel') : lc.t('notifications.targetPost');
       if (item.moderationDecision == 'reject') {
-        return 'Your $target was rejected. Please check Violation Center.';
+        return lc.t('notifications.msgModerationRejected', {'target': target});
       }
-      return 'Your $target was published successfully.';
+      return lc.t('notifications.msgModerationPublished', {'target': target});
     }
     if (item.type == 'report') {
       if (item.reportAudience == 'offender') {
-        return 'Action was taken on your content. Check Violation Center for details.';
+        return lc.t('notifications.msgReportOffender');
       }
       return item.reportOutcome == 'action_taken'
-          ? 'Thanks for your report. We reviewed and took action.'
-          : 'Thanks for your report. We reviewed and found no violation.';
+          ? lc.t('notifications.msgReportActionTaken')
+          : lc.t('notifications.msgReportNoViolation');
     }
     if (item.type == 'system_notice') {
       final title = item.systemNoticeTitle?.trim() ?? '';
       final body = item.systemNoticeBody?.trim() ?? '';
-      if (title.isEmpty) return body.isEmpty ? 'System notice' : body;
+      if (title.isEmpty) return body.isEmpty ? lc.t('notifications.msgSystemNotice') : body;
       return body.isEmpty ? title : '$title: $body';
     }
-    return 'New notification';
+    return lc.t('notifications.msgNew');
   }
 
   IconData _iconFor(String type) {
@@ -543,11 +547,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text(LanguageController.instance.t('notifications.cancel')),
                     ),
                     const Spacer(),
                     Text(
-                      'Select time',
+                      LanguageController.instance.t('notifications.muteSelectTime'),
                       style: TextStyle(
                         color: scheme.onSurface,
                         fontWeight: FontWeight.w600,
@@ -556,7 +560,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     const Spacer(),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(draft),
-                      child: const Text('Done'),
+                      child: Text(LanguageController.instance.t('notifications.done')),
                     ),
                   ],
                 ),
@@ -623,7 +627,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             .map((entry) => entry.id == item.id ? prev : entry)
             .toList(growable: false);
       });
-      _showSnack('Unable to update notification.', error: true);
+      _showSnack(LanguageController.instance.t('notifications.updateError'), error: true);
     }
   }
 
@@ -639,7 +643,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _items = prev);
-      _showSnack('Unable to delete notification.', error: true);
+      _showSnack(LanguageController.instance.t('notifications.deleteError'), error: true);
     }
   }
 
@@ -674,7 +678,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
-                  'Filter notifications',
+                  LanguageController.instance.t('notifications.filterTitle'),
                   style: TextStyle(
                     color: scheme.onSurface,
                     fontSize: 15,
@@ -783,7 +787,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   color: scheme.onSurfaceVariant,
                 ),
                 title: Text(
-                  'Mark all as read',
+                  LanguageController.instance.t('notifications.manageMarkAllRead'),
                   style: TextStyle(color: scheme.onSurface),
                 ),
                 onTap: () {
@@ -794,7 +798,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ListTile(
                 leading: Icon(Icons.delete_outline_rounded, color: scheme.error),
                 title: Text(
-                  'Delete notifications',
+                  LanguageController.instance.t('notifications.manageDeleteAll'),
                   style: TextStyle(color: scheme.error),
                 ),
                 onTap: () {
@@ -818,7 +822,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   void _confirmMarkAllRead() {
     final unreadCount = _items.where((n) => n.isUnread).length;
     if (unreadCount == 0) {
-      _showSnack('All notifications are already read.');
+      _showSnack(LanguageController.instance.t('notifications.alreadyAllRead'));
       return;
     }
     final scheme = Theme.of(context).colorScheme;
@@ -836,14 +840,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 side: BorderSide(color: scheme.outline.withValues(alpha: 0.7)),
               ),
               title: Text(
-                'Mark all as read',
+                LanguageController.instance.t('notifications.dialogMarkAllTitle'),
                 style: TextStyle(
                   color: scheme.onSurface,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               content: Text(
-                'Mark $unreadCount unread notification${unreadCount != 1 ? "s" : ""} as read?',
+                unreadCount == 1
+                    ? LanguageController.instance.t('notifications.dialogMarkAllBodySingle')
+                    : LanguageController.instance.t('notifications.dialogMarkAllBodyPlural', {'count': unreadCount.toString()}),
                 style: TextStyle(color: scheme.onSurfaceVariant),
               ),
               actions: [
@@ -851,7 +857,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   onPressed: saving
                       ? null
                       : () => Navigator.pop(dialogCtx),
-                  child: const Text('Cancel'),
+                  child: Text(LanguageController.instance.t('notifications.cancel')),
                 ),
                 FilledButton(
                   onPressed: saving
@@ -872,21 +878,21 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                     )
                                     .toList(growable: false);
                               });
-                              _showSnack('All notifications marked as read');
+                              _showSnack(LanguageController.instance.t('notifications.dialogMarkAllSuccess'));
                             }
                             if (ctx.mounted) Navigator.pop(dialogCtx);
                           } catch (_) {
                             setDialogState(() => saving = false);
                             if (mounted) {
                               _showSnack(
-                                'Failed to mark all as read',
+                                LanguageController.instance.t('notifications.dialogMarkAllFailed'),
                                 error: true,
                               );
                             }
                             if (ctx.mounted) Navigator.pop(dialogCtx);
                           }
                         },
-                  child: Text(saving ? 'Marking...' : 'Mark all as read'),
+                  child: Text(saving ? LanguageController.instance.t('notifications.dialogMarkAllMarking') : LanguageController.instance.t('notifications.dialogMarkAllConfirm')),
                 ),
               ],
             );
@@ -916,14 +922,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 side: BorderSide(color: scheme.outline.withValues(alpha: 0.7)),
               ),
               title: Text(
-                'Delete notifications',
+                LanguageController.instance.t('notifications.dialogDeleteTitle'),
                 style: TextStyle(
                   color: scheme.onSurface,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               content: Text(
-                'Delete $count selected notification${count != 1 ? "s" : ""}? This cannot be undone.',
+                count == 1
+                    ? LanguageController.instance.t('notifications.dialogDeleteBodySingle')
+                    : LanguageController.instance.t('notifications.dialogDeleteBodyPlural', {'count': count.toString()}),
                 style: TextStyle(color: scheme.onSurfaceVariant),
               ),
               actions: [
@@ -931,7 +939,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   onPressed: deleting
                       ? null
                       : () => Navigator.pop(dialogCtx),
-                  child: const Text('Cancel'),
+                  child: Text(LanguageController.instance.t('notifications.cancel')),
                 ),
                 FilledButton(
                   style: FilledButton.styleFrom(
@@ -960,19 +968,21 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 _deleteMode = false;
                               });
                               _showSnack(
-                                '$count notification${count != 1 ? "s" : ""} deleted',
+                                count == 1
+                                    ? LanguageController.instance.t('notifications.dialogDeleteSuccessSingle')
+                                    : LanguageController.instance.t('notifications.dialogDeleteSuccessPlural', {'count': count.toString()}),
                               );
                             }
                             if (ctx.mounted) Navigator.pop(dialogCtx);
                           } catch (_) {
                             setDialogState(() => deleting = false);
                             if (mounted) {
-                              _showSnack('Failed to delete', error: true);
+                              _showSnack(LanguageController.instance.t('notifications.dialogDeleteFailed'), error: true);
                             }
                             if (ctx.mounted) Navigator.pop(dialogCtx);
                           }
                         },
-                  child: Text(deleting ? 'Deleting...' : 'Delete $count'),
+                  child: Text(deleting ? LanguageController.instance.t('notifications.dialogDeleting') : LanguageController.instance.t('notifications.dialogDeleteBtnLabel')),
                 ),
               ],
             );
@@ -1016,7 +1026,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 color: scheme.onSurfaceVariant,
               ),
               title: Text(
-                item.isUnread ? 'Mark as read' : 'Mark as unread',
+                item.isUnread ? LanguageController.instance.t('notifications.menuMarkRead') : LanguageController.instance.t('notifications.menuMarkUnread'),
                 style: TextStyle(color: scheme.onSurface),
               ),
               onTap: () => Navigator.pop(context, 'toggle-read'),
@@ -1028,7 +1038,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   color: scheme.onSurfaceVariant,
                 ),
                 title: Text(
-                  item.postKind == 'reel' ? 'Mute this reel' : 'Mute this post',
+                  item.postKind == 'reel' ? LanguageController.instance.t('notifications.menuMuteReel') : LanguageController.instance.t('notifications.menuMutePost'),
                   style: TextStyle(color: scheme.onSurface),
                 ),
                 onTap: () => Navigator.pop(context, 'mute'),
@@ -1036,7 +1046,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ListTile(
               leading: Icon(Icons.delete_outline_rounded, color: scheme.error),
               title: Text(
-                'Delete notification',
+                LanguageController.instance.t('notifications.menuDelete'),
                 style: TextStyle(color: scheme.error),
               ),
               onTap: () => Navigator.pop(context, 'delete'),
@@ -1069,15 +1079,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final tokens = _tokens;
     final isDark = theme.brightness == Brightness.dark;
 
-    const options = <Map<String, dynamic>>[
-      {'key': '5m', 'label': '5 minutes', 'ms': 5 * 60 * 1000},
-      {'key': '10m', 'label': '10 minutes', 'ms': 10 * 60 * 1000},
-      {'key': '15m', 'label': '15 minutes', 'ms': 15 * 60 * 1000},
-      {'key': '30m', 'label': '30 minutes', 'ms': 30 * 60 * 1000},
-      {'key': '1h', 'label': '1 hour', 'ms': 60 * 60 * 1000},
-      {'key': '1d', 'label': '1 day', 'ms': 24 * 60 * 60 * 1000},
-      {'key': 'until', 'label': 'Until I turn it back on', 'ms': null},
-      {'key': 'custom', 'label': 'Choose date & time', 'ms': null},
+    final lc = LanguageController.instance;
+    final options = <Map<String, dynamic>>[
+      {'key': '5m', 'label': lc.t('settings.notifications.muteOptions.5m'), 'ms': 5 * 60 * 1000},
+      {'key': '10m', 'label': lc.t('settings.notifications.muteOptions.10m'), 'ms': 10 * 60 * 1000},
+      {'key': '15m', 'label': lc.t('settings.notifications.muteOptions.15m'), 'ms': 15 * 60 * 1000},
+      {'key': '30m', 'label': lc.t('settings.notifications.muteOptions.30m'), 'ms': 30 * 60 * 1000},
+      {'key': '1h', 'label': lc.t('settings.notifications.muteOptions.1h'), 'ms': 60 * 60 * 1000},
+      {'key': '1d', 'label': lc.t('settings.notifications.muteOptions.1d'), 'ms': 24 * 60 * 60 * 1000},
+      {'key': 'until', 'label': lc.t('settings.notifications.muteOptions.until'), 'ms': null},
+      {'key': 'custom', 'label': lc.t('settings.notifications.muteOptions.custom'), 'ms': null},
     ];
 
     String selected = '5m';
@@ -1111,7 +1122,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Mute notifications',
+                                lc.t('notifications.muteTitle'),
                                 style: TextStyle(
                                   color: scheme.onSurface,
                                   fontSize: 20,
@@ -1120,7 +1131,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Choose how long to pause alerts for this post.',
+                                lc.t('notifications.muteSubtitle'),
                                 style: TextStyle(
                                   color: scheme.onSurfaceVariant,
                                   fontSize: 14,
@@ -1268,7 +1279,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 size: 16,
                               ),
                               label: Text(
-                                customDate.isEmpty ? 'Select date' : customDate,
+                                customDate.isEmpty ? lc.t('notifications.muteSelectDate') : customDate,
                               ),
                             ),
                           ),
@@ -1292,7 +1303,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 size: 16,
                               ),
                               label: Text(
-                                customTime.isEmpty ? 'Select time' : customTime,
+                                customTime.isEmpty ? lc.t('notifications.muteSelectTime') : customTime,
                               ),
                             ),
                           ),
@@ -1314,7 +1325,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           onPressed: saving
                               ? null
                               : () => Navigator.of(dialogCtx).pop(),
-                          child: const Text('Cancel'),
+                          child: Text(lc.t('notifications.cancel')),
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
@@ -1342,8 +1353,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                       if (iso == null) {
                                         setModalState(() {
                                           saving = false;
-                                          error =
-                                              'Please select a valid date and time.';
+                                          error = lc.t('notifications.muteErrorInvalidDateTime');
                                         });
                                         return;
                                       }
@@ -1351,8 +1361,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                       if (!dt.isAfter(DateTime.now().toUtc())) {
                                         setModalState(() {
                                           saving = false;
-                                          error =
-                                              'Please choose a future time.';
+                                          error = lc.t('notifications.muteErrorFutureTime');
                                         });
                                         return;
                                       }
@@ -1407,11 +1416,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                       saving = false;
                                       error = e is ApiException
                                           ? e.message
-                                          : 'Failed to update notifications';
+                                          : lc.t('notifications.updateError');
                                     });
                                   }
                                 },
-                          child: Text(saving ? 'Saving...' : 'Save'),
+                          child: Text(saving ? lc.t('notifications.muteSaving') : lc.t('notifications.muteSave')),
                         ),
                       ],
                     ),
@@ -1444,8 +1453,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
         title: _deleteMode
             ? Text(
                 _selectedIds.isEmpty
-                    ? 'Select notifications'
-                    : '${_selectedIds.length} selected',
+                    ? LanguageController.instance.t('notifications.selectNotificationsBar')
+                    : LanguageController.instance.t('notifications.selectedCountBar', {'count': _selectedIds.length.toString()}),
                 style: TextStyle(
                   color: scheme.onSurface,
                   fontSize: 17,
@@ -1456,7 +1465,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Notifications',
+                    LanguageController.instance.t('notifications.appBarTitle'),
                     style: TextStyle(
                       color: scheme.onSurface,
                       fontSize: 18,
@@ -1471,7 +1480,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   TextButton(
                     onPressed: _confirmBulkDelete,
                     child: Text(
-                      'Delete (${_selectedIds.length})',
+                      LanguageController.instance.t('notifications.deleteCountBtn', {'count': _selectedIds.length.toString()}),
                       style: TextStyle(
                         color: scheme.error,
                         fontWeight: FontWeight.w700,
@@ -1484,7 +1493,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     _selectedIds.clear();
                   }),
                   child: Text(
-                    'Cancel',
+                    LanguageController.instance.t('notifications.cancel'),
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
                 ),
@@ -1496,7 +1505,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     Icons.tune_rounded,
                     color: scheme.onSurfaceVariant,
                   ),
-                  tooltip: 'Manage notifications',
+                  tooltip: LanguageController.instance.t('notifications.manageTooltip'),
                 ),
                 IconButton(
                   onPressed: _load,
@@ -1579,8 +1588,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   const SizedBox(width: 8),
                   Text(
                     _selectedIds.isEmpty
-                        ? 'Tap a notification to select it'
-                        : '${_selectedIds.length} notification${_selectedIds.length != 1 ? "s" : ""} selected',
+                        ? LanguageController.instance.t('notifications.tapToSelect')
+                        : (_selectedIds.length == 1
+                            ? LanguageController.instance.t('notifications.selectedItemBar', {'count': '1'})
+                            : LanguageController.instance.t('notifications.selectedItemsBar', {'count': _selectedIds.length.toString()})),
                     style: TextStyle(
                       color: scheme.onSurfaceVariant,
                       fontSize: 12,

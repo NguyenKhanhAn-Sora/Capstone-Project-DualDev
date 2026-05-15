@@ -1,0 +1,309 @@
+/* ── Mobile Top Bar ────────────────────────────────────────────── */
+.topBar {
+  display: none; /* hidden on desktop */
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.logo {
+  border-radius: 8px;
+}
+
+.brandName {
+  font-size: 17px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 1.2px;
+  color: var(--color-text);
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.topAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s;
+  text-decoration: none;
+}
+
+.topAction:hover {
+  background: var(--color-surface-muted);
+}
+
+.actionWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.actionBadge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff6b6b, #ff8f6b);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.guestLoginLink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  padding: 6px 10px;
+}
+
+/* ── Avatar Button ─────────────────────────────────────────────── */
+.avatarWrap {
+  position: relative;
+}
+
+.avatarBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatarFallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #d93aff, #6b8bff 70%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+}
+
+/* ── Profile Dropdown Sheet ────────────────────────────────────── */
+.profileSheet {
+  position: fixed;
+  top: 56px; /* below top bar */
+  right: 8px;
+  width: 260px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-strong);
+  z-index: 2100;
+  overflow: hidden;
+}
+
+.profileSheetHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--gradient-surface);
+}
+
+.profileSheetAvatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sheetAvatarFallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #d93aff, #6b8bff 70%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+}
+
+.sheetName {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sheetUsername {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.profileSheetMenu {
+  padding: 8px;
+  display: grid;
+  gap: 2px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.sheetItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.sheetItem:hover {
+  background: var(--color-surface-muted);
+}
+
+.sheetItemDanger {
+  color: #dc2626;
+}
+
+.sheetItemDanger:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.sheetLangRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.sheetLangLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.sheetLangBtns {
+  display: flex;
+  gap: 4px;
+}
+
+.langChip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.langChip:hover {
+  background: var(--color-surface-muted);
+}
+
+.langChipActive {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+/* ── Mobile Bottom Tab Bar ─────────────────────────────────────── */
+.bottomNav {
+  display: none; /* hidden on desktop */
+}
+
+.tabItem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 10px 0;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.tabItem:hover {
+  color: var(--color-text);
+}
+
+.tabItemActive {
+  color: var(--color-primary);
+}
+
+/* ── Show on Mobile ────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .topBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    height: 56px;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .bottomNav {
+    display: flex;
+    align-items: stretch;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottomNavHidden {
+    display: none !important;
+  }
+}

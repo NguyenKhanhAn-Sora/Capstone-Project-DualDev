@@ -1,6 +1,7 @@
 "use client";
 
 import Sidebar from "@/ui/Sidebar/sidebar";
+import MobileNav from "@/ui/MobileNav/mobile-nav";
 import { usePathname } from "next/navigation";
 import GlobalDmIncomingCalls from "@/components/GlobalDmIncomingCalls";
 import { PostUploadProvider } from "@/context/post-upload-context";
@@ -23,11 +24,17 @@ export default function MainLayout({
       <GuestAuthProvider>
         <GlobalDmIncomingCalls />
         {isMessagesPage ? (
-          <>{children}</>
+          <>
+            <MobileNav />
+            <div className="messages-mobile-wrapper">
+              {children}
+            </div>
+          </>
         ) : (
           <div className="app-shell flex">
             <Sidebar />
-            <div className="page flex-1" data-scroll-root>
+            <MobileNav />
+            <div className="page flex-1 mobile-page" data-scroll-root>
               {children}
             </div>
             {modal}

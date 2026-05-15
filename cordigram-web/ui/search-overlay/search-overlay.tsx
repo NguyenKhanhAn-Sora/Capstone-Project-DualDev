@@ -88,6 +88,28 @@ function HashTile() {
   );
 }
 
+function PersonTile() {
+  return (
+    <div className={styles.personTile} aria-hidden>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+}
+
+function QueryTile() {
+  return (
+    <div className={styles.queryTile} aria-hidden>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+        <path d="m16.5 16.5 3.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+}
+
 function toCloudinaryVideoThumbnail(url: string): string {
   const raw = (url ?? "").trim();
   if (!raw) return "";
@@ -638,16 +660,20 @@ export default function SearchOverlay(props: {
                       mediaUrl={h.imageUrl}
                       mediaType={h.mediaType || ""}
                     />
-                  ) : h.imageUrl ? (
-                    <Image
-                      src={h.imageUrl}
-                      alt=""
-                      width={42}
-                      height={42}
-                      className={styles.avatar}
-                    />
+                  ) : h.kind === "profile" ? (
+                    h.imageUrl ? (
+                      <Image
+                        src={h.imageUrl}
+                        alt=""
+                        width={48}
+                        height={48}
+                        className={styles.avatar}
+                      />
+                    ) : (
+                      <PersonTile />
+                    )
                   ) : (
-                    <div className={styles.avatar} aria-hidden />
+                    <QueryTile />
                   )}
 
                   <div className={styles.meta}>

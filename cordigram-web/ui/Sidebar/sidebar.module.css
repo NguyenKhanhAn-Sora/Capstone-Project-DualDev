@@ -582,6 +582,12 @@
   color: var(--color-primary);
 }
 
+@media (max-width: 767px) {
+  .sidebar {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .switchCard {
     max-width: 540px;

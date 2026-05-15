@@ -59,30 +59,20 @@ bool _canView(String visibility, bool isOwner, bool isFollowing) {
 }
 
 String _visibilityBadge(String visibility) {
-  if (visibility == 'private') return 'Private';
-  if (visibility == 'followers') return 'Followers only';
+  final lc = LanguageController.instance;
+  if (visibility == 'private') return lc.t('profile.visibility.private');
+  if (visibility == 'followers') return lc.t('profile.visibility.followersOnly');
   return '';
 }
 
 String _formatBirthdate(String? raw) {
   if (raw == null || raw.isEmpty) return '';
   try {
+    final lc = LanguageController.instance;
     final dt = DateTime.parse(raw);
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    final monthKeys = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    final month = lc.t('profile.months.${monthKeys[dt.month - 1]}');
+    return '$month ${dt.day}, ${dt.year}';
   } catch (_) {
     return raw;
   }
@@ -90,15 +80,16 @@ String _formatBirthdate(String? raw) {
 
 String _formatGender(String? g) {
   if (g == null) return '';
+  final lc = LanguageController.instance;
   switch (g) {
     case 'male':
-      return 'Male';
+      return lc.t('profile.gender.male');
     case 'female':
-      return 'Female';
+      return lc.t('profile.gender.female');
     case 'other':
-      return 'Other';
+      return lc.t('profile.gender.other');
     case 'prefer_not_to_say':
-      return 'Prefer not to say';
+      return lc.t('profile.gender.preferNot');
     default:
       return g;
   }
@@ -436,17 +427,16 @@ class _ProfileScreenState extends State<ProfileScreen>
         setState(() {
           _blockedView = true;
           _loading = false;
+          final lc = LanguageController.instance;
           if (isBlockedByYou) {
             _blockedViewKind = _BlockedViewKind.blockedByYou;
-            _blockedMessage =
-                'You blocked this account. Unblock them from your settings if you want to view their profile again.';
+            _blockedMessage = lc.t('profile.blocked.youBlockedMsg');
           } else if (isBlockedByUser) {
             _blockedViewKind = _BlockedViewKind.blockedByUser;
-            _blockedMessage =
-                'This user has blocked you. Their profile and content are not available.';
+            _blockedMessage = lc.t('profile.blocked.blockedByUserMsg');
           } else if (isUnavailable) {
             _blockedViewKind = _BlockedViewKind.unavailable;
-            _blockedMessage = 'This account is currently unavailable.';
+            _blockedMessage = lc.t('profile.blocked.unavailableMsg');
           } else {
             _blockedViewKind = _BlockedViewKind.generic;
           }
@@ -843,7 +833,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       setState(() {
         _profile = p.copyWith(isFollowing: !nextFollow, stats: revertStats);
       });
-      _showToast('Unable to update follow status');
+      _showToast(_t('profile.followError'));
     } finally {
       if (mounted) setState(() => _followLoading = false);
     }
@@ -1347,7 +1337,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               label: LanguageController.instance.t('profile.menu.copyLink'),
               onTap: () {
                 Navigator.pop(context);
-                _showToast('Link copied (coming soon)');
+                _showToast(_t('profile.linkCopied'));
               },
             ),
             const SizedBox(height: 8),
@@ -1373,26 +1363,26 @@ class _ProfileScreenState extends State<ProfileScreen>
         backgroundColor: const Color(0xFF111827),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
-          'Block @${p.username}?',
+          _t('profile.block.dialogTitle', {'username': p.username}),
           style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
         ),
-        content: const Text(
-          'Blocking this user will hide their content from you.',
-          style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+        content: Text(
+          _t('profile.block.dialogBody'),
+          style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF7A8BB0)),
+            child: Text(
+              LanguageController.instance.t('notifications.cancel'),
+              style: const TextStyle(color: Color(0xFF7A8BB0)),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Block',
-              style: TextStyle(
+            child: Text(
+              _t('profile.block.confirm'),
+              style: const TextStyle(
                 color: Color(0xFFEF4444),
                 fontWeight: FontWeight.w700,
               ),
@@ -1410,14 +1400,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       setState(() {
         _blockedView = true;
         _blockedViewKind = _BlockedViewKind.blockedByYou;
-        _blockedMessage =
-            'You blocked this account. Unblock them from your settings if you want to view their profile again.';
+        _blockedMessage = _t('profile.blocked.youBlockedMsg');
         _profile = null;
       });
-      _showToast('Blocked @${p.username}');
+      _showToast(_t('profile.block.successToast', {'username': p.username}));
     } catch (e) {
       final msg = e.toString().replaceFirst(RegExp(r'^.*?Exception: '), '');
-      _showToast(msg.isEmpty ? 'Unable to block user' : msg);
+      _showToast(msg.isEmpty ? _t('profile.errorGeneric') : msg);
     }
   }
 
@@ -1425,12 +1414,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     final p = _profile;
     if (p == null) return;
     if (_viewerId != null && _viewerId == p.userId) {
-      _showToast('You cannot report yourself');
+      _showToast(_t('profile.report.selfError'));
       return;
     }
     final authHeader = _authHeader();
     if (authHeader == null) {
-      _showToast('Session expired. Please sign in again.');
+      _showToast(_t('profile.report.sessionError'));
       return;
     }
 
@@ -1440,7 +1429,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       authHeader: authHeader,
     );
     if (reported && mounted) {
-      _showToast('Report submitted');
+      _showToast(_t('profile.report.success'));
     }
   }
 
@@ -1487,7 +1476,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
             Text(
-              'About',
+              _t('profile.about.title'),
               style: TextStyle(
                 color: _textPrimary,
                 fontSize: 17,
@@ -1571,9 +1560,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   String _visibilityRestriction(String? vis, String field) {
-    if (vis == 'private') return 'This $field is private.';
-    if (vis == 'followers') return 'This $field is visible to followers only.';
-    return '$field is not available.';
+    if (vis == 'private') return _t('profile.visibility.restrictPrivate', {'field': field});
+    if (vis == 'followers') return _t('profile.visibility.restrictFollowers', {'field': field});
+    return _t('profile.visibility.restrictUnavailable', {'field': field});
   }
 
   @override
@@ -1618,7 +1607,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (_profile == null) {
       return _buildErrorView(
-        message: 'Profile data is unavailable. Please try again.',
+        message: LanguageController.instance.t('profile.dataUnavailable'),
       );
     }
 
@@ -1669,9 +1658,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
                 tabs: [
                   Tab(text: LanguageController.instance.t('profile.tabs.posts')),
-                  const Tab(text: 'Reels'),
-                  if (isOwner) const Tab(text: 'Saved'),
-                  const Tab(text: 'Repost'),
+                  Tab(text: LanguageController.instance.t('profile.tabs.reels')),
+                  if (isOwner) Tab(text: LanguageController.instance.t('profile.tabs.saved')),
+                  Tab(text: LanguageController.instance.t('profile.tabs.repost')),
                 ],
               ),
               backgroundColor: _bg,
@@ -1694,8 +1683,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     final emptyTexts = {
       'posts': _t('profilePage.manage.noPostsYet'),
       'reels': _t('profilePage.manage.noReelsYet'),
-      'saved': 'No saved items yet.',
-      'repost': 'No reposts yet.',
+      'saved': _t('profilePage.manage.noSavedYet'),
+      'repost': _t('profilePage.manage.noRepostYet'),
     };
 
     const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
@@ -2006,7 +1995,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 size: 22,
               ),
               title: Text(
-                'View avatar',
+                _t('profile.avatar.view'),
                 style: TextStyle(color: scheme.onSurface, fontSize: 15),
               ),
               onTap: () {
@@ -2023,7 +2012,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 size: 22,
               ),
               title: Text(
-                'Upload photo',
+                _t('profile.avatar.upload'),
                 style: TextStyle(color: scheme.onSurface, fontSize: 15),
               ),
               onTap: () {
@@ -2041,7 +2030,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   size: 22,
                 ),
                 title: Text(
-                  'Remove current photo',
+                  _t('profile.avatar.removeMenu'),
                   style: TextStyle(color: scheme.error, fontSize: 15),
                 ),
                 onTap: () {
@@ -2326,7 +2315,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         const SizedBox(width: 8),
         _IconActionButton(
           icon: Icons.share_outlined,
-          onTap: () => _showToast('Share coming soon'),
+          onTap: () => _showToast(_t('profile.shareSoon')),
         ),
       ],
     );
@@ -2345,7 +2334,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   followStyle: true,
                 )
               : _PrimaryButton(
-                  label: p.isFollowing ? 'Following' : 'Follow',
+                  label: p.isFollowing ? _t('profile.followSheet.following') : _t('profile.followSheet.follow'),
                   onTap: _toggleFollow,
                   ghost: p.isFollowing,
                   followStyle: true,
@@ -2356,7 +2345,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           flex: 2,
           child: _SecondaryButton(
             label: LanguageController.instance.t('profile.message'),
-            onTap: () => _showToast('Messaging coming soon'),
+            onTap: () => _showToast(_t('profile.messagingSoon')),
           ),
         ),
         const SizedBox(width: 8),
@@ -2405,7 +2394,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               child: Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  _bioExpanded ? 'See less' : 'See more',
+                  _bioExpanded ? _t('profile.bio.seeLess') : _t('profile.bio.seeMore'),
                   style: TextStyle(
                     color: _accent,
                     fontSize: 13,

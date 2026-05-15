@@ -1821,3 +1821,150 @@
     justify-content: stretch;
   }
 }
+
+/* ── Mobile profile: full-screen, no card box ─────────────────── */
+@media (max-width: 767px) {
+  /* Page: no padding, no centering, full width */
+  .page {
+    padding: 0 !important;
+    display: block !important;
+    background: var(--color-bg) !important;
+  }
+
+  /* Card becomes flat, full-width strip */
+  .card {
+    width: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 16px 16px 0 !important;
+    background: var(--color-surface) !important;
+    gap: 10px !important;
+  }
+
+  /* Header: vertical, avatar centered */
+  .header {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .avatarRing {
+    width: 100px !important;
+    height: 100px !important;
+  }
+
+  /* Identity block: centered */
+  .identity {
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .displayName {
+    font-size: 20px !important;
+    text-align: center !important;
+  }
+
+  .username {
+    text-align: center !important;
+  }
+
+  .bio {
+    text-align: center !important;
+    max-width: 100% !important;
+  }
+
+  /* Stats row: evenly distributed with dividers */
+  .statsRow {
+    border-top: 1px solid var(--color-border) !important;
+    border-bottom: 1px solid var(--color-border) !important;
+    padding: 0 !important;
+    justify-content: space-around !important;
+    gap: 0 !important;
+    width: 100% !important;
+    margin-top: 4px !important;
+  }
+
+  .statCard {
+    flex-direction: column !important;
+    gap: 2px !important;
+    padding: 10px 0 !important;
+    flex: 1 !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Actions: Edit profile full-width, icon buttons side by side */
+  .actions {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    gap: 8px !important;
+    margin-top: 4px !important;
+  }
+
+  /* "Edit profile" / primary action takes full row */
+  .ownerActions .primaryButton,
+  .viewerActions .primaryButton {
+    width: 100% !important;
+    min-width: unset !important;
+    flex: 1 0 100% !important;
+  }
+
+  /* Settings + Share icon buttons: equal small squares */
+  .secondaryButton {
+    flex: 1 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    padding: 10px !important;
+  }
+
+  /* About / bio info rows */
+  .aboutGrid {
+    padding-top: 4px !important;
+  }
+
+  /* Nav tabs: horizontal scrollable, full-width, no grid */
+  .navRow {
+    display: flex !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    gap: 0 !important;
+    margin-top: 4px !important;
+    border-bottom: 1px solid var(--color-border) !important;
+    padding-bottom: 0 !important;
+  }
+
+  .navRow::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .navItemWrap {
+    flex: 1 !important;
+    min-width: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .navItem {
+    border-radius: 0 !important;
+    padding: 12px 8px !important;
+    width: 100% !important;
+    font-size: 13px !important;
+  }
+
+  .navItemContent {
+    justify-content: center !important;
+    gap: 4px !important;
+  }
+
+  /* Posts grid: tight 3-column (handled by child page, but override any padding) */
+  .postsGrid,
+  .reelsGrid,
+  .savedGrid {
+    padding: 0 !important;
+    gap: 2px !important;
+    border-radius: 0 !important;
+  }
+}

@@ -2009,3 +2009,76 @@
   color: #cbd5e1;
   padding: 24px 0;
 }
+
+/* ── Mobile feed fixes ──────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Block horizontal overflow from the feed page down */
+  .page {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Card must not exceed viewport */
+  .feedCard {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    padding: 12px !important;
+  }
+
+  /* Action row: compress, no overflow */
+  .actionRow {
+    gap: 0 !important;
+    justify-content: space-around !important;
+    overflow: hidden !important;
+    max-width: 100% !important;
+  }
+
+  /* Action buttons: icon only — hide the text span */
+  .actionBtn {
+    padding: 8px !important;
+    gap: 0 !important;
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+    flex: 1 !important;
+    justify-content: center !important;
+  }
+
+  .actionBtn span {
+    display: none !important;
+  }
+
+  /* Stats row */
+  .statsRow {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Header row of each card */
+  .headerRow {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .authorBlock {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    flex-shrink: 1 !important;
+  }
+
+  .authorName,
+  .authorHandle {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .headerActions {
+    flex-shrink: 0 !important;
+  }
+}
