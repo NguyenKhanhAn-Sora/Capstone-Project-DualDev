@@ -585,12 +585,14 @@ export async function createReel(opts: {
 export async function fetchFeed(opts: {
   token?: string | null;
   limit?: number;
+  page?: number;
   scope?: "all" | "following";
   kinds?: Array<"post" | "reel">;
 }): Promise<FeedItem[]> {
-  const { token, limit = 20, scope, kinds } = opts;
+  const { token, limit = 20, page, scope, kinds } = opts;
   const params = new URLSearchParams();
   params.set("limit", String(limit));
+  if (page && page > 1) params.set("page", String(page));
   if (scope) params.set("scope", scope);
   if (kinds?.length) params.set("kinds", kinds.join(","));
 

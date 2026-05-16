@@ -113,12 +113,11 @@ const getUserIdFromToken = (token: string | null): string | undefined => {
 };
 
 const PAGE_SIZE = 12;
-const MS_24H = 24 * 60 * 60 * 1000;
 const VIEW_DEBOUNCE_MS = 800;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 300000;
 const REPORT_ANIMATION_MS = 200;
-const FEED_POLL_MS = 4000;
+const FEED_POLL_MS = 15000; // per-post stats refresh when card is visible (15 s)
 const FEED_CACHE_KEY = "feedCache:v1";
 const FEED_CACHE_INTENT_KEY = "feedCache:intent";
 const QUOTE_CHAR_LIMIT = 500;
@@ -534,6 +533,9 @@ export default function HomePage({
   const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const autoLoadLockRef = useRef(false);
+  const [newPostsAvailable, setNewPostsAvailable] = useState(false);
+  const topPostIdRef = useRef<string | null>(null);
+  const newPostsCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const feedCacheKey = useMemo(() => {
     const searchKey = (searchQueryOverride ?? "").trim();
@@ -547,38 +549,11 @@ export default function HomePage({
   }, [scopeOverride, searchQueryOverride]);
 
   const isSearchMode = Boolean((searchQueryOverride ?? "").trim());
-  const sortedItems = useMemo(() => {
-    if (!viewerId) return items;
-    const now = Date.now();
-    const own24h: PostViewState[] = [];
-    const rest: PostViewState[] = [];
-    for (const entry of items) {
-      const isOwn = entry.item.authorId === viewerId;
-      const isPostKind = entry.item.kind === "post";
-      const ts =
-        (entry.item as any).createdAt ||
-        (entry.item as any).publishedAt;
-      const isRecent = ts
-        ? now - new Date(ts as string).getTime() < MS_24H
-        : false;
-      if (isOwn && isPostKind && isRecent) {
-        own24h.push(entry);
-      } else {
-        rest.push(entry);
-      }
-    }
-    if (!own24h.length) return items;
-    own24h.sort((a, b) => {
-      const aTs = (a.item as any).createdAt || (a.item as any).publishedAt || "";
-      const bTs = (b.item as any).createdAt || (b.item as any).publishedAt || "";
-      return new Date(bTs).getTime() - new Date(aTs).getTime();
-    });
-    return [...own24h, ...rest];
-  }, [items, viewerId]);
-
+  // Backend ranking already handles ordering (verified boost, relationship boost,
+  // freshness decay). No re-sort on the client — preserves the server's intent.
   const visibleItems = useMemo(
-    () => (maxItems ? sortedItems.slice(0, maxItems) : sortedItems),
-    [sortedItems, maxItems],
+    () => (maxItems ? items.slice(0, maxItems) : items),
+    [items, maxItems],
   );
   const livestreamInsertIndex = useMemo(() => {
     if (!visibleItems.length) return 0;
@@ -951,25 +926,31 @@ export default function HomePage({
   const syncStats = useCallback(async () => {
     if (!token) return;
     try {
-      const limit = page * pageSize;
       const searchKey = (searchQueryOverride ?? "").trim();
-      const data = searchKey
-        ? ((
-            await searchPosts({
-              token,
-              query: searchKey,
-              limit,
-              page: 1,
-              kinds: kindsOverride ?? ["post"],
-              sort: "trending",
-            })
-          )?.items ?? [])
-        : await fetchFeed({
-            token,
-            limit,
-            scope: scopeOverride,
-            kinds: kindsOverride,
-          });
+      // Sync stats for all currently loaded pages in parallel requests
+      const pageCount = Math.max(1, page);
+      const pages = Array.from({ length: pageCount }, (_, i) => i + 1);
+      const allFetched = await Promise.all(
+        pages.map((p) =>
+          searchKey
+            ? searchPosts({
+                token,
+                query: searchKey,
+                limit: pageSize,
+                page: p,
+                kinds: kindsOverride ?? ["post"],
+                sort: "trending",
+              }).then((r) => r?.items ?? [])
+            : fetchFeed({
+                token,
+                limit: pageSize,
+                page: p,
+                scope: scopeOverride,
+                kinds: kindsOverride,
+              }),
+        ),
+      );
+      const data = allFetched.flat();
       const posts = filterFeedItemsByBlockedAuthors(
         onlyPostItems(Array.isArray(data) ? data : []),
         blockedIds,
@@ -1001,12 +982,55 @@ export default function HomePage({
     token,
   ]);
 
+  // Periodically check for new posts at the top of the feed (every 60 s)
+  useEffect(() => {
+    if (!initialized || isSearchMode || embedded) return;
+    if (typeof window === "undefined") return;
+
+    const check = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const peeked = await fetchFeed({
+          token,
+          limit: 1,
+          page: 1,
+          scope: scopeOverride,
+          kinds: kindsOverride,
+        });
+        const latestId = Array.isArray(peeked) && peeked[0]?.id;
+        if (!latestId) return;
+        if (topPostIdRef.current === null) {
+          // first snapshot — just record
+          topPostIdRef.current = latestId;
+          return;
+        }
+        if (topPostIdRef.current !== latestId) {
+          setNewPostsAvailable(true);
+        }
+      } catch {}
+    };
+
+    newPostsCheckIntervalRef.current = setInterval(check, 60_000);
+    return () => {
+      if (newPostsCheckIntervalRef.current) {
+        clearInterval(newPostsCheckIntervalRef.current);
+        newPostsCheckIntervalRef.current = null;
+      }
+    };
+  }, [initialized, isSearchMode, embedded, token, scopeOverride, kindsOverride]);
+
+  // Track the leading post id so the banner knows when feed truly changed
+  useEffect(() => {
+    if (items.length > 0 && !newPostsAvailable) {
+      topPostIdRef.current = items[0].item.id;
+    }
+  }, [items, newPostsAvailable]);
+
   const load = useCallback(
     async (nextPage: number) => {
       setLoading(true);
       setError("");
       try {
-        const limit = nextPage * pageSize;
         const searchKey = (searchQueryOverride ?? "").trim();
         const data = searchKey
           ? await searchPosts({
@@ -1019,7 +1043,8 @@ export default function HomePage({
             })
           : await fetchFeed({
               token,
-              limit,
+              limit: pageSize,
+              page: nextPage,
               scope: scopeOverride,
               kinds: kindsOverride,
             });
@@ -1029,8 +1054,9 @@ export default function HomePage({
           onlyPostItems(rawItems),
           blockedIds,
         ).filter(shouldRenderInHomeFeed);
+        // If a full page came back there are likely more items
         const nextHasMore = Array.isArray(data)
-          ? rawItems.length >= limit
+          ? rawItems.length >= pageSize
           : Boolean(data.hasMore);
         setHasMore(nextHasMore);
         const mapped = posts.map((item) => ({
@@ -1042,12 +1068,15 @@ export default function HomePage({
               (item as unknown as { following?: boolean }).following ?? false,
           },
         }));
-        setItems(mapped);
-        if (!searchKey) {
-          persistFeedCache({
-            items: mapped,
-            page: nextPage,
-            hasMore: nextHasMore,
+        if (nextPage === 1) {
+          // Fresh load — replace entire list
+          setItems(mapped);
+        } else {
+          // Append, deduplicating by id to handle any feed overlap between pages
+          setItems((prev) => {
+            const existingIds = new Set(prev.map((p) => p.item.id));
+            const newItems = mapped.filter((p) => !existingIds.has(p.item.id));
+            return [...prev, ...newItems];
           });
         }
         setPage(nextPage);
@@ -1066,7 +1095,6 @@ export default function HomePage({
       blockedIds,
       kindsOverride,
       pageSize,
-      persistFeedCache,
       scopeOverride,
       searchQueryOverride,
       t,
@@ -1658,6 +1686,24 @@ export default function HomePage({
       <div className={embedded ? styles.embedded : styles.centerColumn}>
         <PostUploadBanner />
         {headerSlot}
+
+        {newPostsAvailable && !isSearchMode && (
+          <button
+            className={styles.newPostsBanner}
+            onClick={() => {
+              setNewPostsAvailable(false);
+              topPostIdRef.current = null;
+              void load(1);
+              if (typeof window !== "undefined") {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
+          >
+            <span className={styles.newPostsIcon}>↑</span>
+            {t("feed.newPostsAvailable")}
+          </button>
+        )}
+
         {visibleItems.map(({ item, flags }, index) => (
           <Fragment key={item.id}>
             <FeedCard

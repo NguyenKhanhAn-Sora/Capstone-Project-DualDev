@@ -1996,6 +1996,53 @@
   cursor: pointer;
 }
 
+/* "New posts available" sticky banner — appears at top of feed */
+.newPostsBanner {
+  position: sticky;
+  top: 12px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 auto 12px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(34, 211, 238, 0.85));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.35);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+  animation: bannerSlideDown 250ms ease;
+}
+
+.newPostsBanner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 26px rgba(99, 102, 241, 0.5);
+}
+
+.newPostsIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+@keyframes bannerSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .errorBox {
   padding: 12px 14px;
   border-radius: 12px;

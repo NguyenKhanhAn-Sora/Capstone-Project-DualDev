@@ -51,6 +51,12 @@ const SPONSORED_REPUTATION_WINDOW_DAYS = 30
 const ADS_FREQUENCY_COOLDOWN_MINUTES = 30
 const ADS_FREQUENCY_MAX_IMPRESSIONS_24H = 3
 const REACH_RESTRICT_SCORE_MULTIPLIER = 0.15
+// Feed ranking tunables
+const FRESHNESS_HALF_LIFE_HOURS = 36       // decay half-life for post freshness
+const FOLLOW_RELATIONSHIP_BOOST = 2.0      // score multiplier for followed users
+const VERIFIED_CREATOR_BOOST = 1.8         // score multiplier for blue-tick creators
+const MAX_POSTS_PER_AUTHOR_PER_FEED = 2    // author diversity cap across the ranked pool
+const MIN_CANDIDATE_POOL_SIZE = 300        // minimum candidates to rank before slicing
 
 @Injectable()
 export class PostsService {
@@ -1343,7 +1349,8 @@ export class PostsService {
     }
 
     const minSpacing = 5;
-    const maxSponsored = Math.max(1, Math.floor(pageSize / minSpacing));
+    // Exactly 1 sponsored post per page — better UX, less intrusive
+    const maxSponsored = 1;
 
     const arranged: Array<{ post: Post; score: number }> = [];
     const overflowSponsored: Array<{ post: Post; score: number }> = [];
@@ -1372,6 +1379,29 @@ export class PostsService {
 
     // Keep stable output length by appending overflow campaigns after normal posts.
     return [...arranged, ...overflowSponsored];
+  }
+
+  private applyAuthorDiversity<T extends { post: Post }>(
+    scored: T[],
+    maxPerAuthor = MAX_POSTS_PER_AUTHOR_PER_FEED,
+  ): T[] {
+    const counts = new Map<string, number>();
+    const result: T[] = [];
+    const overflow: T[] = [];
+
+    for (const item of scored) {
+      const authorId = item.post.authorId?.toString?.() ?? '';
+      const count = counts.get(authorId) ?? 0;
+      if (count < maxPerAuthor) {
+        result.push(item);
+        counts.set(authorId, count + 1);
+      } else {
+        overflow.push(item);
+      }
+    }
+
+    // Append overflow at end so the pool is still fully traversable for deep pages
+    return [...result, ...overflow];
   }
 
   private extractVideoDuration(
@@ -1887,15 +1917,20 @@ export class PostsService {
     };
     const publicDiscoveryModerationFilter = { $in: ['normal', null] as const };
 
-    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    // Allow up to 100 items per page so deeper pagination works
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
     const safePage = Math.min(Math.max(page || 1, 1), 50);
     const sliceStart = (safePage - 1) * safeLimit;
     const sliceEnd = sliceStart + safeLimit;
-    const candidateLimit = Math.min(safeLimit * 2 * safePage, 500);
+    // Large candidate pool so the ranking algorithm has meaningful data to work with
+    const candidateLimit = Math.min(
+      Math.max(MIN_CANDIDATE_POOL_SIZE, safeLimit * 3 * safePage),
+      500,
+    );
 
-    // Guest (no userId): skip all personalization, return popular public posts only
+    // Guest (no userId): use scoring algorithm (freshness + engagement) instead of raw sort
     if (!userId) {
-      const guestCandidates = await this.postModel
+      const guestRaw = await this.postModel
         .find({
           kind: { $in: allowedKinds },
           status: 'published',
@@ -1904,11 +1939,23 @@ export class PostsService {
           deletedAt: null,
           publishedAt: { $ne: null },
         })
-        .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
+        .sort({ createdAt: -1 })
         .limit(candidateLimit)
         .lean();
 
-      const guestSlice = guestCandidates.slice(sliceStart, sliceEnd);
+      const now = new Date();
+      const emptySet = new Set<string>();
+      const guestScored = guestRaw
+        .map((raw) => ({
+          raw,
+          score: this.scorePost(this.postModel.hydrate(raw) as Post, emptySet, now),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      // Apply author diversity for guests too
+      const guestDiversified = this.applyAuthorDiversity(guestScored.map((s) => ({ post: this.postModel.hydrate(s.raw) as Post, score: s.score })));
+      const guestSlice = guestDiversified.slice(sliceStart, sliceEnd).map((s) => s.post);
+
       const authorIds = [...new Set(guestSlice.map((p) => p.authorId?.toString()).filter(Boolean))];
       const profiles = await this.getProfilesWithCreatorVerification(
         authorIds.map((id) => new Types.ObjectId(id)),
@@ -1916,9 +1963,9 @@ export class PostsService {
       const profileMap = new Map(profiles.map((p) => [p.userId?.toString(), p]));
 
       return Promise.all(
-        guestSlice.map((raw) => {
-          const profile = profileMap.get(raw.authorId?.toString()) ?? null;
-          return this.toResponse(this.postModel.hydrate(raw) as Post, profile, {});
+        guestSlice.map((post) => {
+          const profile = profileMap.get(post.authorId?.toString()) ?? null;
+          return this.toResponse(post, profile, {});
         }),
       );
     }
@@ -2093,6 +2140,20 @@ export class PostsService {
       now,
     );
 
+    // Fetch verification status for ALL candidate authors before scoring
+    const allCandidateAuthorIds = Array.from(
+      new Set(merged.map((p) => p.authorId?.toString?.()).filter(Boolean)),
+    ).map((id) => new Types.ObjectId(id));
+    const allCandidateProfiles = await this.getProfilesWithCreatorVerification(
+      allCandidateAuthorIds,
+    );
+    const verifiedByAuthorId = new Map<string, boolean>(
+      allCandidateProfiles.map((p) => [
+        p.userId?.toString?.() ?? '',
+        p.isCreatorVerified ?? false,
+      ]),
+    );
+
     const scored = merged
       .map((post) => {
         const postId = post._id?.toString?.() ?? '';
@@ -2107,6 +2168,7 @@ export class PostsService {
         const reputationPriority = isSponsored
           ? (sponsoredSignals.reputationByAuthorId.get(authorId) ?? 0)
           : 0;
+        const isCreatorVerified = verifiedByAuthorId.get(authorId) ?? false;
         return {
           post,
           score: this.scorePost(
@@ -2115,6 +2177,7 @@ export class PostsService {
             now,
             boost,
             reachRestrictedAuthorIds.has(authorId),
+            isCreatorVerified,
           ),
           isSponsored,
           boost,
@@ -2136,6 +2199,7 @@ export class PostsService {
         return b.score - a.score;
       });
 
+    // Unviewed posts first, already-viewed go to the bottom (avoids repetition)
     const prioritizedAll = [
       ...scored.filter((item) =>
         item.post._id ? !viewedIds.has(item.post._id.toString()) : true,
@@ -2211,7 +2275,10 @@ export class PostsService {
       prioritized = mixed;
     }
 
-    const pagePosts = prioritized
+    // Enforce author diversity across the ranked pool (max 2 posts per author)
+    const diversified = this.applyAuthorDiversity(prioritized);
+
+    const pagePosts = diversified
       .slice(sliceStart, sliceEnd)
       .map((item) => item.post);
 
@@ -2384,11 +2451,14 @@ export class PostsService {
     const followerVisibleModerationFilter = {
       $in: ['normal', 'restricted', null] as const,
     };
-    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
     const safePage = Math.min(Math.max(page || 1, 1), 50);
     const sliceStart = (safePage - 1) * safeLimit;
     const sliceEnd = sliceStart + safeLimit;
-    const candidateLimit = Math.min(safeLimit * 2 * safePage, 500);
+    const candidateLimit = Math.min(
+      Math.max(MIN_CANDIDATE_POOL_SIZE, safeLimit * 3 * safePage),
+      500,
+    );
     const userObjectId = this.asObjectId(userId, 'userId');
 
     const hidden = await this.postInteractionModel
@@ -2471,10 +2541,25 @@ export class PostsService {
       now,
     );
 
+    // Fetch verification status for all candidate authors before scoring
+    const followingCandidateAuthorIds = Array.from(
+      new Set(merged.map((p) => p.authorId?.toString?.()).filter(Boolean)),
+    ).map((id) => new Types.ObjectId(id));
+    const followingCandidateProfiles = await this.getProfilesWithCreatorVerification(
+      followingCandidateAuthorIds,
+    );
+    const followingVerifiedByAuthorId = new Map<string, boolean>(
+      followingCandidateProfiles.map((p) => [
+        p.userId?.toString?.() ?? '',
+        p.isCreatorVerified ?? false,
+      ]),
+    );
+
     const scored = merged
       .map((post) => {
         const boost = 0;
         const authorId = post.authorId?.toString?.() ?? '';
+        const isCreatorVerified = followingVerifiedByAuthorId.get(authorId) ?? false;
         return {
           post,
           score: this.scorePost(
@@ -2483,6 +2568,7 @@ export class PostsService {
             now,
             boost,
             reachRestrictedAuthorIds.has(authorId),
+            isCreatorVerified,
           ),
         };
       })
@@ -2494,7 +2580,9 @@ export class PostsService {
       safeLimit,
     );
 
-    const topPosts = prioritized
+    // Apply author diversity then slice for the requested page
+    const diversified = this.applyAuthorDiversity(prioritized);
+    const topPosts = diversified
       .slice(sliceStart, sliceEnd)
       .map((item) => item.post);
 
@@ -4783,13 +4871,15 @@ export class PostsService {
     now: Date,
     sponsoredBoostWeight = 0,
     reachRestricted = false,
+    isCreatorVerified = false,
   ) {
     const createdAt = post.createdAt ? new Date(post.createdAt) : now;
     const ageHours = Math.max(
       0.1,
       (now.getTime() - createdAt.getTime()) / 3_600_000,
     );
-    const freshness = 1 / (1 + ageHours / 12);
+    // Slower decay: half-life 36 h so quality content stays visible longer
+    const freshness = 1 / (1 + ageHours / FRESHNESS_HALF_LIFE_HOURS);
     const stats = post.stats ?? ({} as PostStats);
     const engagement =
       (stats.hearts ?? 0) * 2 +
@@ -4802,12 +4892,15 @@ export class PostsService {
 
     const qualityBoost =
       1 + ((post.qualityScore ?? 0) - (post.spamScore ?? 0)) * 0.01;
+    // Stronger boost for followed users so "following" content wins over viral strangers
     const relationshipBoost = followeeSet.has(post.authorId?.toString?.() ?? '')
-      ? 1.3
+      ? FOLLOW_RELATIONSHIP_BOOST
       : 1;
+    // Verified creators always rank higher within the same score tier
+    const verifiedBoost = isCreatorVerified ? VERIFIED_CREATOR_BOOST : 1;
 
     const baseScore =
-      (engagement + 1) * freshness * qualityBoost * relationshipBoost;
+      (engagement + 1) * freshness * qualityBoost * relationshipBoost * verifiedBoost;
     const sponsoredBoost = 1 + Math.max(0, sponsoredBoostWeight);
     const reachPenalty = reachRestricted ? REACH_RESTRICT_SCORE_MULTIPLIER : 1;
     return baseScore * sponsoredBoost * reachPenalty;

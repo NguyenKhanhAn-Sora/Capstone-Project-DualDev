@@ -153,6 +153,7 @@
       "unableToLoad": "Unable to load feed",
       "followingEmpty": "You are not following anyone yet, or the people you follow have not posted anything.",
       "loadMore": "Load more",
+      "newPostsAvailable": "New posts available — tap to refresh",
       "suggestionsAria": "Suggestions"
     },
     "toast": {
