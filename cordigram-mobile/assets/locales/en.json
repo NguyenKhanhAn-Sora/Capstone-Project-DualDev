@@ -480,7 +480,8 @@
     "feed": {
       "loadError": "Failed to load feed. Please try again.",
       "allSeen": "You've seen all the posts",
-      "empty": "Your feed is empty.\nFollow people to see their posts here."
+      "empty": "Your feed is empty.\nFollow people to see their posts here.",
+      "newPosts": "New posts available — tap to refresh"
     },
     "snack": {
       "saved": "Saved",
@@ -1768,6 +1769,8 @@
       "pinLimitError": "Can only pin up to {max} posts. {current} already pinned, {remaining} more available.",
       "pinReelLimitError": "Can only pin up to {max} reels. {current} already pinned, {remaining} more available.",
       "pinFailed": "Failed to pin. Please try again.",
+      "pinPostFailed": "You can only pin up to 3 posts at a time.",
+      "pinReelFailed": "You can only pin up to 3 reels at a time.",
       "deletePostTitle": "Delete selected posts?",
       "deleteReelTitle": "Delete selected reels?",
       "deletePostBody": "You are deleting {count} post(s). This action cannot be undone.",
@@ -1778,5 +1781,9 @@
       "noSavedYet": "No saved items yet.",
       "noRepostYet": "No reposts yet."
     }
+  },
+  "video": {
+    "speed": "Playback speed",
+    "quality": "Video quality"
   }
 }

@@ -480,7 +480,8 @@
     "feed": {
       "loadError": "フィードの読み込みに失敗しました。もう一度お試しください。",
       "allSeen": "すべての投稿を見ました",
-      "empty": "フィードが空です。\n人をフォローして投稿を見ましょう。"
+      "empty": "フィードが空です。\n人をフォローして投稿を見ましょう。",
+      "newPosts": "新しい投稿があります — タップして更新"
     },
     "snack": {
       "saved": "保存しました",
@@ -1768,6 +1769,8 @@
       "pinLimitError": "投稿は最大{max}件まで固定できます。現在{current}件固定中、あと{remaining}件固定可能。",
       "pinReelLimitError": "リールは最大{max}件まで固定できます。現在{current}件固定中、あと{remaining}件固定可能。",
       "pinFailed": "固定に失敗しました。もう一度お試しください。",
+      "pinPostFailed": "You can only pin up to 3 posts at a time.",
+      "pinReelFailed": "You can only pin up to 3 reels at a time.",
       "deletePostTitle": "選択した投稿を削除しますか？",
       "deleteReelTitle": "選択したリールを削除しますか？",
       "deletePostBody": "{count}件の投稿を削除します。この操作は元に戻せません。",
@@ -1778,5 +1781,9 @@
       "noSavedYet": "まだ保存したアイテムがありません。",
       "noRepostYet": "まだリポストがありません。"
     }
+  },
+  "video": {
+    "speed": "再生速度",
+    "quality": "動画品質"
   }
 }

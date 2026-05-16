@@ -481,7 +481,8 @@
     "feed": {
       "loadError": "Không thể tải bảng tin. Vui lòng thử lại.",
       "allSeen": "Bạn đã xem hết tất cả bài viết",
-      "empty": "Bảng tin của bạn đang trống.\nHãy theo dõi người khác để xem bài viết của họ."
+      "empty": "Bảng tin của bạn đang trống.\nHãy theo dõi người khác để xem bài viết của họ.",
+      "newPosts": "Có bài viết mới — nhấn để làm mới"
     },
     "snack": {
       "saved": "Đã lưu",
@@ -1769,6 +1770,8 @@
       "pinLimitError": "Chỉ có thể ghim tối đa {max} bài viết. Đã ghim {current}, còn có thể ghim thêm {remaining}.",
       "pinReelLimitError": "Chỉ có thể ghim tối đa {max} reel. Đã ghim {current}, còn có thể ghim thêm {remaining}.",
       "pinFailed": "Ghim thất bại. Vui lòng thử lại.",
+      "pinPostFailed": "You can only pin up to 3 posts at a time.",
+      "pinReelFailed": "You can only pin up to 3 reels at a time.",
       "deletePostTitle": "Xóa bài viết đã chọn?",
       "deleteReelTitle": "Xóa reel đã chọn?",
       "deletePostBody": "Bạn đang xóa {count} bài viết. Hành động này không thể hoàn tác.",
@@ -1779,5 +1782,9 @@
       "noSavedYet": "Chưa có mục đã lưu nào.",
       "noRepostYet": "Chưa có bài chia sẻ lại nào."
     }
+  },
+  "video": {
+    "speed": "Tốc độ phát",
+    "quality": "Chất lượng video"
   }
 }

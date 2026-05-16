@@ -635,18 +635,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         items = raw
             .where((m) => m['repostOf'] == null || m['repostOf'] == '')
             .toList();
-        items.sort((a, b) {
-          final aT = _itemDisplayTimeMs(a);
-          final bT = _itemDisplayTimeMs(b);
-          return bT.compareTo(aT);
-        });
+        items = _sortItems(items);
       } else if (key == 'reels') {
         items = await ProfileService.fetchUserReels(ownerId, limit: 30);
-        items.sort((a, b) {
-          final aT = _itemDisplayTimeMs(a);
-          final bT = _itemDisplayTimeMs(b);
-          return bT.compareTo(aT);
-        });
+        items = _sortItems(items);
       } else if (key == 'repost') {
         // Combine posts + reels, keep only items with repostOf
         final results = await Future.wait([
@@ -975,9 +967,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       });
     } catch (_) {
       if (!mounted) return;
-      setState(
-        () => _managePinError = _t('profilePage.manage.pinFailed'),
-      );
+      setState(() => _managePinError = _t(
+        key == 'reels'
+            ? 'profilePage.manage.pinReelFailed'
+            : 'profilePage.manage.pinPostFailed',
+      ));
     } finally {
       if (mounted) setState(() => _manageIsBusy = false);
     }
@@ -1056,7 +1050,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         alignment: Alignment.bottomCenter,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).viewPadding.bottom),
           decoration: BoxDecoration(
             color: const Color(0xFF1A2333),
             borderRadius:
@@ -1148,7 +1142,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 28),
+      padding: EdgeInsets.fromLTRB(12, 10, 12, 12 + MediaQuery.of(context).viewPadding.bottom),
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
         border: Border(
@@ -1667,7 +1661,14 @@ class _ProfileScreenState extends State<ProfileScreen>
               borderColor: _border,
             ),
           ),
-          _buildActiveTabSliver(isOwner),
+          SliverPadding(
+            padding: EdgeInsets.only(
+              bottom: _isManageMode
+                  ? MediaQuery.of(context).viewPadding.bottom + 88
+                  : MediaQuery.of(context).viewPadding.bottom,
+            ),
+            sliver: _buildActiveTabSliver(isOwner),
+          ),
         ],
       ),
     );
@@ -3148,125 +3149,6 @@ class _ProfileTabBarDelegate extends SliverPersistentHeaderDelegate {
       oldDelegate._tabBar != _tabBar;
 }
 
-// ── Profile tab content (grid) ────────────────────────────────────────────────
-
-class _ProfileTabContent extends StatelessWidget {
-  const _ProfileTabContent({
-    required this.tabKey,
-    required this.items,
-    required this.loading,
-    required this.loaded,
-    required this.error,
-    required this.emptyText,
-    required this.onTap,
-    this.isOwner = true,
-  });
-
-  final String tabKey;
-  final List<Map<String, dynamic>> items;
-  final bool loading;
-  final bool loaded;
-  final String error;
-  final String emptyText;
-  final void Function(Map<String, dynamic>) onTap;
-  final bool isOwner;
-
-  // Helper: non-grid states wrapped in scrollable so NestedScrollView works
-  Widget _centeredScrollable(Widget child) {
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverFillRemaining(hasScrollBody: false, child: Center(child: child)),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Saved tab: non-owners see lockout message
-    if (tabKey == 'saved' && !isOwner) {
-      return _centeredScrollable(
-        const Padding(
-          padding: EdgeInsets.all(32),
-          child: Text(
-            'You cannot view saved items here.',
-            style: TextStyle(color: Color(0xFF9BAECF), fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    // Loading skeleton: 9 grey boxes
-    if (loading && !loaded) {
-      return GridView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 2,
-          crossAxisSpacing: 2,
-        ),
-        itemCount: 9,
-        itemBuilder: (_, __) => const ColoredBox(color: Color(0xFF1A2740)),
-      );
-    }
-
-    // Error
-    if (error.isNotEmpty) {
-      return _centeredScrollable(
-        Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text(
-            error,
-            style: const TextStyle(color: Color(0xFFE57373), fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    // Empty
-    if (loaded && items.isEmpty) {
-      return _centeredScrollable(
-        Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text(
-            emptyText,
-            style: const TextStyle(color: Color(0xFF9BAECF), fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    // Initial state (not yet loading, not yet loaded) → empty scrollable placeholder
-    if (!loading && !loaded) {
-      return CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: const [SliverToBoxAdapter(child: SizedBox.shrink())],
-      );
-    }
-
-    // Grid
-    return GridView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 2,
-        crossAxisSpacing: 2,
-      ),
-      itemCount: items.length,
-      itemBuilder: (context, i) => _GridTile(
-        item: items[i],
-        showRepostBadge: tabKey == 'repost',
-        onTap: () => onTap(items[i]),
-      ),
-    );
-  }
-}
-
 // ── Grid tile ─────────────────────────────────────────────────────────────────
 
 class _GridTile extends StatefulWidget {
@@ -3459,10 +3341,10 @@ class _GridTileState extends State<_GridTile> {
               child: Icon(Icons.repeat, color: Colors.white70, size: 16),
             ),
 
-          // Pinned badge (bottom-left) — shown outside manage mode
+          // Pinned badge (top-left) — shown outside manage mode
           if (widget.isPinned && !widget.manageMode)
             Positioned(
-              bottom: 4,
+              top: 4,
               left: 4,
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -3495,8 +3377,8 @@ class _GridTileState extends State<_GridTile> {
               ),
             ),
 
-          // Views count (bottom-left) — hidden when pinned badge shows
-          if (views != null && !widget.isPinned && !widget.manageMode)
+          // Views count (bottom-left)
+          if (views != null && !widget.manageMode)
             Positioned(
               bottom: 4,
               left: 4,

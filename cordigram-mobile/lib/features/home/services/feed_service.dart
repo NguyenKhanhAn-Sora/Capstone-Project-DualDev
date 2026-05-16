@@ -5,13 +5,9 @@ import '../models/feed_post.dart';
 class FeedService {
   static const int pageSize = 12;
 
-  /// Mirrors cordigram-web's load() strategy:
-  /// always fetches from the beginning with limit = page * pageSize (no ?page= param).
-  ///
-  /// Why: the backend's candidateLimit = limit * 2. If limit is small and a
-  /// ?page= offset is used, the candidate pool is exhausted early and the feed
-  /// appears to end at 3-5 posts even when many more exist. The web avoids
-  /// this by growing the limit on every "load more" call.
+  /// Proper offset-based pagination: sends limit=pageSize&page=N.
+  /// Backend now has a large candidate pool (≥300) and supports per-page slicing,
+  /// so this is safe and avoids refetching all previous items on every load-more.
   static Future<List<FeedPost>> fetchFeed({
     int page = 1,
     String scope = 'all',
@@ -20,7 +16,6 @@ class FeedService {
     final token = AuthStorage.accessToken;
     if (token == null) throw const ApiException('Not authenticated');
 
-    final limit = page * pageSize;
     final normalizedKinds = kinds
         .map((k) => k.trim().toLowerCase())
         .where((k) => k == 'post' || k == 'reel')
@@ -29,9 +24,10 @@ class FeedService {
     final normalizedScope = scope.trim().toLowerCase();
 
     final queryParams = <String, String>{
-      'limit': limit.toString(),
+      'limit': pageSize.toString(),
       'kinds': normalizedKinds.isEmpty ? 'post' : normalizedKinds.join(','),
     };
+    if (page > 1) queryParams['page'] = page.toString();
     if (normalizedScope == 'following') {
       queryParams['scope'] = 'following';
     }

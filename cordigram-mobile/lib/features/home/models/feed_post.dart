@@ -1,3 +1,21 @@
+class VideoQuality {
+  const VideoQuality({
+    required this.label,
+    required this.height,
+    required this.url,
+  });
+
+  final String label;
+  final int height;
+  final String url;
+
+  factory VideoQuality.fromJson(Map<String, dynamic> json) => VideoQuality(
+    label: (json['label'] as String?) ?? '',
+    height: (json['height'] as num?)?.toInt() ?? 0,
+    url: (json['url'] as String?) ?? '',
+  );
+}
+
 class FeedMedia {
   const FeedMedia({
     required this.type,
@@ -5,6 +23,7 @@ class FeedMedia {
     this.originalUrl,
     this.originalSecureUrl,
     this.moderationDecision,
+    this.metadata,
   });
 
   final String type; // "image" | "video"
@@ -12,6 +31,24 @@ class FeedMedia {
   final String? originalUrl;
   final String? originalSecureUrl;
   final String? moderationDecision;
+  final Map<String, dynamic>? metadata;
+
+  List<VideoQuality>? get qualities {
+    final raw = metadata?['qualities'];
+    if (raw is! List) return null;
+    final list = raw
+        .whereType<Map<String, dynamic>>()
+        .map(VideoQuality.fromJson)
+        .where((q) => q.url.isNotEmpty && q.label.isNotEmpty)
+        .toList();
+    return list.isEmpty ? null : list;
+  }
+
+  double? get metadataDurationSeconds {
+    final d = metadata?['duration'];
+    if (d is num) return d.toDouble();
+    return null;
+  }
 
   bool get isBlurredByModeration {
     final decision = (moderationDecision ?? '').toLowerCase().trim();
@@ -77,6 +114,7 @@ class FeedMedia {
           : null,
       originalUrl: (original != null && original.isNotEmpty) ? original : null,
       moderationDecision: decisionRaw?.trim(),
+      metadata: metadata,
     );
   }
 }

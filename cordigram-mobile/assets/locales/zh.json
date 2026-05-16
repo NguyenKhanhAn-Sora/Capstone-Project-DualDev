@@ -522,7 +522,8 @@
     "feed": {
       "loadError": "加载动态失败，请重试。",
       "allSeen": "您已看完所有帖子",
-      "empty": "您的动态为空。\n关注他人以查看他们的帖子。"
+      "empty": "您的动态为空。\n关注他人以查看他们的帖子。",
+      "newPosts": "有新帖子 — 点击刷新"
     },
     "snack": {
       "saved": "已保存",
@@ -1810,6 +1811,8 @@
       "pinLimitError": "最多可置顶{max}条帖子。当前已置顶{current}条，还可置顶{remaining}条。",
       "pinReelLimitError": "最多可置顶{max}条视频。当前已置顶{current}条，还可置顶{remaining}条。",
       "pinFailed": "置顶失败，请重试。",
+      "pinPostFailed": "You can only pin up to 3 posts at a time.",
+      "pinReelFailed": "You can only pin up to 3 reels at a time.",
       "deletePostTitle": "删除所选帖子？",
       "deleteReelTitle": "删除所选视频？",
       "deletePostBody": "您将删除{count}条帖子，此操作无法撤销。",
@@ -1820,5 +1823,9 @@
       "noSavedYet": "暂无已保存内容。",
       "noRepostYet": "暂无转发内容。"
     }
+  },
+  "video": {
+    "speed": "播放速度",
+    "quality": "视频质量"
   }
 }
