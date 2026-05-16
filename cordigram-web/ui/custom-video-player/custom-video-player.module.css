@@ -1,0 +1,314 @@
+.playerWrap {
+  position: relative;
+  display: block;
+  background: #000;
+  overflow: hidden;
+  /* Inherit the parent's width/height (mediaCarousel sets these) */
+  width: 100%;
+  height: 100%;
+}
+
+.videoEl {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #0b1020;
+  display: block;
+}
+
+/* Invisible click area over the video (below controls) */
+.clickArea {
+  position: absolute;
+  inset: 0;
+  bottom: 56px; /* leave space for controls */
+  cursor: pointer;
+  z-index: 1;
+}
+
+/* ─── Controls overlay ───────────────────────────────────────────────────── */
+
+.controls {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, transparent 100%);
+  padding: 28px 10px 8px;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  pointer-events: none;
+}
+
+.controlsVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ─── Progress bar ───────────────────────────────────────────────────────── */
+
+.progressWrap {
+  position: relative;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+
+.progressTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  overflow: hidden;
+  transition: height 0.15s ease;
+  pointer-events: none;
+}
+
+.progressWrap:hover .progressTrack {
+  height: 5px;
+}
+
+.progressBuffered {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+}
+
+.progressFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: #4aa3e4;
+  border-radius: 2px;
+}
+
+.progressInput {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 3;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ─── Bottom bar ─────────────────────────────────────────────────────────── */
+
+.bottomBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.leftGroup,
+.rightGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ─── Icon button ────────────────────────────────────────────────────────── */
+
+.iconBtn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.14s ease, transform 0.1s ease;
+  flex-shrink: 0;
+}
+
+.iconBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.06);
+}
+
+.iconBtn:active {
+  transform: scale(0.96);
+}
+
+/* ─── Time display ───────────────────────────────────────────────────────── */
+
+.timeDisplay {
+  font-size: 12px;
+  color: #fff;
+  white-space: nowrap;
+  user-select: none;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.timeSep {
+  opacity: 0.55;
+  margin: 0 2px;
+}
+
+/* ─── Volume ─────────────────────────────────────────────────────────────── */
+
+.volumeGroup {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.volumeSliderWrap {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(18, 24, 38, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+.volumeSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 4px;
+  height: 72px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.volumeSlider::-webkit-slider-runnable-track {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  width: 4px;
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  margin-left: -4px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.volumeSlider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Speed ──────────────────────────────────────────────────────────────── */
+
+.speedGroup {
+  position: relative;
+}
+
+.speedLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.speedMenu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: rgba(18, 24, 38, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 72px;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.speedItem {
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.speedItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.speedItemActive {
+  color: #4aa3e4;
+  font-weight: 600;
+}
+
+/* ─── Quality loading overlay ───────────────────────────────────────────── */
+
+.qualityLoadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.qualitySpinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Fullscreen overrides ───────────────────────────────────────────────── */
+
+:global(:fullscreen) .playerWrap,
+:global(:-webkit-full-screen) .playerWrap {
+  width: 100vw;
+  height: 100vh;
+}
+
+:global(:fullscreen) .videoEl,
+:global(:-webkit-full-screen) .videoEl {
+  object-fit: contain;
+}

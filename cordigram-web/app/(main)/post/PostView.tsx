@@ -68,6 +68,8 @@ import {
 } from "@/lib/interaction-mute";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 import { useGuestAuth } from "@/context/guest-auth-context";
+import CustomVideoPlayer, { VideoQuality } from "@/ui/custom-video-player/CustomVideoPlayer";
+import { videoVolumeStore } from "@/hooks/use-video-volume";
 
 function upsertById(list: CommentItem[], incoming: CommentItem): CommentItem[] {
   const idx = list.findIndex((c) => c.id === incoming.id);
@@ -1449,7 +1451,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [mediaDirection, setMediaDirection] = useState<"next" | "prev">("next");
   const [revealedMediaMap, setRevealedMediaMap] = useState<Record<string, boolean>>({});
   const mediaVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [soundOn, setSoundOn] = useState(false);
   const mediaTimeRef = useRef<Map<string, number>>(new Map());
   const lastMediaKeyRef = useRef<string | null>(null);
   const resumeAppliedRef = useRef(false);
@@ -1492,18 +1493,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     if (!current || current.type !== "video") return;
     const keyMedia = current.url || `media-${mediaIndex}`;
     const videoEl = mediaVideoRef.current;
-    const time =
-      videoEl?.currentTime ?? mediaTimeRef.current.get(keyMedia) ?? 0;
-    const sound = videoEl ? !videoEl.muted || soundOn : soundOn;
+    const time = videoEl?.currentTime ?? mediaTimeRef.current.get(keyMedia) ?? 0;
+    const sound = videoEl ? !videoEl.muted : false;
     if (time <= 0.05) return;
     try {
-      const payload = { mediaIndex, time, soundOn: sound };
       sessionStorage.setItem(
         `postVideoResume:${post.id}`,
-        JSON.stringify(payload),
+        JSON.stringify({ mediaIndex, time, soundOn: sound }),
       );
     } catch {}
-  }, [mediaIndex, post, soundOn]);
+  }, [mediaIndex, post]);
 
   const goToAuthorProfile = useCallback(() => {
     setShowMoreMenu(false);
@@ -3413,36 +3412,24 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       const safeTime = Number.isFinite(duration)
         ? Math.min(Math.max(saved, 0), Math.max(0, duration - 0.2))
         : Math.max(saved, 0);
-      try {
-        videoEl.currentTime = safeTime;
-      } catch {}
+      try { videoEl.currentTime = safeTime; } catch {}
     };
 
     const handleLoaded = () => applySavedTime();
-    const handleTimeUpdate = () => {
-      mediaTimeRef.current.set(key, videoEl.currentTime || 0);
-    };
-    const handlePause = () => {
-      mediaTimeRef.current.set(key, videoEl.currentTime || 0);
-    };
+    const handleTimeUpdate = () => { mediaTimeRef.current.set(key, videoEl.currentTime || 0); };
+    const handlePause = () => { mediaTimeRef.current.set(key, videoEl.currentTime || 0); };
 
     videoEl.addEventListener("loadedmetadata", handleLoaded);
     videoEl.addEventListener("timeupdate", handleTimeUpdate);
     videoEl.addEventListener("pause", handlePause);
 
-    if (videoEl.readyState >= 1) {
-      applySavedTime();
-    }
+    if (videoEl.readyState >= 1) applySavedTime();
 
-    const playCurrent = () => {
-      try {
-        videoEl.muted = !soundOn;
-        const p = videoEl.play();
-        if (p?.catch) p.catch(() => undefined);
-      } catch {}
-    };
-
-    playCurrent();
+    // volume is managed by CustomVideoPlayer via global store; just start playback
+    try {
+      const p = videoEl.play();
+      if (p?.catch) p.catch(() => undefined);
+    } catch {}
 
     return () => {
       try {
@@ -3453,7 +3440,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       videoEl.removeEventListener("timeupdate", handleTimeUpdate);
       videoEl.removeEventListener("pause", handlePause);
     };
-  }, [currentMedia, mediaIndex, soundOn]);
+  }, [currentMedia, mediaIndex]);
 
   useEffect(() => {
     if (!post) return;
@@ -3554,7 +3541,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       mediaTimeRef.current.set(keyMedia, Math.max(0, time));
     }
 
-    if (sound) setSoundOn(true);
+    if (sound) videoVolumeStore.set({ muted: false });
 
     resumePendingRef.current = null;
   }, [post, mediaIndex]);
@@ -3571,9 +3558,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   useEffect(() => {
     return () => {
-      persistResume();
+      if (!asModal) {
+        persistResume();
+      }
     };
-  }, [persistResume]);
+  }, [persistResume, asModal]);
 
   const renderMedia = () => {
     const transitionClass = `${styles.mediaEnter} ${
@@ -3587,25 +3576,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       );
     if (currentMedia.type === "video") {
       if (!resumeReady) return null;
+      const currentMediaQualities = (currentMedia.metadata?.qualities as VideoQuality[] | undefined) ?? null;
+      const currentMediaExpectedDuration = (currentMedia.metadata?.duration as number | undefined) ?? null;
       return (
-        <video
+        <CustomVideoPlayer
           key={`${currentMedia.url}-${shouldRevealCurrentMedia ? "revealed" : "blurred"}`}
-          className={`${styles.mediaVisual} ${transitionClass}`}
-          controls
-          controlsList="nodownload noremoteplayback"
-          onContextMenu={(e) => e.preventDefault()}
-          src={currentMediaDisplayUrl}
           ref={mediaVideoRef}
+          className={`${styles.mediaVisual} ${transitionClass}`}
+          src={currentMediaDisplayUrl || ""}
+          allowDownload={allowDownloads}
+          onDownload={handleDownloadCurrentMedia}
+          qualities={currentMediaQualities}
+          expectedDuration={currentMediaExpectedDuration}
           playsInline
-          preload="metadata"
-          muted={!soundOn}
-          onVolumeChange={(e) => {
-            const target = e.currentTarget;
-            const userUnmuted = !target.muted && target.volume > 0;
-            if (userUnmuted) {
-              setSoundOn(true);
-            }
-          }}
         />
       );
     }

@@ -60,6 +60,8 @@ import {
 } from "@/lib/interaction-mute";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 import LivestreamHub from "@/components/livestream/LivestreamHub";
+import CustomVideoPlayer, { VideoQuality } from "@/ui/custom-video-player/CustomVideoPlayer";
+import { videoVolumeStore } from "@/hooks/use-video-volume";
 import styles from "./home-feed.module.css";
 import { usePostUpload } from "@/context/post-upload-context";
 import PostUploadBanner from "@/ui/post-upload-banner/post-upload-banner";
@@ -2938,30 +2940,21 @@ function FeedCard({
     Record<string, boolean>
   >({});
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [soundOn, setSoundOn] = useState(false);
-  const lastTimeRef = useRef(0);
-  const lastSoundRef = useRef(false);
   const resumeTimeRef = useRef<number | null>(null);
   const resumeAppliedRef = useRef(false);
   const persistResume = useCallback(() => {
     if (typeof window === "undefined") return;
     const videoEl = videoRef.current;
-    const time = videoEl
-      ? videoEl.currentTime || lastTimeRef.current || 0
-      : lastTimeRef.current || 0;
-    const sound = videoEl
-      ? !videoEl.muted || soundOn || lastSoundRef.current
-      : soundOn || lastSoundRef.current;
+    const time = videoEl?.currentTime ?? 0;
+    const sound = videoEl ? !videoEl.muted : false;
     if (time <= 0.05) return;
     try {
-      const payload = {
-        mediaIndex,
-        time,
-        soundOn: sound,
-      };
-      sessionStorage.setItem(`postVideoResume:${id}`, JSON.stringify(payload));
+      sessionStorage.setItem(
+        `postVideoResume:${id}`,
+        JSON.stringify({ mediaIndex, time, soundOn: sound }),
+      );
     } catch {}
-  }, [id, mediaIndex, soundOn]);
+  }, [id, mediaIndex]);
 
   const targetPostId = repostOf || id;
   const currentFeedMedia = effectiveMedia?.[mediaIndex];
@@ -3000,6 +2993,31 @@ function FeedCard({
 
     router.push(`/post/${targetPostId}`, { scroll: false });
   }, [targetPostId, router, persistResume, onPersistFeedCache]);
+
+  const handleDownloadCurrentMedia = useCallback(async () => {
+    const current = effectiveMedia?.[mediaIndex];
+    if (!current) return;
+    try {
+      const sameOrigin =
+        typeof window !== "undefined" &&
+        current.url?.startsWith(window.location.origin);
+      const res = await fetch(current.url, {
+        credentials: sameOrigin ? "include" : "omit",
+        mode: "cors",
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const nameFromUrl = current.url?.split("/").pop()?.split("?")[0];
+      link.href = objectUrl;
+      link.download = (current as any)?.filename || nameFromUrl || `media-${mediaIndex + 1}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    } catch {}
+  }, [effectiveMedia, mediaIndex]);
 
   const openAdsDetail = useCallback(async () => {
     if (!token || !promotedAdPostId) return;
@@ -3063,7 +3081,6 @@ function FeedCard({
 
   useEffect(() => {
     setMediaIndex(0);
-    setSoundOn(false);
     setImageViewerOpen(false);
     setRevealedMediaMap({});
   }, [id]);
@@ -3072,13 +3089,11 @@ function FeedCard({
     const mediaCount = effectiveMedia?.length ?? 0;
     if (mediaCount === 0) {
       setMediaIndex(0);
-      setSoundOn(false);
       setImageViewerOpen(false);
       setRevealedMediaMap({});
       return;
     }
     setMediaIndex((prev) => (prev >= mediaCount ? 0 : prev));
-    setSoundOn(false);
     setRevealedMediaMap({});
   }, [mediaKey]);
 
@@ -3104,18 +3119,13 @@ function FeedCard({
       if (typeof data.time === "number") {
         resumeTimeRef.current = Math.max(0, data.time);
       }
-      if (data.soundOn) setSoundOn(true);
+      if (data.soundOn) videoVolumeStore.set({ muted: false });
       resumeAppliedRef.current = true;
     } catch {}
     sessionStorage.removeItem(key);
   }, [id, mediaKey, effectiveMedia]);
 
-  useEffect(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl) return;
-    videoEl.muted = !soundOn;
-  }, [soundOn, mediaIndex]);
-
+  // Apply resume time when video loads metadata (forwarded ref still works)
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
@@ -3123,88 +3133,16 @@ function FeedCard({
       if (resumeTimeRef.current == null) return;
       const duration = videoEl.duration;
       const safe = Number.isFinite(duration)
-        ? Math.min(
-            Math.max(resumeTimeRef.current, 0),
-            Math.max(duration - 0.2, 0),
-          )
+        ? Math.min(Math.max(resumeTimeRef.current, 0), Math.max(duration - 0.2, 0))
         : Math.max(resumeTimeRef.current, 0);
-      try {
-        videoEl.currentTime = safe;
-      } catch {}
+      try { videoEl.currentTime = safe; } catch {}
       resumeTimeRef.current = null;
     };
     videoEl.addEventListener("loadedmetadata", applyResume);
     if (videoEl.readyState >= 1) applyResume();
-    return () => {
-      videoEl.removeEventListener("loadedmetadata", applyResume);
-    };
+    return () => videoEl.removeEventListener("loadedmetadata", applyResume);
   }, [mediaIndex]);
 
-  useEffect(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl) return;
-
-    const handleEntries = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const playPromise = videoEl.play();
-          if (playPromise?.catch) playPromise.catch(() => undefined);
-        } else {
-          videoEl.pause();
-        }
-      });
-    };
-
-    const observer = new IntersectionObserver(handleEntries, {
-      threshold: 0.6,
-    });
-
-    observer.observe(videoEl);
-
-    return () => {
-      observer.disconnect();
-      videoEl.pause();
-    };
-  }, [mediaIndex, mediaKey]);
-
-  useEffect(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl) return;
-    const handler = () => persistResume();
-    videoEl.addEventListener("timeupdate", handler);
-    videoEl.addEventListener("pause", handler);
-    videoEl.addEventListener("ended", handler);
-    const updateRefs = () => {
-      lastTimeRef.current = videoEl.currentTime || 0;
-      lastSoundRef.current = !videoEl.muted;
-    };
-    videoEl.addEventListener("timeupdate", updateRefs);
-    videoEl.addEventListener("volumechange", updateRefs);
-    videoEl.addEventListener("pause", updateRefs);
-    return () => {
-      videoEl.removeEventListener("timeupdate", handler);
-      videoEl.removeEventListener("pause", handler);
-      videoEl.removeEventListener("ended", handler);
-      videoEl.removeEventListener("timeupdate", updateRefs);
-      videoEl.removeEventListener("volumechange", updateRefs);
-      videoEl.removeEventListener("pause", updateRefs);
-    };
-  }, [persistResume]);
-
-  useEffect(() => {
-    return () => {
-      persistResume();
-    };
-  }, [persistResume]);
-
-  const enableSound = useCallback(() => {
-    setSoundOn(true);
-    const videoEl = videoRef.current;
-    if (!videoEl) return;
-    videoEl.muted = false;
-    const playPromise = videoEl.play();
-    if (playPromise?.catch) playPromise.catch(() => undefined);
-  }, []);
 
   const captionNodes = useMemo(() => {
     if (!renderedContent) return null;
@@ -4401,19 +4339,21 @@ function FeedCard({
                 const current = sourceMedia[mediaIndex];
                 if (!current) return null;
                 if (current.type === "video") {
+                  const currentQualities = (current.metadata?.qualities as VideoQuality[] | undefined) ?? null;
+                  const currentExpectedDuration = (current.metadata?.duration as number | undefined) ?? null;
                   return (
-                    <video
+                    <CustomVideoPlayer
                       key={`${id}-source-${mediaIndex}`}
                       ref={videoRef}
                       src={currentFeedMediaDisplayUrl || current.url}
-                      controls
-                      controlsList="nodownload noremoteplayback"
-                      muted={!soundOn}
-                      playsInline
-                      preload="metadata"
-                      onContextMenu={(e) => e.preventDefault()}
-                      onPlay={() => onView(id, 1000)}
                       className={styles.mediaVisual}
+                      allowDownload={allowDownload ?? false}
+                      onDownload={handleDownloadCurrentMedia}
+                      qualities={currentQualities}
+                      expectedDuration={currentExpectedDuration}
+                      autoPlayOnIntersect
+                      playsInline
+                      onPlay={() => onView(id, 1000)}
                     />
                   );
                 }
@@ -4488,32 +4428,22 @@ function FeedCard({
             const current = media[mediaIndex];
             if (!current) return null;
             if (current.type === "video") {
+              const currentQualities = (current.metadata?.qualities as VideoQuality[] | undefined) ?? null;
+              const currentExpectedDuration = (current.metadata?.duration as number | undefined) ?? null;
               return (
-                <>
-                  <video
-                    key={`${id}-${mediaIndex}`}
-                    ref={videoRef}
-                    src={currentFeedMediaDisplayUrl || current.url}
-                    controls
-                    controlsList="nodownload noremoteplayback"
-                    muted={!soundOn}
-                    playsInline
-                    preload="metadata"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onPlay={() => onView(id, 1000)}
-                    className={styles.mediaVisual}
-                  />
-                  {!soundOn ? (
-                    <button
-                      type="button"
-                      className={styles.soundToggle}
-                      onClick={enableSound}
-                      aria-pressed={false}
-                    >
-                      {t("media.tapForSound")}
-                    </button>
-                  ) : null}
-                </>
+                <CustomVideoPlayer
+                  key={`${id}-${mediaIndex}`}
+                  ref={videoRef}
+                  src={currentFeedMediaDisplayUrl || current.url}
+                  className={styles.mediaVisual}
+                  allowDownload={allowDownload ?? false}
+                  onDownload={handleDownloadCurrentMedia}
+                  qualities={currentQualities}
+                  expectedDuration={currentExpectedDuration}
+                  autoPlayOnIntersect
+                  playsInline
+                  onPlay={() => onView(id, 1000)}
+                />
               );
             }
             return (

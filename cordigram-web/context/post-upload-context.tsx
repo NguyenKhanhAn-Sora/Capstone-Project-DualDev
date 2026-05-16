@@ -209,6 +209,7 @@ export function PostUploadProvider({ children }: { children: ReactNode }) {
               moderationScores: uploaded.moderationScores,
               originalUrl: uploaded.originalUrl,
               originalSecureUrl: uploaded.originalSecureUrl,
+              qualities: uploaded.qualities ?? null,
             },
           });
 

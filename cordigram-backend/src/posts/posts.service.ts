@@ -1690,6 +1690,7 @@ export class PostsService {
       folder,
       resourceType,
       overwrite: false,
+      eagerQualityHeights: isVideo ? [240, 360, 480, 720, 1080] : undefined,
     });
 
     const secureUrl =
@@ -1718,6 +1719,15 @@ export class PostsService {
             })
         : upload.url;
 
+    const qualities =
+      isVideo && upload.publicId
+        ? this.cloudinary.buildVideoQualityUrls({
+            publicId: upload.publicId,
+            originalHeight: upload.height,
+            secure: true,
+          })
+        : null;
+
     return {
       folder,
       url,
@@ -1735,6 +1745,7 @@ export class PostsService {
       moderationProvider: moderation.provider,
       moderationReasons: moderation.reasons,
       moderationScores: moderation.scores,
+      qualities,
     };
   }
 

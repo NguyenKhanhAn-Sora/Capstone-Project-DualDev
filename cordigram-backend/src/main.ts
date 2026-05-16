@@ -37,6 +37,11 @@ async function bootstrap() {
     ],
   });
 
+  // Allow up to 15 minutes for video upload + eager transcoding
+  const server = app.getHttpServer();
+  server.timeout = 900_000;
+  server.keepAliveTimeout = 900_000;
+
   await app.listen(config.port, () => {
     console.log(`Server is running on port ${config.port}`);
   });

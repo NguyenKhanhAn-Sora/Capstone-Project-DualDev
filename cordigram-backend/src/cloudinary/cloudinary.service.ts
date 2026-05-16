@@ -18,6 +18,12 @@ export interface UploadResult {
   duration?: number;
 }
 
+export interface VideoQuality {
+  label: string;
+  height: number;
+  url: string;
+}
+
 export interface StorageUsage {
   usedBytes: number;
   limitBytes: number | null;
@@ -41,6 +47,8 @@ export class CloudinaryService implements OnModuleInit {
     publicId?: string;
     resourceType?: 'image' | 'video' | 'raw';
     overwrite?: boolean;
+    /** Pre-generate quality variants in background (video only) */
+    eagerQualityHeights?: number[];
   }): Promise<UploadResult> {
     const {
       buffer,
@@ -48,6 +56,7 @@ export class CloudinaryService implements OnModuleInit {
       publicId,
       resourceType = 'image',
       overwrite,
+      eagerQualityHeights,
     } = params;
 
     const options: UploadApiOptions = {
@@ -57,6 +66,21 @@ export class CloudinaryService implements OnModuleInit {
       overwrite: overwrite ?? false,
       unique_filename: true,
     };
+
+    if (eagerQualityHeights && eagerQualityHeights.length > 0) {
+      options.eager = eagerQualityHeights.map((h) => ({
+        height: h,
+        crop: 'limit',
+        quality: 'auto',
+        format: 'mp4',
+      }));
+      // eager_async: false — block until all quality variants are generated.
+      // The upload API takes longer but quality URLs are ready by the time
+      // the post goes live, preventing the "duration grows from 0" issue.
+      options.eager_async = false;
+      // Allow up to 10 minutes for long videos (Cloudinary default is too short)
+      options.timeout = 600000;
+    }
 
     const res = await new Promise<UploadApiResponse>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
@@ -133,5 +157,38 @@ export class CloudinaryService implements OnModuleInit {
       secure,
       transformation: [{ effect: `blur:${blurStrength}` }],
     });
+  }
+
+  buildVideoQualityUrls(params: {
+    publicId: string;
+    originalHeight?: number;
+    secure?: boolean;
+  }): VideoQuality[] {
+    const { publicId, originalHeight, secure = true } = params;
+    const tiers = [
+      { label: '240p', height: 240 },
+      { label: '360p', height: 360 },
+      { label: '480p', height: 480 },
+      { label: '720p', height: 720 },
+      { label: '1080p', height: 1080 },
+    ];
+
+    const available = originalHeight
+      ? tiers.filter((t) => t.height <= originalHeight)
+      : tiers;
+
+    // Always include at least one tier
+    const list = available.length > 0 ? available : [tiers[0]];
+
+    return list.map((t) => ({
+      label: t.label,
+      height: t.height,
+      url: cloudinary.url(publicId, {
+        resource_type: 'video',
+        secure,
+        transformation: [{ height: t.height, crop: 'limit', quality: 'auto' }],
+        format: 'mp4',
+      }),
+    }));
   }
 }

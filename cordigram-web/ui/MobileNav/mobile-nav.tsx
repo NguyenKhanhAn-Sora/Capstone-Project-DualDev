@@ -71,7 +71,11 @@ export default function MobileNav() {
   const notificationOpenRef = useRef(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (isAccessTokenValid(token)) setIsGuest(false);
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     notificationOpenRef.current = notificationOpen;
@@ -350,7 +354,7 @@ export default function MobileNav() {
           </Link>
 
           {/* Profile avatar */}
-          {isGuest ? (
+          {!mounted ? null : isGuest ? (
             <Link href="/login" className={styles.guestLoginLink}>
               {t("menu.profile")}
             </Link>

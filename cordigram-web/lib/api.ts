@@ -2361,6 +2361,12 @@ export async function resetPassword(opts: {
   });
 }
 
+export type VideoQuality = {
+  label: string;
+  height: number;
+  url: string;
+};
+
 export type UploadPostMediaResponse = {
   folder: string;
   url: string;
@@ -2378,6 +2384,7 @@ export type UploadPostMediaResponse = {
   moderationProvider?: string | null;
   moderationReasons?: string[];
   moderationScores?: Record<string, number>;
+  qualities?: VideoQuality[] | null;
 };
 
 export type ReportProblemAttachment = {

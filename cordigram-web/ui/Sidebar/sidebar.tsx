@@ -79,7 +79,11 @@ export default function Sidebar() {
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [isGuest, setIsGuest] = useState(true);
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (isAccessTokenValid(token)) setIsGuest(false);
+    setMounted(true);
+  }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -500,7 +504,7 @@ export default function Sidebar() {
         </Link>
 
         <nav className={styles.nav}>
-          {navItems.filter(({ guestVisible }) => !isGuest || guestVisible).map(({ key, href, icon: Icon, hasAvatar }) =>
+          {navItems.filter(({ guestVisible }) => !mounted || !isGuest || guestVisible).map(({ key, href, icon: Icon, hasAvatar }) =>
             key === "search" ? (
               <button
                 key={key}
@@ -574,7 +578,7 @@ export default function Sidebar() {
           )}
         </nav>
 
-        {isGuest ? (
+        {!mounted ? null : isGuest ? (
           <div className={styles.guestCard}>
             <div className={styles.guestTools}>
               <button
