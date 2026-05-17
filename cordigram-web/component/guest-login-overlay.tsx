@@ -52,15 +52,9 @@ export default function GuestLoginOverlay({ open, onClose }: Props) {
 
         <div className={styles.actions}>
           <Link
-            href="/login"
+            href="/login?skipRestore=1"
             className={styles.btnPrimary}
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                window.sessionStorage.setItem("skipSessionRestore", "1");
-                window.localStorage.removeItem("accessToken");
-              }
-              onClose();
-            }}
+            onClick={onClose}
           >
             Log in
           </Link>

@@ -38,6 +38,11 @@ function normalizeApiBaseUrl(raw: string | undefined | null): string {
 
 export const apiBaseUrl = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE);
 
+// Debounce: only dispatch session-expired once per 30 s regardless of how many
+// concurrent requests fail with 401 at the same time.
+let _sessionExpiredFiredAt = 0;
+const SESSION_EXPIRED_DEBOUNCE_MS = 30_000;
+
 function extractPayloadMessage(payload: ApiErrorPayload | null): string | null {
   if (!payload) return null;
   if (typeof payload.message === "string" && payload.message.trim()) {
@@ -128,6 +133,102 @@ async function toJson<T>(res: Response): Promise<T> {
   }
 }
 
+/**
+ * Build a human-readable device info string for the current browser.
+ * Uses User-Agent Client Hints (Chrome/Edge) when available for richer detail,
+ * then falls back to UA string parsing.
+ *
+ * Result examples:
+ *   "Chrome 120 on Windows 11"
+ *   "Firefox 121 on macOS 14.2"
+ *   "Redmi Note 12 · Chrome 120 · Android 12"  ← mobile Chrome via Client Hints
+ *   "Chrome on Android"                          ← fallback
+ */
+export async function getWebDeviceInfo(): Promise<string> {
+  if (typeof navigator === "undefined") return "";
+
+  // Try User-Agent Client Hints (Chrome/Edge only)
+  const uaData = (navigator as any).userAgentData;
+  if (uaData) {
+    try {
+      const hints = await uaData.getHighEntropyValues([
+        "model",
+        "platform",
+        "platformVersion",
+        "fullVersionList",
+      ]);
+      const brand = (hints.fullVersionList as { brand: string; version: string }[] | undefined)
+        ?.filter((b) => !b.brand.toLowerCase().includes("not") && !b.brand.includes("Chromium"))
+        .at(0);
+      const browserStr = brand ? `${brand.brand} ${brand.version.split(".")[0]}` : "";
+      const platform: string = hints.platform ?? "";
+      const platformVersion: string = hints.platformVersion ?? "";
+
+      // On Windows, platformVersion "0.x.0" = Windows 10, "10.x.0" = Windows 11
+      let osStr = platform;
+      if (platform === "Windows" && platformVersion) {
+        const major = parseInt(platformVersion.split(".")[0], 10);
+        osStr = major >= 13 ? "Windows 11" : "Windows 10";
+      } else if (platform === "macOS" && platformVersion) {
+        osStr = `macOS ${platformVersion.split(".").slice(0, 2).join(".")}`;
+      } else if (platform === "Android" && platformVersion) {
+        osStr = `Android ${platformVersion}`;
+      }
+
+      const model: string = hints.model ?? "";
+
+      if (model) {
+        // Mobile: "Redmi Note 12 · Chrome 120 · Android 12"
+        const parts = [model, browserStr, osStr].filter(Boolean);
+        return parts.join(" · ");
+      }
+      if (browserStr && osStr) return `${browserStr} on ${osStr}`;
+      if (browserStr) return browserStr;
+    } catch {
+      // Client Hints blocked or unsupported — fall through
+    }
+  }
+
+  // Fallback: parse UA string manually
+  const ua = navigator.userAgent;
+  const lower = ua.toLowerCase();
+
+  let browser = "Browser";
+  const chromeMatch = ua.match(/Chrome\/([\d]+)/);
+  const firefoxMatch = ua.match(/Firefox\/([\d]+)/);
+  const safariMatch = ua.match(/Version\/([\d]+).*Safari/);
+  const edgeMatch = ua.match(/Edg\/([\d]+)/);
+  if (edgeMatch) browser = `Edge ${edgeMatch[1]}`;
+  else if (chromeMatch && !lower.includes("edg/")) browser = `Chrome ${chromeMatch[1]}`;
+  else if (firefoxMatch) browser = `Firefox ${firefoxMatch[1]}`;
+  else if (safariMatch) browser = `Safari ${safariMatch[1]}`;
+
+  // Try to extract Android device model from UA
+  const androidModel = ua.match(/Android[\s/][\d.]+;\s*([^)]+)\)/i)?.[1]?.trim();
+  if (androidModel && !androidModel.toLowerCase().startsWith("build/")) {
+    return `${androidModel} · ${browser}`;
+  }
+
+  let os = "Unknown OS";
+  if (lower.includes("windows nt 10")) os = lower.includes("windows nt 10.0") && Number(ua.match(/Windows NT 10\.0; Win64/)?.[0] ? 1 : 0) >= 0 ? "Windows" : "Windows 10";
+  if (lower.includes("windows")) os = "Windows";
+  if (lower.includes("mac os x")) {
+    const macVer = ua.match(/Mac OS X ([\d_]+)/)?.[1]?.replace(/_/g, ".");
+    os = macVer ? `macOS ${macVer.split(".").slice(0, 2).join(".")}` : "macOS";
+  }
+  if (lower.includes("android")) {
+    const ver = ua.match(/Android ([\d.]+)/)?.[1];
+    os = ver ? `Android ${ver}` : "Android";
+  }
+  if (lower.includes("iphone") || lower.includes("ipad")) {
+    const ver = ua.match(/OS ([\d_]+)/)?.[1]?.replace(/_/g, ".");
+    os = ver ? `iOS ${ver}` : "iOS";
+  }
+  if (lower.includes("linux") && !lower.includes("android")) os = "Linux";
+
+  return `${browser} on ${os}`;
+}
+
 export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
   const { path, headers, ...rest } = options;
   const url = `${apiBaseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
@@ -185,7 +286,11 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
     );
     if (!isLoginRequest && hadAuthHeader) {
       window.localStorage.removeItem("accessToken");
-      window.dispatchEvent(new CustomEvent("cordigram:session-expired"));
+      const now = Date.now();
+      if (now - _sessionExpiredFiredAt > SESSION_EXPIRED_DEBOUNCE_MS) {
+        _sessionExpiredFiredAt = now;
+        window.dispatchEvent(new CustomEvent("cordigram:session-expired"));
+      }
     }
   }
 

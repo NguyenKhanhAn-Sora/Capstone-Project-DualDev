@@ -252,6 +252,19 @@ export class UsersService {
       }
     }
 
+    // Try to extract device model from Android UA string:
+    // e.g. "Mozilla/5.0 (Linux; Android 12; Redmi Note 12) AppleWebKit..."
+    if (!deviceInfo && os === 'Android' && userAgent) {
+      const modelMatch = userAgent.match(/Android[\s/][\d.]+;\s*([^)]+)\)/i);
+      if (modelMatch) {
+        const model = modelMatch[1].trim();
+        // Skip generic tokens
+        if (model && !model.toLowerCase().startsWith('build/')) {
+          deviceInfo = model;
+        }
+      }
+    }
+
     if (!deviceInfo) {
       if (browser !== 'unknown' && os !== 'unknown') {
         deviceInfo = `${browser} on ${os}`;

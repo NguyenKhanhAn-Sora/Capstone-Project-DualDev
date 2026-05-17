@@ -11,6 +11,7 @@ import {
   fetchCurrentProfile,
   fetchUserSettings,
   getApiBaseUrl,
+  getWebDeviceInfo,
   resendTwoFactorLoginOtp,
   removeRecentAccount,
   RecentAccountResponse,
@@ -130,6 +131,10 @@ export default function LoginPage() {
       if (params.get("loggedOut") === "1") {
         clearStoredAccessToken();
         setError(null);
+        skipRestore = true;
+      }
+      if (params.get("skipRestore") === "1") {
+        clearStoredAccessToken();
         skipRestore = true;
       }
       if (window.sessionStorage.getItem("skipSessionRestore") === "1") {
@@ -430,6 +435,7 @@ export default function LoginPage() {
       if (deviceId && typeof window !== "undefined") {
         window.localStorage.setItem("cordigramDeviceId", deviceId);
       }
+      const deviceInfo = await getWebDeviceInfo();
       const result = await apiFetch<
         | { accessToken: string }
         | {
@@ -446,14 +452,11 @@ export default function LoginPage() {
           loginMethod: "recent",
         }),
         credentials: "include",
-        headers:
-          typeof navigator !== "undefined"
-            ? {
-                "x-device-info": navigator.userAgent,
-                ...(deviceId ? { "x-device-id": deviceId } : {}),
-                "x-login-method": "recent",
-              }
-            : undefined,
+        headers: {
+          ...(deviceInfo ? { "x-device-info": deviceInfo } : {}),
+          ...(deviceId ? { "x-device-id": deviceId } : {}),
+          "x-login-method": "recent",
+        },
       });
 
       if ("requiresTwoFactor" in result && result.requiresTwoFactor) {
@@ -531,6 +534,7 @@ export default function LoginPage() {
       if (deviceId && typeof window !== "undefined") {
         window.localStorage.setItem("cordigramDeviceId", deviceId);
       }
+      const deviceInfo = await getWebDeviceInfo();
       const result = await apiFetch<
         | { accessToken: string }
         | {
@@ -547,14 +551,11 @@ export default function LoginPage() {
           loginMethod: "password",
         }),
         credentials: "include",
-        headers:
-          typeof navigator !== "undefined"
-            ? {
-                "x-device-info": navigator.userAgent,
-                ...(deviceId ? { "x-device-id": deviceId } : {}),
-                "x-login-method": "password",
-              }
-            : undefined,
+        headers: {
+          ...(deviceInfo ? { "x-device-info": deviceInfo } : {}),
+          ...(deviceId ? { "x-device-id": deviceId } : {}),
+          "x-login-method": "password",
+        },
       });
 
       if ("requiresTwoFactor" in result && result.requiresTwoFactor) {
