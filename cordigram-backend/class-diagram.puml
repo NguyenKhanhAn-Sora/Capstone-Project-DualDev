@@ -1,0 +1,339 @@
+@startuml cordigram-class-diagram
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor White
+  BorderColor Black
+}
+
+' ─── USER & AUTH ─────────────────────────────
+
+class User {
+  +email: string
+  +roles: string[]
+  +status: string
+  +isVerified: boolean
+  +isCreatorVerified: boolean
+  +followerCount: number
+  +followingCount: number
+  +twoFactorEnabled: boolean
+}
+
+class Profile {
+  +userId: ObjectId
+  +displayName: string
+  +username: string
+  +avatarUrl: string
+  +bio: string
+  +pronouns: string
+  +location: string
+  +birthdate: Date
+  +visibility: string
+  +stats: object
+}
+
+class Session {
+  +userId: ObjectId
+  +tokenHash: string
+  +expiresAt: Date
+  +deviceType: string
+  +loginMethod: string
+  +ip: string
+}
+
+class Otp {
+  +email: string
+  +codeHash: string
+  +expiresAt: Date
+  +consumed: boolean
+  +attempts: number
+}
+
+class Follow {
+  +followerId: ObjectId
+  +followeeId: ObjectId
+}
+
+class Block {
+  +blockerId: ObjectId
+  +blockedId: ObjectId
+}
+
+class CreatorVerificationRequest {
+  +userId: ObjectId
+  +status: string
+  +requestNote: string
+  +reviewedBy: ObjectId
+  +reviewedAt: Date
+}
+
+' ─── SEARCH ──────────────────────────────────
+
+class SearchHistory {
+  +userId: ObjectId
+  +items: SearchHistoryItem[]
+}
+
+class SearchHistoryItem {
+  +key: string
+  +kind: string
+  +label: string
+  +refId: string
+  +lastUsedAt: Date
+}
+
+' ─── CONTENT ─────────────────────────────────
+
+class Post {
+  +authorId: ObjectId
+  +serverId: ObjectId
+  +channelId: ObjectId
+  +kind: string
+  +content: string
+  +visibility: string
+  +status: string
+  +hashtags: string[]
+  +stats: object
+  +moderationState: string
+}
+
+class Comment {
+  +postId: ObjectId
+  +authorId: ObjectId
+  +content: string
+  +parentId: ObjectId
+  +rootCommentId: ObjectId
+  +moderationState: string
+}
+
+class Poll {
+  +creatorId: ObjectId
+  +question: string
+  +options: string[]
+  +expiresAt: Date
+  +allowMultipleAnswers: boolean
+  +votes: object[]
+}
+
+class Hashtag {
+  +name: string
+  +usageCount: number
+  +lastUsedAt: Date
+}
+
+class Livestream {
+  +hostUserId: ObjectId
+  +title: string
+  +status: string
+  +visibility: string
+  +provider: string
+  +roomName: string
+  +startedAt: Date
+  +endedAt: Date
+}
+
+' ─── MESSAGING ───────────────────────────────
+
+class DirectMessage {
+  +senderId: ObjectId
+  +receiverId: ObjectId
+  +content: string
+  +type: string
+  +attachments: string[]
+  +replyTo: ObjectId
+  +isPinned: boolean
+  +isEdited: boolean
+  +isRead: boolean
+  +isDeleted: boolean
+}
+
+class Message {
+  +channelId: ObjectId
+  +senderId: ObjectId
+  +content: string
+  +messageType: string
+  +attachments: string[]
+  +replyTo: ObjectId
+  +isDeleted: boolean
+  +isPinned: boolean
+}
+
+class Notification {
+  +recipientId: ObjectId
+  +actorId: ObjectId
+  +type: string
+  +postId: ObjectId
+  +commentId: ObjectId
+  +readAt: Date
+}
+
+' ─── SERVER / COMMUNITY ──────────────────────
+
+class Server {
+  +name: string
+  +ownerId: ObjectId
+  +memberCount: number
+  +accessMode: string
+  +isPublic: boolean
+  +isAgeRestricted: boolean
+  +members: object[]
+  +bannedUsers: object[]
+}
+
+class Channel {
+  +name: string
+  +type: string
+  +serverId: ObjectId
+  +createdBy: ObjectId
+  +isDefault: boolean
+  +isPrivate: boolean
+  +position: number
+}
+
+class Role {
+  +name: string
+  +serverId: ObjectId
+  +color: string
+  +position: number
+  +isDefault: boolean
+  +mentionable: boolean
+  +memberIds: ObjectId[]
+  +permissions: object
+}
+
+class ServerInvite {
+  +fromUserId: ObjectId
+  +toUserId: ObjectId
+  +serverId: ObjectId
+  +status: string
+}
+
+' ─── PAYMENT & BOOST ─────────────────────────
+
+class PaymentTransaction {
+  +userId: string
+  +amountTotal: number
+  +currency: string
+  +paymentStatus: string
+  +objective: string
+  +promotedPostId: string
+}
+
+class BoostEntitlement {
+  +userId: string
+  +tier: string
+  +billingCycle: string
+  +status: string
+  +startsAt: Date
+  +expiresAt: Date
+}
+
+' ─── ADMIN ───────────────────────────────────
+
+class CommunityDiscoveryHistory {
+  +adminId: ObjectId
+  +serverId: ObjectId
+  +action: string
+  +note: string
+  +serverSnapshot: object
+}
+
+class Report {
+  +reporterId: ObjectId
+  +targetId: ObjectId
+  +targetType: string
+  +category: string
+  +reason: string
+  +status: string
+  +resolvedBy: ObjectId
+  +resolvedAt: Date
+}
+
+class ModerationAction {
+  +targetType: string
+  +targetId: ObjectId
+  +action: string
+  +moderatorId: ObjectId
+  +reason: string
+  +expiresAt: Date
+}
+
+class AuditLog {
+  +serverId: ObjectId
+  +actorUserId: ObjectId
+  +targetUserId: ObjectId
+  +action: string
+  +targetType: string
+  +roleId: ObjectId
+  +changes: object[]
+}
+
+class BroadcastNotice {
+  +adminId: ObjectId
+  +title: string
+  +body: string
+  +level: string
+  +targetMode: string
+  +targetUserCount: number
+  +realtimeDeliveredCount: number
+}
+
+' ─── Relationships ───────────────────────────
+
+' User & Auth
+User "1" -- "1" Profile
+User "1" -- "*" Session
+User "1" -- "*" Otp : verifies via
+User "1" -- "*" Follow
+User "1" -- "*" Block
+User "1" -- "0..1" CreatorVerificationRequest
+
+' User & Search
+User "1" -- "1" SearchHistory
+SearchHistory "1" *-- "*" SearchHistoryItem
+
+' User & Content
+User "1" -- "*" Post : creates
+User "1" -- "*" Comment : writes
+User "1" -- "*" Livestream : hosts
+
+' User & Messaging
+User "1" -- "*" DirectMessage : sends/receives
+User "1" -- "*" Notification : receives
+
+' User & Payment
+User "1" -- "*" PaymentTransaction : makes
+User "1" -- "*" BoostEntitlement
+
+' Content
+Post "1" -- "*" Comment
+Post "1" -- "0..1" Poll
+Post "*" -- "*" Hashtag
+
+' Server
+Server "1" -- "*" Channel
+Server "1" -- "*" Role
+Server "1" -- "*" ServerInvite
+Channel "1" -- "*" Message
+
+' DirectMessage self-ref (reply)
+DirectMessage "0..1" -- "*" DirectMessage : replyTo
+
+' Admin (User với role = "admin")
+User "1" -- "*" BroadcastNotice : sends (admin)
+User "1" -- "*" CommunityDiscoveryHistory : reviews (admin)
+User "1" -- "*" AuditLog : acts (admin)
+
+' Report
+User "1" -- "*" Report : files
+Post "1" -- "*" Report : reported via
+Comment "1" -- "*" Report : reported via
+User "1" -- "*" Report : resolves (admin)
+
+' Moderation
+User "1" -- "*" ModerationAction : receives
+User "1" -- "*" ModerationAction : performs (admin)
+Post "1" -- "*" ModerationAction : moderated via
+Server "1" -- "*" AuditLog : logs
+Server "1" -- "*" CommunityDiscoveryHistory : reviewed via
+
+@enduml
