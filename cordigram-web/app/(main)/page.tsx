@@ -533,6 +533,7 @@ export default function HomePage({
   const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const autoLoadLockRef = useRef(false);
+  const autoLoadPausedRef = useRef(false);
   const [newPostsAvailable, setNewPostsAvailable] = useState(false);
   const topPostIdRef = useRef<string | null>(null);
   const newPostsCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -924,7 +925,9 @@ export default function HomePage({
   }, [initialized, isSearchMode, items, page, hasMore, persistFeedCache]);
 
   const syncStats = useCallback(async () => {
-    if (!token) return;
+    const currentToken =
+      typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!currentToken) return;
     try {
       const searchKey = (searchQueryOverride ?? "").trim();
       // Sync stats for all currently loaded pages in parallel requests
@@ -934,7 +937,7 @@ export default function HomePage({
         pages.map((p) =>
           searchKey
             ? searchPosts({
-                token,
+                token: currentToken,
                 query: searchKey,
                 limit: pageSize,
                 page: p,
@@ -942,7 +945,7 @@ export default function HomePage({
                 sort: "trending",
               }).then((r) => r?.items ?? [])
             : fetchFeed({
-                token,
+                token: currentToken,
                 limit: pageSize,
                 page: p,
                 scope: scopeOverride,
@@ -979,7 +982,6 @@ export default function HomePage({
     pageSize,
     scopeOverride,
     searchQueryOverride,
-    token,
   ]);
 
   // Periodically check for new posts at the top of the feed (every 60 s)
@@ -1028,13 +1030,20 @@ export default function HomePage({
 
   const load = useCallback(
     async (nextPage: number) => {
+      // Read token fresh from localStorage each call so expired tokens removed by
+      // the session-expired handler don't cause a repeated 401 → overlay loop.
+      const currentToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("accessToken")
+          : null;
+      autoLoadPausedRef.current = false;
       setLoading(true);
       setError("");
       try {
         const searchKey = (searchQueryOverride ?? "").trim();
         const data = searchKey
           ? await searchPosts({
-              token,
+              token: currentToken,
               query: searchKey,
               limit: pageSize,
               page: nextPage,
@@ -1042,7 +1051,7 @@ export default function HomePage({
               sort: "trending",
             })
           : await fetchFeed({
-              token,
+              token: currentToken,
               limit: pageSize,
               page: nextPage,
               scope: scopeOverride,
@@ -1086,6 +1095,9 @@ export default function HomePage({
             ? (err as { message?: string }).message || t("feed.unableToLoad")
             : t("feed.unableToLoad");
         setError(msg);
+        // Pause auto-load after a failed fetch to break the 401 → overlay loop
+        // where the IntersectionObserver re-fires immediately after loading=false.
+        autoLoadPausedRef.current = true;
       } finally {
         setInitialized(true);
         setLoading(false);
@@ -1098,7 +1110,6 @@ export default function HomePage({
       scopeOverride,
       searchQueryOverride,
       t,
-      token,
     ],
   );
 
@@ -1142,6 +1153,7 @@ export default function HomePage({
         const isVisible = entries.some((entry) => entry.isIntersecting);
         if (!isVisible) return;
         if (autoLoadLockRef.current) return;
+        if (autoLoadPausedRef.current) return;
         if (loading || !hasMore) return;
         autoLoadLockRef.current = true;
         handleLoadMore();
