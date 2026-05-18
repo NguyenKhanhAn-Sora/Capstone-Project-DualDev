@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import styles from "../../profile.module.css";
 import type { FeedItem } from "@/lib/api";
 import { useProfileContext } from "../profile-context";
+import { useLanguage } from "@/component/language-provider";
 
 const formatCount = (value?: number) => {
   const n = value ?? 0;
@@ -34,6 +35,7 @@ const IconView = () => (
 
 export default function ProfileSavedPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { profile, viewerId, tabs, prefetchTab } = useProfileContext();
   const tab = tabs?.saved;
 
@@ -65,7 +67,7 @@ export default function ProfileSavedPage() {
 
   if (!isOwner) {
     return (
-      <div className={styles.errorBox}>You cannot view saved items here.</div>
+      <div className={styles.errorBox}>{t("profilePage.cannotViewSaved")}</div>
     );
   }
 
@@ -73,7 +75,7 @@ export default function ProfileSavedPage() {
     <>
       {error ? <div className={styles.errorBox}>{error}</div> : null}
       {suppressGrid ? null : showEmpty ? (
-        <div className={styles.errorBox}>No saved yet.</div>
+        <div className={styles.errorBox}>{t("profilePage.noSaved")}</div>
       ) : (
         <SavedGrid
           items={items}
@@ -127,7 +129,7 @@ function SavedGrid({
   }
 
   if (!items.length) {
-    return <div className={styles.errorBox}>No saved yet.</div>;
+    return null;
   }
 
   return (

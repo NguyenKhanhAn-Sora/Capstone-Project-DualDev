@@ -120,18 +120,29 @@ class PushNotificationService {
       unawaited(_syncTokenWithBackend(token));
     });
 
-    final token = await _messaging.getToken();
-    if (token != null && token.trim().isNotEmpty) {
-      await _syncTokenWithBackend(token);
+    try {
+      final token = await _messaging.getToken();
+      if (token != null && token.trim().isNotEmpty) {
+        await _syncTokenWithBackend(token);
+      }
+    } catch (_) {
+      // Google Play Services unavailable on this device/session — push
+      // notifications won't work but the app should still launch normally.
     }
 
     _initialized = true;
   }
 
   static Future<void> syncCurrentToken() async {
-    final token = await _messaging.getToken();
-    if (token == null || token.trim().isEmpty) return;
-    await _syncTokenWithBackend(token);
+    try {
+      final token = await _messaging
+          .getToken()
+          .timeout(const Duration(seconds: 8));
+      if (token == null || token.trim().isEmpty) return;
+      await _syncTokenWithBackend(token);
+    } catch (_) {
+      // Ignore — token will sync on next startup or token refresh.
+    }
   }
 
   static Future<void> _syncTokenWithBackend(String token) async {

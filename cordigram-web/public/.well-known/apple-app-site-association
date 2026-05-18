@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.com.example.cordigramMobile"],
+        "components": [
+          { "/": "/profile/*" },
+          { "/": "/post/*" }
+        ]
+      }
+    ]
+  }
+}

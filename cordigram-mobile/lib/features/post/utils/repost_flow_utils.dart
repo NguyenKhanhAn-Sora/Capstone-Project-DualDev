@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/services/language_controller.dart';
 
 class RepostQuoteInput {
   const RepostQuoteInput({
@@ -83,6 +84,7 @@ class _RepostMenuSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lc = LanguageController.instance;
     final scheme = Theme.of(context).colorScheme;
     final dividerColor = scheme.outline.withValues(alpha: 0.22);
     return SafeArea(
@@ -100,7 +102,7 @@ class _RepostMenuSheet extends StatelessWidget {
             children: [
               const SizedBox(height: 12),
               Text(
-                'Repost',
+                lc.t('home.repost.title'),
                 style: TextStyle(
                   color: scheme.onSurface,
                   fontWeight: FontWeight.w700,
@@ -119,18 +121,18 @@ class _RepostMenuSheet extends StatelessWidget {
               const SizedBox(height: 12),
               Divider(height: 1, color: dividerColor),
               _RepostMenuButton(
-                text: 'Repost',
+                text: lc.t('home.repost.action'),
                 color: scheme.primary,
                 onTap: () => Navigator.of(context).pop(_RepostIntent.quick),
               ),
               Divider(height: 1, color: dividerColor),
               _RepostMenuButton(
-                text: 'Quote',
+                text: lc.t('home.repost.quote'),
                 onTap: () => Navigator.of(context).pop(_RepostIntent.quote),
               ),
               Divider(height: 1, color: dividerColor),
               _RepostMenuButton(
-                text: 'Cancel',
+                text: lc.t('common.cancel'),
                 onTap: () => Navigator.of(context).pop(_RepostIntent.cancel),
               ),
             ],
@@ -286,16 +288,19 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
       }
 
       if (!mounted) return;
-      setState(() {
-        _locationLoading = false;
-        _locationOptions = options;
-        _locationError = options.isEmpty ? 'No suggestions found' : '';
-      });
-    } catch (_) {
+      final lc = LanguageController.instance;
       if (!mounted) return;
       setState(() {
         _locationLoading = false;
-        _locationError = 'Unable to search location';
+        _locationOptions = options;
+        _locationError = options.isEmpty ? lc.t('home.quoteRepost.noLocationSuggestions') : '';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      final lc = LanguageController.instance;
+      setState(() {
+        _locationLoading = false;
+        _locationError = lc.t('home.quoteRepost.locationSearchFailed');
         _locationOptions = const [];
       });
     }
@@ -303,6 +308,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final lc = LanguageController.instance;
     final scheme = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return SafeArea(
@@ -315,7 +321,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Quote repost',
+                lc.t('home.quoteRepost.title'),
                 style: TextStyle(
                   color: scheme.onSurface,
                   fontSize: 18,
@@ -333,26 +339,26 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                 maxLines: 5,
                 maxLength: 500,
                 style: TextStyle(color: scheme.onSurface),
-                decoration: _inputDecoration('Write your quote...'),
+                decoration: _inputDecoration(lc.t('home.quoteRepost.contentHint')),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _hashtagsCtrl,
                 style: TextStyle(color: scheme.onSurface),
-                decoration: _inputDecoration('Hashtags (comma separated)'),
+                decoration: _inputDecoration(lc.t('home.quoteRepost.hashtagsHint')),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _locationCtrl,
                 style: TextStyle(color: scheme.onSurface),
-                decoration: _inputDecoration('Location (optional)'),
+                decoration: _inputDecoration(lc.t('home.quoteRepost.locationHint')),
                 onChanged: _onLocationChanged,
               ),
               if (_locationLoading)
                 Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text(
-                    'Searching location...',
+                    lc.t('home.quoteRepost.searchingLocation'),
                     style: TextStyle(
                       color: scheme.onSurfaceVariant,
                       fontSize: 12,
@@ -412,18 +418,15 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _visibility,
-                items: const [
-                  DropdownMenuItem(value: 'public', child: Text('Public')),
-                  DropdownMenuItem(
-                    value: 'followers',
-                    child: Text('Followers'),
-                  ),
-                  DropdownMenuItem(value: 'private', child: Text('Private')),
+                items: [
+                  DropdownMenuItem(value: 'public', child: Text(lc.t('home.quoteRepost.visibilityPublic'))),
+                  DropdownMenuItem(value: 'followers', child: Text(lc.t('home.quoteRepost.visibilityFollowers'))),
+                  DropdownMenuItem(value: 'private', child: Text(lc.t('home.quoteRepost.visibilityPrivate'))),
                 ],
                 dropdownColor: scheme.surface,
                 iconEnabledColor: scheme.onSurfaceVariant,
                 style: TextStyle(color: scheme.onSurface, fontSize: 14),
-                decoration: _inputDecoration('Visibility'),
+                decoration: _inputDecoration(lc.t('home.quoteRepost.visibilityHint')),
                 onChanged: (v) {
                   if (v != null) setState(() => _visibility = v);
                 },
@@ -433,7 +436,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                 value: _allowComments,
                 onChanged: (v) => setState(() => _allowComments = v),
                 title: Text(
-                  'Allow comments',
+                  lc.t('home.quoteRepost.allowComments'),
                   style: TextStyle(color: scheme.onSurface),
                 ),
                 contentPadding: EdgeInsets.zero,
@@ -443,7 +446,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                 value: widget.initialAllowDownload,
                 onChanged: null,
                 title: Text(
-                  'Allow downloads (inherits original)',
+                  lc.t('home.quoteRepost.allowDownloads'),
                   style: TextStyle(color: scheme.onSurfaceVariant),
                 ),
                 contentPadding: EdgeInsets.zero,
@@ -453,7 +456,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                 value: _hideLikeCount,
                 onChanged: (v) => setState(() => _hideLikeCount = v),
                 title: Text(
-                  'Hide like count',
+                  lc.t('home.quoteRepost.hideLikeCount'),
                   style: TextStyle(color: scheme.onSurface),
                 ),
                 contentPadding: EdgeInsets.zero,
@@ -472,7 +475,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                         foregroundColor: scheme.onSurface,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
-                      child: const Text('Cancel'),
+                      child: Text(lc.t('common.cancel')),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -495,7 +498,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                         foregroundColor: scheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
-                      child: const Text('Share quote'),
+                      child: Text(lc.t('home.quoteRepost.shareQuote')),
                     ),
                   ),
                 ],

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -231,18 +232,18 @@ class _LoginScreenState extends State<LoginScreen> {
         accessToken: accessToken,
         refreshToken: result.refreshToken,
       );
+      if (!mounted) return;
+      unawaited(Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      ));
       if (_rememberMe) {
-        await _upsertRecentAfterLogin(
+        unawaited(_upsertRecentAfterLogin(
           email: _emailController.text.trim().toLowerCase(),
           accessToken: accessToken,
-        );
+        ));
       }
-      await PushNotificationService.syncCurrentToken();
-      await DmCallManager.instance.onAuthChanged();
-      if (!mounted) return;
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      unawaited(PushNotificationService.syncCurrentToken());
+      unawaited(DmCallManager.instance.onAuthChanged());
     } on ApiException catch (e) {
       setState(() {
         _error = e.message;
@@ -284,16 +285,16 @@ class _LoginScreenState extends State<LoginScreen> {
           accessToken: accessToken,
           refreshToken: refreshToken,
         );
+        if (!mounted) return;
+        unawaited(Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        ));
         final email = _decodeEmailFromToken(accessToken);
         if (email.isNotEmpty) {
-          await _upsertRecentAfterLogin(email: email, accessToken: accessToken);
+          unawaited(_upsertRecentAfterLogin(email: email, accessToken: accessToken));
         }
-        await PushNotificationService.syncCurrentToken();
-        await DmCallManager.instance.onAuthChanged();
-        if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        unawaited(PushNotificationService.syncCurrentToken());
+        unawaited(DmCallManager.instance.onAuthChanged());
       } else if (signupToken != null && needsProfile) {
         final email = _decodeEmailFromToken(signupToken);
         if (!mounted) return;
@@ -375,17 +376,16 @@ class _LoginScreenState extends State<LoginScreen> {
         accessToken: accessToken,
         refreshToken: result.refreshToken,
       );
-      await _upsertRecentAfterLogin(
+      if (!mounted) return;
+      unawaited(Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      ));
+      unawaited(_upsertRecentAfterLogin(
         email: account.email,
         accessToken: accessToken,
-      );
-      await PushNotificationService.syncCurrentToken();
-      await DmCallManager.instance.onAuthChanged();
-
-      if (!mounted) return;
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      ));
+      unawaited(PushNotificationService.syncCurrentToken());
+      unawaited(DmCallManager.instance.onAuthChanged());
     } on ApiException catch (e) {
       setState(() {
         _error = e.message;
@@ -470,8 +470,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   validator: (value) {
                                     final input = (value ?? '').trim();
-                                    if (input.isEmpty)
+                                    if (input.isEmpty) {
                                       return 'Please enter email';
+                                    }
                                     final ok = RegExp(
                                       r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
                                     ).hasMatch(input);

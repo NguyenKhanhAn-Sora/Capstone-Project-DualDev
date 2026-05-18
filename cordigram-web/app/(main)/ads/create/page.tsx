@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import EmojiPicker from "emoji-picker-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import {
@@ -59,41 +60,13 @@ type DurationPackage = {
   note: string;
 };
 
-const OBJECTIVE_OPTIONS: Array<{
-  value: Objective;
-  label: string;
-  desc: string;
-}> = [
-  {
-    value: "awareness",
-    label: "Awareness",
-    desc: "Reach new people likely to remember your brand.",
-  },
-  {
-    value: "traffic",
-    label: "Traffic",
-    desc: "Send people to your website or product page.",
-  },
-  {
-    value: "engagement",
-    label: "Engagement",
-    desc: "Get more reactions, comments, and shares.",
-  },
-  {
-    value: "leads",
-    label: "Lead generation",
-    desc: "Collect contact info from potential customers.",
-  },
-  {
-    value: "sales",
-    label: "Sales",
-    desc: "Drive purchases and conversion actions.",
-  },
-  {
-    value: "messages",
-    label: "Messages",
-    desc: "Start conversations with people interested in your offer.",
-  },
+const OBJECTIVE_KEYS: Objective[] = [
+  "awareness",
+  "traffic",
+  "engagement",
+  "leads",
+  "sales",
+  "messages",
 ];
 
 const CTA_OPTIONS: Cta[] = [
@@ -104,11 +77,7 @@ const CTA_OPTIONS: Cta[] = [
   "Contact Us",
 ];
 
-const FORMAT_OPTIONS: Array<{ value: AdFormat; label: string }> = [
-  { value: "single", label: "Single image" },
-  { value: "carousel", label: "Carousel" },
-  { value: "video", label: "Video" },
-];
+const FORMAT_KEYS: AdFormat[] = ["single", "carousel", "video"];
 
 const RECOMMENDED_INTERESTS: string[] = [
   "Technology",
@@ -160,35 +129,17 @@ const FALLBACK_COUNTRIES = [
   "Ireland",
 ];
 
-const BOOST_PACKAGES: BoostPackage[] = [
-  {
-    id: "light",
-    title: "Light Boost",
-    level: "Low competition",
-    price: 79000,
-    highlight: "Best for first ad",
-  },
-  {
-    id: "standard",
-    title: "Standard Boost",
-    level: "Medium competition",
-    price: 149000,
-    highlight: "Most chosen",
-  },
-  {
-    id: "strong",
-    title: "Strong Boost",
-    level: "High competition",
-    price: 299000,
-    highlight: "High visibility",
-  },
+const BOOST_KEYS: Array<{ id: BoostPackage["id"]; price: number }> = [
+  { id: "light", price: 79000 },
+  { id: "standard", price: 149000 },
+  { id: "strong", price: 299000 },
 ];
 
-const DURATION_PACKAGES: DurationPackage[] = [
-  { id: "d3", days: 3, price: 29000, note: "Short burst" },
-  { id: "d7", days: 7, price: 59000, note: "One week run" },
-  { id: "d14", days: 14, price: 99000, note: "Sustained delivery" },
-  { id: "d30", days: 30, price: 179000, note: "Full month coverage" },
+const DURATION_KEYS: Array<{ id: DurationPackage["id"]; days: number; price: number }> = [
+  { id: "d3", days: 3, price: 29000 },
+  { id: "d7", days: 7, price: 59000 },
+  { id: "d14", days: 14, price: 99000 },
+  { id: "d30", days: 30, price: 179000 },
 ];
 
 const toCurrency = (value: number) =>
@@ -300,6 +251,7 @@ function CustomSelect({
 export default function AdsCreatePage() {
   const canRender = useRequireAuth();
   const router = useRouter();
+  const t = useTranslations("ads.create");
 
   const [objective, setObjective] = useState<Objective>("traffic");
   const [adFormat, setAdFormat] = useState<AdFormat>("single");
@@ -348,6 +300,52 @@ export default function AdsCreatePage() {
   const headlineFieldRef = useRef<HTMLLabelElement | null>(null);
   const destinationUrlFieldRef = useRef<HTMLLabelElement | null>(null);
   const mediaFieldRef = useRef<HTMLDivElement | null>(null);
+
+  // Build translated objective options
+  const objectiveOptions = useMemo(
+    () =>
+      OBJECTIVE_KEYS.map((key) => ({
+        value: key,
+        label: t(`objective.options.${key}.label`),
+        desc: t(`objective.options.${key}.desc`),
+      })),
+    [t],
+  );
+
+  // Build translated format options
+  const formatOptions = useMemo(
+    () =>
+      FORMAT_KEYS.map((key) => ({
+        value: key,
+        label: t(`creative.formatOptions.${key}`),
+      })),
+    [t],
+  );
+
+  // Build translated boost packages
+  const boostPackages = useMemo<BoostPackage[]>(
+    () =>
+      BOOST_KEYS.map(({ id, price }) => ({
+        id,
+        price,
+        title: t(`package.boosts.${id}.title`),
+        level: t(`package.boosts.${id}.level`),
+        highlight: t(`package.boosts.${id}.highlight`),
+      })),
+    [t],
+  );
+
+  // Build translated duration packages
+  const durationPackages = useMemo<DurationPackage[]>(
+    () =>
+      DURATION_KEYS.map(({ id, days, price }) => ({
+        id,
+        days,
+        price,
+        note: t(`package.durations.${id}`),
+      })),
+    [t],
+  );
 
   useEffect(() => {
     if (!primaryEmojiOpen) return;
@@ -463,13 +461,13 @@ export default function AdsCreatePage() {
   }, []);
 
   const selectedBoost = useMemo(
-    () => BOOST_PACKAGES.find((item) => item.id === selectedBoostId) ?? null,
-    [selectedBoostId],
+    () => boostPackages.find((item) => item.id === selectedBoostId) ?? null,
+    [boostPackages, selectedBoostId],
   );
 
   const selectedDuration = useMemo(
-    () => DURATION_PACKAGES.find((item) => item.id === selectedDurationId) ?? null,
-    [selectedDurationId],
+    () => durationPackages.find((item) => item.id === selectedDurationId) ?? null,
+    [durationPackages, selectedDurationId],
   );
 
   const totalBudget = useMemo(() => {
@@ -489,11 +487,11 @@ export default function AdsCreatePage() {
     return [
       {
         value: "",
-        label: countriesLoading ? "Loading countries..." : "Select location",
+        label: countriesLoading ? t("audience.loadingCountries") : t("audience.selectLocation"),
       },
       ...base,
     ];
-  }, [countryOptions, countriesLoading, locationText]);
+  }, [countryOptions, countriesLoading, locationText, t]);
 
   const ctaOptions = useMemo<SelectOption[]>(
     () => CTA_OPTIONS.map((item) => ({ value: item, label: item })),
@@ -501,8 +499,8 @@ export default function AdsCreatePage() {
   );
 
   const selectedObjectiveLabel = useMemo(
-    () => OBJECTIVE_OPTIONS.find((item) => item.value === objective)?.label ?? "Objective",
-    [objective],
+    () => objectiveOptions.find((item) => item.value === objective)?.label ?? t("objective.title"),
+    [objective, objectiveOptions, t],
   );
 
   const mediaInputConfig = useMemo(() => {
@@ -511,7 +509,7 @@ export default function AdsCreatePage() {
         accept: "video/*",
         multiple: false,
         maxFiles: 1,
-        label: "Upload one video",
+        label: t("creative.mediaConfig.video"),
       };
     }
 
@@ -520,7 +518,7 @@ export default function AdsCreatePage() {
         accept: "image/*",
         multiple: true,
         maxFiles: 5,
-        label: "Upload up to 5 images",
+        label: t("creative.mediaConfig.carousel"),
       };
     }
 
@@ -528,9 +526,9 @@ export default function AdsCreatePage() {
       accept: "image/*",
       multiple: false,
       maxFiles: 1,
-      label: "Upload one image",
+      label: t("creative.mediaConfig.single"),
     };
-  }, [adFormat]);
+  }, [adFormat, t]);
 
   useEffect(() => {
     setMediaUploadError("");
@@ -619,33 +617,33 @@ export default function AdsCreatePage() {
     const trimmedDestinationUrl = destinationUrl.trim();
 
     if (!trimmedPrimaryText) {
-      nextErrors.primaryText = "Primary text is required.";
+      nextErrors.primaryText = t("validation.primaryTextRequired");
     }
 
     if (!trimmedHeadline) {
-      nextErrors.headline = "Headline is required.";
+      nextErrors.headline = t("validation.headlineRequired");
     }
 
     if (!trimmedDestinationUrl) {
-      nextErrors.destinationUrl = "Destination URL is required.";
+      nextErrors.destinationUrl = t("validation.destinationUrlRequired");
     } else {
       try {
         const parsed = new URL(trimmedDestinationUrl);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-          nextErrors.destinationUrl = "Destination URL must start with http:// or https://.";
+          nextErrors.destinationUrl = t("validation.destinationUrlInvalidProtocol");
         }
       } catch {
-        nextErrors.destinationUrl = "Destination URL is invalid.";
+        nextErrors.destinationUrl = t("validation.destinationUrlInvalid");
       }
     }
 
     if (uploadedMedia.length === 0) {
-      nextErrors.media = "Please upload media before publishing.";
+      nextErrors.media = t("validation.mediaRequired");
     }
 
     setPublishValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      setPaymentError("Please fill all required fields before payment.");
+      setPaymentError(t("validation.fillRequired"));
 
       const firstErrorKey = ([
         "primaryText",
@@ -679,7 +677,7 @@ export default function AdsCreatePage() {
 
   const handleStartCheckout = async () => {
     if (!hasAcceptedPaymentTerms) {
-      setPaymentError("Please accept the terms before continuing to payment.");
+      setPaymentError(t("payment.acceptTermsFirst"));
       return;
     }
 
@@ -689,7 +687,7 @@ export default function AdsCreatePage() {
         : null;
 
     if (!token) {
-      setPaymentError("Please login again before payment.");
+      setPaymentError(t("payment.loginBeforePayment"));
       return;
     }
 
@@ -750,7 +748,7 @@ export default function AdsCreatePage() {
         const message =
           error instanceof Error
             ? error.message
-            : "Failed to prepare ad creative for checkout.";
+            : t("validation.prepareCreativeFailed");
         setPaymentError(message);
         return;
       }
@@ -786,14 +784,14 @@ export default function AdsCreatePage() {
     try {
       const session = await createStripeCheckoutSession({ token, payload });
       if (!session.url) {
-        setPaymentError("Unable to create Stripe checkout session.");
+        setPaymentError(t("payment.checkoutSessionFailed"));
         return;
       }
 
       window.location.href = session.url;
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to start checkout session.";
+        error instanceof Error ? error.message : t("payment.checkoutFailed");
       setPaymentError(message);
     } finally {
       setIsCreatingCheckout(false);
@@ -830,7 +828,7 @@ export default function AdsCreatePage() {
         : null;
 
     if (!token) {
-      setMediaUploadError("Please login again to upload media.");
+      setMediaUploadError(t("validation.loginToUpload"));
       return;
     }
 
@@ -842,8 +840,8 @@ export default function AdsCreatePage() {
     if (validFiles.length === 0) {
       setMediaUploadError(
         adFormat === "video"
-          ? "Please select a video file."
-          : "Please select image files.",
+          ? t("validation.selectVideoFile")
+          : t("validation.selectImageFiles"),
       );
       return;
     }
@@ -856,8 +854,8 @@ export default function AdsCreatePage() {
     if (remainingSlots === 0) {
       setMediaUploadError(
         adFormat === "carousel"
-          ? "Carousel supports up to 5 images. Remove one to upload more."
-          : "This format only supports one file.",
+          ? t("validation.carouselLimit")
+          : t("validation.singleFileOnly"),
       );
       return;
     }
@@ -886,7 +884,7 @@ export default function AdsCreatePage() {
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Upload failed. Please try again.";
+        error instanceof Error ? error.message : t("validation.uploadFailed");
       setMediaUploadError(message);
     } finally {
       setIsUploadingMedia(false);
@@ -901,10 +899,8 @@ export default function AdsCreatePage() {
 
       <header className={styles.topBar}>
         <div>
-          <h1 className={styles.title}>Create Ad Campaign</h1>
-          <p className={styles.subtitle}>
-            Build your ad in a simple flow: objective, creative, audience, and package pricing.
-          </p>
+          <h1 className={styles.title}>{t("title")}</h1>
+          <p className={styles.subtitle}>{t("subtitle")}</p>
         </div>
 
         {hasCreatedAdsBefore ? (
@@ -914,7 +910,7 @@ export default function AdsCreatePage() {
               className={styles.secondaryBtn}
               onClick={() => router.push("/ads")}
             >
-              Back to dashboard
+              {t("backToDashboard")}
             </button>
           </div>
         ) : null}
@@ -924,12 +920,12 @@ export default function AdsCreatePage() {
         <div className={styles.formColumn}>
           <article className={styles.card}>
             <div className={styles.cardHead}>
-              <h2>Choose Campaign Objective</h2>
-              <span className={styles.pill}>Required</span>
+              <h2>{t("objective.title")}</h2>
+              <span className={styles.pill}>{t("objective.required")}</span>
             </div>
 
             <div className={styles.objectiveGrid}>
-              {OBJECTIVE_OPTIONS.map((item) => (
+              {objectiveOptions.map((item) => (
                 <button
                   key={item.value}
                   type="button"
@@ -947,27 +943,27 @@ export default function AdsCreatePage() {
 
           <article className={styles.card}>
             <div className={styles.cardHead}>
-              <h2>Ad Creative</h2>
-              <span className={styles.pill}>Main content</span>
+              <h2>{t("creative.title")}</h2>
+              <span className={styles.pill}>{t("creative.mainContent")}</span>
             </div>
 
             <label className={styles.fieldLabel}>
-              Campaign name
+              {t("creative.campaignName")}
               <input
                 className={styles.input}
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="e.g. Back to school promo"
+                placeholder={t("creative.campaignNamePlaceholder")}
               />
             </label>
 
             <div className={styles.formatTabs}>
-              {FORMAT_OPTIONS.map((item) => (
+              {formatOptions.map((item) => (
                 <button
                   key={item.value}
                   type="button"
                   className={`${styles.tabBtn} ${adFormat === item.value ? styles.tabBtnActive : ""}`}
-                  onClick={() => setAdFormat(item.value)}
+                  onClick={() => setAdFormat(item.value as AdFormat)}
                 >
                   {item.label}
                 </button>
@@ -976,23 +972,23 @@ export default function AdsCreatePage() {
 
             <div className={styles.fieldLabel} ref={primaryTextFieldRef}>
               <div className={styles.emojiRow}>
-                <span>Primary text</span>
+                <span>{t("creative.primaryText")}</span>
                 <div className={styles.emojiWrap} ref={primaryEmojiRef}>
                   <button
                     type="button"
                     className={styles.emojiButton}
                     onClick={() => setPrimaryEmojiOpen((prev) => !prev)}
-                    aria-label="Add emoji"
+                    aria-label={t("creative.addEmoji")}
                   >
                     <svg
-                      aria-label="Emoji icon"
+                      aria-label={t("creative.emojiIcon")}
                       fill="currentColor"
                       height="20"
                       role="img"
                       viewBox="0 0 24 24"
                       width="20"
                     >
-                      <title>Emoji icon</title>
+                      <title>{t("creative.emojiIcon")}</title>
                       <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
                     </svg>
                   </button>
@@ -1054,7 +1050,7 @@ export default function AdsCreatePage() {
 
             <div className={styles.twoCols}>
               <label className={styles.fieldLabel} ref={headlineFieldRef}>
-                Headline
+                {t("creative.headline")}
                 <input
                   className={styles.input}
                   value={headline}
@@ -1066,18 +1062,18 @@ export default function AdsCreatePage() {
               </label>
 
               <label className={styles.fieldLabel}>
-                CTA button
+                {t("creative.ctaButton")}
                 <CustomSelect
                   value={cta}
                   options={ctaOptions}
                   onChange={(value) => setCta(value as Cta)}
-                  placeholder="Select CTA"
+                  placeholder={t("creative.selectCta")}
                 />
               </label>
             </div>
 
             <label className={styles.fieldLabel}>
-              Description
+              {t("creative.description")}
               <input
                 className={styles.input}
                 value={description}
@@ -1086,7 +1082,7 @@ export default function AdsCreatePage() {
             </label>
 
             <label className={styles.fieldLabel} ref={destinationUrlFieldRef}>
-              Destination URL
+              {t("creative.destinationUrl")}
               <input
                 className={styles.input}
                 value={destinationUrl}
@@ -1094,7 +1090,7 @@ export default function AdsCreatePage() {
                   setDestinationUrl(e.target.value);
                   setPublishValidationErrors((prev) => ({ ...prev, destinationUrl: undefined }));
                 }}
-                placeholder="https://"
+                placeholder={t("creative.destinationUrlPlaceholder")}
               />
             </label>
             {publishValidationErrors.headline ? (
@@ -1107,9 +1103,9 @@ export default function AdsCreatePage() {
             <div className={styles.mediaPlaceholder} ref={mediaFieldRef}>
               <div className={styles.mediaIcon}>+</div>
               <div>
-                <p className={styles.mediaTitle}>Upload media</p>
+                <p className={styles.mediaTitle}>{t("creative.uploadMedia")}</p>
                 <p className={styles.mediaHint}>
-                  {mediaInputConfig.label}. Files are uploaded to server and reflected in preview.
+                  {mediaInputConfig.label}. {t("creative.uploadHintSuffix")}
                 </p>
               </div>
               <input
@@ -1126,7 +1122,7 @@ export default function AdsCreatePage() {
                 onClick={openFilePicker}
                 disabled={isUploadingMedia}
               >
-                {isUploadingMedia ? "Uploading..." : "Choose files"}
+                {isUploadingMedia ? t("creative.uploading") : t("creative.chooseFiles")}
               </button>
             </div>
 
@@ -1135,14 +1131,14 @@ export default function AdsCreatePage() {
                 {uploadedMedia.map((item, index) => (
                   <div key={`${item.publicId || item.url}-${index}`} className={styles.uploadedMediaItem}>
                     <span>
-                      {item.resourceType === "video" ? "Video" : "Image"} {index + 1}
+                      {item.resourceType === "video" ? t("creative.video") : t("creative.image")} {index + 1}
                     </span>
                     <button
                       type="button"
                       className={styles.removeMediaBtn}
                       onClick={() => removeUploadedMedia(index)}
                     >
-                      Remove
+                      {t("creative.remove")}
                     </button>
                   </div>
                 ))}
@@ -1158,24 +1154,24 @@ export default function AdsCreatePage() {
 
           <article className={styles.card}>
             <div className={styles.cardHead}>
-              <h2>Audience Targeting</h2>
-              <span className={styles.pill}>Targeting</span>
+              <h2>{t("audience.title")}</h2>
+              <span className={styles.pill}>{t("audience.targeting")}</span>
             </div>
 
             <div className={styles.twoCols}>
               <label className={styles.fieldLabel}>
-                Location
+                {t("audience.location")}
                 <CustomSelect
                   value={locationText}
                   options={locationOptions}
                   onChange={(value) => setLocationText(value)}
-                  placeholder="Select location"
+                  placeholder={t("audience.selectLocation")}
                   disabled={countriesLoading && locationOptions.length <= 1}
                 />
               </label>
 
               <div className={styles.fieldLabel}>
-                Age range
+                {t("audience.ageRange")}
                 <div className={styles.ageRow}>
                   <input
                     className={styles.input}
@@ -1185,7 +1181,7 @@ export default function AdsCreatePage() {
                     value={ageMin}
                     onChange={(e) => setAgeMin(Number(e.target.value || 13))}
                   />
-                  <span className={styles.ageSep}>to</span>
+                  <span className={styles.ageSep}>{t("audience.ageTo")}</span>
                   <input
                     className={styles.input}
                     type="number"
@@ -1199,20 +1195,20 @@ export default function AdsCreatePage() {
             </div>
 
             <div className={styles.fieldLabel}>
-              Interests
+              {t("audience.interests")}
               <div className={styles.interestComposer}>
                 <input
                   className={styles.input}
                   value={interestDraft}
                   onChange={(e) => setInterestDraft(e.target.value)}
-                  placeholder="Type an interest and press Add"
+                  placeholder={t("audience.interestPlaceholder")}
                 />
                 <button
                   type="button"
                   className={styles.smallBtn}
                   onClick={() => addInterest(interestDraft)}
                 >
-                  Add
+                  {t("audience.add")}
                 </button>
               </div>
 
@@ -1245,20 +1241,18 @@ export default function AdsCreatePage() {
             </div>
 
             <div className={styles.feedOnlyNotice}>
-              <span className={styles.feedOnlyTitle}>Placement</span>
-              <span className={styles.feedOnlyText}>
-                This ad will be delivered only on Home Feed.
-              </span>
+              <span className={styles.feedOnlyTitle}>{t("audience.placement")}</span>
+              <span className={styles.feedOnlyText}>{t("audience.placementText")}</span>
             </div>
           </article>
 
           <article className={styles.card}>
-            <h3 className={styles.estimationTitle}>Promotion package</h3>
+            <h3 className={styles.estimationTitle}>{t("package.title")}</h3>
 
-            <p className={styles.packageSectionLabel}>1. Boost strength</p>
+            <p className={styles.packageSectionLabel}>{t("package.boostStrength")}</p>
 
             <div className={styles.quickBudgetGrid}>
-              {BOOST_PACKAGES.map((item) => {
+              {boostPackages.map((item) => {
                 const active = item.id === selectedBoostId;
                 return (
                   <button
@@ -1273,16 +1267,16 @@ export default function AdsCreatePage() {
                     </div>
                     <span className={styles.quickBudgetAmount}>{toCurrency(item.price)}</span>
                     <span className={styles.quickBudgetNote}>{item.level}</span>
-                    <span className={styles.quickBudgetHint}>Controls how strongly your ad is boosted in Home Feed.</span>
+                    <span className={styles.quickBudgetHint}>{t("package.boostHint")}</span>
                   </button>
                 );
               })}
             </div>
 
-            <p className={styles.packageSectionLabel}>2. Duration package</p>
+            <p className={styles.packageSectionLabel}>{t("package.durationPackage")}</p>
 
             <div className={styles.quickBudgetGrid}>
-              {DURATION_PACKAGES.map((item) => {
+              {durationPackages.map((item) => {
                 const active = item.id === selectedDurationId;
                 return (
                   <button
@@ -1292,7 +1286,7 @@ export default function AdsCreatePage() {
                     onClick={() => setSelectedDurationId(item.id)}
                   >
                     <div className={styles.packageTopRow}>
-                      <span className={styles.quickBudgetLabel}>{item.days} days</span>
+                      <span className={styles.quickBudgetLabel}>{t("package.days", { count: item.days })}</span>
                     </div>
                     <span className={styles.quickBudgetAmount}>{toCurrency(item.price)}</span>
                     <span className={styles.quickBudgetHint}>{item.note}</span>
@@ -1303,20 +1297,23 @@ export default function AdsCreatePage() {
 
             <div className={styles.totalCard}>
               <div className={styles.totalRow}>
-                <span>Boost package</span>
+                <span>{t("package.boostPackageLabel")}</span>
                 <strong>{toCurrency(selectedBoost?.price ?? 0)}</strong>
               </div>
               <div className={styles.totalRow}>
-                <span>Duration package</span>
+                <span>{t("package.durationPackageLabel")}</span>
                 <strong>{toCurrency(selectedDuration?.price ?? 0)}</strong>
               </div>
               <div className={styles.totalDivider} />
               <div className={styles.totalRow}>
-                <span>Total cost</span>
+                <span>{t("package.totalCost")}</span>
                 <strong className={styles.totalValue}>{toCurrency(totalBudget)}</strong>
               </div>
               <p className={styles.helperSummary}>
-                You selected <strong>{selectedBoost?.title}</strong> for <strong>{selectedDuration?.days} days</strong>.
+                {t("package.selected", {
+                  boost: selectedBoost?.title ?? "",
+                  days: selectedDuration?.days ?? 0,
+                })}
               </p>
             </div>
           </article>
@@ -1325,10 +1322,10 @@ export default function AdsCreatePage() {
 
           <footer className={styles.bottomActionBar}>
             <button type="button" className={styles.secondaryBtn} onClick={handleCancel}>
-              Cancel
+              {t("cancel")}
             </button>
             <button type="button" className={styles.primaryBtn} onClick={handlePublish}>
-              Publish Ad
+              {t("publish")}
             </button>
           </footer>
 
@@ -1337,8 +1334,8 @@ export default function AdsCreatePage() {
         <aside className={styles.previewColumn}>
           <article className={styles.previewCard}>
             <div className={styles.previewHead}>
-              <h3>Live preview</h3>
-              <span className={styles.previewBadge}>Sponsored</span>
+              <h3>{t("preview.title")}</h3>
+              <span className={styles.previewBadge}>{t("preview.sponsored")}</span>
             </div>
 
             <div className={styles.previewPost}>
@@ -1361,16 +1358,16 @@ export default function AdsCreatePage() {
                     {currentProfile?.displayName || "Display name"}
                   </p>
                   <p className={styles.previewMeta}>
-                    @{currentProfile?.username || "username"} • Sponsored
+                    @{currentProfile?.username || "username"} • {t("preview.sponsored")}
                   </p>
                 </div>
               </div>
 
-              <p className={styles.previewText}>{primaryText || "Your primary text will appear here."}</p>
+              <p className={styles.previewText}>{primaryText || t("preview.primaryTextPlaceholder")}</p>
 
               <div className={styles.previewMedia}>
                 {uploadedMedia.length === 0 ? (
-                  <span>{adFormat === "video" ? "Video preview" : "Creative preview"}</span>
+                  <span>{adFormat === "video" ? t("creative.videoPreview") : t("creative.creativePreview")}</span>
                 ) : null}
 
                 {uploadedMedia.length > 0 && adFormat === "video" ? (
@@ -1429,8 +1426,8 @@ export default function AdsCreatePage() {
 
               <div className={styles.previewFooter}>
                 <div>
-                  <p className={styles.previewHeadline}>{headline || "Headline"}</p>
-                  <p className={styles.previewDescription}>{description || "Description"}</p>
+                  <p className={styles.previewHeadline}>{headline || t("preview.headlinePlaceholder")}</p>
+                  <p className={styles.previewDescription}>{description || t("preview.descriptionPlaceholder")}</p>
                 </div>
                 <button type="button" className={styles.previewCtaBtn}>{cta}</button>
               </div>
@@ -1443,7 +1440,7 @@ export default function AdsCreatePage() {
         <div className={styles.paymentOverlay} role="dialog" aria-modal="true" aria-label="Payment">
           <div className={styles.paymentDialog}>
             <div className={styles.paymentHead}>
-              <h3>Confirm Payment</h3>
+              <h3>{t("payment.title")}</h3>
               <button
                 type="button"
                 className={styles.paymentCloseBtn}
@@ -1455,30 +1452,28 @@ export default function AdsCreatePage() {
               </button>
             </div>
 
-            <p className={styles.paymentSubtext}>
-              You will be redirected to Stripe Checkout to complete payment.
-            </p>
+            <p className={styles.paymentSubtext}>{t("payment.subtitle")}</p>
 
             <div className={styles.paymentSummary}>
               <div className={styles.paymentRow}>
-                <span>Objective</span>
+                <span>{t("payment.objective")}</span>
                 <strong>{selectedObjectiveLabel}</strong>
               </div>
               <div className={styles.paymentRow}>
-                <span>Ad format</span>
+                <span>{t("payment.adFormat")}</span>
                 <strong>{adFormat}</strong>
               </div>
               <div className={styles.paymentRow}>
-                <span>Boost package</span>
+                <span>{t("payment.boostPackage")}</span>
                 <strong>{toCurrency(selectedBoost?.price ?? 0)}</strong>
               </div>
               <div className={styles.paymentRow}>
-                <span>Duration package</span>
+                <span>{t("payment.durationPackage")}</span>
                 <strong>{toCurrency(selectedDuration?.price ?? 0)}</strong>
               </div>
               <div className={styles.paymentDivider} />
               <div className={styles.paymentRow}>
-                <span>Total</span>
+                <span>{t("payment.total")}</span>
                 <strong className={styles.paymentTotal}>{toCurrency(totalBudget)}</strong>
               </div>
             </div>
@@ -1495,16 +1490,16 @@ export default function AdsCreatePage() {
                 disabled={isCreatingCheckout}
               />
               <span className={styles.paymentTermsText}>
-                I agree to the{" "}
+                {t("payment.termsText")}{" "}
                 <Link
                   href="/terms"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.paymentTermsLink}
                 >
-                  Term
+                  {t("payment.termsLink")}
                 </Link>{" "}
-                and advertising rules of Cordigram.
+                {t("payment.termsAnd")}
               </span>
             </label>
 
@@ -1517,7 +1512,7 @@ export default function AdsCreatePage() {
                 onClick={closePaymentModal}
                 disabled={isCreatingCheckout}
               >
-                Back
+                {t("payment.back")}
               </button>
               <button
                 type="button"
@@ -1525,7 +1520,7 @@ export default function AdsCreatePage() {
                 onClick={handleStartCheckout}
                 disabled={isCreatingCheckout || !hasAcceptedPaymentTerms}
               >
-                {isCreatingCheckout ? "Creating checkout..." : "Pay with Stripe"}
+                {isCreatingCheckout ? t("payment.creatingCheckout") : t("payment.payWithStripe")}
               </button>
             </div>
           </div>

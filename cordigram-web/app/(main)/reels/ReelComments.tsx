@@ -309,7 +309,7 @@ export default function ReelComments({
   onBlockedUser,
   style,
 }: ReelCommentsProps) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { showLoginOverlay } = useGuestAuth();
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [page, setPage] = useState(1);
@@ -875,7 +875,7 @@ export default function ReelComments({
       setDeleteTarget(null);
     } catch (err) {
       setDeleteError(
-        (err as { message?: string })?.message || "Failed to delete comment",
+        (err as { message?: string })?.message || t("reelsPage.comments.failedToDeleteComment"),
       );
     } finally {
       setDeleteSubmitting(false);
@@ -930,7 +930,7 @@ export default function ReelComments({
       setBlockTarget(null);
     } catch (err) {
       setError(
-        (err as { message?: string })?.message || "Failed to block user",
+        (err as { message?: string })?.message || t("reelsPage.comments.failedToBlockUser"),
       );
     } finally {
       setBlocking(false);
@@ -983,7 +983,7 @@ export default function ReelComments({
     } catch (err) {
       setReportSubmitting(false);
       setReportError(
-        (err as { message?: string })?.message || "Failed to report comment",
+        (err as { message?: string })?.message || t("reelsPage.comments.failedToReportComment"),
       );
     }
   };
@@ -1126,7 +1126,7 @@ export default function ReelComments({
         }
       } catch (err) {
         setError(
-          (err as { message?: string })?.message || "Failed to update pin",
+          (err as { message?: string })?.message || t("reelsPage.comments.failedToUpdatePin"),
         );
       }
     };
@@ -1179,7 +1179,7 @@ export default function ReelComments({
                 ? postStyles.commentAvatarSmall
                 : postStyles.commentAvatar
             }
-            aria-label="View profile"
+            aria-label={t("reelsPage.comments.ariaViewProfile")}
           >
             {comment.author?.avatarUrl ? (
               <img
@@ -1243,13 +1243,13 @@ export default function ReelComments({
             {isPostAuthorComment ? (
               <span className={postStyles.commentAuthorBadge}>
                 <IconCrown size={12} />
-                <span>Author</span>
+                <span>{t("reelsPage.comments.author")}</span>
               </span>
             ) : null}
             {comment.pinnedAt ? (
               <span className={postStyles.commentPinned}>
                 <IconPin size={12} />
-                <span>Pinned comment</span>
+                <span>{t("reelsPage.comments.pinnedComment")}</span>
               </span>
             ) : null}
           </div>
@@ -1387,7 +1387,7 @@ export default function ReelComments({
                       : ""
                   }`}
                   src={comment.media.url}
-                  alt="Comment attachment"
+                  alt={t("reelsPage.comments.altCommentAttachment")}
                   loading="lazy"
                   onContextMenu={(e) => e.preventDefault()}
                   onClick={() => {
@@ -1411,7 +1411,7 @@ export default function ReelComments({
               }
               disabled={!token}
             >
-              Reply
+              {t("reelsPage.comments.reply")}
             </button>
             <button
               className={postStyles.linkBtn}
@@ -1484,17 +1484,17 @@ export default function ReelComments({
                                 disabled={translatingIds.has(comment.id)}
                               >
                                 {translatingIds.has(comment.id)
-                                  ? "Translating..."
+                                  ? t("reelsPage.comments.translating")
                                   : translatedComments.has(comment.id)
-                                  ? "Hide translation"
-                                  : "Translate comment"}
+                                  ? t("reelsPage.comments.hideTranslation")
+                                  : t("reelsPage.comments.translate")}
                               </button>
                             ) : null}
                             <button
                               className={postStyles.commentMoreItem}
                               onClick={() => startEditComment(comment)}
                             >
-                              Edit comment
+                              {t("reelsPage.comments.editComment")}
                             </button>
                             {isPostOwner && !comment.parentId ? (
                               <button
@@ -1502,15 +1502,15 @@ export default function ReelComments({
                                 onClick={handleTogglePin}
                               >
                                 {comment.pinnedAt
-                                  ? "Unpin comment"
-                                  : "Pin comment"}
+                                  ? t("reelsPage.comments.unpin")
+                                  : t("reelsPage.comments.pin")}
                               </button>
                             ) : null}
                             <button
                               className={`${postStyles.commentMoreItem} ${postStyles.commentDanger}`}
                               onClick={() => handleDeleteComment(comment)}
                             >
-                              Delete comment
+                              {t("reelsPage.comments.deleteComment")}
                             </button>
                           </>
                         ) : isPostOwner ? (
@@ -1522,10 +1522,10 @@ export default function ReelComments({
                                 disabled={translatingIds.has(comment.id)}
                               >
                                 {translatingIds.has(comment.id)
-                                  ? "Translating..."
+                                  ? t("reelsPage.comments.translating")
                                   : translatedComments.has(comment.id)
-                                  ? "Hide translation"
-                                  : "Translate comment"}
+                                  ? t("reelsPage.comments.hideTranslation")
+                                  : t("reelsPage.comments.translate")}
                               </button>
                             ) : null}
                             {!comment.parentId ? (
@@ -1534,27 +1534,27 @@ export default function ReelComments({
                                 onClick={handleTogglePin}
                               >
                                 {comment.pinnedAt
-                                  ? "Unpin comment"
-                                  : "Pin comment"}
+                                  ? t("reelsPage.comments.unpin")
+                                  : t("reelsPage.comments.pin")}
                               </button>
                             ) : null}
                             <button
                               className={postStyles.commentMoreItem}
                               onClick={() => handleDeleteComment(comment)}
                             >
-                              Delete comment
+                              {t("reelsPage.comments.deleteComment")}
                             </button>
                             <button
                               className={postStyles.commentMoreItem}
                               onClick={() => handleReportComment(comment)}
                             >
-                              Report comment
+                              {t("reelsPage.comments.reportComment")}
                             </button>
                             <button
                               className={`${postStyles.commentMoreItem} ${postStyles.commentDanger}`}
                               onClick={() => handleBlockUser(comment)}
                             >
-                              Block this user
+                              {t("reelsPage.comments.blockUser")}
                             </button>
                           </>
                         ) : (
@@ -1566,23 +1566,23 @@ export default function ReelComments({
                                 disabled={translatingIds.has(comment.id)}
                               >
                                 {translatingIds.has(comment.id)
-                                  ? "Translating..."
+                                  ? t("reelsPage.comments.translating")
                                   : translatedComments.has(comment.id)
-                                  ? "Hide translation"
-                                  : "Translate comment"}
+                                  ? t("reelsPage.comments.hideTranslation")
+                                  : t("reelsPage.comments.translate")}
                               </button>
                             ) : null}
                             <button
                               className={postStyles.commentMoreItem}
                               onClick={() => handleReportComment(comment)}
                             >
-                              Report comment
+                              {t("reelsPage.comments.reportComment")}
                             </button>
                             <button
                               className={`${postStyles.commentMoreItem} ${postStyles.commentDanger}`}
                               onClick={() => handleBlockUser(comment)}
                             >
-                              Block this user
+                              {t("reelsPage.comments.blockUser")}
                             </button>
                           </>
                         )}
@@ -1601,10 +1601,10 @@ export default function ReelComments({
               disabled={loadingReplies}
             >
               {loadingReplies
-                ? "Loading..."
+                ? t("reelsPage.comments.loadingReplies")
                 : expanded
-                  ? "Hide replies"
-                  : `View replies${replyCountLabel}`}
+                  ? t("reelsPage.comments.hideReplies")
+                  : `${t("reelsPage.comments.loadReplies")}${replyCountLabel}`}
             </button>
           ) : null}
 
@@ -1622,7 +1622,7 @@ export default function ReelComments({
                   }
                   disabled={loadingReplies}
                 >
-                  {loadingReplies ? "Loading..." : "Load more replies"}
+                  {loadingReplies ? t("reelsPage.comments.loadingReplies") : t("reelsPage.comments.loadReplies")}
                 </button>
               ) : null}
             </div>
@@ -1662,7 +1662,7 @@ export default function ReelComments({
             : Math.max(initialCount ?? 0, res?.items?.length ?? 0);
         updateTotal(baseTotal);
       })
-      .catch((err) => setError(err?.message || "Failed to load comments"))
+      .catch((err) => setError(err?.message || t("reelsPage.comments.failedToLoadComments")))
       .finally(() => setLoading(false));
   }, [blockedIds, open, postId, token, updateTotal, prioritizeRootComments]);
 
@@ -1719,7 +1719,7 @@ export default function ReelComments({
       setMentionSuggestions([]);
       setMentionOpen(false);
       setMentionHighlight(-1);
-      setMentionError("Sign in to mention users");
+      setMentionError(t("reelsPage.comments.signInToMention"));
       return;
     }
 
@@ -1739,7 +1739,7 @@ export default function ReelComments({
         setMentionSuggestions([]);
         setMentionOpen(false);
         setMentionHighlight(-1);
-        setMentionError("User not found");
+        setMentionError(t("reelsPage.comments.userNotFound"));
       } finally {
         if (!cancelled) setMentionLoading(false);
       }
@@ -1784,7 +1784,7 @@ export default function ReelComments({
     } catch (err) {
       setError(
         (err as { message?: string })?.message ||
-          "Failed to load more comments",
+          t("reelsPage.comments.failedToLoadMore"),
       );
     } finally {
       setLoadingMore(false);
@@ -1910,7 +1910,7 @@ export default function ReelComments({
             loading: false,
             error:
               (err as { message?: string })?.message ||
-              "Failed to load replies",
+              t("reelsPage.comments.failedToLoadReplies"),
           },
         }));
       }
@@ -2094,7 +2094,7 @@ export default function ReelComments({
         likesCount: Math.max(0, (c.likesCount ?? 0) + (liked ? 1 : -1)),
       }));
       setError(
-        (err as { message?: string })?.message || "Unable to update like",
+        (err as { message?: string })?.message || t("reelsPage.comments.failedToUpdateLike"),
       );
     }
   };
@@ -2154,7 +2154,7 @@ export default function ReelComments({
         };
       } catch (err) {
         setError(
-          (err as { message?: string })?.message || "Failed to upload media",
+          (err as { message?: string })?.message || t("reelsPage.comments.failedToUploadMedia"),
         );
         setSubmitting(false);
         setCommentMediaUploading(false);
@@ -2191,7 +2191,7 @@ export default function ReelComments({
         setReplyTarget(null);
       } catch (err) {
         setError(
-          (err as { message?: string })?.message || "Failed to update comment",
+          (err as { message?: string })?.message || t("reelsPage.comments.failedToUpdateComment"),
         );
       } finally {
         setSubmitting(false);
@@ -2306,7 +2306,7 @@ export default function ReelComments({
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
       }
       setError(
-        (err as { message?: string })?.message || "Unable to send comment",
+        (err as { message?: string })?.message || t("reelsPage.comments.unableToSendComment"),
       );
     } finally {
       setSubmitting(false);
@@ -2368,7 +2368,7 @@ export default function ReelComments({
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      setCommentMediaError("Only image or video files are allowed");
+      setCommentMediaError(t("reelsPage.comments.onlyImageOrVideo"));
       if (commentMediaInputRef.current) {
         commentMediaInputRef.current.value = "";
       }
@@ -2483,7 +2483,7 @@ export default function ReelComments({
       <aside
         className={`${styles.commentSidebar} ${styles.commentSidebarDocked} ${sidebarAnimClass}`}
         role="complementary"
-        aria-label="Comments"
+        aria-label={t("reelsPage.comments.ariaPanel")}
         style={style}
         ref={(node) => {
           if (panelRef) panelRef.current = node;
@@ -2492,13 +2492,13 @@ export default function ReelComments({
         <div className={styles.commentSidebarHeader}>
           <div>
             <div className={styles.commentSidebarTitle}>
-              Comments ({Math.max(0, totalCount)})
+              {t("reelsPage.comments.commentsTitle", { count: Math.max(0, totalCount) })}
             </div>
           </div>
           <button
             className={styles.commentCloseBtn}
             onClick={onClose}
-            aria-label="Close comments"
+            aria-label={t("reelsPage.comments.ariaClose")}
           >
             ×
           </button>
@@ -2509,10 +2509,10 @@ export default function ReelComments({
           <div className={postStyles.commentList}>
             {topLevelComments.map((comment) => renderCommentThread(comment))}
             {loading ? (
-              <div className={postStyles.stateBox}>Loading comments...</div>
+              <div className={postStyles.stateBox}>{t("reelsPage.comments.loading")}</div>
             ) : null}
             {!loading && !comments.length && !error ? (
-              <div className={postStyles.stateBox}>No comments yet.</div>
+              <div className={postStyles.stateBox}>{t("reelsPage.comments.noComments")}</div>
             ) : null}
           </div>
           {hasMore ? (
@@ -2521,23 +2521,23 @@ export default function ReelComments({
               onClick={loadMore}
               disabled={loading || loadingMore}
             >
-              {loadingMore ? "Loading..." : "Load more"}
+              {loadingMore ? t("reelsPage.comments.loadingMore") : t("reelsPage.comments.loadMore")}
             </button>
           ) : null}
         </div>
 
         {commentsLocked ? (
           <div className={postStyles.commentsLockedNotice}>
-            The post owner has turned off comments.
+            {t("reelsPage.comments.commentsLockedNotice")}
           </div>
         ) : (
           <div>
             {replyTarget ? (
               <div className={postStyles.replyBadge}>
-                Replying to @{replyTarget.username || "comment"}
+                {t("reelsPage.comments.replyingTo", { username: replyTarget.username || "comment" })}
                 <button
                   onClick={() => setReplyTarget(null)}
-                  aria-label="Cancel reply"
+                  aria-label={t("reelsPage.comments.ariaCancelReply")}
                 >
                   ×
                 </button>
@@ -2546,10 +2546,10 @@ export default function ReelComments({
 
             {editingCommentId ? (
               <div className={postStyles.replyBadge}>
-                Editing your comment
+                {t("reelsPage.comments.editingComment")}
                 <button
                   onClick={cancelEditComment}
-                  aria-label="Cancel edit"
+                  aria-label={t("reelsPage.comments.ariaCancelEdit")}
                   disabled={submitting}
                 >
                   ×
@@ -2565,7 +2565,7 @@ export default function ReelComments({
                 <div className={postStyles.composerInput}>
                   <textarea
                     className={postStyles.input}
-                    placeholder="Add a comment..."
+                    placeholder={t("reelsPage.comments.placeholder")}
                     value={text}
                     onChange={handleTextChange}
                     rows={3}
@@ -2629,12 +2629,12 @@ export default function ReelComments({
                       <div className={feedStyles.mentionDropdown}>
                         {mentionLoading ? (
                           <div className={feedStyles.mentionItem}>
-                            Searching...
+                            {t("reelsPage.comments.searching")}
                           </div>
                         ) : null}
                         {!mentionLoading && mentionSuggestions.length === 0 ? (
                           <div className={feedStyles.mentionItem}>
-                            {mentionError || "No matches"}
+                            {mentionError || t("reelsPage.comments.noMentionMatches")}
                           </div>
                         ) : null}
                         {mentionSuggestions.map((opt, idx) => {
@@ -2698,18 +2698,18 @@ export default function ReelComments({
                         type="button"
                         className={postStyles.emojiButton}
                         onClick={() => setEmojiOpen((prev) => !prev)}
-                        aria-label="Add emoji"
+                        aria-label={t("reelsPage.comments.ariaAddEmoji")}
                         disabled={!canInteract}
                       >
                         <svg
-                          aria-label="Emoji icon"
+                          aria-label={t("reelsPage.comments.ariaEmojiIcon")}
                           fill="currentColor"
                           height="22"
                           role="img"
                           viewBox="0 0 24 24"
                           width="22"
                         >
-                          <title>Emoji icon</title>
+                          <title>{t("reelsPage.comments.ariaEmojiIcon")}</title>
                           <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
                         </svg>
                       </button>
@@ -2731,7 +2731,7 @@ export default function ReelComments({
                         type="button"
                         className={postStyles.mediaButton}
                         onClick={() => commentMediaInputRef.current?.click()}
-                        aria-label="Attach photo or video"
+                        aria-label={t("reelsPage.comments.ariaAttachMedia")}
                         disabled={!canInteract || submitting}
                       >
                         <svg
@@ -2772,7 +2772,7 @@ export default function ReelComments({
                         type="button"
                         className={postStyles.stickerButton}
                         onClick={() => setShowGifPicker((prev) => !prev)}
-                        aria-label="Add GIF"
+                        aria-label={t("reelsPage.comments.ariaAddGif")}
                         disabled={!canInteract || submitting}
                       >
                         <span
@@ -2797,7 +2797,7 @@ export default function ReelComments({
                           <div className={postStyles.stickerSearch}>
                             <input
                               className={postStyles.stickerSearchInput}
-                              placeholder="Search GIFs"
+                              placeholder={t("reelsPage.comments.gifSearchPlaceholder")}
                               value={gifQuery}
                               onChange={(e) => setGifQuery(e.target.value)}
                             />
@@ -2807,12 +2807,12 @@ export default function ReelComments({
                               onClick={() => fetchGifs(gifQuery)}
                               disabled={gifLoading}
                             >
-                              Search
+                              {t("reelsPage.comments.searchBtn")}
                             </button>
                           </div>
                           {gifLoading ? (
                             <div className={postStyles.stickerHint}>
-                              Loading GIFs...
+                              {t("reelsPage.comments.loadingGifs")}
                             </div>
                           ) : null}
                           {gifError ? (
@@ -2830,7 +2830,7 @@ export default function ReelComments({
                               >
                                 <img
                                   src={gif.preview}
-                                  alt="GIF"
+                                  alt={t("reelsPage.comments.altGif")}
                                   loading="lazy"
                                 />
                               </button>
@@ -2844,7 +2844,7 @@ export default function ReelComments({
                         type="button"
                         className={postStyles.stickerButton}
                         onClick={() => setShowStickerPicker((prev) => !prev)}
-                        aria-label="Add sticker"
+                        aria-label={t("reelsPage.comments.ariaAddSticker")}
                         disabled={!canInteract || submitting}
                       >
                         <svg
@@ -2881,7 +2881,7 @@ export default function ReelComments({
                           <div className={postStyles.stickerSearch}>
                             <input
                               className={postStyles.stickerSearchInput}
-                              placeholder="Search stickers"
+                              placeholder={t("reelsPage.comments.stickerSearchPlaceholder")}
                               value={stickerQuery}
                               onChange={(e) => setStickerQuery(e.target.value)}
                             />
@@ -2891,12 +2891,12 @@ export default function ReelComments({
                               onClick={() => fetchStickers(stickerQuery)}
                               disabled={stickerLoading}
                             >
-                              Search
+                              {t("reelsPage.comments.searchBtn")}
                             </button>
                           </div>
                           {stickerLoading ? (
                             <div className={postStyles.stickerHint}>
-                              Loading stickers...
+                              {t("reelsPage.comments.loadingStickers")}
                             </div>
                           ) : null}
                           {stickerError ? (
@@ -2914,7 +2914,7 @@ export default function ReelComments({
                               >
                                 <img
                                   src={sticker.preview}
-                                  alt="Sticker"
+                                  alt={t("reelsPage.comments.altSticker")}
                                   loading="lazy"
                                 />
                               </button>
@@ -2927,7 +2927,7 @@ export default function ReelComments({
                   <button
                     className={postStyles.composerSubmit}
                     onClick={handleSubmit}
-                    aria-label={submitting ? "Sending" : "Post"}
+                    aria-label={submitting ? t("reelsPage.comments.ariaSending") : t("reelsPage.comments.ariaPost")}
                     disabled={
                       !canInteract ||
                       submitting ||
@@ -2977,7 +2977,7 @@ export default function ReelComments({
                     <img
                       className={postStyles.commentMediaPreviewImage}
                       src={commentPreviewUrl}
-                      alt="Selected media"
+                      alt={t("reelsPage.comments.altSelectedMedia")}
                       onContextMenu={(e) => e.preventDefault()}
                     />
                   )}
@@ -2985,7 +2985,7 @@ export default function ReelComments({
                     type="button"
                     className={postStyles.commentMediaRemove}
                     onClick={clearCommentMedia}
-                    aria-label="Remove attachment"
+                    aria-label={t("reelsPage.comments.ariaRemoveAttachment")}
                   >
                     ×
                   </button>
@@ -3021,14 +3021,14 @@ export default function ReelComments({
           >
             <div className={postStyles.reportHeader}>
               <div>
-                <h3 className={postStyles.reportTitle}>Report this comment</h3>
+                <h3 className={postStyles.reportTitle}>{t("reelsPage.comments.reportModal.title")}</h3>
                 <p className={postStyles.reportBody}>
-                  Help us understand what is wrong with this comment.
+                  {t("reelsPage.comments.reportModal.body")}
                 </p>
               </div>
               <button
                 className={postStyles.reportClose}
-                aria-label="Close"
+                aria-label={t("reelsPage.comments.reportModal.close")}
                 onClick={closeReportModal}
               >
                 ×
@@ -3065,7 +3065,7 @@ export default function ReelComments({
                         style={{ background: group.accent }}
                       />
                       <span className={postStyles.reportCategoryLabel}>
-                        {group.label}
+                        {t(`reelsPage.reportCategories.${group.key}`)}
                       </span>
                     </button>
                   );
@@ -3074,7 +3074,7 @@ export default function ReelComments({
 
               <div className={postStyles.reportReasonPanel}>
                 <div className={postStyles.reportReasonHeader}>
-                  Select a specific reason
+                  {t("reelsPage.comments.reportModal.selectReason")}
                 </div>
                 {selectedReportGroup ? (
                   <div className={postStyles.reportReasonList}>
@@ -3098,22 +3098,22 @@ export default function ReelComments({
                               />
                             ) : null}
                           </span>
-                          <span>{reason.label}</span>
+                          <span>{t(`reelsPage.reportReasons.${reason.key}`)}</span>
                         </button>
                       );
                     })}
                   </div>
                 ) : (
                   <div className={postStyles.reportReasonPlaceholder}>
-                    Pick a category first.
+                    {t("reelsPage.comments.reportModal.pickCategory")}
                   </div>
                 )}
 
                 <label className={postStyles.reportNoteLabel}>
-                  Additional notes (optional)
+                  {t("reelsPage.comments.reportModal.notesLabel")}
                   <textarea
                     className={postStyles.reportNoteInput}
-                    placeholder="Add brief context if needed..."
+                    placeholder={t("reelsPage.comments.reportModal.placeholder")}
                     value={reportNote}
                     onChange={(e) => setReportNote(e.target.value)}
                     maxLength={500}
@@ -3133,7 +3133,7 @@ export default function ReelComments({
                 onClick={closeReportModal}
                 disabled={reportSubmitting}
               >
-                Cancel
+                {t("reelsPage.comments.reportModal.cancel")}
               </button>
               <button
                 className={postStyles.reportPrimary}
@@ -3142,7 +3142,7 @@ export default function ReelComments({
                   !reportReason || reportSubmitting || !reportingCommentId
                 }
               >
-                {reportSubmitting ? "Submitting..." : "Submit report"}
+                {reportSubmitting ? t("reelsPage.comments.reportModal.submitting") : t("reelsPage.comments.reportModal.submit")}
               </button>
             </div>
           </div>
@@ -3162,15 +3162,14 @@ export default function ReelComments({
           >
             <div className={postStyles.reportHeader}>
               <div>
-                <h3 className={postStyles.reportTitle}>Delete this comment?</h3>
+                <h3 className={postStyles.reportTitle}>{t("reelsPage.comments.deleteModal.title")}</h3>
                 <p className={postStyles.reportBody}>
-                  Removing this comment will also delete its replies. This
-                  action cannot be undone.
+                  {t("reelsPage.comments.deleteModal.body")}
                 </p>
               </div>
               <button
                 className={postStyles.reportClose}
-                aria-label="Close"
+                aria-label={t("reelsPage.comments.deleteModal.close")}
                 onClick={closeDeleteConfirm}
                 disabled={deleteSubmitting}
               >
@@ -3188,14 +3187,14 @@ export default function ReelComments({
                 onClick={closeDeleteConfirm}
                 disabled={deleteSubmitting}
               >
-                Cancel
+                {t("reelsPage.comments.deleteModal.cancel")}
               </button>
               <button
                 className={`${postStyles.reportPrimary} ${postStyles.blockDanger}`}
                 onClick={confirmDeleteComment}
                 disabled={deleteSubmitting}
               >
-                {deleteSubmitting ? "Deleting..." : "Delete"}
+                {deleteSubmitting ? t("reelsPage.comments.deleteModal.deleting") : t("reelsPage.comments.deleteModal.delete")}
               </button>
             </div>
           </div>
@@ -3215,9 +3214,9 @@ export default function ReelComments({
           >
             <div className={postStyles.reportHeader}>
               <div>
-                <h3 className={postStyles.reportTitle}>Block this account?</h3>
+                <h3 className={postStyles.reportTitle}>{t("reelsPage.comments.blockModal.title")}</h3>
                 <p className={postStyles.reportBody}>
-                  {`You are about to block @${blockTarget.label}. They will no longer be able to interact with you.`}
+                  {t("reelsPage.comments.blockModal.body", { username: blockTarget.label })}
                 </p>
               </div>
             </div>
@@ -3228,14 +3227,14 @@ export default function ReelComments({
                 onClick={closeBlockUserModal}
                 disabled={blocking}
               >
-                Cancel
+                {t("reelsPage.comments.blockModal.cancel")}
               </button>
               <button
                 className={`${postStyles.reportPrimary} ${postStyles.blockDanger}`}
                 onClick={confirmBlockUser}
                 disabled={blocking}
               >
-                {blocking ? "Blocking..." : "Block"}
+                {blocking ? t("reelsPage.comments.blockModal.blocking") : t("reelsPage.comments.blockModal.block")}
               </button>
             </div>
           </div>
@@ -3252,7 +3251,7 @@ export default function ReelComments({
           <button
             type="button"
             className={postStyles.commentImageClose}
-            aria-label="Close image"
+            aria-label={t("reelsPage.comments.ariaCloseImage")}
             onClick={(e) => {
               e.stopPropagation();
               setCommentImageViewerUrl(null);
@@ -3267,7 +3266,7 @@ export default function ReelComments({
             <img
               className={postStyles.commentImagePreview}
               src={commentImageViewerUrl}
-              alt="Comment image"
+              alt={t("reelsPage.comments.altCommentImage")}
               onContextMenu={(e) => e.preventDefault()}
             />
           </div>

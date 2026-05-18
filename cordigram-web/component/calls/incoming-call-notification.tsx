@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import styles from './incoming-call-notification.module.css';
 import { CallType } from '@/lib/calls/call-types';
 
@@ -21,6 +22,7 @@ export const IncomingCallNotification: React.FC<IncomingCallNotificationProps> =
   onAccept,
   onReject,
 }) => {
+  const t = useTranslations("notifications");
   const [ringing, setRinging] = useState(true);
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export const IncomingCallNotification: React.FC<IncomingCallNotificationProps> =
           )}
           <h3 className={styles.callerName}>{callerName}</h3>
           <p className={styles.callType}>
-            {callType === CallType.VIDEO ? '📹 Video call' : '📱 Audio call'}
+            {callType === CallType.VIDEO ? `📹 ${t("call.video")}` : `📱 ${t("call.audio")}`}
           </p>
         </div>
 

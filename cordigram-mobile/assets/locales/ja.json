@@ -86,7 +86,6 @@
         }
       }
     },
-    "personalInfo": "個人情報",
     "profile": {
       "profilePage": "プロフィールページ",
       "aboutThisUser": "このユーザーについて",
@@ -114,13 +113,26 @@
     "accountEmail": "アカウントメール",
     "manageSignInEmail": "サインイン用メールと確認手順を管理します。",
     "currentEmail": "現在のメール",
-    "personalInfo": "個人情報",
+    "personalInfo": {
+      "displayName": "表示名",
+      "username": "ユーザー名",
+      "birthdate": "誕生日",
+      "gender": "性別",
+      "location": "場所",
+      "workplace": "職場",
+      "bio": "自己紹介"
+    },
     "profileVisibility": "プロフィールの公開設定",
     "controlWhoCanView": "プロフィール、自己紹介セクション、フォロワーリストを見られる人を管理します。",
     "profilePageDesc": "プロフィールページとタブを見られる人。",
     "aboutThisUserDesc": "プロフィールの自己紹介オーバーレイを開ける人。",
     "followersListDesc": "フォロワーリストを見られる人。",
     "followingListDesc": "フォロー中のアカウントを見られる人。",
+    "visibility": {
+      "public": "公開",
+      "followers": "フォロワーのみ",
+      "private": "非公開"
+    },
     "emailStep": {
       "verifyPassword": "ステップ1 · パスワード確認",
       "currentOtp": "ステップ2 · 現在のメールOTP",
@@ -472,9 +484,7 @@
     "visibility": {
       "public": "公開",
       "followers": "フォロワー",
-      "private": "非公開",
-      "cancel": "キャンセル",
-      "shareQuote": "引用をシェア"
+      "private": "非公開"
     },
     "liveNow": "ライブ配信中",
     "feed": {
@@ -539,10 +549,17 @@
       "contentHint": "引用を入力...",
       "hashtagsHint": "ハッシュタグ（カンマ区切り）",
       "locationHint": "場所（任意）",
+      "searchingLocation": "場所を検索中...",
+      "noLocationSuggestions": "候補が見つかりません",
+      "locationSearchFailed": "場所を検索できません",
       "visibilityHint": "公開範囲",
+      "visibilityPublic": "公開",
+      "visibilityFollowers": "フォロワー",
+      "visibilityPrivate": "非公開",
       "allowComments": "コメントを許可",
       "allowDownloads": "ダウンロードを許可（元の投稿から継承）",
-      "hideLikeCount": "いいね数を非表示"
+      "hideLikeCount": "いいね数を非表示",
+      "shareQuote": "引用をシェア"
     },
     "suggestions": {
       "title": "知り合いかもしれない人",

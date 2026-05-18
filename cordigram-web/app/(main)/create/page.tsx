@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { usePostUpload } from "@/context/post-upload-context";
+import { useTranslations } from "next-intl";
 
 function LocationIcon() {
   return (
@@ -122,15 +123,9 @@ function TabLivestreamIcon() {
   );
 }
 
-const audienceOptions = [
-  { value: "public", label: "Public" },
-  { value: "followers", label: "Friends / Following" },
-  { value: "private", label: "Private" },
-];
-
 const REEL_MAX_DURATION_SECONDS = 90;
-const REEL_MAX_BYTES = 50 * 1024 * 1024; // 50MB hard cap
-const POST_MAX_BYTES = 100 * 1024 * 1024; // Must match backend FREE_MAX_UPLOAD_BYTES
+const REEL_MAX_BYTES = 50 * 1024 * 1024;
+const POST_MAX_BYTES = 100 * 1024 * 1024;
 const MAX_MEDIA_ITEMS = 10;
 
 type Step = "select" | "details";
@@ -162,7 +157,7 @@ const normalizeHashtag = (value: string) =>
   value
     .replace(/^#/, "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/\s+/g, "")
     .replace(/[^a-zA-Z0-9_]/g, "")
     .toLowerCase();
@@ -245,6 +240,7 @@ export default function CreatePostPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
   const { startUpload } = usePostUpload();
+  const t = useTranslations("create");
   const [mode, setMode] = useState<"post" | "reel" | "livestream">("post");
   const [step, setStep] = useState<Step>("select");
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
@@ -294,6 +290,15 @@ export default function CreatePostPage() {
   const audienceRef = useRef<HTMLDivElement | null>(null);
   const emojiRef = useRef<HTMLDivElement | null>(null);
 
+  const audienceOptions = useMemo(
+    () => [
+      { value: "public", label: t("audiencePublic") },
+      { value: "followers", label: t("audienceFollowers") },
+      { value: "private", label: t("audiencePrivate") },
+    ],
+    [t],
+  );
+
   const totalSizeLabel = useMemo(() => {
     if (!mediaItems.length) return "-";
     const mb =
@@ -310,7 +315,7 @@ export default function CreatePostPage() {
     () =>
       audienceOptions.find((option) => option.value === form.audience) ||
       audienceOptions[0],
-    [form.audience],
+    [audienceOptions, form.audience],
   );
 
   const scheduleParts = useMemo(
@@ -455,25 +460,23 @@ export default function CreatePostPage() {
     });
 
     if (!valid.length) {
-      setError("Please select image or video files only.");
+      setError(t("errorInvalidFiles"));
       return;
     }
 
     if (mode === "reel") {
       const videoFile = valid.find((file) => file.type.startsWith("video/"));
       if (!videoFile) {
-        setError("Reels require a video file.");
+        setError(t("errorReelNoVideo"));
         return;
       }
       if (videoFile.size > REEL_MAX_BYTES) {
-        setError("Reel file must be 50MB or smaller.");
+        setError(t("errorReelTooLarge"));
         return;
       }
       const duration = await readVideoDuration(videoFile);
       if (duration !== null && duration > REEL_MAX_DURATION_SECONDS) {
-        setError(
-          `Reel video must be ${REEL_MAX_DURATION_SECONDS}s or shorter.`,
-        );
+        setError(t("errorReelTooLong", { seconds: REEL_MAX_DURATION_SECONDS }));
         return;
       }
 
@@ -495,7 +498,7 @@ export default function CreatePostPage() {
 
     const tooLargePostFile = valid.find((file) => file.size > POST_MAX_BYTES);
     if (tooLargePostFile) {
-      setError("Each post media file must be 100MB or smaller.");
+      setError(t("errorFileTooLarge"));
       return;
     }
 
@@ -516,7 +519,7 @@ export default function CreatePostPage() {
     }
 
     if (!newItems.length) {
-      setError(`You can attach up to ${MAX_MEDIA_ITEMS} files per post.`);
+      setError(t("errorTooManyFiles", { max: MAX_MEDIA_ITEMS }));
       return;
     }
 
@@ -642,22 +645,18 @@ export default function CreatePostPage() {
     setSubmitError("");
 
     if (!mediaItems.length) {
-      setSubmitError(
-        "Please choose at least one photo or video before publishing.",
-      );
+      setSubmitError(t("errorNoMedia"));
       return;
     }
 
     if (mode === "reel") {
       const reel = mediaItems[0];
       if (mediaItems.length !== 1 || reel.kind !== "video") {
-        setSubmitError("Reels require exactly one video file.");
+        setSubmitError(t("errorReelOneVideo"));
         return;
       }
       if (reel.duration !== null && reel.duration > REEL_MAX_DURATION_SECONDS) {
-        setSubmitError(
-          `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`,
-        );
+        setSubmitError(t("errorVideoExceedsLimit", { seconds: REEL_MAX_DURATION_SECONDS }));
         return;
       }
     }
@@ -667,20 +666,20 @@ export default function CreatePostPage() {
         ? localStorage.getItem("accessToken")
         : null;
     if (!token) {
-      setSubmitError("Missing access token. Please log in again.");
+      setSubmitError(t("errorMissingToken"));
       return;
     }
 
     const normalizedHashtags = Array.from(
-      new Set((form.hashtags || []).map((t) => normalizeHashtag(t.toString()))),
+      new Set((form.hashtags || []).map((tag) => normalizeHashtag(tag.toString()))),
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
       new Set(
         [
           ...extractMentionsFromCaption(form.caption || ""),
-          ...(form.mentions || []).map((t) =>
-            t.toString().trim().replace(/^@/, "").toLowerCase(),
+          ...(form.mentions || []).map((tag) =>
+            tag.toString().trim().replace(/^@/, "").toLowerCase(),
           ),
         ].filter(Boolean),
       ),
@@ -759,7 +758,7 @@ export default function CreatePostPage() {
         const compact = [road, city].filter(Boolean).join(", ") || addr;
         const chosen = compact || fallback;
         setForm((prev) => ({ ...prev, location: chosen }));
-      } catch (err) {
+      } catch {
         setForm((prev) => ({ ...prev, location: fallback }));
       }
     };
@@ -784,7 +783,6 @@ export default function CreatePostPage() {
         navigator.geolocation.getCurrentPosition(
           handleSuccess,
           (err2) => handleError(err2, true),
-          // --------------------------------
           highOptions,
         );
         return;
@@ -792,12 +790,13 @@ export default function CreatePostPage() {
 
       const friendly =
         err.code === err.PERMISSION_DENIED
-          ? "You denied location access. Please allow it to autofill your place."
+          ? t("errorGeoDenied")
           : err.code === err.POSITION_UNAVAILABLE
-            ? "We couldn’t get a location fix. Try again or check GPS/Wi‑Fi."
+            ? t("errorGeoUnavailable")
             : err.code === err.TIMEOUT
-              ? "Location request took too long. Please retry."
-              : "Could not fetch your location.";
+              ? t("errorGeoTimeout")
+              : t("errorGeoFailed");
+      setLocationError(friendly);
       setGeoStatus(err.code === err.PERMISSION_DENIED ? "denied" : "error");
     };
 
@@ -830,7 +829,7 @@ export default function CreatePostPage() {
   const removeHashtag = (tag: string) => {
     setForm((prev) => ({
       ...prev,
-      hashtags: prev.hashtags.filter((t) => t !== tag),
+      hashtags: prev.hashtags.filter((h) => h !== tag),
     }));
   };
 
@@ -838,7 +837,7 @@ export default function CreatePostPage() {
     const escaped = handle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     setForm((prev) => ({
       ...prev,
-      mentions: prev.mentions.filter((t) => t !== handle),
+      mentions: prev.mentions.filter((h) => h !== handle),
       caption: prev.caption.replace(
         new RegExp(`@${escaped}(?![a-zA-Z0-9_.])`, "gi"),
         "",
@@ -906,7 +905,7 @@ export default function CreatePostPage() {
       setMentionSuggestions([]);
       setMentionOpen(false);
       setMentionHighlight(-1);
-      setMentionError("You need to be logged in to search users.");
+      setMentionError(t("errorNotLoggedIn"));
       return;
     }
 
@@ -925,14 +924,14 @@ export default function CreatePostPage() {
         setMentionOpen(res.items.length > 0);
         setMentionHighlight(res.items.length ? 0 : -1);
         if (!res.items.length) {
-          setMentionError("User not found");
+          setMentionError(t("userNotFound"));
         }
-      } catch (err) {
+      } catch {
         if (cancelled) return;
         setMentionSuggestions([]);
         setMentionOpen(false);
         setMentionHighlight(-1);
-        setMentionError("User not found");
+        setMentionError(t("userNotFound"));
       } finally {
         if (!cancelled) setMentionLoading(false);
       }
@@ -942,7 +941,7 @@ export default function CreatePostPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [mentionDraft]);
+  }, [mentionDraft, t]);
 
   const selectMention = (opt: ProfileSearchItem) => {
     const handle = opt.username.toLowerCase();
@@ -1025,7 +1024,7 @@ export default function CreatePostPage() {
         setLocationSuggestions([]);
         setLocationOpen(false);
         setLocationHighlight(-1);
-        setLocationError("No suggestions found, try different keywords.");
+        setLocationError(t("errorNoLocationSuggestions"));
       } finally {
         if (!controller.signal.aborted) setLocationLoading(false);
       }
@@ -1035,7 +1034,7 @@ export default function CreatePostPage() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [locationQuery]);
+  }, [locationQuery, t]);
 
   const selectLocation = (option: {
     label: string;
@@ -1073,18 +1072,17 @@ export default function CreatePostPage() {
 
   if (accountLimited.active) {
     const untilLabel = accountLimited.indefinitely
-      ? "until a moderator turns this restriction off"
+      ? t("limitUntilModerator")
       : accountLimited.until
-        ? `until ${new Date(accountLimited.until).toLocaleString()}`
-        : "temporarily";
+        ? t("limitUntilDate", { date: new Date(accountLimited.until).toLocaleString() })
+        : t("limitTemporarily");
 
     return (
       <div className={styles.screen}>
         <div className={styles.limitNotice}>
-          <h1 className={styles.limitTitle}>Create is unavailable</h1>
+          <h1 className={styles.limitTitle}>{t("limitTitle")}</h1>
           <p className={styles.limitText}>
-            Your account is currently limited to read-only mode {untilLabel}.
-            You can still browse posts and continue using messages.
+            {t("limitText", { untilLabel })}
           </p>
         </div>
       </div>
@@ -1096,14 +1094,14 @@ export default function CreatePostPage() {
       <div className={styles.headerRow}>
         <div>
           <p className={styles.eyebrow}>
-            Create {mode === "reel" ? "reel" : mode === "livestream" ? "livestream" : "post"}
+            {mode === "reel" ? t("eyebrowReel") : mode === "livestream" ? t("eyebrowLivestream") : t("eyebrowPost")}
           </p>
           <h1 className={styles.title}>
             {mode === "reel"
-              ? "Share a short reel"
+              ? t("titleReel")
               : mode === "livestream"
-                ? "Go live from desktop"
-                : "Share genuine moments"}
+                ? t("titleLivestream")
+                : t("titlePost")}
           </h1>
           <div className={styles.modeSwitch}>
             <button
@@ -1119,7 +1117,7 @@ export default function CreatePostPage() {
             >
               <span className={styles.modeButtonInner}>
                 <TabPostIcon />
-                <span>Post</span>
+                <span>{t("tabPost")}</span>
               </span>
             </button>
             <button
@@ -1135,7 +1133,7 @@ export default function CreatePostPage() {
             >
               <span className={styles.modeButtonInner}>
                 <TabReelIcon />
-                <span>Reel</span>
+                <span>{t("tabReel")}</span>
               </span>
             </button>
             <button
@@ -1151,7 +1149,7 @@ export default function CreatePostPage() {
             >
               <span className={styles.modeButtonInner}>
                 <TabLivestreamIcon />
-                <span>Livestream</span>
+                <span>{t("tabLivestream")}</span>
               </span>
             </button>
           </div>
@@ -1165,7 +1163,7 @@ export default function CreatePostPage() {
             >
               <span className={styles.stepNumber}>1</span>
               <div>
-                <p className={styles.stepLabel}>Choose content</p>
+                <p className={styles.stepLabel}>{t("stepChoose")}</p>
               </div>
             </div>
             <div
@@ -1175,7 +1173,7 @@ export default function CreatePostPage() {
             >
               <span className={styles.stepNumber}>2</span>
               <div>
-                <p className={styles.stepLabel}>Add details</p>
+                <p className={styles.stepLabel}>{t("stepDetails")}</p>
               </div>
             </div>
           </div>
@@ -1208,14 +1206,12 @@ export default function CreatePostPage() {
             htmlFor="fileInput"
           >
             <div className={styles.dropContent}>
-              <div className={styles.dropBadge}>Drag & drop or choose</div>
+              <div className={styles.dropBadge}>{t("dropBadge")}</div>
               <h2 className={styles.dropTitle}>
-                {mode === "reel" ? "Add a reel video" : "Add a photo or video"}
+                {mode === "reel" ? t("dropTitleReel") : t("dropTitlePost")}
               </h2>
               <p className={styles.dropText}>
-                {mode === "reel"
-                  ? "MP4 / MOV, vertical preferred (9:16), max 90s, up to 50MB."
-                  : "Supports .jpg, .png, .mp4, .mov."}
+                {mode === "reel" ? t("dropTextReel") : t("dropTextPost")}
               </p>
               <div className={styles.actions}>
                 <button
@@ -1223,7 +1219,7 @@ export default function CreatePostPage() {
                   className={styles.primaryButton}
                   onClick={openFileDialog}
                 >
-                  Choose from device
+                  {t("chooseFromDevice")}
                 </button>
               </div>
               {error && <p className={styles.error}>{error}</p>}
@@ -1231,27 +1227,21 @@ export default function CreatePostPage() {
           </label>
 
           <div className={styles.tipsCard}>
-            <p className={styles.tipsTitle}>Quick tips</p>
+            <p className={styles.tipsTitle}>{t("tipsTitle")}</p>
             <ul className={styles.tipsList}>
               {mode === "reel" ? (
                 <>
-                  <li>
-                    Keep it under 90 seconds; 1080x1920 (9:16) looks best.
-                  </li>
-                  <li>Use .mp4 when possible for smoother playback.</li>
-                  <li>
-                    Hook viewers in the first 3 seconds with motion or text.
-                  </li>
-                  <li>Add captions; many viewers watch muted by default.</li>
+                  <li>{t("tipsReel1")}</li>
+                  <li>{t("tipsReel2")}</li>
+                  <li>{t("tipsReel3")}</li>
+                  <li>{t("tipsReel4")}</li>
                 </>
               ) : (
                 <>
-                  <li>Maximum size per file: 100 MB.</li>
-                  <li>
-                    Recommended: “.mp4”. Other major formats are supported.
-                  </li>
-                  <li>High-resolution recommended: 1080p, 1440p, 4K.</li>
-                  <li>Recommended: 16:9 for landscape, 9:16 for vertical.</li>
+                  <li>{t("tipsPost1")}</li>
+                  <li>{t("tipsPost2")}</li>
+                  <li>{t("tipsPost3")}</li>
+                  <li>{t("tipsPost4")}</li>
                 </>
               )}
             </ul>
@@ -1267,13 +1257,11 @@ export default function CreatePostPage() {
           <div className={styles.previewCard}>
             <div className={styles.cardHeader}>
               <div>
-                <p className={styles.cardEyebrow}>Selected content</p>
+                <p className={styles.cardEyebrow}>{t("selectedContent")}</p>
                 <p className={styles.cardTitle}>
                   {mediaItems.length
-                    ? `${mediaItems.length} item${
-                        mediaItems.length > 1 ? "s" : ""
-                      } selected`
-                    : "No content chosen"}
+                    ? t("itemsSelected", { count: mediaItems.length })
+                    : t("noContentChosen")}
                 </p>
                 <p className={styles.meta}>{totalSizeLabel}</p>
               </div>
@@ -1283,14 +1271,14 @@ export default function CreatePostPage() {
                   className={styles.secondaryButton}
                   onClick={resetSelection}
                 >
-                  Cancel
+                  {t("cancel")}
                 </button>
                 <button
                   type="button"
                   className={styles.primaryGhost}
                   onClick={openFileDialog}
                 >
-                  {mode === "reel" ? "Change file" : "Add more"}
+                  {mode === "reel" ? t("changeFile") : t("addMore")}
                 </button>
               </div>
             </div>
@@ -1365,12 +1353,12 @@ export default function CreatePostPage() {
                       onClick={openFileDialog}
                     >
                       <span className={styles.addTileIcon}>+</span>
-                      <span className={styles.addTileText}>Add more</span>
+                      <span className={styles.addTileText}>{t("addMore")}</span>
                     </button>
                   ) : null}
                 </div>
               ) : (
-                <div className={styles.mediaPlaceholder}>No content yet</div>
+                <div className={styles.mediaPlaceholder}>{t("noContentYet")}</div>
               )}
             </div>
           </div>
@@ -1378,19 +1366,19 @@ export default function CreatePostPage() {
           <div className={styles.formCard}>
             <div>
               <p className={styles.cardEyebrow}>
-                {mode === "reel" ? "Reel details" : "Post details"}
+                {mode === "reel" ? t("reelDetails") : t("postDetails")}
               </p>
             </div>
 
             <div className={styles.formGroup}>
               <div className={styles.labelRow}>
-                <label htmlFor="caption">Caption</label>
+                <label htmlFor="caption">{t("captionLabel")}</label>
                 <div className={styles.emojiWrap} ref={emojiRef}>
                   <button
                     type="button"
                     className={styles.emojiButton}
                     onClick={() => setShowEmojiPicker((prev) => !prev)}
-                    aria-label="Add emoji"
+                    aria-label={t("addEmojiAria")}
                   >
                     <svg
                       aria-label="Emoji icon"
@@ -1425,7 +1413,7 @@ export default function CreatePostPage() {
                   id="caption"
                   name="caption"
                   ref={captionRef}
-                  placeholder="Type @ to tag friends..."
+                  placeholder={t("captionPlaceholder")}
                   value={form.caption}
                   onChange={handleCaptionChange}
                   onKeyDown={onCaptionKeyDown}
@@ -1445,7 +1433,7 @@ export default function CreatePostPage() {
                   <div className={styles.mentionSuggestions}>
                     {mentionLoading && (
                       <div className={styles.mentionSuggestionMuted}>
-                        Searching users...
+                        {t("searchingUsers")}
                       </div>
                     )}
                     {!mentionLoading &&
@@ -1486,7 +1474,7 @@ export default function CreatePostPage() {
                           </div>
                           {typeof opt.followersCount === "number" && (
                             <span className={styles.mentionStat}>
-                              {opt.followersCount.toLocaleString()} followers
+                              {t("followers", { count: opt.followersCount.toLocaleString() })}
                             </span>
                           )}
                         </button>
@@ -1494,9 +1482,7 @@ export default function CreatePostPage() {
                   </div>
                 )}
               </div>
-              <p className={styles.helper}>
-                Type @ to tag friends directly in the caption.
-              </p>
+              <p className={styles.helper}>{t("captionHelper")}</p>
               {form.mentions.length > 0 && (
                 <div className={styles.chipShell}>
                   <div className={styles.chips}>
@@ -1519,7 +1505,7 @@ export default function CreatePostPage() {
 
             <div className={styles.rowGroup}>
               <div className={styles.formGroup}>
-                <label>Hashtags #</label>
+                <label>{t("hashtagsLabel")}</label>
                 <div className={styles.chipShell}>
                   <div className={styles.chips}>
                     {form.hashtags.map((tag) => (
@@ -1537,7 +1523,7 @@ export default function CreatePostPage() {
                     <input
                       className={styles.chipInput}
                       placeholder={
-                        form.hashtags.length ? "Add hashtag" : "Example: travel"
+                        form.hashtags.length ? t("addHashtag") : t("hashtagPlaceholder")
                       }
                       value={hashtagDraft}
                       onChange={(e) =>
@@ -1552,13 +1538,13 @@ export default function CreatePostPage() {
 
             <div className={styles.rowGroup}>
               <div className={styles.formGroup}>
-                <label htmlFor="location">Location</label>
+                <label htmlFor="location">{t("locationLabel")}</label>
                 <div className={styles.locationCombo}>
                   <div className={styles.inputShell}>
                     <input
                       id="location"
                       name="location"
-                      placeholder="Add a location (optional)"
+                      placeholder={t("locationPlaceholder")}
                       value={locationInput}
                       onChange={(e) => onLocationChange(e.target.value)}
                       onKeyDown={onLocationKeyDown}
@@ -1578,12 +1564,12 @@ export default function CreatePostPage() {
                     <div className={styles.locationSuggestions}>
                       {locationLoading && (
                         <div className={styles.locationSuggestionMuted}>
-                          Searching...
+                          {t("searching")}
                         </div>
                       )}
                       {!locationLoading && locationSuggestions.length === 0 && (
                         <div className={styles.locationSuggestionMuted}>
-                          {locationError || "No suggestions found"}
+                          {locationError || t("noSuggestions")}
                         </div>
                       )}
                       {!locationLoading &&
@@ -1613,7 +1599,7 @@ export default function CreatePostPage() {
               </div>
 
               <div className={styles.formGroup}>
-                <label htmlFor="audience">Visibility</label>
+                <label htmlFor="audience">{t("visibilityLabel")}</label>
                 <div className={styles.dropdownShell} ref={audienceRef}>
                   <button
                     type="button"
@@ -1643,7 +1629,7 @@ export default function CreatePostPage() {
                     <div
                       className={styles.dropdownMenu}
                       role="listbox"
-                      aria-label="Select visibility"
+                      aria-label={t("visibilityAria")}
                     >
                       {audienceOptions.map((option) => (
                         <button
@@ -1685,10 +1671,8 @@ export default function CreatePostPage() {
                   onChange={() => toggle("allowComments")}
                 />
                 <div>
-                  <p className={styles.switchTitle}>Allow comments</p>
-                  <p className={styles.switchHint}>
-                    Enable to receive feedback from everyone
-                  </p>
+                  <p className={styles.switchTitle}>{t("allowCommentsTitle")}</p>
+                  <p className={styles.switchHint}>{t("allowCommentsHint")}</p>
                 </div>
               </label>
 
@@ -1699,10 +1683,8 @@ export default function CreatePostPage() {
                   onChange={() => toggle("allowDownload")}
                 />
                 <div>
-                  <p className={styles.switchTitle}>Allow downloads</p>
-                  <p className={styles.switchHint}>
-                    Share the original file with people you trust
-                  </p>
+                  <p className={styles.switchTitle}>{t("allowDownloadsTitle")}</p>
+                  <p className={styles.switchHint}>{t("allowDownloadsHint")}</p>
                 </div>
               </label>
 
@@ -1713,16 +1695,14 @@ export default function CreatePostPage() {
                   onChange={() => toggle("hideLikeCount")}
                 />
                 <div>
-                  <p className={styles.switchTitle}>Hide like</p>
-                  <p className={styles.switchHint}>
-                    Viewers won’t see the number of likes on this post
-                  </p>
+                  <p className={styles.switchTitle}>{t("hideLikeTitle")}</p>
+                  <p className={styles.switchHint}>{t("hideLikeHint")}</p>
                 </div>
               </label>
             </div>
 
             <div className={styles.formGroup}>
-              <label>Publish time</label>
+              <label>{t("publishTimeLabel")}</label>
               <div className={styles.radioRow}>
                 <label className={styles.radioOption}>
                   <input
@@ -1734,7 +1714,7 @@ export default function CreatePostPage() {
                       setForm((prev) => ({ ...prev, publishMode: "now" }))
                     }
                   />
-                  <span>Post now</span>
+                  <span>{t("postNow")}</span>
                 </label>
                 <label className={styles.radioOption}>
                   <input
@@ -1759,27 +1739,23 @@ export default function CreatePostPage() {
                       })
                     }
                   />
-                  <span>Schedule</span>
+                  <span>{t("schedule")}</span>
                 </label>
-                <span className={styles.helper}>
-                  We will post automatically at your chosen time.
-                </span>
+                <span className={styles.helper}>{t("publishAutoHelper")}</span>
               </div>
 
               {form.publishMode === "schedule" && (
                 <div className={styles.schedulerCard}>
                   <div className={styles.schedulerHeader}>
                     <div>
-                      <p className={styles.schedulerLabel}>Schedule</p>
-                      <p className={styles.schedulerTitle}>
-                        Choose date and time
-                      </p>
+                      <p className={styles.schedulerLabel}>{t("schedulerLabel")}</p>
+                      <p className={styles.schedulerTitle}>{t("chooseDatetime")}</p>
                     </div>
                   </div>
 
                   <div className={styles.schedulerGrid}>
                     <div className={styles.schedulerField}>
-                      <label className={styles.schedulerFieldLabel}>Date</label>
+                      <label className={styles.schedulerFieldLabel}>{t("dateLabel")}</label>
                       <DateSelect
                         value={scheduledDate}
                         minDate={new Date()}
@@ -1810,7 +1786,7 @@ export default function CreatePostPage() {
                     </div>
 
                     <div className={styles.schedulerField}>
-                      <label className={styles.schedulerFieldLabel}>Time</label>
+                      <label className={styles.schedulerFieldLabel}>{t("timeLabel")}</label>
                       <TimeSelect
                         value={scheduledTime}
                         selectedDate={scheduledDate}
@@ -1831,9 +1807,7 @@ export default function CreatePostPage() {
                     </div>
                   </div>
 
-                  <p className={styles.schedulerHint}>
-                    You can only select dates and times from now onward.
-                  </p>
+                  <p className={styles.schedulerHint}>{t("schedulerHint")}</p>
                 </div>
               )}
             </div>
@@ -1844,14 +1818,14 @@ export default function CreatePostPage() {
                 className={styles.secondaryButton}
                 onClick={resetSelection}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="submit"
                 className={styles.primaryButton}
                 disabled={!mediaItems.length}
               >
-                Finish
+                {t("finish")}
               </button>
             </div>
 

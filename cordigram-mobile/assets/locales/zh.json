@@ -86,7 +86,6 @@
         }
       }
     },
-    "personalInfo": "个人信息",
     "profile": {
       "profilePage": "个人主页",
       "aboutThisUser": "关于此用户",
@@ -156,13 +155,26 @@
     "accountEmail": "账号邮箱",
     "manageSignInEmail": "管理您的登录邮箱和验证步骤。",
     "currentEmail": "当前邮箱",
-    "personalInfo": "个人信息",
+    "personalInfo": {
+      "displayName": "显示名称",
+      "username": "用户名",
+      "birthdate": "生日",
+      "gender": "性别",
+      "location": "所在地",
+      "workplace": "工作地点",
+      "bio": "个人简介"
+    },
     "profileVisibility": "个人主页可见性",
     "controlWhoCanView": "控制谁可以查看您的个人主页、关于部分和粉丝列表。",
     "profilePageDesc": "谁可以查看您的个人主页和标签。",
     "aboutThisUserDesc": "谁可以打开您个人主页上的关于弹窗。",
     "followersListDesc": "谁可以查看您的粉丝列表。",
     "followingListDesc": "谁可以查看您关注的账号。",
+    "visibility": {
+      "public": "公开",
+      "followers": "仅关注者",
+      "private": "私密"
+    },
     "emailStep": {
       "verifyPassword": "第1步 · 验证密码",
       "currentOtp": "第2步 · 当前邮箱OTP",
@@ -514,9 +526,7 @@
     "visibility": {
       "public": "公开",
       "followers": "粉丝",
-      "private": "私密",
-      "cancel": "取消",
-      "shareQuote": "分享引用"
+      "private": "私密"
     },
     "liveNow": "正在直播",
     "feed": {
@@ -581,10 +591,17 @@
       "contentHint": "写下您的引用...",
       "hashtagsHint": "标签（用逗号分隔）",
       "locationHint": "位置（可选）",
+      "searchingLocation": "正在搜索位置...",
+      "noLocationSuggestions": "未找到建议",
+      "locationSearchFailed": "无法搜索位置",
       "visibilityHint": "可见性",
+      "visibilityPublic": "公开",
+      "visibilityFollowers": "关注者",
+      "visibilityPrivate": "私密",
       "allowComments": "允许评论",
       "allowDownloads": "允许下载（继承原帖）",
-      "hideLikeCount": "隐藏点赞数"
+      "hideLikeCount": "隐藏点赞数",
+      "shareQuote": "分享引用"
     },
     "suggestions": {
       "title": "您可能认识的人",

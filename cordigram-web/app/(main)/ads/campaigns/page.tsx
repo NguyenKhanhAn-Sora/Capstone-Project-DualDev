@@ -18,14 +18,6 @@ const money = (value: number) =>
 const integer = (value: number) => new Intl.NumberFormat("en-US").format(value);
 const pct = (value: number) => `${value.toFixed(2)}%`;
 
-function statusLabel(status: "active" | "hidden" | "paused" | "canceled" | "completed") {
-  if (status === "active") return "Active";
-  if (status === "hidden") return "Hidden";
-  if (status === "paused") return "Paused";
-  if (status === "canceled") return "Canceled";
-  return "Completed";
-}
-
 type FilterOption<T extends string> = {
   value: T;
   label: string;
@@ -127,26 +119,11 @@ function FilterDropdown<T extends string>({
   );
 }
 
-const STATUS_FILTER_OPTIONS: FilterOption<
-  "all" | "active" | "hidden" | "canceled" | "completed"
->[] = [
-  { value: "all", label: "All status" },
-  { value: "active", label: "Active" },
-  { value: "hidden", label: "Hidden" },
-  { value: "canceled", label: "Canceled" },
-  { value: "completed", label: "Completed" },
-];
-
-const SORT_OPTIONS: FilterOption<"newest" | "oldest" | "spent" | "ctr">[] = [
-  { value: "newest", label: "Newest" },
-  { value: "oldest", label: "Oldest" },
-  { value: "spent", label: "Highest spent" },
-  { value: "ctr", label: "Highest CTR" },
-];
-
 export default function AdsCampaignsPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
+  const t = useTranslations("ads");
+
   const [dashboard, setDashboard] = useState<AdsDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -157,6 +134,27 @@ export default function AdsCampaignsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "spent" | "ctr">("newest");
+
+  const statusFilterOptions = useMemo<FilterOption<"all" | "active" | "hidden" | "canceled" | "completed">[]>(
+    () => [
+      { value: "all", label: t("campaigns.statusOptions.all") },
+      { value: "active", label: t("campaigns.statusOptions.active") },
+      { value: "hidden", label: t("campaigns.statusOptions.hidden") },
+      { value: "canceled", label: t("campaigns.statusOptions.canceled") },
+      { value: "completed", label: t("campaigns.statusOptions.completed") },
+    ],
+    [t],
+  );
+
+  const sortOptions = useMemo<FilterOption<"newest" | "oldest" | "spent" | "ctr">[]>(
+    () => [
+      { value: "newest", label: t("campaigns.sortOptions.newest") },
+      { value: "oldest", label: t("campaigns.sortOptions.oldest") },
+      { value: "spent", label: t("campaigns.sortOptions.spent") },
+      { value: "ctr", label: t("campaigns.sortOptions.ctr") },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -182,7 +180,7 @@ export default function AdsCampaignsPage() {
       .catch((err) => {
         if (cancelled) return;
         setDashboard(null);
-        setError(err instanceof Error ? err.message : "Failed to load campaigns.");
+        setError(err instanceof Error ? err.message : t("campaigns.loadFailed"));
       })
       .finally(() => {
         if (cancelled) return;
@@ -192,7 +190,7 @@ export default function AdsCampaignsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const campaigns = useMemo(
     () =>
@@ -201,23 +199,6 @@ export default function AdsCampaignsPage() {
       ),
     [dashboard],
   );
-
-  const stats = useMemo(() => {
-    const total = campaigns.length;
-    const active = campaigns.filter((item) => item.status === "active").length;
-    const totalSpent = campaigns.reduce((sum, item) => sum + (item.spent || 0), 0);
-    const totalImpressions = campaigns.reduce(
-      (sum, item) => sum + (item.impressions || 0),
-      0,
-    );
-
-    return {
-      total,
-      active,
-      totalSpent,
-      totalImpressions,
-    };
-  }, [campaigns]);
 
   const filteredCampaigns = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase();
@@ -270,6 +251,9 @@ export default function AdsCampaignsPage() {
     setSortBy("newest");
   };
 
+  const statusLabel = (status: "active" | "hidden" | "paused" | "canceled" | "completed") =>
+    t(`status.${status}`);
+
   if (!canRender) return null;
 
   return (
@@ -277,20 +261,20 @@ export default function AdsCampaignsPage() {
       <div className={styles.container}>
         <div className={styles.headerRow}>
           <div>
-            <h1 className={styles.title}>All Ad Campaigns</h1>
-            <p className={styles.subtitle}>Full history of your campaigns and performance.</p>
+            <h1 className={styles.title}>{t("campaigns.title")}</h1>
+            <p className={styles.subtitle}>{t("campaigns.subtitle")}</p>
           </div>
           <button
             type="button"
             className={styles.secondaryBtn}
             onClick={() => router.push("/ads")}
           >
-            Back to dashboard
+            {t("campaigns.backToDashboard")}
           </button>
         </div>
 
         <section className={styles.card}>
-          {loading ? <p className={styles.helper}>Loading campaigns...</p> : null}
+          {loading ? <p className={styles.helper}>{t("campaigns.loading")}</p> : null}
           {!loading && error ? <p className={styles.helper}>{error}</p> : null}
           {!loading && !error ? (
             <>
@@ -299,27 +283,27 @@ export default function AdsCampaignsPage() {
                   <input
                     className={`${styles.filterInput} ${styles.searchInput}`}
                     type="search"
-                    placeholder="Search campaign name..."
+                    placeholder={t("campaigns.searchPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
 
                   <label className={styles.filterInlineField}>
-                    <span className={styles.filterInlineLabel}>Status:</span>
+                    <span className={styles.filterInlineLabel}>{t("campaigns.statusLabel")}</span>
                     <FilterDropdown
-                      ariaLabel="Status filter"
+                      ariaLabel={t("campaigns.statusAriaLabel")}
                       value={statusFilter}
-                      options={STATUS_FILTER_OPTIONS}
+                      options={statusFilterOptions}
                       onChange={setStatusFilter}
                     />
                   </label>
 
                   <label className={styles.filterInlineField}>
-                    <span className={styles.filterInlineLabel}>Sort by:</span>
+                    <span className={styles.filterInlineLabel}>{t("campaigns.sortLabel")}</span>
                     <FilterDropdown
-                      ariaLabel="Sort campaigns"
+                      ariaLabel={t("campaigns.sortAriaLabel")}
                       value={sortBy}
-                      options={SORT_OPTIONS}
+                      options={sortOptions}
                       onChange={setSortBy}
                     />
                   </label>
@@ -327,7 +311,7 @@ export default function AdsCampaignsPage() {
 
                 <div className={styles.filtersRow}>
                   <label className={styles.filterInlineField}>
-                    <span className={styles.filterInlineLabel}>From date:</span>
+                    <span className={styles.filterInlineLabel}>{t("campaigns.fromDate")}</span>
                     <span className={styles.dateSelectWrap}>
                       <DateSelect
                         value={dateFrom}
@@ -341,7 +325,7 @@ export default function AdsCampaignsPage() {
                   </label>
 
                   <label className={styles.filterInlineField}>
-                    <span className={styles.filterInlineLabel}>To date:</span>
+                    <span className={styles.filterInlineLabel}>{t("campaigns.toDate")}</span>
                     <span className={styles.dateSelectWrap}>
                       <DateSelect
                         value={dateTo}
@@ -355,7 +339,9 @@ export default function AdsCampaignsPage() {
                   </label>
 
                   <span className={styles.filterCount}>
-                    {filteredCampaigns.length} result{filteredCampaigns.length === 1 ? "" : "s"}
+                    {filteredCampaigns.length === 1
+                      ? t("campaigns.resultCount", { count: filteredCampaigns.length })
+                      : t("campaigns.resultCountPlural", { count: filteredCampaigns.length })}
                   </span>
 
                   <button
@@ -364,24 +350,24 @@ export default function AdsCampaignsPage() {
                     onClick={clearFilters}
                     disabled={!hasActiveFilters}
                   >
-                    Clear
+                    {t("campaigns.clear")}
                   </button>
                 </div>
-              </div>event dwell
+              </div>
 
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Campaign</th>
-                      <th>Status</th>
-                      <th>Start</th>
-                      <th>End</th>
-                      <th>Spent</th>
-                      <th>Impr.</th>
-                      <th>CTR</th>
-                      <th>Clicks</th>
-                      <th>Action</th>
+                      <th>{t("table.campaign")}</th>
+                      <th>{t("table.status")}</th>
+                      <th>{t("table.start")}</th>
+                      <th>{t("table.end")}</th>
+                      <th>{t("table.spent")}</th>
+                      <th>{t("table.impressions")}</th>
+                      <th>{t("table.ctr")}</th>
+                      <th>{t("table.clicks")}</th>
+                      <th>{t("table.action")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -396,7 +382,7 @@ export default function AdsCampaignsPage() {
                           </span>
                           {item.status === "canceled" && item.adminCancelReason?.trim() ? (
                             <p className={styles.cancelReasonText}>
-                              Admin reason: {item.adminCancelReason.trim()}
+                              {t("campaigns.adminReason", { reason: item.adminCancelReason.trim() })}
                             </p>
                           ) : null}
                         </td>
@@ -412,14 +398,14 @@ export default function AdsCampaignsPage() {
                             className={styles.secondaryBtn}
                             onClick={() => router.push(`/ads/campaigns/${item.id}`)}
                           >
-                            Details
+                            {t("table.details")}
                           </button>
                         </td>
                       </tr>
                     ))}
                     {filteredCampaigns.length === 0 ? (
                       <tr>
-                        <td colSpan={9}>No campaigns matched your filters.</td>
+                        <td colSpan={9}>{t("table.noMatch")}</td>
                       </tr>
                     ) : null}
                   </tbody>

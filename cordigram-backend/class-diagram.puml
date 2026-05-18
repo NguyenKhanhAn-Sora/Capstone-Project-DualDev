@@ -31,23 +31,6 @@ class Profile {
   +stats: object
 }
 
-class Session {
-  +userId: ObjectId
-  +tokenHash: string
-  +expiresAt: Date
-  +deviceType: string
-  +loginMethod: string
-  +ip: string
-}
-
-class Otp {
-  +email: string
-  +codeHash: string
-  +expiresAt: Date
-  +consumed: boolean
-  +attempts: number
-}
-
 class Follow {
   +followerId: ObjectId
   +followeeId: ObjectId
@@ -105,14 +88,6 @@ class Comment {
   +moderationState: string
 }
 
-class Poll {
-  +creatorId: ObjectId
-  +question: string
-  +options: string[]
-  +expiresAt: Date
-  +allowMultipleAnswers: boolean
-  +votes: object[]
-}
 
 class Hashtag {
   +name: string
@@ -218,15 +193,6 @@ class PaymentTransaction {
   +promotedPostId: string
 }
 
-class BoostEntitlement {
-  +userId: string
-  +tier: string
-  +billingCycle: string
-  +status: string
-  +startsAt: Date
-  +expiresAt: Date
-}
-
 ' ─── ADMIN ───────────────────────────────────
 
 class CommunityDiscoveryHistory {
@@ -257,16 +223,6 @@ class ModerationAction {
   +expiresAt: Date
 }
 
-class AuditLog {
-  +serverId: ObjectId
-  +actorUserId: ObjectId
-  +targetUserId: ObjectId
-  +action: string
-  +targetType: string
-  +roleId: ObjectId
-  +changes: object[]
-}
-
 class BroadcastNotice {
   +adminId: ObjectId
   +title: string
@@ -281,7 +237,6 @@ class BroadcastNotice {
 
 ' User & Auth
 User "1" -- "1" Profile
-User "1" -- "*" Session
 User "1" -- "*" Otp : verifies via
 User "1" -- "*" Follow
 User "1" -- "*" Block
@@ -302,11 +257,9 @@ User "1" -- "*" Notification : receives
 
 ' User & Payment
 User "1" -- "*" PaymentTransaction : makes
-User "1" -- "*" BoostEntitlement
 
 ' Content
 Post "1" -- "*" Comment
-Post "1" -- "0..1" Poll
 Post "*" -- "*" Hashtag
 
 ' Server
@@ -321,7 +274,6 @@ DirectMessage "0..1" -- "*" DirectMessage : replyTo
 ' Admin (User với role = "admin")
 User "1" -- "*" BroadcastNotice : sends (admin)
 User "1" -- "*" CommunityDiscoveryHistory : reviews (admin)
-User "1" -- "*" AuditLog : acts (admin)
 
 ' Report
 User "1" -- "*" Report : files
@@ -333,7 +285,6 @@ User "1" -- "*" Report : resolves (admin)
 User "1" -- "*" ModerationAction : receives
 User "1" -- "*" ModerationAction : performs (admin)
 Post "1" -- "*" ModerationAction : moderated via
-Server "1" -- "*" AuditLog : logs
 Server "1" -- "*" CommunityDiscoveryHistory : reviewed via
 
 @enduml

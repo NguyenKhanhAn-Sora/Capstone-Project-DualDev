@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
+import { useLanguage } from "@/component/language-provider";
 
 export type FollowersOverlayTab = "followers" | "following";
 
@@ -67,6 +68,7 @@ export default function FollowersOverlay(props: Props) {
     onClose,
   } = props;
 
+  const { t } = useLanguage();
   const [tab, setTab] = useState<FollowersOverlayTab>(initialTab);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -127,7 +129,7 @@ export default function FollowersOverlay(props: Props) {
     const token = getStoredAccessToken();
     if (!token) {
       const setter = which === "followers" ? setFollowers : setFollowing;
-      setter((p) => ({ ...p, loading: false, error: "Session expired." }));
+      setter((p) => ({ ...p, loading: false, error: t("profilePage.followersOverlay.sessionExpired") }));
       return;
     }
 
@@ -160,7 +162,7 @@ export default function FollowersOverlay(props: Props) {
       setter((p) => ({
         ...p,
         loading: false,
-        error: err?.message || "Failed to load list",
+        error: err?.message || t("profilePage.followersOverlay.failedToLoad"),
       }));
     }
   };
@@ -172,7 +174,7 @@ export default function FollowersOverlay(props: Props) {
 
     const token = getStoredAccessToken();
     if (!token) {
-      setState((p) => ({ ...p, error: "Session expired." }));
+      setState((p) => ({ ...p, error: t("profilePage.followersOverlay.sessionExpired") }));
       return;
     }
 
@@ -206,7 +208,7 @@ export default function FollowersOverlay(props: Props) {
       setState((p) => ({
         ...p,
         loadingMore: false,
-        error: err?.message || "Failed to load more",
+        error: err?.message || t("profilePage.followersOverlay.failedToLoadMore"),
       }));
     }
   };
@@ -314,7 +316,7 @@ export default function FollowersOverlay(props: Props) {
             className={styles.close}
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("profilePage.followersOverlay.closeAria")}
           >
             <IconClose />
           </button>
@@ -326,14 +328,14 @@ export default function FollowersOverlay(props: Props) {
             className={`${styles.tab} ${tab === "followers" ? styles.tabActive : ""}`}
             onClick={() => setTab("followers")}
           >
-            Followers
+            {t("profilePage.followersOverlay.tabFollowers")}
           </button>
           <button
             type="button"
             className={`${styles.tab} ${tab === "following" ? styles.tabActive : ""}`}
             onClick={() => setTab("following")}
           >
-            Following
+            {t("profilePage.followersOverlay.tabFollowing")}
           </button>
         </div>
 
@@ -342,7 +344,9 @@ export default function FollowersOverlay(props: Props) {
             type="text"
             className={styles.searchInput}
             placeholder={
-              tab === "followers" ? "Search followers" : "Search following"
+              tab === "followers"
+                ? t("profilePage.followersOverlay.searchFollowers")
+                : t("profilePage.followersOverlay.searchFollowing")
             }
             value={activeSearch}
             onChange={(event) => setActiveSearch(event.target.value)}
@@ -352,7 +356,7 @@ export default function FollowersOverlay(props: Props) {
               type="button"
               className={styles.searchClear}
               onClick={() => setActiveSearch("")}
-              aria-label="Clear search"
+              aria-label={t("profilePage.followersOverlay.clearSearchAria")}
             >
               ×
             </button>
@@ -361,7 +365,7 @@ export default function FollowersOverlay(props: Props) {
 
         <div className={styles.list} ref={scrollRef}>
           {state.loading ? (
-            <div className={styles.loading}>Loading…</div>
+            <div className={styles.loading}>{t("profilePage.followersOverlay.loading")}</div>
           ) : null}
           {state.error && !state.loading ? (
             <div className={styles.error}>{state.error}</div>
@@ -369,7 +373,9 @@ export default function FollowersOverlay(props: Props) {
 
           {!state.loading && !state.error && !filteredItems.length ? (
             <div className={styles.loading}>
-              {activeSearch ? "No matches found" : "No users yet"}
+              {activeSearch
+                ? t("profilePage.followersOverlay.noMatches")
+                : t("profilePage.followersOverlay.noUsers")}
             </div>
           ) : null}
 
@@ -377,7 +383,7 @@ export default function FollowersOverlay(props: Props) {
             <div key={item.userId} className={styles.row}>
               <Link
                 href={toProfileHref(item)}
-                aria-label={`View ${item.username} profile`}
+                aria-label={t("profilePage.followersOverlay.viewProfileAria", { username: item.username ?? "" })}
               >
                 <img
                   className={styles.avatar}
@@ -400,16 +406,16 @@ export default function FollowersOverlay(props: Props) {
                 disabled={Boolean(viewerId && item.userId === viewerId)}
               >
                 {viewerId && item.userId === viewerId
-                  ? "You"
+                  ? t("profilePage.followersOverlay.youLabel")
                   : item.isFollowing
-                    ? "Following"
-                    : "Follow"}
+                    ? t("profilePage.followersOverlay.followingLabel")
+                    : t("profilePage.followersOverlay.followLabel")}
               </button>
             </div>
           ))}
 
           {state.loadingMore ? (
-            <div className={styles.loading}>Loading more…</div>
+            <div className={styles.loading}>{t("profilePage.followersOverlay.loadingMore")}</div>
           ) : null}
           <div ref={sentinelRef} className={styles.sentinel} />
         </div>

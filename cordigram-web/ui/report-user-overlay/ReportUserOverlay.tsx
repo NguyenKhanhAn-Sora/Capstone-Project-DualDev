@@ -1,76 +1,51 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { reportUser } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import styles from "./report-user-overlay.module.css";
 
 type ReportCategoryKey = "abuse" | "violence" | "misinfo" | "spam" | "privacy" | "other";
 
-type ReportCategory = {
-  key: ReportCategoryKey;
-  label: string;
-  accent: string;
-  reasons: Array<{ key: string; label: string }>;
+const REASON_KEYS: Record<ReportCategoryKey, Array<{ key: string; accent: string }>> = {
+  abuse: [
+    { key: "harassment", accent: "#f59e0b" },
+    { key: "hate_speech", accent: "#f59e0b" },
+    { key: "offensive_discrimination", accent: "#f59e0b" },
+  ],
+  violence: [
+    { key: "violence_threats", accent: "#ef4444" },
+    { key: "graphic_violence", accent: "#ef4444" },
+    { key: "self_harm", accent: "#ef4444" },
+    { key: "extremism", accent: "#ef4444" },
+  ],
+  misinfo: [
+    { key: "impersonation", accent: "#22c55e" },
+    { key: "fake_news", accent: "#22c55e" },
+  ],
+  spam: [
+    { key: "spam", accent: "#14b8a6" },
+    { key: "financial_scam", accent: "#14b8a6" },
+    { key: "unsolicited_ads", accent: "#14b8a6" },
+  ],
+  privacy: [
+    { key: "doxxing", accent: "#06b6d4" },
+    { key: "nonconsensual_intimate", accent: "#06b6d4" },
+  ],
+  other: [{ key: "other", accent: "#94a3b8" }],
 };
 
-const REPORT_GROUPS: ReportCategory[] = [
-  {
-    key: "abuse",
-    label: "Harassment / Hate",
-    accent: "#f59e0b",
-    reasons: [
-      { key: "harassment", label: "Harassment or bullying" },
-      { key: "hate_speech", label: "Hate speech or slurs" },
-      { key: "offensive_discrimination", label: "Offensive discrimination" },
-    ],
-  },
-  {
-    key: "violence",
-    label: "Threats / Safety",
-    accent: "#ef4444",
-    reasons: [
-      { key: "violence_threats", label: "Violence or physical threats" },
-      { key: "graphic_violence", label: "Graphic violence" },
-      { key: "self_harm", label: "Encouraging self-harm" },
-      { key: "extremism", label: "Extremism or terrorism" },
-    ],
-  },
-  {
-    key: "misinfo",
-    label: "Impersonation / Misleading",
-    accent: "#22c55e",
-    reasons: [
-      { key: "impersonation", label: "Pretending to be someone else" },
-      { key: "fake_news", label: "Fake news or misinformation" },
-    ],
-  },
-  {
-    key: "spam",
-    label: "Spam / Scam",
-    accent: "#14b8a6",
-    reasons: [
-      { key: "spam", label: "Spam or mass mentions" },
-      { key: "financial_scam", label: "Scam or fraud" },
-      { key: "unsolicited_ads", label: "Unwanted promotions" },
-    ],
-  },
-  {
-    key: "privacy",
-    label: "Privacy violation",
-    accent: "#06b6d4",
-    reasons: [
-      { key: "doxxing", label: "Sharing private information" },
-      { key: "nonconsensual_intimate", label: "Non-consensual intimate content" },
-    ],
-  },
-  {
-    key: "other",
-    label: "Other",
-    accent: "#94a3b8",
-    reasons: [{ key: "other", label: "Other reason" }],
-  },
-];
+const CATEGORY_ACCENTS: Record<ReportCategoryKey, string> = {
+  abuse: "#f59e0b",
+  violence: "#ef4444",
+  misinfo: "#22c55e",
+  spam: "#14b8a6",
+  privacy: "#06b6d4",
+  other: "#94a3b8",
+};
+
+const CATEGORY_KEYS: ReportCategoryKey[] = ["abuse", "violence", "misinfo", "spam", "privacy", "other"];
 
 const ANIM_MS = 180;
 
@@ -82,6 +57,7 @@ type Props = {
 };
 
 export default function ReportUserOverlay({ open, targetUserId, targetHandle, onClose }: Props) {
+  const t = useTranslations("reportUser");
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const visTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -126,15 +102,15 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
     return () => document.removeEventListener("keydown", handler);
   }, [isVisible, onClose]);
 
-  const selectedGroup = useMemo(
-    () => REPORT_GROUPS.find((g) => g.key === category),
+  const selectedReasons = useMemo(
+    () => (category ? REASON_KEYS[category] : null),
     [category],
   );
 
   const handleSubmit = useCallback(async () => {
     if (!targetUserId || !category || !reason) return;
     const token = getStoredAccessToken();
-    if (!token) { setError("Session expired. Please sign in again."); return; }
+    if (!token) { setError(t("sessionExpired")); return; }
     setSubmitting(true);
     setError("");
     try {
@@ -142,11 +118,11 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
       await reportUser({ token, userId: targetUserId, category: category as any, reason, note: note.trim() || undefined });
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit report.");
+      setError(err instanceof Error ? err.message : t("errorFallback"));
     } finally {
       setSubmitting(false);
     }
-  }, [targetUserId, category, reason, note]);
+  }, [targetUserId, category, reason, note, t]);
 
   if (!isVisible) return null;
 
@@ -159,7 +135,7 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
       className={`${styles.overlay} ${isClosing ? styles.overlayClosing : styles.overlayVisible}`}
       role="dialog"
       aria-modal="true"
-      aria-label="Report user"
+      aria-label={t("ariaLabel")}
       onClick={onClose}
     >
       <div
@@ -168,60 +144,62 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
       >
         {done ? (
           <div className={styles.doneWrap}>
-            <h3 className={styles.title}>Report submitted</h3>
-            <p className={styles.sub}>Thank you. We&apos;ll review this report and take appropriate action.</p>
+            <h3 className={styles.title}>{t("doneTitle")}</h3>
+            <p className={styles.sub}>{t("doneText")}</p>
             <div className={styles.actions}>
-              <button type="button" className={styles.btnPrimary} onClick={onClose}>Close</button>
+              <button type="button" className={styles.btnPrimary} onClick={onClose}>
+                {t("close")}
+              </button>
             </div>
           </div>
         ) : (
           <>
             <div className={styles.header}>
               <div className={styles.headerText}>
-                <h3 className={styles.title}>Report this account</h3>
-                <p className={styles.sub}>
-                  Reporting {displayHandle}. Please choose the closest reason.
-                </p>
+                <h3 className={styles.title}>{t("title")}</h3>
+                <p className={styles.sub}>{t("subtitle", { handle: displayHandle })}</p>
               </div>
-              <button type="button" className={styles.closeBtn} aria-label="Close" onClick={onClose}>
+              <button type="button" className={styles.closeBtn} aria-label={t("close")} onClick={onClose}>
                 <IconClose />
               </button>
             </div>
 
             <div className={styles.reportGrid}>
               <div className={styles.categoryGrid}>
-                {REPORT_GROUPS.map((group) => {
-                  const isActive = category === group.key;
+                {CATEGORY_KEYS.map((key) => {
+                  const isActive = category === key;
+                  const accent = CATEGORY_ACCENTS[key];
                   return (
                     <button
-                      key={group.key}
+                      key={key}
                       type="button"
                       className={`${styles.categoryCard} ${isActive ? styles.categoryCardActive : ""}`}
                       style={{
-                        borderColor: isActive ? group.accent : undefined,
-                        boxShadow: isActive ? `0 0 0 1px ${group.accent}` : undefined,
+                        borderColor: isActive ? accent : undefined,
+                        boxShadow: isActive ? `0 0 0 1px ${accent}` : undefined,
                       }}
                       onClick={() => {
-                        setCategory(group.key);
-                        setReason(group.reasons.length === 1 ? group.reasons[0].key : "");
+                        setCategory(key);
+                        const reasons = REASON_KEYS[key];
+                        setReason(reasons.length === 1 ? reasons[0].key : "");
                       }}
                     >
                       <span
                         className={styles.categoryDot}
-                        style={{ background: group.accent }}
+                        style={{ background: accent }}
                         aria-hidden
                       />
-                      <span>{group.label}</span>
+                      <span>{t(`categories.${key}`)}</span>
                     </button>
                   );
                 })}
               </div>
 
               <div className={styles.reasonPanel}>
-                <div className={styles.reasonHeader}>Select a specific reason</div>
-                {selectedGroup ? (
+                <div className={styles.reasonHeader}>{t("selectReason")}</div>
+                {selectedReasons ? (
                   <div className={styles.reasonList}>
-                    {selectedGroup.reasons.map((r) => {
+                    {selectedReasons.map((r) => {
                       const checked = reason === r.key;
                       return (
                         <button
@@ -233,20 +211,20 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
                           <span className={styles.reasonRadio} aria-checked={checked}>
                             {checked ? <span className={styles.reasonRadioDot} /> : null}
                           </span>
-                          <span>{r.label}</span>
+                          <span>{t(`reasons.${r.key}`)}</span>
                         </button>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className={styles.reasonPlaceholder}>Pick a category first.</div>
+                  <div className={styles.reasonPlaceholder}>{t("pickCategory")}</div>
                 )}
 
                 <label className={styles.noteLabel}>
-                  Additional notes (optional)
+                  {t("notesLabel")}
                   <textarea
                     className={styles.noteInput}
-                    placeholder="Add brief context if needed..."
+                    placeholder={t("notesPlaceholder")}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     maxLength={500}
@@ -263,7 +241,7 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
                 onClick={onClose}
                 disabled={submitting}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -271,7 +249,7 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
                 onClick={() => void handleSubmit()}
                 disabled={!category || !reason || submitting}
               >
-                {submitting ? "Submitting..." : "Submit report"}
+                {submitting ? t("submitting") : t("submit")}
               </button>
             </div>
           </>

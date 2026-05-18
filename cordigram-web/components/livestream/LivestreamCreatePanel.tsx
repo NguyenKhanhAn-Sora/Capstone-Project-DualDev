@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import EmojiPicker from "emoji-picker-react";
+import { useTranslations } from "next-intl";
 import {
   createLivestream,
   type LivestreamLatencyMode,
@@ -20,37 +21,6 @@ import {
 } from "@/lib/livestream-screen-share-cache";
 import { searchProfiles, type ProfileSearchItem } from "@/lib/api";
 import panelStyles from "./livestream-create-panel.module.css";
-
-const visibilityOptions: Array<{
-  value: "public" | "followers" | "private";
-  label: string;
-}> = [
-  { value: "public", label: "Public" },
-  { value: "followers", label: "Friends / Following" },
-  { value: "private", label: "Private" },
-];
-
-const latencyOptions: Array<{
-  value: LivestreamLatencyMode;
-  label: string;
-  note: string;
-}> = [
-  {
-    value: "adaptive",
-    label: "Adaptive latency",
-    note: "Auto-tunes bitrate and quality based on network and device performance.",
-  },
-  {
-    value: "balanced",
-    label: "Balanced latency",
-    note: "Keeps a stable stream with moderate delay and consistent quality.",
-  },
-  {
-    value: "low",
-    label: "Low latency",
-    note: "Minimizes delay for near real-time interaction, with more aggressive quality trade-offs.",
-  },
-];
 
 const MIC_LEVEL_MULTIPLIER = 1.5;
 const MIC_MONITOR_DELAY_SECONDS = 0.2;
@@ -128,6 +98,7 @@ function getCameraCaptureConstraints(mode: LivestreamLatencyMode) {
 
 export default function LivestreamCreatePanel() {
   const router = useRouter();
+  const t = useTranslations("create.livestream");
   type PermissionState = "unknown" | "granted" | "denied" | "unsupported";
   type PreviewAttempt = "screen" | "camera" | null;
   const [title, setTitle] = useState("");
@@ -190,11 +161,41 @@ export default function LivestreamCreatePanel() {
   const micRafRef = useRef<number | null>(null);
   const micOverlayTimerRef = useRef<number | null>(null);
 
+  const visibilityOptions = useMemo(
+    () => [
+      { value: "public" as const, label: t("visibilityPublic") },
+      { value: "followers" as const, label: t("visibilityFollowers") },
+      { value: "private" as const, label: t("visibilityPrivate") },
+    ],
+    [t],
+  );
+
+  const latencyOptions = useMemo(
+    () => [
+      {
+        value: "adaptive" as LivestreamLatencyMode,
+        label: t("latencyAdaptiveLabel"),
+        note: t("latencyAdaptiveNote"),
+      },
+      {
+        value: "balanced" as LivestreamLatencyMode,
+        label: t("latencyBalancedLabel"),
+        note: t("latencyBalancedNote"),
+      },
+      {
+        value: "low" as LivestreamLatencyMode,
+        label: t("latencyLowLabel"),
+        note: t("latencyLowNote"),
+      },
+    ],
+    [t],
+  );
+
   const selectedVisibility = useMemo(
     () =>
       visibilityOptions.find((option) => option.value === visibility) ||
       visibilityOptions[0],
-    [visibility],
+    [visibilityOptions, visibility],
   );
 
   const hasScreenPreview =
@@ -227,10 +228,10 @@ export default function LivestreamCreatePanel() {
   }, [title]);
 
   const permissionLabel = (state: PermissionState) => {
-    if (state === "granted") return "Granted";
-    if (state === "denied") return "Blocked";
-    if (state === "unsupported") return "Unsupported";
-    return "Not requested";
+    if (state === "granted") return t("permGranted");
+    if (state === "denied") return t("permBlocked");
+    if (state === "unsupported") return t("permUnsupported");
+    return t("permUnknown");
   };
 
   const stopMicMeter = () => {
@@ -482,7 +483,7 @@ export default function LivestreamCreatePanel() {
   const requestMicrophonePermission = async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setMicPermission("unsupported");
-      setPermissionError("Microphone API is not supported in this browser.");
+      setPermissionError(t("errorMicUnsupported"));
       return;
     }
 
@@ -509,7 +510,7 @@ export default function LivestreamCreatePanel() {
     } catch {
       setMicPermission("denied");
       setMicOverlayState("blocked");
-      setPermissionError("Cannot access microphone. Please allow microphone permission in browser settings.");
+      setPermissionError(t("errorMicDenied"));
     } finally {
       setPermissionBusy(null);
     }
@@ -518,7 +519,7 @@ export default function LivestreamCreatePanel() {
   const startMicTesting = async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setMicPermission("unsupported");
-      setPermissionError("Microphone API is not supported in this browser.");
+      setPermissionError(t("errorMicUnsupported"));
       return;
     }
 
@@ -551,7 +552,7 @@ export default function LivestreamCreatePanel() {
     } catch {
       setMicPermission("denied");
       setMicOverlayState("blocked");
-      setPermissionError("Cannot start mic test. Please allow microphone permission in browser settings.");
+      setPermissionError(t("errorMicTestDenied"));
       stopMicMeter();
     } finally {
       setPermissionBusy(null);
@@ -565,7 +566,7 @@ export default function LivestreamCreatePanel() {
   const requestScreenPreview = async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       setScreenPermission("unsupported");
-      setPermissionError("Screen sharing is not supported in this browser.");
+      setPermissionError(t("errorScreenUnsupported"));
       return;
     }
 
@@ -592,7 +593,7 @@ export default function LivestreamCreatePanel() {
       }
     } catch {
       setScreenPermission("denied");
-      setPermissionError("Screen share was blocked or cancelled. Please try again.");
+      setPermissionError(t("errorScreenDenied"));
     } finally {
       setPermissionBusy(null);
     }
@@ -601,7 +602,7 @@ export default function LivestreamCreatePanel() {
   const requestCameraPreview = async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setCameraPermission("unsupported");
-      setPermissionError("Camera API is not supported in this browser.");
+      setPermissionError(t("errorCameraUnsupported"));
       return;
     }
 
@@ -631,7 +632,7 @@ export default function LivestreamCreatePanel() {
       };
     } catch {
       setCameraPermission("denied");
-      setPermissionError("Camera was blocked or unavailable. Please try again.");
+      setPermissionError(t("errorCameraDenied"));
     } finally {
       setPermissionBusy(null);
     }
@@ -814,22 +815,22 @@ export default function LivestreamCreatePanel() {
     const trimmedTitle = title.trim();
 
     if (!trimmedTitle) {
-      setError("Please enter a livestream title.");
+      setError(t("errorNoTitle"));
       return;
     }
 
     if (titleWordCount > 300) {
-      setTitleError("Livestream title supports up to 300 words.");
+      setTitleError(t("errorTitleTooLong"));
       return;
     }
 
     if (requiresScreen && !hasScreenPreview) {
-      setError("Please choose a screen share source before creating livestream.");
+      setError(t("errorNoScreen"));
       return;
     }
 
     if (requiresCamera && !hasCameraPreview) {
-      setError("Please enable a camera source before creating livestream.");
+      setError(t("errorNoCamera"));
       return;
     }
 
@@ -854,30 +855,37 @@ export default function LivestreamCreatePanel() {
       });
       router.push(`/livestream/${encodeURIComponent(data.stream.id)}?host=1`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create livestream.");
+      setError(err instanceof Error ? err.message : t("errorFailed"));
     } finally {
       setLoading(false);
     }
   };
 
+  const previewSourceLabel = (() => {
+    if (computedPreviewMode === "none") return t("previewSourceNone");
+    if (computedPreviewMode === "screen-camera") return t("previewSourceScreenCamera");
+    if (computedPreviewMode === "screen") return t("previewSourceScreen");
+    return t("previewSourceCamera");
+  })();
+
   return (
     <section className={panelStyles.panel}>
       <div className={panelStyles.header}>
-        <p className={panelStyles.tag}>Livestream</p>
-        <h2 className={panelStyles.title}>Create a livestream</h2>
+        <p className={panelStyles.tag}>{t("tag")}</p>
+        <h2 className={panelStyles.title}>{t("title")}</h2>
       </div>
 
       <div className={panelStyles.contentGrid}>
       <form onSubmit={onSubmit} className={panelStyles.form}>
         <label className={panelStyles.label}>
           <span className={panelStyles.titleLabelRow}>
-            <span>Livestream title</span>
+            <span>{t("titleLabel")}</span>
             <div className={panelStyles.emojiWrap} ref={emojiRef}>
               <button
                 type="button"
                 className={panelStyles.emojiButton}
                 onClick={() => setShowEmojiPicker((prev) => !prev)}
-                aria-label="Open emoji picker"
+                aria-label={t("emojiAriaLabel")}
               >
                 <svg
                   aria-hidden
@@ -925,11 +933,11 @@ export default function LivestreamCreatePanel() {
                   setTitle(next);
                   if (titleError) setTitleError("");
                 } else {
-                  setTitleError("Livestream title supports up to 300 words.");
+                  setTitleError(t("errorTitleTooLong"));
                 }
               }}
               className={panelStyles.titleInput}
-              placeholder="Write a title and tag users with @username"
+              placeholder={t("titlePlaceholder")}
               onKeyDown={(e) => {
                 if (!mentionOpen) return;
                 if (e.key === "ArrowDown") {
@@ -990,13 +998,13 @@ export default function LivestreamCreatePanel() {
         </label>
 
         <label className={panelStyles.label}>
-          Location (optional)
+          {t("locationLabel")}
           <input
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             maxLength={160}
             className={panelStyles.input}
-            placeholder="Add a location"
+            placeholder={t("locationPlaceholder")}
             onBlur={() => setTimeout(() => setLocationOpen(false), 120)}
             onFocus={() => {
               if (locationSuggestions.length) setLocationOpen(true);
@@ -1033,7 +1041,7 @@ export default function LivestreamCreatePanel() {
           {locationOpen && (
             <div className={panelStyles.locationSuggestions}>
               {locationLoading ? (
-                <div className={panelStyles.locationMuted}>Searching...</div>
+                <div className={panelStyles.locationMuted}>{t("searching")}</div>
               ) : locationSuggestions.length ? (
                 locationSuggestions.map((option, idx) => (
                   <button
@@ -1053,14 +1061,14 @@ export default function LivestreamCreatePanel() {
                   </button>
                 ))
               ) : (
-                <div className={panelStyles.locationMuted}>No suggestions found.</div>
+                <div className={panelStyles.locationMuted}>{t("noSuggestions")}</div>
               )}
             </div>
           )}
         </label>
 
         <label className={panelStyles.label}>
-          Visibility
+          {t("visibilityLabel")}
           <div className={panelStyles.dropdownShell} ref={visibilityRef}>
             <button
               type="button"
@@ -1090,7 +1098,7 @@ export default function LivestreamCreatePanel() {
               <div
                 className={panelStyles.dropdownMenu}
                 role="listbox"
-                aria-label="Select livestream visibility"
+                aria-label={t("visibilityAria")}
               >
                 {visibilityOptions.map((option) => (
                   <button
@@ -1127,8 +1135,8 @@ export default function LivestreamCreatePanel() {
         </label>
 
         <div className={panelStyles.label}>
-          <span>Livestream latency</span>
-          <div className={panelStyles.latencyGroup} role="radiogroup" aria-label="Livestream latency mode">
+          <span>{t("latencyLabel")}</span>
+          <div className={panelStyles.latencyGroup} role="radiogroup" aria-label={t("latencyAria")}>
             {latencyOptions.map((option) => (
               <button
                 key={option.value}
@@ -1148,24 +1156,24 @@ export default function LivestreamCreatePanel() {
         </div>
 
         <label className={panelStyles.label}>
-          Short description (optional)
+          {t("descriptionLabel")}
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             maxLength={500}
             className={panelStyles.textarea}
-            placeholder="Share what this stream is about"
+            placeholder={t("descriptionPlaceholder")}
           />
         </label>
 
         <label className={panelStyles.label}>
-          Pinned comment (optional)
+          {t("pinnedCommentLabel")}
           <input
             value={pinnedComment}
             onChange={(e) => setPinnedComment(e.target.value)}
             maxLength={180}
             className={panelStyles.input}
-            placeholder="Example: Ask your questions in the chat"
+            placeholder={t("pinnedCommentPlaceholder")}
           />
         </label>
 
@@ -1180,20 +1188,18 @@ export default function LivestreamCreatePanel() {
             (requiresCamera && !hasCameraPreview)
           }
         >
-          {loading ? "Creating..." : "Create livestream"}
+          {loading ? t("submitting") : t("submit")}
         </button>
       </form>
 
       <aside className={panelStyles.sideColumn}>
         <section className={panelStyles.permissionCard}>
-          <h3 className={panelStyles.sideTitle}>Permission setup</h3>
-          <p className={panelStyles.sideNote}>
-            Before going live, verify browser access for microphone and screen sharing.
-          </p>
+          <h3 className={panelStyles.sideTitle}>{t("permissionTitle")}</h3>
+          <p className={panelStyles.sideNote}>{t("permissionNote")}</p>
 
           <div className={panelStyles.permissionList}>
             <div className={panelStyles.deviceRow}>
-              <span>Microphone source</span>
+              <span>{t("micSource")}</span>
               <select
                 className={panelStyles.deviceSelect}
                 value={selectedMicrophoneId}
@@ -1203,17 +1209,17 @@ export default function LivestreamCreatePanel() {
                 {microphoneDevices.length ? (
                   microphoneDevices.map((device, index) => (
                     <option key={device.deviceId || `mic-${index}`} value={device.deviceId}>
-                      {device.label || `Microphone ${index + 1}`}
+                      {device.label || t("micDeviceLabel", { index: index + 1 })}
                     </option>
                   ))
                 ) : (
-                  <option value="">No microphone detected</option>
+                  <option value="">{t("noMicDetected")}</option>
                 )}
               </select>
             </div>
 
             <div className={panelStyles.deviceRow}>
-              <span>Camera source</span>
+              <span>{t("cameraSource")}</span>
               <select
                 className={panelStyles.deviceSelect}
                 value={selectedCameraId}
@@ -1223,11 +1229,11 @@ export default function LivestreamCreatePanel() {
                 {cameraDevices.length ? (
                   cameraDevices.map((device, index) => (
                     <option key={device.deviceId || `camera-${index}`} value={device.deviceId}>
-                      {device.label || `Camera ${index + 1}`}
+                      {device.label || t("cameraDeviceLabel", { index: index + 1 })}
                     </option>
                   ))
                 ) : (
-                  <option value="">No camera detected</option>
+                  <option value="">{t("noCameraDetected")}</option>
                 )}
               </select>
             </div>
@@ -1240,7 +1246,7 @@ export default function LivestreamCreatePanel() {
                 }`}
                 onClick={() => setHostVideoMode("screen-only")}
               >
-                Screen only
+                {t("modeScreenOnly")}
               </button>
               <button
                 type="button"
@@ -1249,7 +1255,7 @@ export default function LivestreamCreatePanel() {
                 }`}
                 onClick={() => setHostVideoMode("screen-camera")}
               >
-                Screen + camera
+                {t("modeScreenCamera")}
               </button>
               <button
                 type="button"
@@ -1258,14 +1264,14 @@ export default function LivestreamCreatePanel() {
                 }`}
                 onClick={() => setHostVideoMode("camera-only")}
               >
-                Camera only
+                {t("modeCameraOnly")}
               </button>
             </div>
 
             {hostVideoMode === "screen-camera" ? (
               <>
                 <div className={panelStyles.deviceRow}>
-                  <span>Camera mini position</span>
+                  <span>{t("cameraPosLabel")}</span>
                   <select
                     className={panelStyles.deviceSelect}
                     value={cameraPosition}
@@ -1273,15 +1279,15 @@ export default function LivestreamCreatePanel() {
                       setCameraPosition(event.target.value as LivestreamCameraPosition)
                     }
                   >
-                    <option value="top-left">Top left</option>
-                    <option value="top-right">Top right</option>
-                    <option value="bottom-left">Bottom left</option>
-                    <option value="bottom-right">Bottom right</option>
+                    <option value="top-left">{t("cameraPosTopLeft")}</option>
+                    <option value="top-right">{t("cameraPosTopRight")}</option>
+                    <option value="bottom-left">{t("cameraPosBotLeft")}</option>
+                    <option value="bottom-right">{t("cameraPosBotRight")}</option>
                   </select>
                 </div>
 
                 <div className={panelStyles.deviceRow}>
-                  <span>Camera mini size</span>
+                  <span>{t("cameraSizeLabel")}</span>
                   <select
                     className={panelStyles.deviceSelect}
                     value={cameraSize}
@@ -1289,16 +1295,16 @@ export default function LivestreamCreatePanel() {
                       setCameraSize(event.target.value as LivestreamCameraSize)
                     }
                   >
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large">Large</option>
+                    <option value="small">{t("cameraSizeSmall")}</option>
+                    <option value="medium">{t("cameraSizeMedium")}</option>
+                    <option value="large">{t("cameraSizeLarge")}</option>
                   </select>
                 </div>
               </>
             ) : null}
 
             <div className={panelStyles.permissionRow}>
-              <span>Microphone</span>
+              <span>{t("micLabel")}</span>
               <span
                 className={`${panelStyles.permissionBadge} ${
                   micPermission === "granted"
@@ -1317,7 +1323,7 @@ export default function LivestreamCreatePanel() {
               onClick={() => void requestMicrophonePermission()}
               disabled={permissionBusy !== null}
             >
-              {permissionBusy === "microphone" ? "Requesting microphone..." : "Allow microphone"}
+              {permissionBusy === "microphone" ? t("requestingMic") : t("allowMic")}
             </button>
 
             <button
@@ -1332,13 +1338,13 @@ export default function LivestreamCreatePanel() {
               }}
               disabled={permissionBusy !== null}
             >
-              {isMicTesting ? "Stop testing" : "Mic test"}
+              {isMicTesting ? t("stopTesting") : t("micTest")}
             </button>
 
             {isMicTesting ? (
               <div className={panelStyles.micMeterWrap}>
                 <div className={panelStyles.micMeterHead}>
-                  <span>Microphone level</span>
+                  <span>{t("micLevelLabel")}</span>
                   <span className={panelStyles.micMeterValue}>{`${micLevel}%`}</span>
                 </div>
                 <div className={panelStyles.micMeterTrack}>
@@ -1347,16 +1353,14 @@ export default function LivestreamCreatePanel() {
                     style={{ width: `${micLevel}%` }}
                   />
                 </div>
-                <p className={panelStyles.micTestHint}>
-                  Mic test is active. You should hear your own voice in real-time.
-                </p>
+                <p className={panelStyles.micTestHint}>{t("micTestHint")}</p>
               </div>
             ) : null}
 
             {requiresScreen ? (
               <>
                 <div className={panelStyles.permissionRow}>
-                  <span>Screen share</span>
+                  <span>{t("screenLabel")}</span>
                   <span
                     className={`${panelStyles.permissionBadge} ${
                       screenPermission === "granted"
@@ -1375,7 +1379,7 @@ export default function LivestreamCreatePanel() {
                   onClick={() => void requestScreenPreview()}
                   disabled={permissionBusy !== null}
                 >
-                  {permissionBusy === "screen" ? "Starting preview..." : "Choose screen share"}
+                  {permissionBusy === "screen" ? t("startingPreview") : t("chooseScreen")}
                 </button>
               </>
             ) : null}
@@ -1383,7 +1387,7 @@ export default function LivestreamCreatePanel() {
             {requiresCamera ? (
               <>
                 <div className={panelStyles.permissionRow}>
-                  <span>Camera</span>
+                  <span>{t("cameraLabel")}</span>
                   <span
                     className={`${panelStyles.permissionBadge} ${
                       cameraPermission === "granted"
@@ -1402,7 +1406,7 @@ export default function LivestreamCreatePanel() {
                   onClick={() => void requestCameraPreview()}
                   disabled={permissionBusy !== null}
                 >
-                  {permissionBusy === "camera" ? "Starting camera..." : "Enable camera"}
+                  {permissionBusy === "camera" ? t("startingCamera") : t("enableCamera")}
                 </button>
               </>
             ) : null}
@@ -1413,13 +1417,13 @@ export default function LivestreamCreatePanel() {
 
         <section className={panelStyles.previewCard}>
           <div className={panelStyles.previewHeader}>
-            <h3 className={panelStyles.sideTitle}>Livestream preview</h3>
+            <h3 className={panelStyles.sideTitle}>{t("previewTitle")}</h3>
           </div>
 
           <div className={panelStyles.previewStage}>
             {computedPreviewMode === "none" ? (
               <div className={panelStyles.previewEmpty}>
-                <p className={panelStyles.previewEmptyTitle}>No preview started</p>
+                <p className={panelStyles.previewEmptyTitle}>{t("noPreview")}</p>
                 {(permissionError || screenPermission === "denied") ? (
                   <button
                     type="button"
@@ -1427,7 +1431,7 @@ export default function LivestreamCreatePanel() {
                     onClick={() => void retryPreview()}
                     disabled={permissionBusy !== null}
                   >
-                    {permissionBusy ? "Retrying..." : "Retry"}
+                    {permissionBusy ? t("retrying") : t("retry")}
                   </button>
                 ) : null}
               </div>
@@ -1479,31 +1483,31 @@ export default function LivestreamCreatePanel() {
           </div>
 
           <p className={panelStyles.sideNote}>
-            Current preview source: {computedPreviewMode === "none" ? "None" : computedPreviewMode === "screen-camera" ? "Screen + Camera" : computedPreviewMode === "screen" ? "Screen share" : "Camera"}
+            {t("previewSourceLabel", { source: previewSourceLabel })}
           </p>
         </section>
       </aside>
       </div>
 
       {micOverlayOpen ? (
-        <div className={panelStyles.micCoachmark} role="dialog" aria-live="polite" aria-label="Microphone permission helper">
+        <div className={panelStyles.micCoachmark} role="dialog" aria-live="polite" aria-label={t("enableMicTitle")}>
           <div className={panelStyles.micCoachmarkArrow} aria-hidden />
-          <h3 className={panelStyles.micCoachmarkTitle}>Enable microphone</h3>
+          <h3 className={panelStyles.micCoachmarkTitle}>{t("enableMicTitle")}</h3>
 
           {micOverlayState === "prompt" ? (
             <p className={panelStyles.micCoachmarkText}>
-              Check the lock icon near the URL and choose <strong>Allow</strong> for Microphone if a prompt does not appear.
+              {t.rich("micPromptText", { strong: (chunks) => <strong>{chunks}</strong> })}
             </p>
           ) : null}
 
           {micOverlayState === "blocked" ? (
             <p className={panelStyles.micCoachmarkText}>
-              Microphone is blocked. Click the lock icon, switch Microphone to <strong>Allow</strong>, then press Retry.
+              {t.rich("micBlockedText", { strong: (chunks) => <strong>{chunks}</strong> })}
             </p>
           ) : null}
 
           {micOverlayState === "granted" ? (
-            <p className={panelStyles.micCoachmarkSuccess}>Microphone access granted.</p>
+            <p className={panelStyles.micCoachmarkSuccess}>{t("micGrantedText")}</p>
           ) : null}
 
           <div className={panelStyles.micCoachmarkActions}>
@@ -1514,7 +1518,7 @@ export default function LivestreamCreatePanel() {
                 onClick={() => void requestMicrophonePermission()}
                 disabled={permissionBusy !== null}
               >
-                {permissionBusy === "microphone" ? "Requesting..." : "Retry"}
+                {permissionBusy === "microphone" ? t("requesting") : t("retry")}
               </button>
             ) : null}
             <button
@@ -1522,7 +1526,7 @@ export default function LivestreamCreatePanel() {
               className={panelStyles.micCoachmarkGhost}
               onClick={closeMicOverlay}
             >
-              Close
+              {t("close")}
             </button>
           </div>
         </div>

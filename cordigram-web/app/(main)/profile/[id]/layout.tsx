@@ -13,6 +13,7 @@ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigat
 import styles from "../profile.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useGuestAuth } from "@/context/guest-auth-context";
+import { useLanguage } from "@/component/language-provider";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
 import ProfileEditOverlay from "@/ui/profile-edit-overlay/profile-edit-overlay";
 import FollowersOverlay, {
@@ -65,9 +66,10 @@ const isValidProfileId = (value: string) => /^[a-f0-9]{24}$/i.test(value);
 
 const getVisibilityStatus = (
   visibility?: "public" | "followers" | "private",
-): "Private" | "Followers only" | "" => {
-  if (visibility === "private") return "Private";
-  if (visibility === "followers") return "Followers only";
+  tFn?: (key: string) => string,
+): string => {
+  if (visibility === "private") return tFn ? tFn("profilePage.visibilityPrivate") : "Private";
+  if (visibility === "followers") return tFn ? tFn("profilePage.visibilityFollowersOnly") : "Followers only";
   return "";
 };
 
@@ -95,11 +97,11 @@ const canViewByVisibility = (
 
 const getVisibilityRestrictionMessage = (
   visibility: "public" | "followers" | "private" | undefined,
-  fallback: string,
+  field: string,
+  tFn?: (key: string, vars?: Record<string, string | number>) => string,
 ) => {
-  if (visibility === "private") return `This ${fallback} is private.`;
-  if (visibility === "followers")
-    return `This ${fallback} is visible to followers only.`;
+  if (visibility === "private") return tFn ? tFn("profilePage.restrictionPrivate", { field }) : `This ${field} is private.`;
+  if (visibility === "followers") return tFn ? tFn("profilePage.restrictionFollowers", { field }) : `This ${field} is visible to followers only.`;
   return "";
 };
 
@@ -207,6 +209,7 @@ export default function ProfileLayout({
 }) {
   const canRender = useRequireAuth({ guestAllowed: true });
   const { showLoginOverlay } = useGuestAuth();
+  const { t } = useLanguage();
   const params = useParams<{ id?: string }>();
   const pathname = usePathname();
   const router = useRouter();
@@ -230,9 +233,7 @@ export default function ProfileLayout({
   const [blocking, setBlocking] = useState(false);
   const [blockError, setBlockError] = useState("");
   const [blockedView, setBlockedView] = useState(false);
-  const [blockedMessage, setBlockedMessage] = useState(
-    "The link may be broken or the profile may have been removed.",
-  );
+  const [blockedMessage, setBlockedMessage] = useState("");
   const [privateView, setPrivateView] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -333,15 +334,13 @@ export default function ProfileLayout({
   useEffect(() => {
     if (!canRender) return;
     if (!profileId || !isValidProfileId(profileId)) {
-      setError("Profile not found");
+      setError(t("profilePage.notFound"));
       setLoading(false);
       return;
     }
     const token = getStoredAccessToken();
     setBlockedView(false);
-    setBlockedMessage(
-      "The link may be broken or the profile may have been removed.",
-    );
+    setBlockedMessage(t("profilePage.blockedDefault"));
     setPrivateView(false);
     setViewerId(getUserIdFromToken(token));
 
@@ -366,7 +365,7 @@ export default function ProfileLayout({
         const message =
           typeof err === "object" && err && "message" in err
             ? String((err as { message?: string }).message)
-            : "Unable to load profile";
+            : t("profilePage.unableToLoad");
         const lowered = message.toLowerCase();
         const isPrivate = maybeStatus === 403 && lowered.includes("private");
         const isUnavailable =
@@ -389,13 +388,13 @@ export default function ProfileLayout({
           setProfile(null);
           setBlockedView(true);
           if (isUnavailable) {
-            setBlockedMessage("This account is currently unavailable.");
+            setBlockedMessage(t("profilePage.accountUnavailable"));
           }
           setError("");
         } else {
           // Keep showing cached data if fetch fails (network issue, etc.)
           if (!cachedProfile) {
-            setError(message || "Unable to load profile");
+            setError(message || t("profilePage.unableToLoad"));
           }
         }
       })
@@ -779,8 +778,8 @@ export default function ProfileLayout({
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Unable to update follow status";
-      setError(message || "Unable to update follow status");
+          : t("profilePage.unableToUpdateFollow");
+      setError(message || t("profilePage.unableToUpdateFollow"));
     } finally {
       setFollowLoading(false);
     }
@@ -838,13 +837,13 @@ export default function ProfileLayout({
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(link);
-        showToast("Copied profile link to clipboard");
+        showToast(t("profilePage.copiedLink"));
       } else {
         throw new Error("Clipboard unavailable");
       }
     } catch (err) {
       console.error("copy link failed", err);
-      showToast("Unable to copy link");
+      showToast(t("profilePage.unableToCopyLink"));
     } finally {
       setMenuOpen(false);
     }
@@ -869,7 +868,7 @@ export default function ProfileLayout({
     if (blocking || !profile) return;
     const token = getStoredAccessToken();
     if (!token) {
-      setError("Session expired. Please sign in again.");
+      setError(t("profilePage.sessionExpired"));
       setBlockOpen(false);
       return;
     }
@@ -877,7 +876,7 @@ export default function ProfileLayout({
     setBlockError("");
     try {
       await blockUser({ token, userId: profile.userId });
-      showToast(`Blocked @${profile.username}`);
+      showToast(t("profilePage.blocked", { username: profile.username ?? "" }));
       setBlockOpen(false);
       setBlockedView(true);
       setProfile(null);
@@ -886,7 +885,7 @@ export default function ProfileLayout({
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Unable to block user";
+          : t("profilePage.unableToBlock");
       setBlockError(message);
       showToast(message);
     } finally {
@@ -899,7 +898,7 @@ export default function ProfileLayout({
     const token = getStoredAccessToken();
     if (!token) { showLoginOverlay(); setMenuOpen(false); return; }
     if (viewerId && profile.userId === viewerId) {
-      showToast("You cannot report yourself");
+      showToast(t("profilePage.cannotReportSelf"));
       setMenuOpen(false);
       return;
     }
@@ -915,8 +914,9 @@ export default function ProfileLayout({
           const message = getVisibilityRestrictionMessage(
             profile?.visibility?.about,
             "about section",
+            t,
           );
-          showToast(message || "About section is not available.");
+          showToast(message || t("profilePage.aboutNotAvailable"));
           break;
         }
         setAboutOpen(true);
@@ -1002,11 +1002,11 @@ export default function ProfileLayout({
     if (avatarSubmitting) return;
     const token = getStoredAccessToken();
     if (!token) {
-      setAvatarError("Session expired. Please sign in again.");
+      setAvatarError(t("profilePage.sessionExpired"));
       return;
     }
     if (!avatarFile || !avatarPreview || !croppedAreaPixels) {
-      setAvatarError("Please select an image to upload");
+      setAvatarError(t("profilePage.selectImage"));
       return;
     }
 
@@ -1037,14 +1037,14 @@ export default function ProfileLayout({
           : prev,
       );
       emitCurrentProfileUpdated();
-      showToast("Avatar updated");
+      showToast(t("profilePage.avatarUpdated"));
       closeAvatarCrop();
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Unable to update avatar";
-      setAvatarError(message || "Unable to update avatar");
+          : t("profilePage.unableToUpdateAvatar");
+      setAvatarError(message || t("profilePage.unableToUpdateAvatar"));
     } finally {
       setAvatarSubmitting(false);
     }
@@ -1054,7 +1054,7 @@ export default function ProfileLayout({
     if (avatarSubmitting) return;
     const token = getStoredAccessToken();
     if (!token) {
-      setAvatarError("Session expired. Please sign in again.");
+      setAvatarError(t("profilePage.sessionExpired"));
       return;
     }
     setAvatarSubmitting(true);
@@ -1071,14 +1071,14 @@ export default function ProfileLayout({
           : prev,
       );
       emitCurrentProfileUpdated();
-      showToast("Avatar removed");
+      showToast(t("profilePage.avatarRemoved"));
       closeAvatarConfirm();
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Unable to remove avatar";
-      setAvatarError(message || "Unable to remove avatar");
+          : t("profilePage.unableToRemoveAvatar");
+      setAvatarError(message || t("profilePage.unableToRemoveAvatar"));
     } finally {
       setAvatarSubmitting(false);
     }
@@ -1096,12 +1096,12 @@ export default function ProfileLayout({
         <div className={styles.blockedIcon} aria-hidden>
           <IconInfo />
         </div>
-        <div className={styles.blockedTitle}>Profile is not available</div>
+        <div className={styles.blockedTitle}>{t("profilePage.blockedTitle")}</div>
         <div className={styles.blockedText}>
-          {message || "The link may be broken or the profile may have been removed."}
+          {message || t("profilePage.blockedDefault")}
         </div>
         <button type="button" className={styles.blockedButton} onClick={onHome}>
-          Go back home
+          {t("profilePage.blockedBackHome")}
         </button>
       </div>
     );
@@ -1113,13 +1113,12 @@ export default function ProfileLayout({
         <div className={styles.privateIcon} aria-hidden>
           <IconLock />
         </div>
-        <div className={styles.privateTitle}>This profile is private</div>
+        <div className={styles.privateTitle}>{t("profilePage.privateTitle")}</div>
         <div className={styles.privateText}>
-          The owner has limited access to their profile. Follow requests may be
-          required to view their content.
+          {t("profilePage.privateText")}
         </div>
         <button type="button" className={styles.privateButton} onClick={onHome}>
-          Go back home
+          {t("profilePage.privateBackHome")}
         </button>
       </div>
     );
@@ -1138,30 +1137,30 @@ export default function ProfileLayout({
 
   const navItems = isOwner
     ? [
-        { key: "posts", label: "POSTS", href: appendPreviewQuery(`/profile/${profileId}`) },
-        { key: "reels", label: "REELS", href: appendPreviewQuery(`/profile/${profileId}/reels`) },
-        { key: "saved", label: "SAVED", href: appendPreviewQuery(`/profile/${profileId}/saved`) },
+        { key: "posts", label: t("profilePage.navPosts"), href: appendPreviewQuery(`/profile/${profileId}`) },
+        { key: "reels", label: t("profilePage.navReels"), href: appendPreviewQuery(`/profile/${profileId}/reels`) },
+        { key: "saved", label: t("profilePage.navSaved"), href: appendPreviewQuery(`/profile/${profileId}/saved`) },
         {
           key: "repost",
-          label: "REPOST",
+          label: t("profilePage.navRepost"),
           href: appendPreviewQuery(`/profile/${profileId}/repost`),
         },
       ]
     : [
-        { key: "posts", label: "POSTS", href: appendPreviewQuery(`/profile/${profileId}`) },
-        { key: "reels", label: "REELS", href: appendPreviewQuery(`/profile/${profileId}/reels`) },
+        { key: "posts", label: t("profilePage.navPosts"), href: appendPreviewQuery(`/profile/${profileId}`) },
+        { key: "reels", label: t("profilePage.navReels"), href: appendPreviewQuery(`/profile/${profileId}/reels`) },
         {
           key: "repost",
-          label: "REPOST",
+          label: t("profilePage.navRepost"),
           href: appendPreviewQuery(`/profile/${profileId}/repost`),
         },
       ];
 
   const menuItems = [
-    { key: "about", label: "About this user" },
-    { key: "block", label: "Block this user" },
-    { key: "report", label: "Report" },
-    { key: "copy-link", label: "Copy link" },
+    { key: "about", label: t("profilePage.menuAbout") },
+    { key: "block", label: t("profilePage.menuBlock") },
+    { key: "report", label: t("profilePage.menuReport") },
+    { key: "copy-link", label: t("profilePage.menuCopyLink") },
   ];
 
   const activeKey = useMemo(() => {
@@ -1199,7 +1198,7 @@ export default function ProfileLayout({
                     type="button"
                     className={`${styles.avatarRing} ${styles.avatarRingButton}`}
                     onClick={openAvatarMenu}
-                    aria-label="Change avatar"
+                    aria-label={t("profilePage.changeAvatarAria")}
                   >
                     <img
                       src={profile.avatarUrl || DEFAULT_AVATAR_URL}
@@ -1212,7 +1211,7 @@ export default function ProfileLayout({
                   <button
                     type="button"
                     className={styles.avatarRing}
-                    aria-label="View avatar"
+                    aria-label={t("profilePage.viewAvatarAria")}
                     onClick={() =>
                       setAvatarViewerUrl(
                         profile.avatarOriginalUrl ||
@@ -1252,26 +1251,27 @@ export default function ProfileLayout({
                         className={styles.liveBtn}
                       >
                         <span className={styles.liveDot} />
-                        Live now
+                        {t("profilePage.liveNow")}
                       </Link>
                     )}
                   </div>
                   <div className={styles.statsRow}>
                     <StatCard
-                      label="Posts"
+                      label={t("profilePage.statPosts")}
                       value={formatCount(displayedPostsCount)}
                     />
                     <StatCard
-                      label="Followers"
+                      label={t("profilePage.statFollowers")}
                       value={formatCount(profile.stats.followers)}
                       onClick={() => {
                         if (!canViewFollowers) {
                           const message = getVisibilityRestrictionMessage(
                             profile.visibility?.followers,
                             "followers list",
+                            t,
                           );
                           showToast(
-                            message || "Followers list is not available.",
+                            message || t("profilePage.followersNotAvailable"),
                           );
                           return;
                         }
@@ -1280,16 +1280,17 @@ export default function ProfileLayout({
                       }}
                     />
                     <StatCard
-                      label="Following"
+                      label={t("profilePage.statFollowing")}
                       value={formatCount(profile.stats.following)}
                       onClick={() => {
                         if (!canViewFollowing) {
                           const message = getVisibilityRestrictionMessage(
                             profile.visibility?.following,
                             "following list",
+                            t,
                           );
                           showToast(
-                            message || "Following list is not available.",
+                            message || t("profilePage.followingNotAvailable"),
                           );
                           return;
                         }
@@ -1310,7 +1311,7 @@ export default function ProfileLayout({
                           type="button"
                           onClick={() => setEditProfileOpen(true)}
                         >
-                          Edit profile
+                          {t("profilePage.editProfile")}
                         </button>
                         <button
                           className={styles.secondaryButton}
@@ -1342,17 +1343,17 @@ export default function ProfileLayout({
                           type="button"
                         >
                           {followLoading
-                            ? "Updating..."
+                            ? t("profilePage.followUpdating")
                             : profile.isFollowing
-                              ? "Following"
-                              : "Follow"}
+                              ? t("profilePage.followingLabel")
+                              : t("profilePage.followLabel")}
                         </button>
                         <button
                           className={styles.secondaryButton}
                           type="button"
                           onClick={handleOpenDirectMessage}
                         >
-                          Message
+                          {t("profilePage.messageBtn")}
                         </button>
                         {viewerId ? (
                           <div className={styles.menuWrapper} ref={menuRef}>
@@ -1402,7 +1403,7 @@ export default function ProfileLayout({
                       className={styles.bioToggle}
                       onClick={() => setBioCollapsed((prev) => !prev)}
                     >
-                      {bioCollapsed ? "See more" : "Collapse"}
+                      {bioCollapsed ? t("profilePage.bioSeeMore") : t("profilePage.bioCollapse")}
                     </button>
                   ) : null}
                 </div>
@@ -1464,7 +1465,7 @@ export default function ProfileLayout({
               className={styles.avatarMenuItem}
               onClick={handleAvatarUploadSelect}
             >
-              Upload photo
+              {t("profilePage.avatarUpload")}
             </button>
             <button
               type="button"
@@ -1474,14 +1475,14 @@ export default function ProfileLayout({
                 openAvatarConfirm();
               }}
             >
-              Remove current photo
+              {t("profilePage.avatarRemovePhoto")}
             </button>
             <button
               type="button"
               className={`${styles.avatarMenuItem} ${styles.avatarMenuDanger}`}
               onClick={closeAvatarMenu}
             >
-              Cancel
+              {t("profilePage.cancel")}
             </button>
           </div>
         </div>
@@ -1499,9 +1500,9 @@ export default function ProfileLayout({
           >
             <div className={styles.modalHeader}>
               <div>
-                <h3 className={styles.modalTitle}>Remove avatar?</h3>
+                <h3 className={styles.modalTitle}>{t("profilePage.avatarConfirmTitle")}</h3>
                 <p className={styles.modalBody}>
-                  This will reset your avatar to the default image.
+                  {t("profilePage.avatarConfirmBody")}
                 </p>
               </div>
             </div>
@@ -1514,14 +1515,14 @@ export default function ProfileLayout({
                 onClick={closeAvatarConfirm}
                 disabled={avatarSubmitting}
               >
-                Cancel
+                {t("profilePage.cancel")}
               </button>
               <button
                 className={`${styles.modalPrimary} ${styles.modalDanger}`}
                 onClick={handleConfirmRemoveAvatar}
                 disabled={avatarSubmitting}
               >
-                {avatarSubmitting ? "Removing..." : "Remove"}
+                {avatarSubmitting ? t("profilePage.removing") : t("profilePage.remove")}
               </button>
             </div>
           </div>
@@ -1548,15 +1549,15 @@ export default function ProfileLayout({
           >
             <div className={styles.avatarCropHeader}>
               <div>
-                <h3 className={styles.modalTitle}>Crop avatar</h3>
+                <h3 className={styles.modalTitle}>{t("profilePage.cropTitle")}</h3>
                 <p className={styles.modalBody}>
-                  Adjust the frame and zoom to choose the best area.
+                  {t("profilePage.cropBody")}
                 </p>
               </div>
               <button
                 type="button"
                 className={styles.closeBtn}
-                aria-label="Close"
+                aria-label={t("profilePage.close")}
                 onClick={closeAvatarCrop}
               >
                 <IconClose />
@@ -1580,23 +1581,23 @@ export default function ProfileLayout({
                   </div>
                 ) : (
                   <div className={styles.avatarPlaceholder}>
-                    No image selected
+                    {t("profilePage.noImageSelected")}
                   </div>
                 )}
               </div>
               <div className={styles.avatarCropControls}>
                 <div className={styles.avatarThumbSmall}>
                   {avatarThumb ? (
-                    <img src={avatarThumb} alt="Preview" />
+                    <img src={avatarThumb} alt={t("profilePage.previewAlt")} />
                   ) : (
                     <img
                       src={profile?.avatarUrl || DEFAULT_AVATAR_URL}
-                      alt="Current avatar"
+                      alt={t("profilePage.currentAvatarAlt")}
                     />
                   )}
                 </div>
                 <div className={styles.sliderRow}>
-                  <span className={styles.sliderLabel}>Zoom</span>
+                  <span className={styles.sliderLabel}>{t("profilePage.zoomLabel")}</span>
                   <input
                     type="range"
                     min={1}
@@ -1617,7 +1618,7 @@ export default function ProfileLayout({
                     onClick={closeAvatarCrop}
                     disabled={avatarSubmitting}
                   >
-                    Cancel
+                    {t("profilePage.cancel")}
                   </button>
                   <button
                     type="button"
@@ -1625,7 +1626,7 @@ export default function ProfileLayout({
                     onClick={handleSubmitAvatar}
                     disabled={avatarSubmitting}
                   >
-                    {avatarSubmitting ? "Saving..." : "Save"}
+                    {avatarSubmitting ? t("profilePage.saving") : t("profilePage.save")}
                   </button>
                 </div>
               </div>
@@ -1646,9 +1647,9 @@ export default function ProfileLayout({
           >
             <div className={styles.modalHeader}>
               <div>
-                <h3 className={styles.modalTitle}>Block this account?</h3>
+                <h3 className={styles.modalTitle}>{t("profilePage.blockTitle")}</h3>
                 <p className={styles.modalBody}>
-                  {`You are about to block @${profile?.username}. They will no longer be able to interact with you.`}
+                  {t("profilePage.blockBody", { username: profile?.username ?? "" })}
                 </p>
               </div>
             </div>
@@ -1661,14 +1662,14 @@ export default function ProfileLayout({
                 onClick={closeBlockModal}
                 disabled={blocking}
               >
-                Cancel
+                {t("profilePage.cancel")}
               </button>
               <button
                 className={`${styles.modalPrimary} ${styles.modalDanger}`}
                 onClick={confirmBlockUser}
                 disabled={blocking}
               >
-                {blocking ? "Blocking..." : "Block"}
+                {blocking ? t("profilePage.blocking") : t("profilePage.blockBtn")}
               </button>
             </div>
           </div>
@@ -1702,13 +1703,13 @@ export default function ProfileLayout({
                   <div className={styles.aboutHeader}>
                     <div>
                       <h3 className={styles.aboutTitle} id="about-user-title">
-                        About this user
+                        {t("profilePage.aboutTitle")}
                       </h3>
                     </div>
                     <button
                       type="button"
                       className={styles.aboutClose}
-                      aria-label="Close"
+                      aria-label={t("profilePage.close")}
                       onClick={closeAboutModal}
                     >
                       <IconClose />
@@ -1740,24 +1741,24 @@ export default function ProfileLayout({
                         <div className={styles.aboutBio}>{p.bio}</div>
                       ) : getVisibilityStatus(p.visibility?.bio) ? (
                         <div className={styles.aboutMuted}>
-                          {getVisibilityStatus(p.visibility?.bio) === "Private"
-                            ? "This bio is private."
-                            : "Bio visible to followers only."}
+                          {p.visibility?.bio === "private"
+                            ? t("profilePage.bioPrivate")
+                            : t("profilePage.bioFollowersOnly")}
                         </div>
                       ) : (
                         <div className={styles.aboutMuted}>
-                          No bio provided.
+                          {t("profilePage.bioNone")}
                         </div>
                       )}
                     </div>
 
                     <div className={styles.aboutRight}>
                       <div className={`${styles.aboutSectionTitle}`}>
-                        Details
+                        {t("profilePage.aboutDetails")}
                       </div>
                       <div className={styles.aboutRows}>
                         <div className={styles.aboutRow}>
-                          <div className={styles.aboutLabel}>Workplace</div>
+                          <div className={styles.aboutLabel}>{t("profilePage.aboutWorkplace")}</div>
                           {(() => {
                             const display = getFieldDisplay(
                               p.workplace?.companyName ?? "",
@@ -1775,7 +1776,7 @@ export default function ProfileLayout({
                           })()}
                         </div>
                         <div className={styles.aboutRow}>
-                          <div className={styles.aboutLabel}>Location</div>
+                          <div className={styles.aboutLabel}>{t("profilePage.aboutLocation")}</div>
                           {(() => {
                             const display = getFieldDisplay(
                               p.location ?? "",
@@ -1793,7 +1794,7 @@ export default function ProfileLayout({
                           })()}
                         </div>
                         <div className={styles.aboutRow}>
-                          <div className={styles.aboutLabel}>Gender</div>
+                          <div className={styles.aboutLabel}>{t("profilePage.aboutGender")}</div>
                           {(() => {
                             const display = getFieldDisplay(
                               p.gender?.trim()
@@ -1813,7 +1814,7 @@ export default function ProfileLayout({
                           })()}
                         </div>
                         <div className={styles.aboutRow}>
-                          <div className={styles.aboutLabel}>Birthdate</div>
+                          <div className={styles.aboutLabel}>{t("profilePage.aboutBirthdate")}</div>
                           {(() => {
                             const display = getFieldDisplay(
                               p.birthdate ?? "",
@@ -1832,25 +1833,25 @@ export default function ProfileLayout({
                         </div>
                       </div>
 
-                      <div className={`${styles.aboutSectionTitle}`}>Stats</div>
+                      <div className={`${styles.aboutSectionTitle}`}>{t("profilePage.aboutStats")}</div>
                       <div className={styles.aboutStatsGrid}>
                         <div className={styles.aboutStat}>
                           <div className={styles.aboutStatValue}>
                             {formatCount(p.stats.totalPosts)}
                           </div>
-                          <div className={styles.aboutStatLabel}>Posts</div>
+                          <div className={styles.aboutStatLabel}>{t("profilePage.statPosts")}</div>
                         </div>
                         <div className={styles.aboutStat}>
                           <div className={styles.aboutStatValue}>
                             {formatCount(p.stats.followers)}
                           </div>
-                          <div className={styles.aboutStatLabel}>Followers</div>
+                          <div className={styles.aboutStatLabel}>{t("profilePage.statFollowers")}</div>
                         </div>
                         <div className={styles.aboutStat}>
                           <div className={styles.aboutStatValue}>
                             {formatCount(p.stats.following)}
                           </div>
-                          <div className={styles.aboutStatLabel}>Following</div>
+                          <div className={styles.aboutStatLabel}>{t("profilePage.statFollowing")}</div>
                         </div>
                       </div>
                     </div>

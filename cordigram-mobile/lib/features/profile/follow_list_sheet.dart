@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import 'services/profile_service.dart';
 
 // ── Model ────────────────────────────────────────────────────────────────────
@@ -392,9 +393,9 @@ class _FollowListSheetState extends State<_FollowListSheet>
         fontSize: 14,
         fontWeight: FontWeight.w400,
       ),
-      tabs: const [
-        Tab(text: 'Followers'),
-        Tab(text: 'Following'),
+      tabs: [
+        Tab(text: LanguageController.instance.t('profile.followSheet.tabFollowers')),
+        Tab(text: LanguageController.instance.t('profile.followSheet.tabFollowing')),
       ],
     );
   }
@@ -404,9 +405,10 @@ class _FollowListSheetState extends State<_FollowListSheet>
     final ctrl = tab == FollowTab.followers
         ? _followersSearch
         : _followingSearch;
+    final lc = LanguageController.instance;
     final hint = tab == FollowTab.followers
-        ? 'Search followers'
-        : 'Search following';
+        ? lc.t('profile.followSheet.searchFollowers')
+        : lc.t('profile.followSheet.searchFollowing');
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -489,7 +491,7 @@ class _FollowListSheetState extends State<_FollowListSheet>
             const SizedBox(height: 16),
             TextButton(
               onPressed: () => _loadFirstPage(tab),
-              child: Text('Retry', style: TextStyle(color: _accent)),
+              child: Text(LanguageController.instance.t('profile.followSheet.retry'), style: TextStyle(color: _accent)),
             ),
           ],
         ),
@@ -504,9 +506,10 @@ class _FollowListSheetState extends State<_FollowListSheet>
               .text
               .trim()
               .isNotEmpty;
+      final lc = LanguageController.instance;
       return Center(
         child: Text(
-          searchActive ? 'No matches found' : 'No users yet',
+          searchActive ? lc.t('profile.followSheet.noMatches') : lc.t('profile.followSheet.noUsers'),
           style: TextStyle(color: _textSecondary, fontSize: 14),
         ),
       );
@@ -664,7 +667,7 @@ class _UserRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                'You',
+                LanguageController.instance.t('profile.followSheet.you'),
                 style: TextStyle(
                   color: tokens.textMuted,
                   fontSize: 13,
@@ -731,7 +734,9 @@ class _FollowButton extends StatelessWidget {
                 ),
               )
             : Text(
-                isFollowing ? 'Following' : 'Follow',
+                isFollowing
+                    ? LanguageController.instance.t('profile.followSheet.following')
+                    : LanguageController.instance.t('profile.followSheet.follow'),
                 style: TextStyle(
                   color: isFollowing ? tokens.primary : Colors.white,
                   fontSize: 13,

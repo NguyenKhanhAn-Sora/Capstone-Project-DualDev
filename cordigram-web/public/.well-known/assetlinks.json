@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.cordigram_mobile",
+      "sha256_cert_fingerprints": [
+        "DB:9E:A3:E7:3F:96:EE:4F:E6:DF:4E:27:5D:65:64:70:0E:F6:A3:98:44:05:1B:79:D7:C7:D0:47:D8:58:66:3C"
+      ]
+    }
+  }
+]

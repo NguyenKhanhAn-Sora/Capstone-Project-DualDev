@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import styles from "../../profile.module.css";
 import type { FeedItem } from "@/lib/api";
 import { useProfileContext } from "../profile-context";
+import { useLanguage } from "@/component/language-provider";
 
 const formatCount = (value?: number) => {
   const n = value ?? 0;
@@ -34,6 +35,7 @@ const IconView = () => (
 
 export default function ProfileRepostPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { tabs, prefetchTab } = useProfileContext();
   const tab = tabs?.repost;
 
@@ -61,7 +63,7 @@ export default function ProfileRepostPage() {
     <>
       {error ? <div className={styles.errorBox}>{error}</div> : null}
       {suppressGrid ? null : showEmpty ? (
-        <div className={styles.errorBox}>No reposts yet.</div>
+        <div className={styles.errorBox}>{t("profilePage.noReposts")}</div>
       ) : (
         <RepostGrid
           items={items}
@@ -116,7 +118,7 @@ function RepostGrid({
   }
 
   if (!items.length) {
-    return <div className={styles.errorBox}>No reposts yet.</div>;
+    return null;
   }
 
   return (

@@ -437,7 +437,7 @@ function ReelVideo({
   onVolumeChange,
   children,
 }: ReelVideoProps) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -748,7 +748,7 @@ function ReelVideo({
       <button
         className={styles.volumeBtn}
         onClick={toggleMute}
-        aria-label="Toggle volume"
+        aria-label={t("reelsPage.ariaToggleVolume")}
       >
         <IconVolume muted={muted || volume <= 0.01} />
         <input
@@ -922,7 +922,7 @@ function ReelVideo({
                         }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
-                        {isFollowing ? "Following" : "Follow"}
+                        {isFollowing ? t("reelsPage.following") : t("reelsPage.follow")}
                       </button>
                     ) : null}
                   </div>
@@ -984,6 +984,7 @@ function ReelActions({
   onFollow: (authorId: string, nextFollow: boolean) => void;
   viewerId?: string;
 }) {
+  const { t } = useLanguage();
   const following = Boolean(
     item.flags?.following ??
     (item as unknown as { following?: boolean }).following,
@@ -1002,7 +1003,7 @@ function ReelActions({
           <Link
             href={`/profile/${item.authorId}`}
             className={styles.avatarWrap}
-            aria-label="View author profile"
+            aria-label={t("reelsPage.ariaViewProfile")}
           >
             {item.authorAvatarUrl ? (
               <img
@@ -1039,7 +1040,7 @@ function ReelActions({
               following ? styles.followBadgeOn : styles.followBadgeOff
             }`}
             onClick={() => onFollow(item.authorId!, !following)}
-            aria-label={following ? "Following" : "Follow"}
+            aria-label={following ? t("reelsPage.following") : t("reelsPage.follow")}
           >
             {following ? (
               <span className={styles.tickIcon}>✓</span>
@@ -1054,7 +1055,7 @@ function ReelActions({
           item.liked ? styles.actionActive : ""
         }`}
         onClick={() => onLike(item.id, Boolean(item.liked))}
-        aria-label={likeCountHidden ? "Like reel (count hidden)" : "Like reel"}
+        aria-label={likeCountHidden ? t("reelsPage.ariaLikeReelHidden") : t("reelsPage.ariaLikeReel")}
       >
         <span className={`${styles.actionBtnWrap}`}>
           <IconHeart filled={item.liked} />
@@ -1064,7 +1065,7 @@ function ReelActions({
       <button
         className={styles.actionBtn}
         onClick={() => onComment(item.id)}
-        aria-label="Open comments"
+        aria-label={t("reelsPage.ariaOpenComments")}
       >
         <span className={`${styles.actionBtnWrap}`}>
           <IconComment />
@@ -1076,7 +1077,7 @@ function ReelActions({
           item.saved ? styles.actionActive : ""
         }`}
         onClick={() => onSave(item.id, Boolean(item.saved))}
-        aria-label="Save reel"
+        aria-label={t("reelsPage.ariaSaveReel")}
       >
         <span className={`${styles.actionBtnWrap}`}>
           <IconSave filled={item.saved} />
@@ -1095,7 +1096,7 @@ function ReelActions({
               e.currentTarget.getBoundingClientRect(),
             )
           }
-          aria-label="Repost reel"
+          aria-label={t("reelsPage.ariaRepostReel")}
         >
           <span className={`${styles.actionBtnWrap}`}>
             <IconRepost />
@@ -1116,6 +1117,7 @@ export default function ReelPage({
   const canRender = useRequireAuth({ guestAllowed: true });
   const { showLoginOverlay } = useGuestAuth();
   const tHome = useTranslations("home");
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams<{ id?: string | string[] }>();
@@ -1413,7 +1415,7 @@ export default function ReelPage({
       setMentionSuggestions([]);
       setMentionOpen(false);
       setMentionHighlight(-1);
-      setMentionError("Sign in to mention users");
+      setMentionError(t("reelsPage.signInToMention"));
       return;
     }
 
@@ -1432,7 +1434,7 @@ export default function ReelPage({
         setMentionOpen(res.items.length > 0);
         setMentionHighlight(res.items.length ? 0 : -1);
         if (!res.items.length) {
-          setMentionError("User not found");
+          setMentionError(t("reelsPage.userNotFound"));
         }
       } catch (err) {
         if (cancelled) return;
@@ -1643,7 +1645,7 @@ export default function ReelPage({
         setError("");
       } catch (err) {
         setError(
-          (err as { message?: string })?.message || "Unable to load reels",
+          (err as { message?: string })?.message || t("reelsPage.unableToLoad"),
         );
       } finally {
         if (isInitial) setLoading(false);
@@ -1754,13 +1756,13 @@ export default function ReelPage({
             setError(
               (fallbackErr as { message?: string })?.message ||
                 (err as { message?: string })?.message ||
-                "Unable to load reel",
+                t("reelsPage.unableToLoadReel"),
             );
             return;
           }
         }
         setError(
-          (err as { message?: string })?.message || "Unable to load reel",
+          (err as { message?: string })?.message || t("reelsPage.unableToLoadReel"),
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -1831,7 +1833,7 @@ export default function ReelPage({
       .catch((err) => {
         if (cancelled) return;
         setError(
-          (err as { message?: string })?.message || "Unable to load reel",
+          (err as { message?: string })?.message || t("reelsPage.unableToLoadReel"),
         );
       });
 
@@ -2108,7 +2110,7 @@ export default function ReelPage({
 
     const targetId = editTargetId ?? active?.id;
     if (!token || !targetId) {
-      setEditError("Please sign in to edit reels");
+      setEditError(t("reelsPage.signInToEdit"));
       return;
     }
 
@@ -2157,15 +2159,15 @@ export default function ReelPage({
       setItems((prev) =>
         prev.map((it) => (it.id === targetId ? { ...it, ...updated } : it)),
       );
-      setEditSuccess("Reel updated");
+      setEditSuccess(t("reelsPage.reelUpdated"));
       setEditOpen(false);
       setEditTargetId(null);
-      showToast("Reel updated");
+      showToast(t("reelsPage.reelUpdated"));
     } catch (err: any) {
       const message =
         (err && typeof err === "object" && "message" in err
           ? (err as { message?: string }).message
-          : null) || "Failed to update reel";
+          : null) || t("reelsPage.failedToUpdateReel");
       setEditError(message);
     } finally {
       setEditSaving(false);
@@ -2179,7 +2181,7 @@ export default function ReelPage({
 
   const confirmDelete = async () => {
     if (!token || !active) {
-      setDeleteError("Please sign in to delete reels");
+      setDeleteError(t("reelsPage.signInToDelete"));
       return;
     }
     setDeleteSubmitting(true);
@@ -2210,12 +2212,12 @@ export default function ReelPage({
       } else {
         router.push(`/reels`);
       }
-      showToast("Deleted reel");
+      showToast(t("reelsPage.reelDeleted"));
     } catch (err: any) {
       const message =
         (err && typeof err === "object" && "message" in err
           ? (err as { message?: string }).message
-          : null) || "Failed to delete reel";
+          : null) || t("reelsPage.failedToDeleteReel");
       setDeleteError(message);
     } finally {
       setDeleteSubmitting(false);
@@ -2243,7 +2245,7 @@ export default function ReelPage({
         );
       } else {
         setError(
-          (err as { message?: string })?.message || "Unable to update like",
+          (err as { message?: string })?.message || t("reelsPage.unableToUpdateLike"),
         );
       }
     }
@@ -2268,7 +2270,7 @@ export default function ReelPage({
         flags: { ...(items.find((x) => x.id === id)?.flags || {}), saved },
       });
       updateStats(id, "saves", saved ? 1 : -1);
-      setError((err as { message?: string })?.message || "Unable to save reel");
+      setError((err as { message?: string })?.message || t("reelsPage.unableToSave"));
     }
   };
 
@@ -2314,7 +2316,7 @@ export default function ReelPage({
             await repostPost({ token, postId: targetId });
           } catch {}
         }
-        showToast("Reposted");
+        showToast(t("reelsPage.reposted"));
       } catch (err) {
         const mutedMessage = getInteractionMutedMessage(err);
         if (mutedMessage) {
@@ -2360,7 +2362,7 @@ export default function ReelPage({
           } catch {}
         }
 
-        showToast("Reposted with quote");
+        showToast(t("reelsPage.repostedWithQuote"));
       } catch (err) {
         const mutedMessage = getInteractionMutedMessage(err);
         if (mutedMessage) {
@@ -2426,11 +2428,11 @@ export default function ReelPage({
   );
 
   const commentsToggleLabel =
-    active?.allowComments === false ? "Turn on comments" : "Turn off comments";
+    active?.allowComments === false ? t("reelsPage.commentsToggleOn") : t("reelsPage.commentsToggleOff");
 
   const hideLikeToggleLabel = active?.hideLikeCount
-    ? "Show like count"
-    : "Hide like count";
+    ? t("reelsPage.showLikeCount")
+    : t("reelsPage.hideLikeCount");
 
   const allowDownloads = useMemo(
     () =>
@@ -2454,16 +2456,16 @@ export default function ReelPage({
 
   const muteOptions = useMemo(
     () => [
-      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
-      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
-      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
-      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
-      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
-      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
-      { key: "until", label: "Until I turn it back on", ms: null },
-      { key: "custom", label: "Choose date & time", ms: null },
+      { key: "5m", label: t("reelsPage.muteOptions.5m"), ms: 5 * 60 * 1000 },
+      { key: "10m", label: t("reelsPage.muteOptions.10m"), ms: 10 * 60 * 1000 },
+      { key: "15m", label: t("reelsPage.muteOptions.15m"), ms: 15 * 60 * 1000 },
+      { key: "30m", label: t("reelsPage.muteOptions.30m"), ms: 30 * 60 * 1000 },
+      { key: "1h", label: t("reelsPage.muteOptions.1h"), ms: 60 * 60 * 1000 },
+      { key: "1d", label: t("reelsPage.muteOptions.1d"), ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: t("reelsPage.muteOptions.until"), ms: null },
+      { key: "custom", label: t("reelsPage.muteOptions.custom"), ms: null },
     ],
-    [],
+    [t],
   );
 
   const muteTarget = useMemo(
@@ -2863,10 +2865,10 @@ export default function ReelPage({
       }
 
       setOpenMoreMenuId(null);
-      showToast("Link copied to clipboard");
+      showToast(t("reelsPage.linkCopied"));
     } catch (err) {
       setOpenMoreMenuId(null);
-      showToast("Failed to copy link");
+      showToast(t("reelsPage.failedToCopyLink"));
     }
   };
 
@@ -2882,10 +2884,10 @@ export default function ReelPage({
         postId: active.id,
         allowComments: nextAllowed,
       });
-      showToast(nextAllowed ? "Comments turned on" : "Comments turned off");
+      showToast(nextAllowed ? t("reelsPage.commentsOn") : t("reelsPage.commentsOff"));
     } catch (err) {
       updateItem(active.id, { allowComments: currentAllowed });
-      showToast("Failed to update comments");
+      showToast(t("reelsPage.failedUpdateComments"));
     }
   };
 
@@ -2901,10 +2903,10 @@ export default function ReelPage({
         postId: active.id,
         hideLikeCount: nextHidden,
       });
-      showToast(nextHidden ? "Like count hidden" : "Like count visible");
+      showToast(nextHidden ? t("reelsPage.likeHidden") : t("reelsPage.likeVisible"));
     } catch (err) {
       updateItem(active.id, { hideLikeCount: currentHidden });
-      showToast("Failed to update like count");
+      showToast(t("reelsPage.failedUpdateLike"));
     }
   };
 
@@ -2915,18 +2917,18 @@ export default function ReelPage({
   }> = [
     {
       value: "public",
-      title: "Public",
-      description: "Anyone can view this reel",
+      title: t("reelsPage.visibility.publicTitle"),
+      description: t("reelsPage.visibility.publicDesc"),
     },
     {
       value: "followers",
-      title: "Friends / Following",
-      description: "Only followers can view this reel",
+      title: t("reelsPage.visibility.followersTitle"),
+      description: t("reelsPage.visibility.followersDesc"),
     },
     {
       value: "private",
-      title: "Private",
-      description: "Only you can view this reel",
+      title: t("reelsPage.visibility.privateTitle"),
+      description: t("reelsPage.visibility.privateDesc"),
     },
   ];
 
@@ -2948,7 +2950,7 @@ export default function ReelPage({
 
   const submitVisibilityUpdate = async () => {
     if (!token || !active) {
-      setVisibilityError("Please sign in to update visibility");
+      setVisibilityError(t("reelsPage.signInToUpdateVisibility"));
       return;
     }
 
@@ -2981,12 +2983,12 @@ export default function ReelPage({
         }
       }
       setVisibilityModalOpen(false);
-      showToast("Visibility updated");
+      showToast(t("reelsPage.visibilityUpdated"));
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Failed to update"
-          : "Failed to update";
+          ? (err as { message?: string }).message || t("reelsPage.failedToUpdate")
+          : t("reelsPage.failedToUpdate");
       setVisibilityError(message);
     } finally {
       setVisibilitySaving(false);
@@ -3032,12 +3034,12 @@ export default function ReelPage({
         note: reportNote.trim() || undefined,
       });
       closeReportModal();
-      showToast("Report submitted");
+      showToast(t("reelsPage.reportSubmitted"));
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Could not submit report"
-          : "Could not submit report";
+          ? (err as { message?: string }).message || t("reelsPage.couldNotSubmitReport")
+          : t("reelsPage.couldNotSubmitReport");
       setReportError(message);
     } finally {
       setReportSubmitting(false);
@@ -3075,10 +3077,10 @@ export default function ReelPage({
       URL.revokeObjectURL(objectUrl);
 
       setOpenMoreMenuId(null);
-      showToast("Download started");
+      showToast(t("reelsPage.downloadStarted"));
     } catch (err) {
       setOpenMoreMenuId(null);
-      showToast("Failed to download");
+      showToast(t("reelsPage.failedToDownload"));
     }
   };
 
@@ -3121,7 +3123,7 @@ export default function ReelPage({
       setMuteModalOpen(false);
       setMuteTargetId(null);
     } catch (err: any) {
-      setMuteError(err?.message || "Failed to update notifications");
+      setMuteError(err?.message || t("reelsPage.failedToUpdateNotifications"));
     } finally {
       setMuteSaving(false);
     }
@@ -3173,7 +3175,7 @@ export default function ReelPage({
       setMuteModalOpen(false);
       setMuteTargetId(null);
     } catch (err: any) {
-      setMuteError(err?.message || "Failed to update notifications");
+      setMuteError(err?.message || t("reelsPage.failedToUpdateNotifications"));
     } finally {
       setMuteSaving(false);
     }
@@ -3252,7 +3254,7 @@ export default function ReelPage({
         ),
       );
       setError(
-        (err as { message?: string })?.message || "Unable to update follow",
+        (err as { message?: string })?.message || t("reelsPage.failedToUpdateFollow"),
       );
     }
   };
@@ -3289,17 +3291,17 @@ export default function ReelPage({
       <div className={styles.page}>
         <div className={styles.rail}>
           {loading ? (
-            <div className={styles.stateCard}>Loading reels...</div>
+            <div className={styles.stateCard}>{t("reelsPage.loading")}</div>
           ) : error ? (
             <div className={styles.stateCard}>{error}</div>
           ) : !items.length ? (
             <div className={styles.stateCard}>
               {!token ? (
                 <>
-                  <p style={{ marginBottom: 12 }}>Sign in to watch reels.</p>
-                  <a href="/login" style={{ color: "var(--accent, #0095f6)", fontWeight: 600, textDecoration: "none" }}>Log in</a>
+                  <p style={{ marginBottom: 12 }}>{t("reelsPage.signInPrompt")}</p>
+                  <a href="/login" style={{ color: "var(--accent, #0095f6)", fontWeight: 600, textDecoration: "none" }}>{t("reelsPage.logIn")}</a>
                   {" · "}
-                  <a href="/signup" style={{ color: "var(--accent, #0095f6)", fontWeight: 600, textDecoration: "none" }}>Sign up</a>
+                  <a href="/signup" style={{ color: "var(--accent, #0095f6)", fontWeight: 600, textDecoration: "none" }}>{t("reelsPage.signUp")}</a>
                 </>
               ) : scope === "following" ? (
                 tHome("feed.followingEmpty")
@@ -3409,7 +3411,7 @@ export default function ReelPage({
                                               handleEditPost();
                                             }}
                                           >
-                                            Edit Reel
+                                            {t("reelsPage.menu.editReel")}
                                           </button>
                                           <button
                                             type="button"
@@ -3420,7 +3422,7 @@ export default function ReelPage({
                                               openVisibilityModal();
                                             }}
                                           >
-                                            Edit visibility
+                                            {t("reelsPage.menu.editVisibility")}
                                           </button>
                                           <button
                                             type="button"
@@ -3438,8 +3440,8 @@ export default function ReelPage({
                                             }}
                                           >
                                             {isMutedForItem(item)
-                                              ? "Turn on notification"
-                                              : "Mute notifications"}
+                                              ? t("reelsPage.menu.unmuteNotification")
+                                              : t("reelsPage.menu.muteNotification")}
                                           </button>
                                           <button
                                             type="button"
@@ -3472,7 +3474,7 @@ export default function ReelPage({
                                               copyLink();
                                             }}
                                           >
-                                            Copy link
+                                            {t("reelsPage.menu.copyLink")}
                                           </button>
                                           {item.repostOf ? (
                                             <button
@@ -3484,7 +3486,7 @@ export default function ReelPage({
                                                 handleGoReel();
                                               }}
                                             >
-                                              Go to this reel
+                                              {t("reelsPage.menu.goToReel")}
                                             </button>
                                           ) : null}
                                           <button
@@ -3496,7 +3498,7 @@ export default function ReelPage({
                                               handleDeletePost();
                                             }}
                                           >
-                                            Delete reel
+                                            {t("reelsPage.menu.deleteReel")}
                                           </button>
                                         </>
                                       ) : (
@@ -3511,8 +3513,8 @@ export default function ReelPage({
                                             }}
                                           >
                                             {activeSaved
-                                              ? "Unsave this reel"
-                                              : "Save this reel"}
+                                              ? t("reelsPage.menu.unsaveReel")
+                                              : t("reelsPage.menu.saveReel")}
                                           </button>
                                           {item.authorId ? (
                                             <button
@@ -3525,8 +3527,8 @@ export default function ReelPage({
                                               }}
                                             >
                                               {activeFollowing
-                                                ? "Unfollow"
-                                                : "Follow"}
+                                                ? t("reelsPage.menu.unfollow")
+                                                : t("reelsPage.menu.follow")}
                                             </button>
                                           ) : null}
                                           {allowDownloads ? (
@@ -3539,7 +3541,7 @@ export default function ReelPage({
                                                 handleDownloadCurrentMedia();
                                               }}
                                             >
-                                              Download
+                                              {t("reelsPage.menu.download")}
                                             </button>
                                           ) : null}
                                           <button
@@ -3551,7 +3553,7 @@ export default function ReelPage({
                                               handleReportFromMenu();
                                             }}
                                           >
-                                            Report
+                                            {t("reelsPage.menu.report")}
                                           </button>
                                           <button
                                             type="button"
@@ -3562,7 +3564,7 @@ export default function ReelPage({
                                               copyLink();
                                             }}
                                           >
-                                            Copy link
+                                            {t("reelsPage.menu.copyLink")}
                                           </button>
                                           {item.repostOf ? (
                                             <button
@@ -3574,7 +3576,7 @@ export default function ReelPage({
                                                 handleGoReel();
                                               }}
                                             >
-                                              Go to this reel
+                                              {t("reelsPage.menu.goToReel")}
                                             </button>
                                           ) : null}
                                           <button
@@ -3586,7 +3588,7 @@ export default function ReelPage({
                                               handleGoProfile();
                                             }}
                                           >
-                                            Go to this profile
+                                            {t("reelsPage.menu.goToProfile")}
                                           </button>
                                         </>
                                       )}
@@ -3596,8 +3598,8 @@ export default function ReelPage({
                                 {isSelf && isMutedForReel ? (
                                   <span
                                     className={styles.muteBadge}
-                                    title="Notifications muted"
-                                    aria-label="Notifications muted"
+                                    title={t("reelsPage.ariaMutedBadge")}
+                                    aria-label={t("reelsPage.ariaMutedBadge")}
                                   >
                                     <svg
                                       aria-hidden
@@ -3652,7 +3654,7 @@ export default function ReelPage({
                               goPrev();
                             }}
                             disabled={activeIndex <= 0}
-                            aria-label="Previous reel"
+                            aria-label={t("reelsPage.ariaPrevReel")}
                           >
                             <IconArrow up />
                           </button>
@@ -3663,7 +3665,7 @@ export default function ReelPage({
                               goNext();
                             }}
                             disabled={activeIndex >= items.length - 1}
-                            aria-label="Next reel"
+                            aria-label={t("reelsPage.ariaNextReel")}
                           >
                             <IconArrow />
                           </button>
@@ -3725,7 +3727,7 @@ export default function ReelPage({
           >
             <div className={feedStyles.modalHeader}>
               <div>
-                <h3 className={feedStyles.modalTitle}>Interaction muted</h3>
+                <h3 className={feedStyles.modalTitle}>{t("reelsPage.interactionMutedTitle")}</h3>
                 <p className={feedStyles.modalBody}>
                   {interactionMuteOverlayMessage}
                 </p>
@@ -3770,11 +3772,11 @@ export default function ReelPage({
           >
             <div className={feedStyles.modalHeader}>
               <div>
-                <h3 className={feedStyles.modalTitle}>Edit reel</h3>
+                <h3 className={feedStyles.modalTitle}>{t("reelsPage.editModal.title")}</h3>
               </div>
               <button
                 className={feedStyles.closeBtn}
-                aria-label="Close"
+                aria-label={t("reelsPage.editModal.close")}
                 onClick={closeEditModal}
                 type="button"
               >
@@ -3785,16 +3787,16 @@ export default function ReelPage({
             <form className={feedStyles.editForm} onSubmit={handleEditSubmit}>
               <label className={feedStyles.editLabel}>
                 <div className={feedStyles.editLabelRow}>
-                  <span className={feedStyles.editLabelText}>Caption</span>
+                  <span className={feedStyles.editLabelText}>{t("reelsPage.editModal.captionLabel")}</span>
                   <div className={feedStyles.emojiWrap} ref={editEmojiRef}>
                     <button
                       type="button"
                       className={feedStyles.emojiButton}
                       onClick={() => setEditEmojiOpen((prev) => !prev)}
-                      aria-label="Add emoji"
+                      aria-label={t("reelsPage.editModal.addEmoji")}
                     >
                       <svg
-                        aria-label="Emoji icon"
+                        aria-label={t("reelsPage.editModal.emojiIcon")}
                         fill="currentColor"
                         height="20"
                         role="img"
@@ -3838,7 +3840,7 @@ export default function ReelPage({
                     }}
                     rows={4}
                     maxLength={2200}
-                    placeholder="Write something..."
+                    placeholder={t("reelsPage.editModal.captionPlaceholder")}
                   />
                   <span className={feedStyles.charCount}>
                     {editCaption.length}/2200
@@ -3849,11 +3851,11 @@ export default function ReelPage({
               {mentionOpen ? (
                 <div className={feedStyles.mentionDropdown}>
                   {mentionLoading ? (
-                    <div className={feedStyles.mentionItem}>Searching...</div>
+                    <div className={feedStyles.mentionItem}>{t("reelsPage.editModal.searching")}</div>
                   ) : null}
                   {!mentionLoading && mentionSuggestions.length === 0 ? (
                     <div className={feedStyles.mentionItem}>
-                      {mentionError || "No matches"}
+                      {mentionError || t("reelsPage.editModal.noMentionMatches")}
                     </div>
                   ) : null}
                   {mentionSuggestions.map((opt, idx) => {
@@ -3905,7 +3907,7 @@ export default function ReelPage({
 
               <div className={feedStyles.editField}>
                 <div className={feedStyles.editLabelRow}>
-                  <span className={feedStyles.editLabelText}>Hashtags</span>
+                  <span className={feedStyles.editLabelText}>{t("reelsPage.editModal.hashtagsLabel")}</span>
                 </div>
                 <div className={feedStyles.chipShell}>
                   <div className={feedStyles.chips}>
@@ -3923,7 +3925,7 @@ export default function ReelPage({
                     ))}
                     <input
                       className={feedStyles.chipInput}
-                      placeholder="Add hashtag"
+                      placeholder={t("reelsPage.editModal.hashtagPlaceholder")}
                       value={hashtagDraft}
                       onChange={(e) => setHashtagDraft(e.target.value)}
                       onKeyDown={(e) => {
@@ -3939,11 +3941,11 @@ export default function ReelPage({
 
               <div className={feedStyles.editField}>
                 <div className={feedStyles.editLabelRow}>
-                  <span className={feedStyles.editLabelText}>Location</span>
+                  <span className={feedStyles.editLabelText}>{t("reelsPage.editModal.locationLabel")}</span>
                 </div>
                 <input
                   className={feedStyles.editInput}
-                  placeholder="Add a place"
+                  placeholder={t("reelsPage.editModal.locationPlaceholder")}
                   value={locationQuery}
                   onChange={(e) => {
                     setEditLocation(e.target.value);
@@ -3965,12 +3967,12 @@ export default function ReelPage({
                   <div className={feedStyles.locationDropdown}>
                     {locationLoading ? (
                       <div className={feedStyles.locationItem}>
-                        Searching...
+                        {t("reelsPage.editModal.searching")}
                       </div>
                     ) : null}
                     {!locationLoading && locationSuggestions.length === 0 ? (
                       <div className={feedStyles.locationItem}>
-                        {locationError || "No suggestions"}
+                        {locationError || t("reelsPage.editModal.noLocationSuggestions")}
                       </div>
                     ) : null}
                     {locationSuggestions.map((opt, idx) => {
@@ -4000,7 +4002,7 @@ export default function ReelPage({
                     onChange={() => setEditAllowComments((prev) => !prev)}
                   />
                   <div>
-                    <p className={feedStyles.switchTitle}>Allow comments</p>
+                    <p className={feedStyles.switchTitle}>{t("reelsPage.editModal.allowComments")}</p>
                     <p className={feedStyles.switchHint}>
                       Enable to receive feedback from everyone
                     </p>
@@ -4023,13 +4025,13 @@ export default function ReelPage({
                     }
                   />
                   <div>
-                    <p className={feedStyles.switchTitle}>Allow downloads</p>
+                    <p className={feedStyles.switchTitle}>{t("reelsPage.editModal.allowDownloads")}</p>
                     <p className={feedStyles.switchHint}>
                       {editingReel?.repostOf
                         ? lockedEditAllowDownloadLoading
                           ? "Inherited from original post (loading…)"
                           : "Inherited from the original post (can’t be changed)"
-                        : "Share the original file with people you trust"}
+                        : t("reelsPage.editModal.allowDownloadsDesc")}
                     </p>
                   </div>
                 </label>
@@ -4041,7 +4043,7 @@ export default function ReelPage({
                     onChange={() => setEditHideLikeCount((prev) => !prev)}
                   />
                   <div>
-                    <p className={feedStyles.switchTitle}>Hide like</p>
+                    <p className={feedStyles.switchTitle}>{t("reelsPage.editModal.hideLike")}</p>
                     <p className={feedStyles.switchHint}>
                       Viewers won’t see the number of likes on this reel
                     </p>
@@ -4063,14 +4065,14 @@ export default function ReelPage({
                   onClick={closeEditModal}
                   disabled={editSaving}
                 >
-                  Cancel
+                  {t("reelsPage.cancel")}
                 </button>
                 <button
                   type="submit"
                   className={feedStyles.modalPrimary}
                   disabled={editSaving}
                 >
-                  {editSaving ? "Saving..." : "Save changes"}
+                  {editSaving ? t("reelsPage.editModal.saving") : t("reelsPage.editModal.saveChanges")}
                 </button>
               </div>
             </form>
@@ -4091,7 +4093,7 @@ export default function ReelPage({
           >
             <div className={postStyles.reportHeader}>
               <div>
-                <h3 className={postStyles.reportTitle}>Delete this reel?</h3>
+                <h3 className={postStyles.reportTitle}>{t("reelsPage.deleteModal.title")}</h3>
                 <p className={postStyles.reportBody}>
                   Removing this reel cannot be undone. It will disappear
                   immediately.
@@ -4099,7 +4101,7 @@ export default function ReelPage({
               </div>
               <button
                 className={postStyles.reportClose}
-                aria-label="Close"
+                aria-label={t("reelsPage.deleteModal.close")}
                 onClick={closeDeleteConfirm}
                 disabled={deleteSubmitting}
               >
@@ -4117,14 +4119,14 @@ export default function ReelPage({
                 onClick={closeDeleteConfirm}
                 disabled={deleteSubmitting}
               >
-                Cancel
+                {t("reelsPage.cancel")}
               </button>
               <button
                 className={`${postStyles.reportPrimary} ${postStyles.blockDanger}`}
                 onClick={confirmDelete}
                 disabled={deleteSubmitting}
               >
-                {deleteSubmitting ? "Deleting..." : "Delete"}
+                {deleteSubmitting ? t("reelsPage.deleteModal.deleting") : t("reelsPage.deleteModal.delete")}
               </button>
             </div>
           </div>
@@ -4144,14 +4146,14 @@ export default function ReelPage({
           >
             <div className={feedStyles.modalHeader}>
               <div>
-                <h3 className={feedStyles.modalTitle}>Edit visibility</h3>
+                <h3 className={feedStyles.modalTitle}>{t("reelsPage.visibilityModal.title")}</h3>
                 <p className={feedStyles.modalBody}>
                   Choose who can view this reel.
                 </p>
               </div>
               <button
                 className={feedStyles.closeBtn}
-                aria-label="Close"
+                aria-label={t("reelsPage.visibilityModal.close")}
                 onClick={closeVisibilityModal}
               >
                 ×
@@ -4195,14 +4197,14 @@ export default function ReelPage({
                 onClick={closeVisibilityModal}
                 disabled={visibilitySaving}
               >
-                Cancel
+                {t("reelsPage.cancel")}
               </button>
               <button
                 className={feedStyles.modalPrimary}
                 onClick={submitVisibilityUpdate}
                 disabled={visibilitySaving}
               >
-                {visibilitySaving ? "Updating..." : "Update visibility"}
+                {visibilitySaving ? t("reelsPage.visibilityModal.updating") : t("reelsPage.visibilityModal.update")}
               </button>
             </div>
           </div>
@@ -4222,14 +4224,14 @@ export default function ReelPage({
           >
             <div className={feedStyles.modalHeader}>
               <div>
-                <h3 className={feedStyles.modalTitle}>Mute notifications</h3>
+                <h3 className={feedStyles.modalTitle}>{t("reelsPage.muteModal.title")}</h3>
                 <p className={feedStyles.modalBody}>
                   Choose how long to pause alerts for this reel.
                 </p>
               </div>
               <button
                 className={feedStyles.closeBtn}
-                aria-label="Close"
+                aria-label={t("reelsPage.muteModal.close")}
                 onClick={closeMuteModal}
               >
                 ×
@@ -4256,24 +4258,24 @@ export default function ReelPage({
             {muteOption === "custom" ? (
               <div className={feedStyles.muteCustomRow}>
                 <div className={feedStyles.mutePicker}>
-                  <label className={feedStyles.editLabel}>Date</label>
+                  <label className={feedStyles.editLabel}>{t("reelsPage.muteModal.dateLabel")}</label>
                   <DateSelect
                     value={muteCustomDate}
                     onChange={setMuteCustomDate}
                     minDate={new Date()}
                     maxDate={null}
-                    placeholder="yyyy-mm-dd"
+                    placeholder={t("reelsPage.muteModal.datePlaceholder")}
                   />
                 </div>
                 <div className={feedStyles.mutePicker}>
-                  <label className={feedStyles.editLabel}>Time</label>
+                  <label className={feedStyles.editLabel}>{t("reelsPage.muteModal.timeLabel")}</label>
                   <TimeSelect
                     value={muteCustomTime}
                     onChange={setMuteCustomTime}
                     selectedDate={muteCustomDate}
                     minDateTime={new Date()}
                     disabled={!muteCustomDate}
-                    placeholder="hh:mm"
+                    placeholder={t("reelsPage.muteModal.timePlaceholder")}
                   />
                 </div>
               </div>
@@ -4290,7 +4292,7 @@ export default function ReelPage({
                 onClick={handleSaveReelMute}
                 disabled={muteSaving}
               >
-                {muteSaving ? "Saving..." : "Save"}
+                {muteSaving ? t("reelsPage.muteModal.saving") : t("reelsPage.muteModal.save")}
               </button>
             </div>
           </div>
@@ -4318,14 +4320,14 @@ export default function ReelPage({
           >
             <div className={postStyles.reportHeader}>
               <div>
-                <h3 className={postStyles.reportTitle}>Report this reel</h3>
+                <h3 className={postStyles.reportTitle}>{t("reelsPage.reportModal.title")}</h3>
                 <p className={postStyles.reportBody}>
                   Help us understand what is wrong with this content.
                 </p>
               </div>
               <button
                 className={postStyles.reportClose}
-                aria-label="Close"
+                aria-label={t("reelsPage.reportModal.close")}
                 onClick={closeReportModal}
               >
                 ×
@@ -4362,7 +4364,7 @@ export default function ReelPage({
                         style={{ background: group.accent }}
                       />
                       <span className={postStyles.reportCategoryLabel}>
-                        {group.label}
+                        {t(`reelsPage.reportCategories.${group.key}`)}
                       </span>
                     </button>
                   );
@@ -4371,7 +4373,7 @@ export default function ReelPage({
 
               <div className={postStyles.reportReasonPanel}>
                 <div className={postStyles.reportReasonHeader}>
-                  Select a specific reason
+                  {t("reelsPage.reportModal.title")}
                 </div>
                 {selectedReportGroup ? (
                   <div className={postStyles.reportReasonList}>
@@ -4395,14 +4397,14 @@ export default function ReelPage({
                               />
                             ) : null}
                           </span>
-                          <span>{reason.label}</span>
+                          <span>{t(`reelsPage.reportReasons.${reason.key}`)}</span>
                         </button>
                       );
                     })}
                   </div>
                 ) : (
                   <div className={postStyles.reportReasonPlaceholder}>
-                    Pick a category first.
+                    {t("reelsPage.reportModal.title")}
                   </div>
                 )}
 
@@ -4410,7 +4412,7 @@ export default function ReelPage({
                   Additional notes (optional)
                   <textarea
                     className={postStyles.reportNoteInput}
-                    placeholder="Add brief context if needed..."
+                    placeholder={t("reelsPage.reportModal.placeholder")}
                     value={reportNote}
                     onChange={(e) => setReportNote(e.target.value)}
                     maxLength={500}
@@ -4430,14 +4432,14 @@ export default function ReelPage({
                 onClick={closeReportModal}
                 disabled={reportSubmitting}
               >
-                Cancel
+                {t("reelsPage.cancel")}
               </button>
               <button
                 className={postStyles.reportPrimary}
                 onClick={submitReport}
                 disabled={!reportReason || reportSubmitting}
               >
-                {reportSubmitting ? "Submitting..." : "Submit report"}
+                {reportSubmitting ? t("reelsPage.reportModal.submitting") : t("reelsPage.reportModal.submit")}
               </button>
             </div>
           </div>

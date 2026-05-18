@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { JSX, useEffect, useMemo, useRef, useState } from "react";
+import { JSX, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import styles from "./notifications-overlay.module.css";
 import {
   deleteNotification,
@@ -212,74 +213,6 @@ function IconSeverityCritical() {
   );
 }
 
-function renderSystemNoticeBadge(item: NotificationItem): JSX.Element | null {
-  if (item.type !== "system_notice") return null;
-  const level = item.systemNoticeLevel ?? "info";
-
-  if (level === "critical") {
-    return (
-      <span className={`${styles.noticeBadge} ${styles.noticeBadgeCritical}`}>
-        <IconSeverityCritical />
-        <span>Critical</span>
-      </span>
-    );
-  }
-
-  if (level === "warning") {
-    return (
-      <span className={`${styles.noticeBadge} ${styles.noticeBadgeWarning}`}>
-        <IconSeverityWarning />
-        <span>Warning</span>
-      </span>
-    );
-  }
-
-  return (
-    <span className={`${styles.noticeBadge} ${styles.noticeBadgeInfo}`}>
-      <IconSeverityInfo />
-      <span>Info</span>
-    </span>
-  );
-}
-
-const TABS: TabConfig[] = [
-  {
-    key: "all",
-    label: "All activity",
-    emptyTitle: "Nothing here yet",
-    emptyText: "When you get notifications, they will appear here.",
-    icon: <IconBell />,
-  },
-  {
-    key: "like",
-    label: "Likes",
-    emptyTitle: "Likes on your posts",
-    emptyText: "When someone likes your content, you’ll see it here.",
-    icon: <IconHeart />,
-  },
-  {
-    key: "comment",
-    label: "Comments",
-    emptyTitle: "Comments on your posts",
-    emptyText: "When someone comments, you’ll see it here.",
-    icon: <IconChat />,
-  },
-  {
-    key: "mentions",
-    label: "Mentions and tags",
-    emptyTitle: "Mentions and tags",
-    emptyText: "When someone mentions or tags you, you’ll see it here.",
-    icon: <IconTag />,
-  },
-  {
-    key: "follow",
-    label: "Followers",
-    emptyTitle: "New followers",
-    emptyText: "When someone follows you, you’ll see it here.",
-    icon: <IconUser />,
-  },
-];
-
 const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
   all: [
     "post_like",
@@ -299,26 +232,6 @@ const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
   follow: ["follow"],
   system: ["system_notice"],
 };
-
-function formatRelativeTime(value: string): string {
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return "";
-  const diff = Date.now() - time;
-  const seconds = Math.max(0, Math.floor(diff / 1000));
-  if (seconds < 60) return "Just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hours`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} days`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks} weeks`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} months`;
-  const years = Math.floor(days / 365);
-  return `${years} years`;
-}
 
 function formatExactTime(value: string): string {
   const dt = new Date(value);
@@ -355,289 +268,6 @@ function formatRemainingHourMinute(value?: string | null): string | null {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function buildMessage(item: NotificationItem): JSX.Element {
-  if (item.type === "post_like") {
-    const name = item.actor.username
-      ? `@${item.actor.username}`
-      : item.actor.displayName || "Someone";
-    const othersCount = Math.max(0, (item.likeCount ?? 1) - 1);
-    const othersLabel = othersCount === 1 ? "1 other" : `${othersCount} others`;
-    const targetLabel = item.postKind === "reel" ? "reel" : "post";
-    return (
-      <>
-        <span className={styles.itemName}>{name}</span>
-        {othersCount > 0 ? ` and ${othersLabel}` : ""} liked your {targetLabel}
-      </>
-    );
-  }
-  if (item.type === "post_comment") {
-    const name = item.actor.username
-      ? `@${item.actor.username}`
-      : item.actor.displayName || "Someone";
-    const othersCount = Math.max(0, (item.commentCount ?? 1) - 1);
-    const othersLabel = othersCount === 1 ? "1 other" : `${othersCount} others`;
-    const targetLabel = item.postKind === "reel" ? "reel" : "post";
-    return (
-      <>
-        <span className={styles.itemName}>{name}</span>
-        {othersCount > 0 ? ` and ${othersLabel}` : ""} commented on your{" "}
-        {targetLabel}
-      </>
-    );
-  }
-  if (item.type === "comment_like") {
-    const name = item.actor.username
-      ? `@${item.actor.username}`
-      : item.actor.displayName || "Someone";
-    const othersCount = Math.max(0, (item.likeCount ?? 1) - 1);
-    const othersLabel = othersCount === 1 ? "1 other" : `${othersCount} others`;
-    return (
-      <>
-        <span className={styles.itemName}>{name}</span>
-        {othersCount > 0 ? ` and ${othersLabel}` : ""} liked your comment
-      </>
-    );
-  }
-  if (item.type === "post_mention") {
-    const name = item.actor.username
-      ? `@${item.actor.username}`
-      : item.actor.displayName || "Someone";
-    const sourceLabel = item.mentionSource === "comment" ? "comment" : "post";
-    return (
-      <>
-        <span className={styles.itemName}>{name}</span>
-        {` mentioned you in a ${sourceLabel}`}
-      </>
-    );
-  }
-  if (item.type === "comment_reply") {
-    const name = item.actor.username
-      ? `@${item.actor.username}`
-      : item.actor.displayName || "Someone";
-    const othersCount = Math.max(0, (item.commentCount ?? 1) - 1);
-    const othersLabel = othersCount === 1 ? "1 other" : `${othersCount} others`;
-    return (
-      <>
-        <span className={styles.itemName}>{name}</span>
-        {othersCount > 0 ? ` and ${othersLabel}` : ""} replied to your comment
-      </>
-    );
-  }
-  if (item.type === "follow") {
-    const name = item.actor.username
-      ? `@${item.actor.username}`
-      : item.actor.displayName || "Someone";
-    return (
-      <>
-        <span className={styles.itemName}>{name}</span> followed you
-      </>
-    );
-  }
-  if (item.type === "login_alert") {
-    return <>You're signing in on a new device</>;
-  }
-  if (item.type === "post_moderation") {
-    const targetLabel = item.postKind === "reel" ? "reel" : "post";
-    if (item.moderationDecision === "approve" || item.moderationDecision === "blur") {
-      return <>Your {targetLabel} was published successfully.</>;
-    }
-    if (item.moderationDecision === "reject") {
-      return (
-        <>
-          Your {targetLabel} was rejected. Please go to Violation Center to see
-          details.
-        </>
-      );
-    }
-    return <>Your {targetLabel} was published successfully.</>;
-  }
-  if (item.type === "report") {
-    if (item.reportAudience === "offender") {
-      if (item.reportAction === "remove_post") {
-        const severity = item.reportSeverity
-          ? item.reportSeverity.charAt(0).toUpperCase() +
-            item.reportSeverity.slice(1)
-          : "Unknown";
-        const strikeDelta =
-          typeof item.reportStrikeDelta === "number"
-            ? `+${item.reportStrikeDelta}`
-            : null;
-        const strikeTotal =
-          typeof item.reportStrikeTotal === "number"
-            ? item.reportStrikeTotal
-            : null;
-        const targetLabel = item.reportTargetId
-          ? ` Post #${item.reportTargetId.slice(-8)}.`
-          : "";
-        return (
-          <>
-            Your post was removed due to a policy violation.
-            {targetLabel}
-            {` Severity: ${severity}.`}
-            {strikeDelta
-              ? ` Strike ${strikeDelta}${
-                  strikeTotal != null ? ` (Total ${strikeTotal})` : ""
-                }.`
-              : ""}{" "}
-            View details in Violation Center.
-          </>
-        );
-      }
-      if (item.reportAction === "restrict_post") {
-        const severity = item.reportSeverity
-          ? item.reportSeverity.charAt(0).toUpperCase() +
-            item.reportSeverity.slice(1)
-          : "Unknown";
-        const strikeDelta =
-          typeof item.reportStrikeDelta === "number"
-            ? `+${item.reportStrikeDelta}`
-            : null;
-        const strikeTotal =
-          typeof item.reportStrikeTotal === "number"
-            ? item.reportStrikeTotal
-            : null;
-        return (
-          <>
-            Your post reach is now restricted to followers only.
-            {` Severity: ${severity}.`}
-            {strikeDelta
-              ? ` Strike ${strikeDelta}${
-                  strikeTotal != null ? ` (Total ${strikeTotal})` : ""
-                }.`
-              : ""}{" "}
-            View details in Violation Center.
-          </>
-        );
-      }
-      if (item.reportAction === "warn" || item.reportAction === "warn_user") {
-        const targetType = item.reportTargetType ?? "content";
-        const targetLabel =
-          targetType === "post"
-            ? "post"
-            : targetType === "comment"
-              ? "comment"
-              : targetType === "user"
-                ? "account"
-                : "content";
-        return (
-          <>
-            You received a policy warning for your {targetLabel}. No strike was
-            added. View details in Violation Center.
-          </>
-        );
-      }
-      if (item.reportAction === "delete_comment") {
-        const severity = item.reportSeverity
-          ? item.reportSeverity.charAt(0).toUpperCase() +
-            item.reportSeverity.slice(1)
-          : "Unknown";
-        const strikeDelta =
-          typeof item.reportStrikeDelta === "number"
-            ? `+${item.reportStrikeDelta}`
-            : null;
-        const strikeTotal =
-          typeof item.reportStrikeTotal === "number"
-            ? item.reportStrikeTotal
-            : null;
-        return (
-          <>
-            Your comment was removed due to a policy violation.
-            {` Severity: ${severity}.`}
-            {strikeDelta
-              ? ` Strike ${strikeDelta}${
-                  strikeTotal != null ? ` (Total ${strikeTotal})` : ""
-                }.`
-              : ""}{" "}
-            View details in Violation Center.
-          </>
-        );
-      }
-      if (item.reportAction === "violation") {
-        const targetType = item.reportTargetType ?? "content";
-        const targetLabel =
-          targetType === "post"
-            ? "post"
-            : targetType === "comment"
-              ? "comment"
-              : targetType === "user"
-                ? "account"
-                : "content";
-        const severity = item.reportSeverity
-          ? item.reportSeverity.charAt(0).toUpperCase() +
-            item.reportSeverity.slice(1)
-          : "Unknown";
-        const strikeDelta =
-          typeof item.reportStrikeDelta === "number"
-            ? `+${item.reportStrikeDelta}`
-            : null;
-        const strikeTotal =
-          typeof item.reportStrikeTotal === "number"
-            ? item.reportStrikeTotal
-            : null;
-        return (
-          <>
-            A policy violation was recorded for your {targetLabel}.
-            {` Severity: ${severity}.`}
-            {strikeDelta
-              ? ` Strike ${strikeDelta}${
-                  strikeTotal != null ? ` (Total ${strikeTotal})` : ""
-                }.`
-              : ""}{" "}
-            View details in Violation Center.
-          </>
-        );
-      }
-      if (item.reportAction === "mute_interaction") {
-        const remaining = formatRemainingHourMinute(item.reportActionExpiresAt);
-        return (
-          <>
-            Your account is under interaction mute. You cannot post reels/posts,
-            comment, reply, like, or repost during this period.
-            {remaining
-              ? ` Remaining: ${remaining}.`
-              : " A moderator must turn this back on."}{" "}
-            View details in Violation Center.
-          </>
-        );
-      }
-      return (
-        <>
-          Action was taken on your reported content. View details in Violation
-          Center.
-        </>
-      );
-    }
-    if (item.reportOutcome === "action_taken") {
-      return (
-        <>
-          Thank you for your report. We reviewed this case and took appropriate
-          action according to our policy.
-        </>
-      );
-    }
-    return (
-      <>
-        Thank you for your report. We reviewed this case and currently found no
-        policy violation.
-      </>
-    );
-  }
-  if (item.type === "system_notice") {
-    const title = item.systemNoticeTitle?.trim() || "";
-    const body = item.systemNoticeBody?.trim() || "";
-    if (!title) {
-      return <>{body || "System notice"}</>;
-    }
-    return (
-      <>
-        <span className={styles.itemName}>{title}</span>
-        {body ? `: ${body}` : ""}
-      </>
-    );
-  }
-  return <>New notification</>;
-}
-
 export default function NotificationsOverlay(props: {
   open: boolean;
   closing?: boolean;
@@ -645,14 +275,55 @@ export default function NotificationsOverlay(props: {
 }) {
   const { open, closing, onClose } = props;
   const router = useRouter();
+  const t = useTranslations("notifications");
+
+  const tabs = useMemo<TabConfig[]>(
+    () => [
+      {
+        key: "all",
+        label: t("tabs.all"),
+        emptyTitle: t("empty.all.title"),
+        emptyText: t("empty.all.text"),
+        icon: <IconBell />,
+      },
+      {
+        key: "like",
+        label: t("tabs.like"),
+        emptyTitle: t("empty.like.title"),
+        emptyText: t("empty.like.text"),
+        icon: <IconHeart />,
+      },
+      {
+        key: "comment",
+        label: t("tabs.comment"),
+        emptyTitle: t("empty.comment.title"),
+        emptyText: t("empty.comment.text"),
+        icon: <IconChat />,
+      },
+      {
+        key: "mentions",
+        label: t("tabs.mentions"),
+        emptyTitle: t("empty.mentions.title"),
+        emptyText: t("empty.mentions.text"),
+        icon: <IconTag />,
+      },
+      {
+        key: "follow",
+        label: t("tabs.follow"),
+        emptyTitle: t("empty.follow.title"),
+        emptyText: t("empty.follow.text"),
+        icon: <IconUser />,
+      },
+    ],
+    [t],
+  );
+
   const [entered, setEntered] = useState(false);
   const [active, setActive] = useState<TabKey>("all");
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [loginAlertItem, setLoginAlertItem] = useState<NotificationItem | null>(
-    null,
-  );
+  const [loginAlertItem, setLoginAlertItem] = useState<NotificationItem | null>(null);
   const [notMeOpen, setNotMeOpen] = useState(false);
   const [notMeSubmitting, setNotMeSubmitting] = useState(false);
   const [notMeError, setNotMeError] = useState<string | null>(null);
@@ -678,8 +349,8 @@ export default function NotificationsOverlay(props: {
   const manageMenuRef = useRef<HTMLDivElement>(null);
 
   const activeTab = useMemo(
-    () => TABS.find((tab) => tab.key === active) ?? TABS[0],
-    [active],
+    () => tabs.find((tab) => tab.key === active) ?? tabs[0],
+    [tabs, active],
   );
 
   const filteredItems = useMemo(() => {
@@ -690,23 +361,239 @@ export default function NotificationsOverlay(props: {
 
   const muteOptions = useMemo(
     () => [
-      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
-      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
-      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
-      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
-      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
-      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
-      { key: "until", label: "Until I turn it back on", ms: null },
-      { key: "custom", label: "Choose date & time", ms: null },
+      { key: "5m", label: t("mute.options.5m"), ms: 5 * 60 * 1000 },
+      { key: "10m", label: t("mute.options.10m"), ms: 10 * 60 * 1000 },
+      { key: "15m", label: t("mute.options.15m"), ms: 15 * 60 * 1000 },
+      { key: "30m", label: t("mute.options.30m"), ms: 30 * 60 * 1000 },
+      { key: "1h", label: t("mute.options.1h"), ms: 60 * 60 * 1000 },
+      { key: "1d", label: t("mute.options.1d"), ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: t("mute.options.until"), ms: null },
+      { key: "custom", label: t("mute.options.custom"), ms: null },
     ],
-    [],
+    [t],
   );
 
   const muteTarget = useMemo(
-    () =>
-      muteTargetId ? items.find((item) => item.id === muteTargetId) : null,
+    () => (muteTargetId ? items.find((item) => item.id === muteTargetId) : null),
     [items, muteTargetId],
   );
+
+  const formatRelativeTime = (value: string): string => {
+    const time = new Date(value).getTime();
+    if (Number.isNaN(time)) return "";
+    const diff = Date.now() - time;
+    const seconds = Math.max(0, Math.floor(diff / 1000));
+    if (seconds < 60) return t("timeJustNow");
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return t("timeMinutes", { count: minutes });
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t("timeHours", { count: hours });
+    const days = Math.floor(hours / 24);
+    if (days < 7) return t("timeDays", { count: days });
+    const weeks = Math.floor(days / 7);
+    if (weeks < 5) return t("timeWeeks", { count: weeks });
+    const months = Math.floor(days / 30);
+    if (months < 12) return t("timeMonths", { count: months });
+    const years = Math.floor(days / 365);
+    return t("timeYears", { count: years });
+  };
+
+  const renderSystemNoticeBadge = (item: NotificationItem): ReactNode => {
+    if (item.type !== "system_notice") return null;
+    const level = item.systemNoticeLevel ?? "info";
+
+    if (level === "critical") {
+      return (
+        <span className={`${styles.noticeBadge} ${styles.noticeBadgeCritical}`}>
+          <IconSeverityCritical />
+          <span>{t("badgeCritical")}</span>
+        </span>
+      );
+    }
+
+    if (level === "warning") {
+      return (
+        <span className={`${styles.noticeBadge} ${styles.noticeBadgeWarning}`}>
+          <IconSeverityWarning />
+          <span>{t("badgeWarning")}</span>
+        </span>
+      );
+    }
+
+    return (
+      <span className={`${styles.noticeBadge} ${styles.noticeBadgeInfo}`}>
+        <IconSeverityInfo />
+        <span>{t("badgeInfo")}</span>
+      </span>
+    );
+  };
+
+  const buildMessage = (item: NotificationItem): ReactNode => {
+    const bold = (chunks: ReactNode) => (
+      <span className={styles.itemName}>{chunks}</span>
+    );
+
+    if (item.type === "post_like") {
+      const name = item.actor.username
+        ? `@${item.actor.username}`
+        : item.actor.displayName || t("msg.someone");
+      const othersCount = Math.max(0, (item.likeCount ?? 1) - 1);
+      const othersLabel = othersCount === 1 ? t("msg.oneOther") : t("msg.nOthers", { count: othersCount });
+      const isReel = item.postKind === "reel";
+      if (othersCount > 0) {
+        return isReel
+          ? t.rich("msg.reelLikeOthers", { name, others: othersLabel, bold })
+          : t.rich("msg.postLikeOthers", { name, others: othersLabel, bold });
+      }
+      return isReel
+        ? t.rich("msg.reelLike", { name, bold })
+        : t.rich("msg.postLike", { name, bold });
+    }
+
+    if (item.type === "post_comment") {
+      const name = item.actor.username
+        ? `@${item.actor.username}`
+        : item.actor.displayName || t("msg.someone");
+      const othersCount = Math.max(0, (item.commentCount ?? 1) - 1);
+      const othersLabel = othersCount === 1 ? t("msg.oneOther") : t("msg.nOthers", { count: othersCount });
+      const isReel = item.postKind === "reel";
+      if (othersCount > 0) {
+        return isReel
+          ? t.rich("msg.reelCommentOthers", { name, others: othersLabel, bold })
+          : t.rich("msg.postCommentOthers", { name, others: othersLabel, bold });
+      }
+      return isReel
+        ? t.rich("msg.reelComment", { name, bold })
+        : t.rich("msg.postComment", { name, bold });
+    }
+
+    if (item.type === "comment_like") {
+      const name = item.actor.username
+        ? `@${item.actor.username}`
+        : item.actor.displayName || t("msg.someone");
+      const othersCount = Math.max(0, (item.likeCount ?? 1) - 1);
+      const othersLabel = othersCount === 1 ? t("msg.oneOther") : t("msg.nOthers", { count: othersCount });
+      if (othersCount > 0) {
+        return t.rich("msg.commentLikeOthers", { name, others: othersLabel, bold });
+      }
+      return t.rich("msg.commentLike", { name, bold });
+    }
+
+    if (item.type === "post_mention") {
+      const name = item.actor.username
+        ? `@${item.actor.username}`
+        : item.actor.displayName || t("msg.someone");
+      return item.mentionSource === "comment"
+        ? t.rich("msg.mentionComment", { name, bold })
+        : t.rich("msg.mentionPost", { name, bold });
+    }
+
+    if (item.type === "comment_reply") {
+      const name = item.actor.username
+        ? `@${item.actor.username}`
+        : item.actor.displayName || t("msg.someone");
+      const othersCount = Math.max(0, (item.commentCount ?? 1) - 1);
+      const othersLabel = othersCount === 1 ? t("msg.oneOther") : t("msg.nOthers", { count: othersCount });
+      if (othersCount > 0) {
+        return t.rich("msg.commentReplyOthers", { name, others: othersLabel, bold });
+      }
+      return t.rich("msg.commentReply", { name, bold });
+    }
+
+    if (item.type === "follow") {
+      const name = item.actor.username
+        ? `@${item.actor.username}`
+        : item.actor.displayName || t("msg.someone");
+      return t.rich("msg.followed", { name, bold });
+    }
+
+    if (item.type === "login_alert") {
+      return <>{t("msg.loginAlert")}</>;
+    }
+
+    if (item.type === "post_moderation") {
+      const isReel = item.postKind === "reel";
+      if (item.moderationDecision === "approve" || item.moderationDecision === "blur") {
+        return <>{isReel ? t("msg.reelPublished") : t("msg.postPublished")}</>;
+      }
+      if (item.moderationDecision === "reject") {
+        return <>{isReel ? t("msg.reelRejected") : t("msg.postRejected")}</>;
+      }
+      return <>{isReel ? t("msg.reelPublished") : t("msg.postPublished")}</>;
+    }
+
+    if (item.type === "report") {
+      const severityStr = item.reportSeverity
+        ? item.reportSeverity.charAt(0).toUpperCase() + item.reportSeverity.slice(1)
+        : t("msg.severityUnknown");
+
+      const strikePart =
+        typeof item.reportStrikeDelta === "number"
+          ? typeof item.reportStrikeTotal === "number"
+            ? t("msg.strikeDelta", { delta: `+${item.reportStrikeDelta}`, total: item.reportStrikeTotal })
+            : t("msg.strikeDeltaNoTotal", { delta: `+${item.reportStrikeDelta}` })
+          : "";
+
+      if (item.reportAudience === "offender") {
+        if (item.reportAction === "remove_post") {
+          const targetPart = item.reportTargetId ? ` Post #${item.reportTargetId.slice(-8)}.` : "";
+          return <>{t("msg.reportRemovePost", { target: targetPart, severity: severityStr, strike: strikePart })}</>;
+        }
+        if (item.reportAction === "restrict_post") {
+          return <>{t("msg.reportRestrictPost", { severity: severityStr, strike: strikePart })}</>;
+        }
+        if (item.reportAction === "warn" || item.reportAction === "warn_user") {
+          const targetType = item.reportTargetType ?? "content";
+          const targetLabel =
+            targetType === "post" ? t("msg.targetPost")
+            : targetType === "comment" ? t("msg.targetComment")
+            : targetType === "user" ? t("msg.targetAccount")
+            : t("msg.targetContent");
+          return <>{t("msg.reportWarn", { target: targetLabel })}</>;
+        }
+        if (item.reportAction === "delete_comment") {
+          return <>{t("msg.reportDeleteComment", { severity: severityStr, strike: strikePart })}</>;
+        }
+        if (item.reportAction === "violation") {
+          const targetType = item.reportTargetType ?? "content";
+          const targetLabel =
+            targetType === "post" ? t("msg.targetPost")
+            : targetType === "comment" ? t("msg.targetComment")
+            : targetType === "user" ? t("msg.targetAccount")
+            : t("msg.targetContent");
+          return <>{t("msg.reportViolation", { target: targetLabel, severity: severityStr, strike: strikePart })}</>;
+        }
+        if (item.reportAction === "mute_interaction") {
+          const remaining = formatRemainingHourMinute(item.reportActionExpiresAt);
+          const remainingPart = remaining
+            ? t("msg.reportMuteRemaining", { time: remaining })
+            : t("msg.reportMuteManual");
+          return <>{t("msg.reportMuteInteraction", { remaining: remainingPart })}</>;
+        }
+        return <>{t("msg.reportActionTaken")}</>;
+      }
+      if (item.reportOutcome === "action_taken") {
+        return <>{t("msg.reportReviewed")}</>;
+      }
+      return <>{t("msg.reportNoViolation")}</>;
+    }
+
+    if (item.type === "system_notice") {
+      const title = item.systemNoticeTitle?.trim() || "";
+      const body = item.systemNoticeBody?.trim() || "";
+      if (!title) {
+        return <>{body || t("msg.systemNotice")}</>;
+      }
+      return (
+        <>
+          <span className={styles.itemName}>{title}</span>
+          {body ? `: ${body}` : ""}
+        </>
+      );
+    }
+
+    return <>{t("msg.newNotification")}</>;
+  };
 
   useEffect(() => {
     if (!open) {
@@ -747,7 +634,7 @@ export default function NotificationsOverlay(props: {
     if (!token) {
       setItems([]);
       setLoading(false);
-      setError("Session expired. Please sign in again.");
+      setError(t("sessionExpired"));
       return;
     }
 
@@ -759,11 +646,11 @@ export default function NotificationsOverlay(props: {
         const message =
           typeof err === "object" && err && "message" in err
             ? String((err as { message?: string }).message)
-            : "Unable to load notifications";
+            : t("loadFailed");
         setError(message);
       })
       .finally(() => setLoading(false));
-  }, [open]);
+  }, [open, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -779,27 +666,20 @@ export default function NotificationsOverlay(props: {
     const handleNotification = (event: Event) => {
       const detail = (event as CustomEvent<NotificationReceivedDetail>).detail;
       if (!detail?.notification) return;
-
       setItems((prev) => {
         const next = prev.filter((item) => item.id !== detail.notification.id);
         return [detail.notification, ...next];
       });
     };
-
     window.addEventListener(NOTIFICATION_RECEIVED_EVENT, handleNotification);
-    return () =>
-      window.removeEventListener(
-        NOTIFICATION_RECEIVED_EVENT,
-        handleNotification,
-      );
+    return () => window.removeEventListener(NOTIFICATION_RECEIVED_EVENT, handleNotification);
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
 
     const handleStateChanged = (event: Event) => {
-      const detail = (event as CustomEvent<NotificationStateChangedDetail>)
-        .detail;
+      const detail = (event as CustomEvent<NotificationStateChangedDetail>).detail;
       if (!detail?.id) return;
       setItems((prev) =>
         prev.map((entry) =>
@@ -818,10 +698,7 @@ export default function NotificationsOverlay(props: {
     window.addEventListener(NOTIFICATION_DELETED_EVENT, handleDeleted);
 
     return () => {
-      window.removeEventListener(
-        NOTIFICATION_STATE_CHANGED_EVENT,
-        handleStateChanged,
-      );
+      window.removeEventListener(NOTIFICATION_STATE_CHANGED_EVENT, handleStateChanged);
       window.removeEventListener(NOTIFICATION_DELETED_EVENT, handleDeleted);
     };
   }, [open]);
@@ -830,12 +707,9 @@ export default function NotificationsOverlay(props: {
     if (!openMenuId) return;
     const handleClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (target.closest(`[data-notification-menu-root="${openMenuId}"]`)) {
-        return;
-      }
+      if (target.closest(`[data-notification-menu-root="${openMenuId}"]`)) return;
       setOpenMenuId(null);
     };
-
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openMenuId]);
@@ -867,9 +741,7 @@ export default function NotificationsOverlay(props: {
   }, [loginAlertItem]);
 
   const showToast = (message: string, duration = 1800) => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(message);
     toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
   };
@@ -892,9 +764,9 @@ export default function NotificationsOverlay(props: {
       const now = new Date().toISOString();
       setItems((prev) => prev.map((item) => ({ ...item, readAt: item.readAt ?? now })));
       setMarkAllConfirmOpen(false);
-      showToast("All notifications marked as read");
+      showToast(t("toast.markedAllRead"));
     } catch {
-      showToast("Failed to mark all as read");
+      showToast(t("toast.markAllReadFailed"));
     } finally {
       setMarkingAllRead(false);
     }
@@ -907,13 +779,17 @@ export default function NotificationsOverlay(props: {
     const ids = Array.from(selectedIds);
     try {
       await Promise.all(
-        ids.map((id) => deleteNotification({ token, notificationId: id }).catch(() => undefined))
+        ids.map((id) => deleteNotification({ token, notificationId: id }).catch(() => undefined)),
       );
       setItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
       setSelectedIds(new Set());
       setDeleteMode(false);
       setDeleteConfirmOpen(false);
-      showToast(`${ids.length} notification${ids.length !== 1 ? "s" : ""} deleted`);
+      showToast(
+        ids.length === 1
+          ? t("toast.deleted", { count: ids.length })
+          : t("toast.deletedPlural", { count: ids.length }),
+      );
     } finally {
       setDeletingBulk(false);
     }
@@ -925,16 +801,11 @@ export default function NotificationsOverlay(props: {
       if (!item.readAt) {
         const token = getStoredAccessToken();
         if (token) {
-          void markNotificationRead({
-            token,
-            notificationId: item.id,
-          }).catch(() => undefined);
+          void markNotificationRead({ token, notificationId: item.id }).catch(() => undefined);
         }
         setItems((prev) =>
           prev.map((entry) =>
-            entry.id === item.id
-              ? { ...entry, readAt: new Date().toISOString() }
-              : entry,
+            entry.id === item.id ? { ...entry, readAt: new Date().toISOString() } : entry,
           ),
         );
         emitNotificationRead({ id: item.id });
@@ -945,32 +816,26 @@ export default function NotificationsOverlay(props: {
     const targetUrl =
       item.type === "report" && item.reportAudience === "offender"
         ? "/settings?section=violations"
-        : item.type === "post_moderation" &&
-            item.moderationDecision === "reject"
+        : item.type === "post_moderation" && item.moderationDecision === "reject"
           ? "/settings?section=violations"
           : item.type === "post_moderation" && item.postId
             ? `/post/${item.postId}`
-        : item.type === "system_notice" && item.systemNoticeActionUrl
-          ? item.systemNoticeActionUrl
-        : item.postId
-          ? `/post/${item.postId}`
-          : item.type === "follow" && item.actor?.id
-            ? `/profile/${item.actor.id}`
-            : null;
+            : item.type === "system_notice" && item.systemNoticeActionUrl
+              ? item.systemNoticeActionUrl
+              : item.postId
+                ? `/post/${item.postId}`
+                : item.type === "follow" && item.actor?.id
+                  ? `/profile/${item.actor.id}`
+                  : null;
     if (!targetUrl) return;
     if (!item.readAt) {
       const token = getStoredAccessToken();
       if (token) {
-        void markNotificationRead({
-          token,
-          notificationId: item.id,
-        }).catch(() => undefined);
+        void markNotificationRead({ token, notificationId: item.id }).catch(() => undefined);
       }
       setItems((prev) =>
         prev.map((entry) =>
-          entry.id === item.id
-            ? { ...entry, readAt: new Date().toISOString() }
-            : entry,
+          entry.id === item.id ? { ...entry, readAt: new Date().toISOString() } : entry,
         ),
       );
       emitNotificationRead({ id: item.id });
@@ -987,9 +852,7 @@ export default function NotificationsOverlay(props: {
     if (item.postMutedIndefinitely) return true;
     if (item.postMutedUntil) {
       const dt = new Date(item.postMutedUntil);
-      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
-        return true;
-      }
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) return true;
     }
     return false;
   };
@@ -1017,25 +880,15 @@ export default function NotificationsOverlay(props: {
     const token = getStoredAccessToken();
     if (!token) return;
     if (item.readAt) {
-      void markNotificationUnread({
-        token,
-        notificationId: item.id,
-      }).catch(() => undefined);
+      void markNotificationUnread({ token, notificationId: item.id }).catch(() => undefined);
       setItems((prev) =>
-        prev.map((entry) =>
-          entry.id === item.id ? { ...entry, readAt: null } : entry,
-        ),
+        prev.map((entry) => (entry.id === item.id ? { ...entry, readAt: null } : entry)),
       );
     } else {
-      void markNotificationRead({
-        token,
-        notificationId: item.id,
-      }).catch(() => undefined);
+      void markNotificationRead({ token, notificationId: item.id }).catch(() => undefined);
       setItems((prev) =>
         prev.map((entry) =>
-          entry.id === item.id
-            ? { ...entry, readAt: new Date().toISOString() }
-            : entry,
+          entry.id === item.id ? { ...entry, readAt: new Date().toISOString() } : entry,
         ),
       );
       emitNotificationRead({ id: item.id });
@@ -1046,13 +899,9 @@ export default function NotificationsOverlay(props: {
   const handleDeleteNotification = (item: NotificationItem) => {
     const token = getStoredAccessToken();
     if (!token) return;
-    void deleteNotification({ token, notificationId: item.id }).catch(
-      () => undefined,
-    );
+    void deleteNotification({ token, notificationId: item.id }).catch(() => undefined);
     setItems((prev) => prev.filter((entry) => entry.id !== item.id));
-    if (loginAlertItem?.id === item.id) {
-      setLoginAlertItem(null);
-    }
+    if (loginAlertItem?.id === item.id) setLoginAlertItem(null);
     setOpenMenuId(null);
   };
 
@@ -1073,13 +922,13 @@ export default function NotificationsOverlay(props: {
       } else if (muteOption === "custom") {
         const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
         if (!iso) {
-          setMuteError("Please select a valid date and time.");
+          setMuteError(t("mute.invalidDateTime"));
           setMuteSaving(false);
           return;
         }
         const dt = new Date(iso);
         if (dt.getTime() <= Date.now()) {
-          setMuteError("Please choose a future time.");
+          setMuteError(t("mute.pastTime"));
           setMuteSaving(false);
           return;
         }
@@ -1115,7 +964,7 @@ export default function NotificationsOverlay(props: {
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Failed to update notifications";
+          : t("mute.updateFailed");
       setMuteError(message);
     } finally {
       setMuteSaving(false);
@@ -1128,7 +977,9 @@ export default function NotificationsOverlay(props: {
     if (item.deviceInfo?.trim()) return item.deviceInfo.trim();
     const parts = [item.browser, item.os].filter(Boolean);
     if (parts.length) return parts.join(" on ");
-    return item.deviceType ? `${item.deviceType} device` : "Unknown device";
+    return item.deviceType
+      ? t("loginAlert.deviceWithType", { type: item.deviceType })
+      : t("loginAlert.unknownDevice");
   };
 
   const handleConfirmLogin = () => {
@@ -1142,12 +993,12 @@ export default function NotificationsOverlay(props: {
 
   const handleLogoutSuspiciousDevice = async () => {
     if (!loginAlertItem?.deviceIdHash) {
-      setNotMeError("Unable to identify the device for logout.");
+      setNotMeError(t("notMe.noDeviceError"));
       return;
     }
     const token = getStoredAccessToken();
     if (!token) {
-      setNotMeError("Session expired. Please sign in again.");
+      setNotMeError(t("sessionExpired"));
       return;
     }
 
@@ -1158,19 +1009,21 @@ export default function NotificationsOverlay(props: {
         token,
         deviceIdHash: loginAlertItem.deviceIdHash,
       });
-      showToast("Device signed out");
+      showToast(t("toast.deviceSignedOut"));
       setNotMeOpen(false);
       setLoginAlertItem(null);
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Unable to log out the device.";
+          : t("notMe.logoutError");
       setNotMeError(message);
     } finally {
       setNotMeSubmitting(false);
     }
   };
+
+  const unreadCount = items.filter((i) => !i.readAt).length;
 
   return (
     <div
@@ -1186,8 +1039,8 @@ export default function NotificationsOverlay(props: {
       >
         <div className={styles.header}>
           <div>
-            <p className={styles.kicker}>Notifications</p>
-            <h2 className={styles.title}>Activity</h2>
+            <p className={styles.kicker}>{t("kicker")}</p>
+            <h2 className={styles.title}>{t("title")}</h2>
           </div>
           <button className={styles.close} type="button" onClick={onClose}>
             <IconClose />
@@ -1210,7 +1063,7 @@ export default function NotificationsOverlay(props: {
             </button>
             {dropdownOpen && (
               <div className={styles.filterMenu} role="listbox">
-                {TABS.map((tab) => (
+                {tabs.map((tab) => (
                   <button
                     key={tab.key}
                     type="button"
@@ -1241,7 +1094,7 @@ export default function NotificationsOverlay(props: {
                 setSelectedIds(new Set());
               }}
             >
-              Cancel
+              {t("cancel")}
             </button>
           ) : (
             <div className={styles.manageWrap} ref={manageMenuRef}>
@@ -1249,7 +1102,7 @@ export default function NotificationsOverlay(props: {
                 type="button"
                 className={`${styles.manageBtn} ${manageMenuOpen ? styles.manageBtnActive : ""}`}
                 onClick={() => setManageMenuOpen((prev) => !prev)}
-                title="Manage notifications"
+                title={t("manageTitle")}
                 aria-haspopup="true"
                 aria-expanded={manageMenuOpen}
               >
@@ -1267,7 +1120,7 @@ export default function NotificationsOverlay(props: {
                     }}
                   >
                     <IconCheckDouble />
-                    Mark all as read
+                    {t("markAllRead")}
                   </button>
                   <button
                     type="button"
@@ -1280,7 +1133,7 @@ export default function NotificationsOverlay(props: {
                     }}
                   >
                     <IconTrash />
-                    Delete notifications
+                    {t("deleteNotifications")}
                   </button>
                 </div>
               )}
@@ -1291,7 +1144,7 @@ export default function NotificationsOverlay(props: {
         {deleteMode && (
           <div className={styles.deleteModeBar}>
             <span className={styles.deleteModeCount}>
-              {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Tap to select"}
+              {selectedIds.size > 0 ? t("selected", { count: selectedIds.size }) : t("tapToSelect")}
             </span>
             {selectedIds.size > 0 && (
               <button
@@ -1299,7 +1152,7 @@ export default function NotificationsOverlay(props: {
                 className={styles.deleteModeDeleteBtn}
                 onClick={() => setDeleteConfirmOpen(true)}
               >
-                Delete ({selectedIds.size})
+                {t("deleteCount", { count: selectedIds.size })}
               </button>
             )}
           </div>
@@ -1309,13 +1162,13 @@ export default function NotificationsOverlay(props: {
           {loading ? (
             <div className={styles.emptyState}>
               <div className={styles.emptyIcon}>{activeTab.icon}</div>
-              <h3 className={styles.emptyTitle}>Loading</h3>
-              <p className={styles.emptyText}>Fetching notifications...</p>
+              <h3 className={styles.emptyTitle}>{t("loading")}</h3>
+              <p className={styles.emptyText}>{t("loadingText")}</p>
             </div>
           ) : error ? (
             <div className={styles.emptyState}>
               <div className={styles.emptyIcon}>{activeTab.icon}</div>
-              <h3 className={styles.emptyTitle}>Unable to load</h3>
+              <h3 className={styles.emptyTitle}>{t("errorTitle")}</h3>
               <p className={styles.emptyText}>{error}</p>
             </div>
           ) : filteredItems.length === 0 ? (
@@ -1341,12 +1194,8 @@ export default function NotificationsOverlay(props: {
                     }
                     handleItemClick(item);
                   }}
-                  role={
-                    item.postId || item.type === "follow" ? "button" : undefined
-                  }
-                  tabIndex={
-                    item.postId || item.type === "follow" ? 0 : undefined
-                  }
+                  role={item.postId || item.type === "follow" ? "button" : undefined}
+                  tabIndex={item.postId || item.type === "follow" ? 0 : undefined}
                   onKeyDown={(event) => {
                     if (!item.postId && item.type !== "follow") return;
                     if (event.key === "Enter" || event.key === " ") {
@@ -1399,7 +1248,7 @@ export default function NotificationsOverlay(props: {
                       data-notification-menu-root={item.id}
                       onClick={(event) => {
                         event.stopPropagation();
-                        setOpenMenuId((prev) => prev === item.id ? null : item.id);
+                        setOpenMenuId((prev) => (prev === item.id ? null : item.id));
                       }}
                       onMouseDown={(event) => event.stopPropagation()}
                     >
@@ -1411,9 +1260,7 @@ export default function NotificationsOverlay(props: {
                       >
                         <IconDots />
                       </button>
-                      {!item.readAt ? (
-                        <span className={styles.itemDot} aria-hidden="true" />
-                      ) : null}
+                      {!item.readAt ? <span className={styles.itemDot} aria-hidden="true" /> : null}
                       {openMenuId === item.id ? (
                         <div className={styles.itemMenu} role="menu">
                           <button
@@ -1425,7 +1272,7 @@ export default function NotificationsOverlay(props: {
                               handleToggleRead(item);
                             }}
                           >
-                            {item.readAt ? "Mark as unread" : "Mark as read"}
+                            {item.readAt ? t("markUnread") : t("markRead")}
                           </button>
                           {canMuteItem(item) ? (
                             <button
@@ -1438,7 +1285,7 @@ export default function NotificationsOverlay(props: {
                                 setOpenMenuId(null);
                               }}
                             >
-                              {item.postKind === "reel" ? "Mute this reel" : "Mute this post"}
+                              {item.postKind === "reel" ? t("muteReel") : t("mutePost")}
                             </button>
                           ) : null}
                           <button
@@ -1450,7 +1297,7 @@ export default function NotificationsOverlay(props: {
                               handleDeleteNotification(item);
                             }}
                           >
-                            Delete notification
+                            {t("deleteNotification")}
                           </button>
                         </div>
                       ) : null}
@@ -1462,6 +1309,7 @@ export default function NotificationsOverlay(props: {
           )}
         </div>
       </aside>
+
       {markAllConfirmOpen && (
         <div
           className={styles.confirmBackdrop}
@@ -1471,7 +1319,7 @@ export default function NotificationsOverlay(props: {
         >
           <div className={styles.confirmCard} onClick={(e) => e.stopPropagation()}>
             <div className={styles.confirmHeader}>
-              <h3 className={styles.confirmTitle}>Mark all as read</h3>
+              <h3 className={styles.confirmTitle}>{t("markAllConfirm.title")}</h3>
               <button
                 type="button"
                 className={styles.confirmClose}
@@ -1483,8 +1331,9 @@ export default function NotificationsOverlay(props: {
               </button>
             </div>
             <p className={styles.confirmBody}>
-              Mark {items.filter((i) => !i.readAt).length} unread notification
-              {items.filter((i) => !i.readAt).length !== 1 ? "s" : ""} as read?
+              {unreadCount === 1
+                ? t("markAllConfirm.body", { count: unreadCount })
+                : t("markAllConfirm.bodyPlural", { count: unreadCount })}
             </p>
             <div className={styles.confirmActions}>
               <button
@@ -1493,7 +1342,7 @@ export default function NotificationsOverlay(props: {
                 onClick={() => setMarkAllConfirmOpen(false)}
                 disabled={markingAllRead}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -1501,7 +1350,7 @@ export default function NotificationsOverlay(props: {
                 onClick={() => void handleMarkAllRead()}
                 disabled={markingAllRead}
               >
-                {markingAllRead ? "Marking..." : "Mark all as read"}
+                {markingAllRead ? t("markAllConfirm.marking") : t("markAllConfirm.confirm")}
               </button>
             </div>
           </div>
@@ -1517,7 +1366,7 @@ export default function NotificationsOverlay(props: {
         >
           <div className={styles.confirmCard} onClick={(e) => e.stopPropagation()}>
             <div className={styles.confirmHeader}>
-              <h3 className={styles.confirmTitle}>Delete notifications</h3>
+              <h3 className={styles.confirmTitle}>{t("deleteConfirm.title")}</h3>
               <button
                 type="button"
                 className={styles.confirmClose}
@@ -1529,8 +1378,9 @@ export default function NotificationsOverlay(props: {
               </button>
             </div>
             <p className={styles.confirmBody}>
-              Delete {selectedIds.size} selected notification
-              {selectedIds.size !== 1 ? "s" : ""}? This action cannot be undone.
+              {selectedIds.size === 1
+                ? t("deleteConfirm.body", { count: selectedIds.size })
+                : t("deleteConfirm.bodyPlural", { count: selectedIds.size })}
             </p>
             <div className={styles.confirmActions}>
               <button
@@ -1539,7 +1389,7 @@ export default function NotificationsOverlay(props: {
                 onClick={() => setDeleteConfirmOpen(false)}
                 disabled={deletingBulk}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -1547,7 +1397,7 @@ export default function NotificationsOverlay(props: {
                 onClick={() => void handleBulkDelete()}
                 disabled={deletingBulk}
               >
-                {deletingBulk ? "Deleting..." : `Delete ${selectedIds.size}`}
+                {deletingBulk ? t("deleteConfirm.deleting") : t("deleteConfirm.confirm", { count: selectedIds.size })}
               </button>
             </div>
           </div>
@@ -1563,7 +1413,7 @@ export default function NotificationsOverlay(props: {
             onClick={(event) => event.stopPropagation()}
           >
             <div className={styles.detailHeader}>
-              <h3 className={styles.detailTitle}>New device sign-in</h3>
+              <h3 className={styles.detailTitle}>{t("loginAlert.title")}</h3>
               <button
                 type="button"
                 className={styles.detailClose}
@@ -1575,24 +1425,20 @@ export default function NotificationsOverlay(props: {
             </div>
             <div className={styles.detailBody}>
               <div className={styles.detailRow}>
-                <span>Device</span>
+                <span>{t("loginAlert.device")}</span>
                 <span>{resolveLoginDeviceName(loginAlertItem)}</span>
               </div>
               <div className={styles.detailRow}>
-                <span>Location</span>
+                <span>{t("loginAlert.location")}</span>
                 <span>
                   {loginAlertItem.location?.trim()
                     ? loginAlertItem.location
-                    : "Unknown location"}
+                    : t("loginAlert.unknownLocation")}
                 </span>
               </div>
               <div className={styles.detailRow}>
-                <span>Time</span>
-                <span>
-                  {formatExactTime(
-                    loginAlertItem.loginAt || loginAlertItem.createdAt,
-                  )}
-                </span>
+                <span>{t("loginAlert.time")}</span>
+                <span>{formatExactTime(loginAlertItem.loginAt || loginAlertItem.createdAt)}</span>
               </div>
             </div>
             <div className={styles.detailActions}>
@@ -1601,19 +1447,20 @@ export default function NotificationsOverlay(props: {
                 className={styles.detailSecondary}
                 onClick={handleConfirmLogin}
               >
-                This was me
+                {t("loginAlert.thisWasMe")}
               </button>
               <button
                 type="button"
                 className={styles.detailDanger}
                 onClick={handleNotMe}
               >
-                This wasn't me
+                {t("loginAlert.thisWasntMe")}
               </button>
             </div>
           </div>
         </div>
       ) : null}
+
       {loginAlertItem && notMeOpen ? (
         <div
           className={styles.notMeBackdrop}
@@ -1626,7 +1473,7 @@ export default function NotificationsOverlay(props: {
             onClick={(event) => event.stopPropagation()}
           >
             <div className={styles.notMeHeader}>
-              <h3 className={styles.notMeTitle}>Secure your account</h3>
+              <h3 className={styles.notMeTitle}>{t("notMe.title")}</h3>
               <button
                 type="button"
                 className={styles.notMeClose}
@@ -1637,12 +1484,8 @@ export default function NotificationsOverlay(props: {
                 <IconClose />
               </button>
             </div>
-            <p className={styles.notMeBody}>
-              If this wasn't you, log out the device and update your password.
-            </p>
-            {notMeError ? (
-              <div className={styles.notMeError}>{notMeError}</div>
-            ) : null}
+            <p className={styles.notMeBody}>{t("notMe.body")}</p>
+            {notMeError ? <div className={styles.notMeError}>{notMeError}</div> : null}
             <div className={styles.notMeActions}>
               <button
                 type="button"
@@ -1650,7 +1493,7 @@ export default function NotificationsOverlay(props: {
                 onClick={handleLogoutSuspiciousDevice}
                 disabled={notMeSubmitting}
               >
-                {notMeSubmitting ? "Logging out..." : "Logout this device"}
+                {notMeSubmitting ? t("notMe.loggingOut") : t("notMe.logout")}
               </button>
               <button
                 type="button"
@@ -1658,22 +1501,24 @@ export default function NotificationsOverlay(props: {
                 onClick={() => {
                   setNotMeOpen(false);
                   setLoginAlertItem(null);
-                  showToast("Opening password settings");
+                  showToast(t("toast.openingPasswordSettings"));
                   router.push("/settings?section=privacy&changePassword=1");
                 }}
                 disabled={notMeSubmitting}
               >
-                Change your password
+                {t("notMe.changePassword")}
               </button>
             </div>
           </div>
         </div>
       ) : null}
+
       {toastMessage ? (
         <div className={styles.toast} role="status" aria-live="polite">
           {toastMessage}
         </div>
       ) : null}
+
       {muteModalOpen && muteTarget ? (
         <div
           className={styles.muteBackdrop}
@@ -1681,16 +1526,12 @@ export default function NotificationsOverlay(props: {
           aria-modal="true"
           onClick={closeMuteModal}
         >
-          <div
-            className={styles.muteCard}
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className={styles.muteCard} onClick={(event) => event.stopPropagation()}>
             <div className={styles.muteHeader}>
               <div>
-                <h3 className={styles.muteTitle}>Mute notifications</h3>
+                <h3 className={styles.muteTitle}>{t("mute.title")}</h3>
                 <p className={styles.muteBody}>
-                  Choose how long to pause alerts for this{" "}
-                  {muteTarget.postKind === "reel" ? "reel" : "post"}.
+                  {muteTarget.postKind === "reel" ? t("mute.bodyReel") : t("mute.bodyPost")}
                 </p>
               </div>
               <button
@@ -1709,9 +1550,7 @@ export default function NotificationsOverlay(props: {
                 <button
                   key={option.key}
                   type="button"
-                  className={`${styles.muteOption} ${
-                    muteOption === option.key ? styles.muteOptionActive : ""
-                  }`}
+                  className={`${styles.muteOption} ${muteOption === option.key ? styles.muteOptionActive : ""}`}
                   onClick={() => setMuteOption(option.key)}
                 >
                   <span className={styles.muteOptionTitle}>{option.label}</span>
@@ -1722,7 +1561,7 @@ export default function NotificationsOverlay(props: {
             {muteOption === "custom" ? (
               <div className={styles.muteCustomRow}>
                 <div className={styles.mutePicker}>
-                  <label className={styles.muteLabel}>Date</label>
+                  <label className={styles.muteLabel}>{t("mute.dateLabel")}</label>
                   <DateSelect
                     value={muteCustomDate}
                     onChange={setMuteCustomDate}
@@ -1732,7 +1571,7 @@ export default function NotificationsOverlay(props: {
                   />
                 </div>
                 <div className={styles.mutePicker}>
-                  <label className={styles.muteLabel}>Time</label>
+                  <label className={styles.muteLabel}>{t("mute.timeLabel")}</label>
                   <TimeSelect
                     value={muteCustomTime}
                     onChange={setMuteCustomTime}
@@ -1745,9 +1584,7 @@ export default function NotificationsOverlay(props: {
               </div>
             ) : null}
 
-            {muteError ? (
-              <div className={styles.muteError}>{muteError}</div>
-            ) : null}
+            {muteError ? <div className={styles.muteError}>{muteError}</div> : null}
 
             <div className={styles.muteActions}>
               <button
@@ -1756,7 +1593,7 @@ export default function NotificationsOverlay(props: {
                 onClick={closeMuteModal}
                 disabled={muteSaving}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -1764,7 +1601,7 @@ export default function NotificationsOverlay(props: {
                 onClick={handleSaveMute}
                 disabled={muteSaving}
               >
-                {muteSaving ? "Saving..." : "Save"}
+                {muteSaving ? t("mute.saving") : t("mute.save")}
               </button>
             </div>
           </div>

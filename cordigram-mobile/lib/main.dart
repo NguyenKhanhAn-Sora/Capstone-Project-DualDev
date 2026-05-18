@@ -5,6 +5,7 @@ import 'core/config/app_config.dart';
 import 'core/config/app_theme.dart';
 import 'core/services/app_shortcut_service.dart';
 import 'core/services/auth_storage.dart';
+import 'core/services/deep_link_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/session_bootstrap.dart';
 import 'core/services/language_controller.dart';
@@ -50,6 +51,7 @@ void main() async {
   // Attach the global call manager so incoming DM calls ring anywhere in
   // the app — not only while the user is inside the matching chat screen.
   await DmCallManager.instance.attach(appNavigatorKey);
+  await DeepLinkService.initialize(appNavigatorKey);
   // Load theme and language BEFORE runApp so the first frame never shows raw keys.
   await ThemeController.instance.load();
   await LanguageController.instance.load();

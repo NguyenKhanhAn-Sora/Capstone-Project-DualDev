@@ -3962,7 +3962,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildAccountEmailSection(),
         const SizedBox(height: 18),
         Text(
-          lc.t('settings.personalInfo'),
+          lc.t('settings.tab.personalInfo'),
           style: TextStyle(
             color: _textPrimary,
             fontSize: 18,

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import styles from "./settings.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -151,14 +151,14 @@ const relativeFormatter = new Intl.RelativeTimeFormat("en", {
   numeric: "auto",
 });
 
-const formatRelativeTime = (value: string | null) => {
+const formatRelativeTime = (value: string | null, lessMinText = "less than a minute") => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const diffMs = date.getTime() - Date.now();
   const past = diffMs < 0;
   const absSec = Math.abs(diffMs) / 1000;
-  if (absSec < 60) return "less than a minute";
+  if (absSec < 60) return lessMinText;
   const minutes = Math.ceil(absSec / 60);
   if (minutes < 60)
     return relativeFormatter.format(past ? -minutes : minutes, "minute");
@@ -428,12 +428,13 @@ const ActivityIcon = ({ type }: { type: ActivityType }) => {
 };
 
 function EyeToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
+  const { t: tEye } = useLanguage();
   return (
     <button
       type="button"
       className={styles.iconButton}
       onClick={onToggle}
-      aria-label={show ? "Hide" : "Show"}
+      aria-label={show ? tEye("settingsPage.common.hide") : tEye("settingsPage.common.show")}
     >
       <svg viewBox="0 0 24 24">
         {show ? (
@@ -457,7 +458,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const tSystem = useTranslations("settings.system");
   const tDevices = useTranslations("settings.devices");
   const [activeKey, setActiveKey] = useState<string>("account");
@@ -745,8 +746,8 @@ export default function SettingsPage() {
             disabled={Boolean(params.submitting) || (params.cooldown ?? 0) > 0}
           >
             {(params.cooldown ?? 0) > 0
-              ? `Resend (${params.cooldown}s)`
-              : "Resend OTP"}
+              ? t("settingsPage.common.resendCooldown", { seconds: params.cooldown ?? 0 })
+              : t("settingsPage.common.resendOtp")}
           </button>
           <button
             type="button"
@@ -755,8 +756,8 @@ export default function SettingsPage() {
             disabled={params.submitting}
           >
             {params.submitting
-              ? "Verifying..."
-              : (params.confirmLabel ?? "Continue")}
+              ? t("settingsPage.common.verifying")
+              : (params.confirmLabel ?? t("settingsPage.common.continue"))}
           </button>
         </div>
       </div>
@@ -935,14 +936,14 @@ export default function SettingsPage() {
       setHiddenPosts(hiddenRes.value.items ?? []);
     } else {
       const apiErr = hiddenRes.reason as ApiError | undefined;
-      setHiddenPostsError(apiErr?.message || "Unable to load hidden posts.");
+      setHiddenPostsError(apiErr?.message || t("settingsPage.content.hidden.errors.loadFailed"));
     }
 
     if (blockedRes.status === "fulfilled") {
       setBlockedUsers(blockedRes.value.items ?? []);
     } else {
       const apiErr = blockedRes.reason as ApiError | undefined;
-      setBlockedUsersError(apiErr?.message || "Unable to load blocked users.");
+      setBlockedUsersError(apiErr?.message || t("settingsPage.content.blocked.errors.loadFailed"));
     }
 
     setHiddenPostsLoading(false);
@@ -951,17 +952,17 @@ export default function SettingsPage() {
 
   const activityFilterOptions = useMemo(
     () => [
-      { key: "all" as const, label: "All" },
-      { key: "post_like" as const, label: "Like post" },
-      { key: "comment_like" as const, label: "Like comment" },
-      { key: "comment" as const, label: "Comment" },
-      { key: "repost" as const, label: "Repost" },
-      { key: "save" as const, label: "Save" },
-      { key: "follow" as const, label: "Follow" },
-      { key: "report_post" as const, label: "Report post/reel" },
-      { key: "report_user" as const, label: "Report user" },
+      { key: "all" as const, label: t("settingsPage.content.activity.filterAll") },
+      { key: "post_like" as const, label: t("settingsPage.content.activity.filterLikePost") },
+      { key: "comment_like" as const, label: t("settingsPage.content.activity.filterLikeComment") },
+      { key: "comment" as const, label: t("settingsPage.content.activity.filterComment") },
+      { key: "repost" as const, label: t("settingsPage.content.activity.filterRepost") },
+      { key: "save" as const, label: t("settingsPage.content.activity.filterSave") },
+      { key: "follow" as const, label: t("settingsPage.content.activity.filterFollow") },
+      { key: "report_post" as const, label: t("settingsPage.content.activity.filterReportPost") },
+      { key: "report_user" as const, label: t("settingsPage.content.activity.filterReportUser") },
     ],
-    [],
+    [t],
   );
 
   const loadActivityLog = useCallback(
@@ -990,7 +991,7 @@ export default function SettingsPage() {
         setActivityCursor(res.nextCursor ?? null);
       } catch (err) {
         const apiErr = err as ApiError | undefined;
-        setActivityError(apiErr?.message || "Unable to load activity log.");
+        setActivityError(apiErr?.message || t("settingsPage.content.activity.errors.loadFailed"));
       } finally {
         if (isReset) setActivityLoading(false);
         else setActivityLoadingMore(false);
@@ -1135,77 +1136,77 @@ export default function SettingsPage() {
 
   const notificationOptions = useMemo(
     () => [
-      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
-      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
-      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
-      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
-      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
-      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
-      { key: "until", label: "Until I turn it back on", ms: null },
-      { key: "custom", label: "Choose date & time", ms: null },
+      { key: "5m", label: t("settingsPage.notifications.muteOptions.5m"), ms: 5 * 60 * 1000 },
+      { key: "10m", label: t("settingsPage.notifications.muteOptions.10m"), ms: 10 * 60 * 1000 },
+      { key: "15m", label: t("settingsPage.notifications.muteOptions.15m"), ms: 15 * 60 * 1000 },
+      { key: "30m", label: t("settingsPage.notifications.muteOptions.30m"), ms: 30 * 60 * 1000 },
+      { key: "1h", label: t("settingsPage.notifications.muteOptions.1h"), ms: 60 * 60 * 1000 },
+      { key: "1d", label: t("settingsPage.notifications.muteOptions.1d"), ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: t("settingsPage.notifications.muteOptions.until"), ms: null },
+      { key: "custom", label: t("settingsPage.notifications.muteOptions.custom"), ms: null },
     ],
-    [],
+    [t],
   );
 
   const notificationCategories = useMemo(
     () => [
       {
         key: "follow" as const,
-        label: "Follows",
-        description: "When someone follows you.",
+        label: t("settingsPage.notifications.categories.follows"),
+        description: t("settingsPage.notifications.categories.followsDesc"),
       },
       {
         key: "comment" as const,
-        label: "Comments",
-        description: "When someone comments on your posts or reels.",
+        label: t("settingsPage.notifications.categories.comments"),
+        description: t("settingsPage.notifications.categories.commentsDesc"),
       },
       {
         key: "like" as const,
-        label: "Likes",
-        description: "When someone likes your posts, reels, or comments.",
+        label: t("settingsPage.notifications.categories.likes"),
+        description: t("settingsPage.notifications.categories.likesDesc"),
       },
       {
         key: "mentions" as const,
-        label: "Mentions & tags",
-        description: "When someone mentions or tags you.",
+        label: t("settingsPage.notifications.categories.mentions"),
+        description: t("settingsPage.notifications.categories.mentionsDesc"),
       },
       {
         key: "system" as const,
-        label: "System notifications",
-        description: "Important announcements and system updates.",
+        label: t("settingsPage.notifications.categories.system"),
+        description: t("settingsPage.notifications.categories.systemDesc"),
       },
     ],
-    [],
+    [t],
   );
 
   const notificationStatusLabel = useMemo(() => {
     if (!notificationSettings) return "";
-    if (notificationSettings.enabled) return "Enabled";
+    if (notificationSettings.enabled) return t("settingsPage.notifications.statusEnabled");
     if (notificationSettings.mutedIndefinitely)
-      return "Muted until you turn it back on";
+      return t("settingsPage.notifications.statusMutedForever");
     if (notificationSettings.mutedUntil) {
-      return `Muted ${formatDistanceToNow(
+      return `${t("settingsPage.notifications.statusMuted")} ${formatDistanceToNow(
         new Date(notificationSettings.mutedUntil),
         { addSuffix: true },
       )}`;
     }
-    return "Muted";
-  }, [notificationSettings]);
+    return t("settingsPage.notifications.statusMuted");
+  }, [notificationSettings, t]);
 
   const getCategoryStatusLabel = useCallback(
     (key: NotificationCategoryKey) => {
       const settings = notificationSettings?.categories?.[key];
-      if (!settings) return "Enabled";
-      if (settings.enabled) return "Enabled";
-      if (settings.mutedIndefinitely) return "Muted until you turn it back on";
+      if (!settings) return t("settingsPage.notifications.statusEnabled");
+      if (settings.enabled) return t("settingsPage.notifications.statusEnabled");
+      if (settings.mutedIndefinitely) return t("settingsPage.notifications.statusMutedForever");
       if (settings.mutedUntil) {
-        return `Muted ${formatDistanceToNow(new Date(settings.mutedUntil), {
+        return `${t("settingsPage.notifications.statusMuted")} ${formatDistanceToNow(new Date(settings.mutedUntil), {
           addSuffix: true,
         })}`;
       }
-      return "Muted";
+      return t("settingsPage.notifications.statusMuted");
     },
-    [notificationSettings?.categories],
+    [notificationSettings?.categories, t],
   );
 
   const handleUnhidePost = async (postId?: string) => {
@@ -1367,13 +1368,13 @@ export default function SettingsPage() {
           notificationCustomTime,
         );
         if (!iso) {
-          setNotificationCustomError("Please select a valid date and time.");
+          setNotificationCustomError(t("settingsPage.notifications.overlay.invalidDateTime"));
           setNotificationSaving(false);
           return;
         }
         const dt = new Date(iso);
         if (dt.getTime() <= Date.now()) {
-          setNotificationCustomError("Please choose a future time.");
+          setNotificationCustomError(t("settingsPage.notifications.overlay.futureTimeRequired"));
           setNotificationSaving(false);
           return;
         }
@@ -1423,13 +1424,13 @@ export default function SettingsPage() {
           categoryCustomTime,
         );
         if (!iso) {
-          setCategoryCustomError("Please select a valid date and time.");
+          setCategoryCustomError(t("settingsPage.notifications.overlay.invalidDateTime"));
           setCategorySaving(false);
           return;
         }
         const dt = new Date(iso);
         if (dt.getTime() <= Date.now()) {
-          setCategoryCustomError("Please choose a future time.");
+          setCategoryCustomError(t("settingsPage.notifications.overlay.futureTimeRequired"));
           setCategorySaving(false);
           return;
         }
@@ -1522,21 +1523,21 @@ export default function SettingsPage() {
     label: string;
   }> = useMemo(
     () => [
-      { value: "public", label: "Public" },
-      { value: "followers", label: "Followers" },
-      { value: "private", label: "Private" },
+      { value: "public", label: t("settingsPage.profileVisibility.visibility.public") },
+      { value: "followers", label: t("settingsPage.profileVisibility.visibility.followers") },
+      { value: "private", label: t("settingsPage.profileVisibility.visibility.private") },
     ],
-    [],
+    [t],
   );
 
   const visibilityLabelMap = useMemo(
     () =>
       ({
-        public: "Public",
-        followers: "Followers",
-        private: "Private",
+        public: t("settingsPage.profileVisibility.visibility.public"),
+        followers: t("settingsPage.profileVisibility.visibility.followers"),
+        private: t("settingsPage.profileVisibility.visibility.private"),
       }) satisfies Record<ProfileFieldVisibility, string>,
-    [],
+    [t],
   );
 
   const getVisibilityLabel = (value?: ProfileFieldVisibility) =>
@@ -1676,7 +1677,7 @@ export default function SettingsPage() {
         >
           <span>{getVisibilityLabel(selectedValue)}</span>
           <span className={styles.visibilityCaret} aria-hidden>
-            ▾
+            â–¾
           </span>
         </button>
         {isOpen ? (
@@ -1700,7 +1701,7 @@ export default function SettingsPage() {
                   <span>{option.label}</span>
                   {active ? (
                     <span className={styles.visibilityCheck} aria-hidden>
-                      ✓
+                      âœ“
                     </span>
                   ) : null}
                 </button>
@@ -1883,7 +1884,7 @@ export default function SettingsPage() {
     if (isCurrent) return null;
     if (device.isActive) return null;
     const value = device.lastSeenAt ?? device.firstSeenAt ?? null;
-    return value ? tDevices("lastActive", { time: formatRelativeTime(value) }) : null;
+    return value ? tDevices("lastActive", { time: formatRelativeTime(value, t("settingsPage.common.lessMin")) }) : null;
   };
 
   const hasOtherLoginDevices = Boolean(
@@ -2493,8 +2494,8 @@ export default function SettingsPage() {
       <div className={styles.card}>
         <header className={styles.header}>
           <div>
-            <p className={styles.kicker}>Settings</p>
-            <h1 className={styles.title}>Account & preferences</h1>
+            <p className={styles.kicker}>{t("settingsPage.title")}</p>
+            <h1 className={styles.title}>{t("settingsPage.subtitle")}</h1>
           </div>
         </header>
 
@@ -2513,7 +2514,7 @@ export default function SettingsPage() {
                     <span className={styles.itemIcon} aria-hidden="true">
                       {section.icon}
                     </span>
-                    <span className={styles.itemLabel}>{section.label}</span>
+                    <span className={styles.itemLabel}>{t(`settingsPage.nav.${section.key}`)}</span>
                   </button>
                 </li>
               ))}
@@ -2524,9 +2525,9 @@ export default function SettingsPage() {
             {activeKey === "account" ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Account email</h2>
+                  <h2 className={styles.sectionTitle}>{t("settingsPage.account.title")}</h2>
                   <p className={styles.sectionDesc}>
-                    Manage your sign-in email and verification steps.
+                    {t("settingsPage.account.desc")}
                   </p>
                 </div>
 
@@ -2534,9 +2535,9 @@ export default function SettingsPage() {
                   <div className={styles.sectionCard}>
                     <div className={styles.emailCard}>
                       <div>
-                        <p className={styles.hint}>Current email</p>
+                        <p className={styles.hint}>{t("settingsPage.account.currentEmailLabel")}</p>
                         <p className={styles.emailValue}>
-                          {currentEmail ?? "Loading..."}
+                          {currentEmail ?? t("settingsPage.common.loading")}
                         </p>
                       </div>
                       <button
@@ -2544,7 +2545,7 @@ export default function SettingsPage() {
                         className={styles.primary}
                         onClick={openChangeEmail}
                       >
-                        Change email
+                        {t("settingsPage.account.changeEmail")}
                       </button>
                     </div>
                   </div>
@@ -2561,18 +2562,18 @@ export default function SettingsPage() {
                             <path d="M15 5L8 12l7 7" />
                           </svg>
                         </span>
-                        Back
+                        {t("settingsPage.common.back")}
                       </button>
                       <span className={styles.stepBadge}>
                         {step === "password"
-                          ? "Step 1 · Verify password"
+                          ? t("settingsPage.account.steps.step1Password")
                           : step === "current-otp"
-                            ? hasPassword ? "Step 2 · Current email OTP" : "Step 1 · Current email OTP"
+                            ? hasPassword ? t("settingsPage.account.steps.step2CurrentOtp") : t("settingsPage.account.steps.step1CurrentOtp")
                             : step === "new-email"
-                              ? hasPassword ? "Step 3 · Enter new email" : "Step 2 · Enter new email"
+                              ? hasPassword ? t("settingsPage.account.steps.step3NewEmail") : t("settingsPage.account.steps.step2NewEmail")
                               : step === "new-otp"
-                                ? hasPassword ? "Step 4 · New email OTP" : "Step 3 · New email OTP"
-                                : "Completed"}
+                                ? hasPassword ? t("settingsPage.account.steps.step4NewOtp") : t("settingsPage.account.steps.step3NewOtp")
+                                : t("settingsPage.account.steps.completed")}
                       </span>
                     </div>
 
@@ -2580,13 +2581,13 @@ export default function SettingsPage() {
                       <div className={styles.stepContent} key="password">
                         <div className={styles.form}>
                           <label className={styles.label}>
-                            Current password
+                            {t("settingsPage.account.passwordLabel")}
                             <div className={styles.inputGroup}>
                               <input
                                 className={`${styles.input} ${styles.inputWithIcon}`}
                                 type={showEmailPassword ? "text" : "password"}
                                 autoComplete="current-password"
-                                placeholder="Enter your password"
+                                placeholder={t("settingsPage.account.passwordPlaceholder")}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                               />
@@ -2597,7 +2598,7 @@ export default function SettingsPage() {
                             </div>
                           </label>
                           <p className={styles.hint}>
-                            We’ll send a 6-digit OTP to your current email.
+                            {t("settingsPage.account.sendCurrentOtpHint")}
                           </p>
                           {error ? (
                             <p className={styles.error}>{error}</p>
@@ -2609,7 +2610,7 @@ export default function SettingsPage() {
                               onClick={handleRequestCurrentOtp}
                               disabled={submitting}
                             >
-                              {submitting ? "Sending..." : "Send OTP"}
+                              {submitting ? t("settingsPage.common.sending") : t("settingsPage.common.sendOtp")}
                             </button>
                           </div>
                         </div>
@@ -2620,7 +2621,7 @@ export default function SettingsPage() {
                       <div className={styles.stepContent} key="current-otp">
                         <div className={styles.form}>
                           <label className={styles.label}>
-                            Enter OTP from current email
+                            {t("settingsPage.account.currentOtpLabel")}
                             <input
                               className={`${styles.input} ${styles.otpInput}`}
                               type="text"
@@ -2635,7 +2636,7 @@ export default function SettingsPage() {
                           </label>
                           <div className={styles.otpRow}>
                             <p className={styles.hint}>
-                              OTP expires in 5 minutes.
+                                {t("settingsPage.account.otpExpiresHint")}
                             </p>
                           </div>
                           {error ? (
@@ -2649,8 +2650,8 @@ export default function SettingsPage() {
                               disabled={submitting || currentCooldown > 0}
                             >
                               {currentCooldown > 0
-                                ? `Resend (${currentCooldown}s)`
-                                : "Resend OTP"}
+                                ? t("settingsPage.common.resendCooldown", { seconds: currentCooldown })
+                                : t("settingsPage.common.resendOtp")}
                             </button>
                             <button
                               type="button"
@@ -2658,7 +2659,7 @@ export default function SettingsPage() {
                               onClick={handleVerifyCurrentOtp}
                               disabled={submitting}
                             >
-                              {submitting ? "Verifying..." : "Verify"}
+                              {submitting ? t("settingsPage.common.verifying") : t("settingsPage.common.verify")}
                             </button>
                           </div>
                         </div>
@@ -2669,21 +2670,20 @@ export default function SettingsPage() {
                       <div className={styles.stepContent} key="new-email">
                         <div className={styles.form}>
                           <label className={styles.label}>
-                            New email
+                            {t("settingsPage.account.newEmailLabel")}
                             <input
                               className={styles.input}
                               type="email"
-                              placeholder="name@example.com"
+                              placeholder={t("settingsPage.account.newEmailPlaceholder")}
                               value={newEmail}
                               onChange={(e) => setNewEmail(e.target.value)}
                             />
                           </label>
                           <p className={styles.hint}>
-                            We’ll send a 6-digit OTP to the new email.
+                            {t("settingsPage.account.sendNewOtpHint")}
                           </p>
                           <p className={styles.hint}>
-                            After this change, your old email will be removed
-                            and you’ll sign in using the new email only.
+                            {t("settingsPage.account.newEmailWarning")}
                           </p>
                           {error ? (
                             <p className={styles.error}>{error}</p>
@@ -2695,7 +2695,7 @@ export default function SettingsPage() {
                               onClick={handleRequestNewOtp}
                               disabled={submitting}
                             >
-                              {submitting ? "Sending..." : "Send OTP"}
+                              {submitting ? t("settingsPage.common.sending") : t("settingsPage.common.sendOtp")}
                             </button>
                           </div>
                         </div>
@@ -2706,7 +2706,7 @@ export default function SettingsPage() {
                       <div className={styles.stepContent} key="new-otp">
                         <div className={styles.form}>
                           <label className={styles.label}>
-                            OTP for new email
+                            {t("settingsPage.account.newOtpLabel")}
                             <input
                               className={`${styles.input} ${styles.otpInput}`}
                               type="text"
@@ -2721,7 +2721,7 @@ export default function SettingsPage() {
                           </label>
                           <div className={styles.otpRow}>
                             <p className={styles.hint}>
-                              OTP expires in 5 minutes.
+                                {t("settingsPage.account.otpExpiresHint")}
                             </p>
                           </div>
                           {error ? (
@@ -2738,8 +2738,8 @@ export default function SettingsPage() {
                               disabled={submitting || newCooldown > 0}
                             >
                               {newCooldown > 0
-                                ? `Resend (${newCooldown}s)`
-                                : "Resend OTP"}
+                                ? t("settingsPage.common.resendCooldown", { seconds: newCooldown })
+                                : t("settingsPage.common.resendOtp")}
                             </button>
                             <button
                               type="button"
@@ -2747,7 +2747,7 @@ export default function SettingsPage() {
                               onClick={handleVerifyNewOtp}
                               disabled={submitting}
                             >
-                              {submitting ? "Verifying..." : "Confirm"}
+                              {submitting ? t("settingsPage.common.verifying") : t("settingsPage.common.confirm")}
                             </button>
                           </div>
                         </div>
@@ -2757,7 +2757,7 @@ export default function SettingsPage() {
                     {step === "done" ? (
                       <div className={styles.stepContent} key="done">
                         <div className={styles.successBox}>
-                          {success ?? "Email updated successfully."}
+                          {success ?? t("settingsPage.account.emailUpdatedSuccess")}
                         </div>
                       </div>
                     ) : null}
@@ -2766,16 +2766,16 @@ export default function SettingsPage() {
 
                 <div className={styles.sectionRowHeader}>
                   <div>
-                    <h3 className={styles.sectionTitle}>Personal info</h3>
+                    <h3 className={styles.sectionTitle}>{t("settingsPage.personalInfo.title")}</h3>
                     <p className={styles.sectionDesc}>
-                      Details shown on your profile.
+                      {t("settingsPage.personalInfo.desc")}
                     </p>
                   </div>
                 </div>
 
                 <div className={styles.sectionCard}>
                   {profileLoading ? (
-                    <p className={styles.hint}>Loading personal info...</p>
+                    <p className={styles.hint}>{t("settingsPage.personalInfo.loading")}</p>
                   ) : null}
                   {profileError ? (
                     <p className={styles.error}>{profileError}</p>
@@ -2784,25 +2784,25 @@ export default function SettingsPage() {
                   <ul className={styles.infoList}>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Display name</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.personalInfo.displayName")}</p>
                         <p className={styles.infoValue}>
-                          {profileDetail?.displayName || "Not set"}
+                          {profileDetail?.displayName || t("settingsPage.common.notSet")}
                         </p>
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Username</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.personalInfo.username")}</p>
                         <p className={styles.infoValue}>
-                          @{profileDetail?.username || "Not set"}
+                          @{profileDetail?.username || t("settingsPage.common.notSet")}
                         </p>
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Birthdate</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.personalInfo.birthdate")}</p>
                         <p className={styles.infoValue}>
-                          {profileDetail?.birthdate || "Not set"}
+                          {profileDetail?.birthdate || t("settingsPage.common.notSet")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2810,15 +2810,15 @@ export default function SettingsPage() {
                           "birthdate",
                           profileDetail?.visibility?.birthdate,
                           !profileDetail || visibilitySaving.birthdate,
-                          "Birthdate visibility",
+                          t("settingsPage.personalInfo.birthdateVisibility"),
                         )}
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Gender</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.personalInfo.gender")}</p>
                         <p className={styles.infoValue}>
-                          {profileDetail?.gender || "Not set"}
+                          {profileDetail?.gender || t("settingsPage.common.notSet")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2826,15 +2826,15 @@ export default function SettingsPage() {
                           "gender",
                           profileDetail?.visibility?.gender,
                           !profileDetail || visibilitySaving.gender,
-                          "Gender visibility",
+                          t("settingsPage.personalInfo.genderVisibility"),
                         )}
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Location</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.personalInfo.location")}</p>
                         <p className={styles.infoValue}>
-                          {profileDetail?.location || "Not set"}
+                          {profileDetail?.location || t("settingsPage.common.notSet")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2842,15 +2842,15 @@ export default function SettingsPage() {
                           "location",
                           profileDetail?.visibility?.location,
                           !profileDetail || visibilitySaving.location,
-                          "Location visibility",
+                          t("settingsPage.personalInfo.locationVisibility"),
                         )}
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Workplace</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.personalInfo.workplace")}</p>
                         <p className={styles.infoValue}>
-                          {profileDetail?.workplace?.companyName || "Not set"}
+                          {profileDetail?.workplace?.companyName || t("settingsPage.common.notSet")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2858,15 +2858,15 @@ export default function SettingsPage() {
                           "workplace",
                           profileDetail?.visibility?.workplace,
                           !profileDetail || visibilitySaving.workplace,
-                          "Workplace visibility",
+                          t("settingsPage.personalInfo.workplaceVisibility"),
                         )}
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Bio</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.personalInfo.bio")}</p>
                         <p className={styles.infoValue}>
-                          {profileDetail?.bio || "Not set"}
+                          {profileDetail?.bio || t("settingsPage.common.notSet")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2874,7 +2874,7 @@ export default function SettingsPage() {
                           "bio",
                           profileDetail?.visibility?.bio,
                           !profileDetail || visibilitySaving.bio,
-                          "Bio visibility",
+                          t("settingsPage.personalInfo.bioVisibility"),
                         )}
                       </div>
                     </li>
@@ -2891,7 +2891,7 @@ export default function SettingsPage() {
                       onClick={() => setEditProfileOpen(true)}
                       disabled={!profileDetail}
                     >
-                      Edit profile
+                      {t("settingsPage.personalInfo.editProfile")}
                     </button>
                   </div>
                 </div>
@@ -2899,10 +2899,9 @@ export default function SettingsPage() {
             ) : activeKey === "profile" ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Profile visibility</h2>
+                  <h2 className={styles.sectionTitle}>{t("settingsPage.profileVisibility.title")}</h2>
                   <p className={styles.sectionDesc}>
-                    Control who can view your profile, About section, and
-                    follower lists.
+                    {t("settingsPage.profileVisibility.desc")}
                   </p>
                 </div>
 
@@ -2910,9 +2909,9 @@ export default function SettingsPage() {
                   <ul className={styles.infoList}>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Profile page</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.profileVisibility.profilePage")}</p>
                         <p className={styles.infoValue}>
-                          Who can view your profile page and tabs.
+                          {t("settingsPage.profileVisibility.profilePageDesc")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2920,15 +2919,15 @@ export default function SettingsPage() {
                           "profile",
                           profileDetail?.visibility?.profile,
                           !profileDetail || visibilitySaving.profile,
-                          "Profile visibility",
+                          t("settingsPage.profileVisibility.profileVisibilityAria"),
                         )}
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>About this user</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.profileVisibility.aboutUser")}</p>
                         <p className={styles.infoValue}>
-                          Who can open the About overlay on your profile.
+                          {t("settingsPage.profileVisibility.aboutUserDesc")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2936,15 +2935,15 @@ export default function SettingsPage() {
                           "about",
                           profileDetail?.visibility?.about,
                           !profileDetail || visibilitySaving.about,
-                          "About visibility",
+                          t("settingsPage.profileVisibility.aboutVisibilityAria"),
                         )}
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Followers list</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.profileVisibility.followersList")}</p>
                         <p className={styles.infoValue}>
-                          Who can view your followers list.
+                          {t("settingsPage.profileVisibility.followersListDesc")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2952,15 +2951,15 @@ export default function SettingsPage() {
                           "followers",
                           profileDetail?.visibility?.followers,
                           !profileDetail || visibilitySaving.followers,
-                          "Followers list visibility",
+                          t("settingsPage.profileVisibility.followersVisibilityAria"),
                         )}
                       </div>
                     </li>
                     <li className={styles.infoItem}>
                       <div className={styles.infoText}>
-                        <p className={styles.infoTitle}>Following list</p>
+                        <p className={styles.infoTitle}>{t("settingsPage.profileVisibility.followingList")}</p>
                         <p className={styles.infoValue}>
-                          Who can view the accounts you follow.
+                          {t("settingsPage.profileVisibility.followingListDesc")}
                         </p>
                       </div>
                       <div className={styles.infoAction}>
@@ -2968,7 +2967,7 @@ export default function SettingsPage() {
                           "following",
                           profileDetail?.visibility?.following,
                           !profileDetail || visibilitySaving.following,
-                          "Following list visibility",
+                          t("settingsPage.profileVisibility.followingVisibilityAria"),
                         )}
                       </div>
                     </li>
@@ -2982,16 +2981,15 @@ export default function SettingsPage() {
             ) : activeKey === "verification" ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Creator verification</h2>
+                  <h2 className={styles.sectionTitle}>{t("settingsPage.verification.title")}</h2>
                   <p className={styles.sectionDesc}>
-                    Apply for the blue creator badge and unlock creator
-                    privileges once your account meets quality requirements.
+                    {t("settingsPage.verification.desc")}
                   </p>
                 </div>
 
                 <div className={styles.sectionCard}>
                   {creatorLoading ? (
-                    <p className={styles.hint}>Loading creator eligibility...</p>
+                    <p className={styles.hint}>{t("settingsPage.verification.loading")}</p>
                   ) : null}
 
                   {creatorStatus ? (
@@ -3001,7 +2999,7 @@ export default function SettingsPage() {
                           {creatorStatus.latestRequest ? (
                             <div className={styles.creatorLatestCard}>
                               <div className={styles.creatorLatestHeader}>
-                                <p className={styles.infoTitle}>Latest request</p>
+                                <p className={styles.infoTitle}>{t("settingsPage.verification.latestRequest")}</p>
                                 <span
                                   className={`${styles.creatorStatusPill} ${
                                     styles[
@@ -3017,9 +3015,7 @@ export default function SettingsPage() {
                               {creatorStatus.latestRequest.createdAt ? (
                                 <p className={styles.hint}>
                                   Submitted {" "}
-                                  {formatRelativeTime(
-                                    creatorStatus.latestRequest.createdAt,
-                                  )}
+                                  {formatRelativeTime(creatorStatus.latestRequest.createdAt, t("settingsPage.common.lessMin"))}
                                 </p>
                               ) : null}
                               {creatorStatus.latestRequest.reviewedAt ? (
@@ -3027,102 +3023,98 @@ export default function SettingsPage() {
                                   Reviewed {" "}
                                   {formatRelativeTime(
                                     creatorStatus.latestRequest.reviewedAt,
+                                    t("settingsPage.common.lessMin"),
                                   )}
                                 </p>
                               ) : null}
                             </div>
                           ) : null}
                           <div className={styles.creatorVerifiedNotice}>
-                            Your account is creator verified.
+                            {t("settingsPage.verification.alreadyVerified")}
                           </div>
                         </div>
                       ) : (
                         <>
                           <div className={styles.verificationScoreCard}>
-                            <p className={styles.infoTitle}>Creator score</p>
+                            <p className={styles.infoTitle}>{t("settingsPage.verification.creatorScore")}</p>
                             <p className={styles.verificationScoreValue}>
                               {creatorStatus.eligibility.score} /{" "}
                               {creatorStatus.eligibility.minimumScore}
-                            </p>
-                            <p className={styles.hint}>
-                              {creatorStatus.eligibility.eligible
-                                ? "Your account currently meets all conditions."
-                                : "Improve the missing conditions below to become eligible."}
                             </p>
                           </div>
 
                           <ul className={styles.infoList}>
                             <li className={styles.infoItem}>
                               <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>Account age</p>
+                                <p className={styles.infoTitle}>{t("settingsPage.verification.accountAge")}</p>
                                 <p className={styles.infoValue}>
                                   {creatorStatus.eligibility.accountAgeDays} days
                                 </p>
                               </div>
                               <p className={styles.hint}>
-                                Minimum {creatorStatus.criteria.minAccountAgeDays} days
+                                {t("settingsPage.verification.minDays", { value: creatorStatus.criteria.minAccountAgeDays })}
                               </p>
                             </li>
                             <li className={styles.infoItem}>
                               <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>Followers</p>
+                                <p className={styles.infoTitle}>{t("settingsPage.verification.followers")}</p>
                                 <p className={styles.infoValue}>
                                   {creatorStatus.eligibility.followersCount}
                                 </p>
                               </div>
                               <p className={styles.hint}>
-                                Minimum {creatorStatus.criteria.minFollowersCount}
+                                {t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minFollowersCount })}
                               </p>
                             </li>
                             <li className={styles.infoItem}>
                               <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>Published posts</p>
+                                <p className={styles.infoTitle}>{t("settingsPage.verification.publishedPosts")}</p>
                                 <p className={styles.infoValue}>
                                   {creatorStatus.eligibility.postsCount}
                                 </p>
                               </div>
                               <p className={styles.hint}>
-                                Minimum {creatorStatus.criteria.minPostsCount}
+                                {t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minPostsCount })}
                               </p>
                             </li>
                             <li className={styles.infoItem}>
                               <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>Active posting days (30d)</p>
+                                <p className={styles.infoTitle}>{t("settingsPage.verification.activeDays")}</p>
                                 <p className={styles.infoValue}>
                                   {creatorStatus.eligibility.activePostingDays30d}
                                 </p>
                               </div>
                               <p className={styles.hint}>
-                                Minimum {creatorStatus.criteria.minActivePostingDays30d}
+                                {t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minActivePostingDays30d })}
                               </p>
                             </li>
                             <li className={styles.infoItem}>
                               <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>Avg engagement/post (30d)</p>
+                                <p className={styles.infoTitle}>{t("settingsPage.verification.avgEngagement")}</p>
                                 <p className={styles.infoValue}>
                                   {creatorStatus.eligibility.engagementPerPost30d}
                                 </p>
                               </div>
                               <p className={styles.hint}>
-                                Minimum {creatorStatus.criteria.minEngagementPerPost30d}
+                                {t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minEngagementPerPost30d })}
                               </p>
                             </li>
                             <li className={styles.infoItem}>
                               <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>Recent violations (90d)</p>
+                                <p className={styles.infoTitle}>{t("settingsPage.verification.recentViolations")}</p>
                                 <p className={styles.infoValue}>
                                   {creatorStatus.eligibility.recentViolations90d}
                                 </p>
                               </div>
                               <p className={styles.hint}>
-                                Maximum {creatorStatus.criteria.maxRecentViolations90d}
+                                {t("settingsPage.verification.maximum", { value: creatorStatus.criteria.maxRecentViolations90d })}
                               </p>
                             </li>
                           </ul>
 
                           {creatorStatus.eligibility.failedRequirements.length ? (
                             <p className={styles.error}>
-                              Missing requirements: {" "}
+                              {t("settingsPage.verification.missingReqs")}: {" "}
                               {creatorStatus.eligibility.failedRequirements
                                 .map(formatRequirementLabel)
                                 .join(", ")}
@@ -3131,16 +3123,14 @@ export default function SettingsPage() {
 
                           {creatorStatus.latestRequest ? (
                             <div className={styles.verificationStatusCard}>
-                              <p className={styles.infoTitle}>Latest request</p>
+                              <p className={styles.infoTitle}>{t("settingsPage.verification.latestRequest")}</p>
                               <p className={styles.infoValue}>
-                                Status: {creatorStatus.latestRequest.status}
+                                {t("settingsPage.verification.statusLabel", { value: creatorStatus.latestRequest.status })}
                               </p>
                               {creatorStatus.latestRequest.createdAt ? (
                                 <p className={styles.hint}>
                                   Submitted {" "}
-                                  {formatRelativeTime(
-                                    creatorStatus.latestRequest.createdAt,
-                                  )}
+                                  {formatRelativeTime(creatorStatus.latestRequest.createdAt, t("settingsPage.common.lessMin"))}
                                 </p>
                               ) : null}
                               {creatorStatus.latestRequest.reviewedAt ? (
@@ -3148,6 +3138,7 @@ export default function SettingsPage() {
                                   Reviewed {" "}
                                   {formatRelativeTime(
                                     creatorStatus.latestRequest.reviewedAt,
+                                    t("settingsPage.common.lessMin"),
                                   )}
                                 </p>
                               ) : null}
@@ -3161,6 +3152,7 @@ export default function SettingsPage() {
                                   You can request again {" "}
                                   {formatRelativeTime(
                                     creatorStatus.latestRequest.cooldownUntil,
+                                    t("settingsPage.common.lessMin"),
                                   )}
                                 </p>
                               ) : null}
@@ -3193,7 +3185,7 @@ export default function SettingsPage() {
                               onClick={loadCreatorVerificationStatus}
                               disabled={creatorLoading || creatorSubmitting}
                             >
-                              Refresh status
+                              {t("settingsPage.verification.refreshStatus")}
                             </button>
                             <button
                               type="button"
@@ -3206,8 +3198,8 @@ export default function SettingsPage() {
                               }
                             >
                               {creatorSubmitting
-                                ? "Submitting..."
-                                : "Request creator verification"}
+                                ? t("settingsPage.common.submitting")
+                                : t("settingsPage.verification.submit")}
                             </button>
                           </div>
                         </div>
@@ -3224,9 +3216,9 @@ export default function SettingsPage() {
             ) : activeKey === "privacy" ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Password & Security</h2>
+                  <h2 className={styles.sectionTitle}>{t("settingsPage.privacy.title")}</h2>
                   <p className={styles.sectionDesc}>
-                    Manage your login protection and password updates.
+                    {t("settingsPage.privacy.desc")}
                   </p>
                 </div>
 
@@ -3235,14 +3227,14 @@ export default function SettingsPage() {
                     <div className={styles.sectionRowHeader}>
                       <div>
                         <h3 className={styles.sectionTitleSmall}>
-                          Change password
+                          {t("settingsPage.privacy.password.changePassword")}
                         </h3>
                         <p className={styles.sectionDesc}>
                           {passwordStatusLoading
-                            ? "Loading last password change..."
+                            ? t("settingsPage.common.loading")
                             : passwordChangedAt
-                              ? `Last changed ${formatRelativeTime(passwordChangedAt)}.`
-                              : "Password has not been changed yet."}
+                              ? `Last changed ${formatRelativeTime(passwordChangedAt, t("settingsPage.common.lessMin"))}.`
+                              : ""}
                         </p>
                       </div>
                       <button
@@ -3250,7 +3242,7 @@ export default function SettingsPage() {
                         className={styles.primary}
                         onClick={openChangePassword}
                       >
-                        Change password
+                        {t("settingsPage.privacy.password.changePassword")}
                       </button>
                     </div>
                   ) : (
@@ -3266,23 +3258,23 @@ export default function SettingsPage() {
                               <path d="M15 5L8 12l7 7" />
                             </svg>
                           </span>
-                          Back
+                          {t("settingsPage.common.back")}
                         </button>
                         <span className={styles.stepBadge}>
                           {passwordStep === "otp"
-                            ? "Step 1 · Email OTP"
+                            ? t("settingsPage.privacy.password.steps.step1Otp")
                             : passwordStep === "form"
-                              ? hasPassword ? "Step 2 · Change password" : "Step 2 · Set password"
-                              : "Completed"}
+                              ? hasPassword ? t("settingsPage.privacy.password.steps.step2Change") : t("settingsPage.privacy.password.steps.step2Set")
+                              : t("settingsPage.privacy.password.steps.completed")}
                         </span>
                       </div>
 
                       {passwordStep === "otp"
                         ? renderOtpStep({
-                            label: "OTP for password change",
+                            label: t("settingsPage.privacy.password.otpLabel"),
                             value: passwordOtp,
                             onChange: setPasswordOtp,
-                            hint: "We sent a 6-digit code to your email.",
+                            hint: t("settingsPage.privacy.password.otpHint"),
                             expiresSec: passwordExpiresSec,
                             error: passwordError,
                             submitting: passwordSubmitting,
@@ -3297,13 +3289,13 @@ export default function SettingsPage() {
                           <div className={styles.form}>
                             {hasPassword ? (
                               <label className={styles.label}>
-                                Current password
+                                {t("settingsPage.privacy.password.currentPasswordLabel")}
                                 <div className={styles.inputGroup}>
                                   <input
                                     className={`${styles.input} ${styles.inputWithIcon}`}
                                     type={showPasswordCurrent ? "text" : "password"}
                                     autoComplete="current-password"
-                                    placeholder="Enter current password"
+                                    placeholder={t("settingsPage.privacy.password.currentPasswordPlaceholder")}
                                     value={passwordCurrent}
                                     onChange={(e) =>
                                       setPasswordCurrent(e.target.value)
@@ -3317,13 +3309,13 @@ export default function SettingsPage() {
                               </label>
                             ) : null}
                             <label className={styles.label}>
-                              New password
+                              {t("settingsPage.privacy.password.newPasswordLabel")}
                               <div className={styles.inputGroup}>
                                 <input
                                   className={`${styles.input} ${styles.inputWithIcon}`}
                                   type={showPasswordNew ? "text" : "password"}
                                   autoComplete="new-password"
-                                  placeholder="Create a new password"
+                                  placeholder={t("settingsPage.privacy.password.newPasswordPlaceholder")}
                                   value={passwordNew}
                                   onChange={(e) => setPasswordNew(e.target.value)}
                                 />
@@ -3334,13 +3326,13 @@ export default function SettingsPage() {
                               </div>
                             </label>
                             <label className={styles.label}>
-                              Confirm new password
+                              {t("settingsPage.privacy.password.confirmPasswordLabel")}
                               <div className={styles.inputGroup}>
                                 <input
                                   className={`${styles.input} ${styles.inputWithIcon}`}
                                   type={showPasswordConfirm ? "text" : "password"}
                                   autoComplete="new-password"
-                                  placeholder="Re-enter new password"
+                                  placeholder={t("settingsPage.privacy.password.confirmPasswordPlaceholder")}
                                   value={passwordConfirm}
                                   onChange={(e) =>
                                     setPasswordConfirm(e.target.value)
@@ -3353,8 +3345,7 @@ export default function SettingsPage() {
                               </div>
                             </label>
                             <p className={styles.hint}>
-                              Password must be at least 8 characters and include
-                              uppercase, lowercase, and a number.
+                              {t("settingsPage.privacy.password.requirement")}
                             </p>
                             {passwordError ? (
                               <p className={styles.error}>{passwordError}</p>
@@ -3367,8 +3358,8 @@ export default function SettingsPage() {
                                 disabled={passwordSubmitting}
                               >
                                 {passwordSubmitting
-                                  ? "Updating..."
-                                  : "Change password"}
+                                  ? t("settingsPage.common.updating")
+                                  : t("settingsPage.privacy.password.changePassword")}
                               </button>
                             </div>
                           </div>
@@ -3379,12 +3370,12 @@ export default function SettingsPage() {
                         <div className={styles.stepContent} key="pw-done">
                           <div className={styles.successBox}>
                             {passwordSuccess ??
-                              "Password updated successfully."}
+                              t("settingsPage.privacy.password.updated")}
                           </div>
                           {passwordLogoutPrompt ? (
                             <div className={styles.form}>
                               <p className={styles.hint}>
-                                Do you want to log out of all other devices?
+                                {t("settingsPage.privacy.password.logoutPrompt.question")}
                               </p>
                               {passwordLogoutError ? (
                                 <p className={styles.error}>
@@ -3398,7 +3389,7 @@ export default function SettingsPage() {
                                   onClick={() => setPasswordLogoutPrompt(false)}
                                   disabled={passwordLogoutSubmitting}
                                 >
-                                  No, keep them signed in
+                                  {t("settingsPage.privacy.password.logoutPrompt.no")}
                                 </button>
                                 <button
                                   type="button"
@@ -3409,8 +3400,8 @@ export default function SettingsPage() {
                                   disabled={passwordLogoutSubmitting}
                                 >
                                   {passwordLogoutSubmitting
-                                    ? "Logging out..."
-                                    : "Yes, log out others"}
+                                    ? t("settingsPage.common.loading")
+                                    : t("settingsPage.privacy.password.logoutPrompt.yes")}
                                 </button>
                               </div>
                             </div>
@@ -3426,10 +3417,10 @@ export default function SettingsPage() {
                     <div className={styles.sectionRowHeader}>
                       <div>
                         <h3 className={styles.sectionTitleSmall}>
-                          Two-factor authentication
+                          {t("settingsPage.privacy.twoFactor.title")}
                         </h3>
                         <p className={styles.sectionDesc}>
-                          Require an email OTP each time you sign in.
+                          {t("settingsPage.privacy.twoFactor.desc")}
                         </p>
                       </div>
                       <button
@@ -3439,10 +3430,10 @@ export default function SettingsPage() {
                         disabled={twoFactorLoading}
                       >
                         {twoFactorLoading
-                          ? "Loading..."
+                          ? t("settingsPage.common.loading")
                           : twoFactorEnabled
-                            ? "Disable"
-                            : "Enable"}
+                            ? t("settingsPage.common.disable")
+                            : t("settingsPage.common.enable")}
                       </button>
                     </div>
                   ) : (
@@ -3458,23 +3449,21 @@ export default function SettingsPage() {
                               <path d="M15 5L8 12l7 7" />
                             </svg>
                           </span>
-                          Back
+                          {t("settingsPage.common.back")}
                         </button>
                         <span className={styles.stepBadge}>
                           {twoFactorStep === "otp"
-                            ? "Step 1 · Email OTP"
-                            : "Completed"}
+                            ? t("settingsPage.privacy.twoFactor.steps.step1Otp")
+                            : t("settingsPage.privacy.twoFactor.steps.completed")}
                         </span>
                       </div>
 
                       {twoFactorStep === "otp"
                         ? renderOtpStep({
-                            label: twoFactorTarget
-                              ? "OTP to enable two-factor"
-                              : "OTP to disable two-factor",
+                            label: t("settingsPage.privacy.twoFactor.steps.step1Otp"),
                             value: twoFactorOtp,
                             onChange: setTwoFactorOtp,
-                            hint: "We sent a 6-digit code to your email.",
+                            hint: t("settingsPage.privacy.passkey.sendOtpHint"),
                             expiresSec: twoFactorExpiresSec,
                             error: twoFactorError,
                             submitting: twoFactorSubmitting,
@@ -3483,15 +3472,15 @@ export default function SettingsPage() {
                               handleRequestTwoFactorOtp(twoFactorTarget),
                             onConfirm: handleVerifyTwoFactorOtp,
                             confirmLabel: twoFactorTarget
-                              ? "Enable"
-                              : "Disable",
+                              ? t("settingsPage.common.enable")
+                              : t("settingsPage.common.disable"),
                           })
                         : null}
 
                       {twoFactorStep === "done" ? (
                         <div className={styles.stepContent}>
                           <div className={styles.successBox}>
-                            {twoFactorSuccess ?? "Two-factor updated."}
+                            {twoFactorSuccess ?? t("settingsPage.privacy.twoFactor.steps.completed")}
                           </div>
                         </div>
                       ) : null}
@@ -3502,15 +3491,15 @@ export default function SettingsPage() {
                 <div className={styles.sectionCard}>
                   <div className={styles.sectionRowHeader}>
                     <div>
-                      <h3 className={styles.sectionTitleSmall}>Passkeys</h3>
+                      <h3 className={styles.sectionTitleSmall}>{t("settingsPage.privacy.passkey.title")}</h3>
                       <p className={styles.sectionDesc}>
-                        Use a 6-digit passkey for quick verification.
+                        {t("settingsPage.privacy.passkey.desc")}
                       </p>
                       {hasPasskey ? (
                         <p className={styles.hint}>
                           {passkeyEnabled
-                            ? "Status: Enabled"
-                            : "Status: Disabled"}
+                            ? t("settingsPage.privacy.passkey.statusEnabled")
+                            : t("settingsPage.privacy.passkey.statusDisabled")}
                         </p>
                       ) : null}
                     </div>
@@ -3526,10 +3515,10 @@ export default function SettingsPage() {
                             }
                           >
                             {passkeyToggleSubmitting
-                              ? "Updating..."
+                              ? t("settingsPage.common.updating")
                               : passkeyEnabled
-                                ? "Disable"
-                                : "Enable"}
+                                ? t("settingsPage.common.disable")
+                                : t("settingsPage.common.enable")}
                           </button>
                         ) : null}
                         <button
@@ -3539,10 +3528,10 @@ export default function SettingsPage() {
                           disabled={passkeyStatusLoading}
                         >
                           {passkeyStatusLoading
-                            ? "Loading..."
+                            ? t("settingsPage.common.loading")
                             : hasPasskey
-                              ? "Change passkey"
-                              : "Set passkey"}
+                              ? t("settingsPage.privacy.passkey.changePasskey")
+                              : t("settingsPage.privacy.passkey.setPasskey")}
                         </button>
                       </div>
                     ) : null}
@@ -3564,18 +3553,18 @@ export default function SettingsPage() {
                               <path d="M15 5L8 12l7 7" />
                             </svg>
                           </span>
-                          Back
+                          {t("settingsPage.common.back")}
                         </button>
                         <span className={styles.stepBadge}>
                           {passkeyStep === "password"
-                            ? "Step 1 · Verify password"
+                            ? t("settingsPage.privacy.passkey.steps.step1Password")
                             : passkeyStep === "otp"
-                              ? hasPassword ? "Step 2 · Email OTP" : "Step 1 · Email OTP"
+                              ? hasPassword ? t("settingsPage.privacy.passkey.steps.step2Otp") : t("settingsPage.privacy.passkey.steps.step1Otp")
                               : passkeyStep === "form"
                                 ? hasPasskey
-                                  ? hasPassword ? "Step 3 · Change passkey" : "Step 2 · Change passkey"
-                                  : hasPassword ? "Step 3 · Set passkey" : "Step 2 · Set passkey"
-                                : "Completed"}
+                                  ? hasPassword ? t("settingsPage.privacy.passkey.steps.step3Change") : t("settingsPage.privacy.passkey.steps.step2Change")
+                                  : hasPassword ? t("settingsPage.privacy.passkey.steps.step3Set") : t("settingsPage.privacy.passkey.steps.step2Set")
+                                : t("settingsPage.privacy.passkey.steps.completed")}
                         </span>
                       </div>
 
@@ -3583,13 +3572,13 @@ export default function SettingsPage() {
                         <div className={styles.stepContent}>
                           <div className={styles.form}>
                             <label className={styles.label}>
-                              Current password
+                              {t("settingsPage.privacy.passkey.passwordLabel")}
                               <div className={styles.inputGroup}>
                                 <input
                                   className={`${styles.input} ${styles.inputWithIcon}`}
                                   type={showPasskeyPassword ? "text" : "password"}
                                   autoComplete="current-password"
-                                  placeholder="Enter your password"
+                                  placeholder={t("settingsPage.privacy.passkey.passwordPlaceholder")}
                                   value={passkeyPassword}
                                   onChange={(e) =>
                                     setPasskeyPassword(e.target.value)
@@ -3602,8 +3591,7 @@ export default function SettingsPage() {
                               </div>
                             </label>
                             <p className={styles.hint}>
-                              We’ll send a 6-digit OTP to confirm your passkey
-                              change.
+                              {t("settingsPage.privacy.passkey.sendOtpHint")}
                             </p>
                             {passkeyError ? (
                               <p className={styles.error}>{passkeyError}</p>
@@ -3615,7 +3603,7 @@ export default function SettingsPage() {
                                 onClick={handleRequestPasskeyOtp}
                                 disabled={passkeySubmitting}
                               >
-                                {passkeySubmitting ? "Sending..." : "Send OTP"}
+                                {passkeySubmitting ? t("settingsPage.common.sending") : t("settingsPage.common.sendOtp")}
                               </button>
                             </div>
                           </div>
@@ -3624,10 +3612,10 @@ export default function SettingsPage() {
 
                       {passkeyStep === "otp"
                         ? renderOtpStep({
-                            label: "OTP for passkey setup",
+                            label: t("settingsPage.privacy.passkey.otpLabel"),
                             value: passkeyOtp,
                             onChange: setPasskeyOtp,
-                            hint: "We sent a 6-digit code to your email.",
+                            hint: t("settingsPage.privacy.passkey.otpHint"),
                             expiresSec: passkeyExpiresSec,
                             error: passkeyError,
                             submitting: passkeySubmitting,
@@ -3642,7 +3630,7 @@ export default function SettingsPage() {
                           <div className={styles.form}>
                             {hasPasskey ? (
                               <label className={styles.label}>
-                                Current passkey
+                                {t("settingsPage.privacy.passkey.currentPasskeyLabel")}
                                 <div className={styles.inputGroup}>
                                   <input
                                     className={`${styles.input} ${styles.inputWithIcon}`}
@@ -3660,14 +3648,14 @@ export default function SettingsPage() {
                               </label>
                             ) : null}
                             <label className={styles.label}>
-                              New passkey
+                              {t("settingsPage.privacy.passkey.newPasskeyLabel")}
                               <div className={styles.inputGroup}>
                                 <input
                                   className={`${styles.input} ${styles.inputWithIcon}`}
                                   type={showPasskeyNew ? "text" : "password"}
                                   inputMode="numeric"
                                   maxLength={6}
-                                  placeholder="Enter 6-digit passkey"
+                                  placeholder={t("settingsPage.privacy.passkey.newPasskeyPlaceholder")}
                                   value={passkeyNew}
                                   onChange={(e) =>
                                     setPasskeyNew(
@@ -3682,14 +3670,14 @@ export default function SettingsPage() {
                               </div>
                             </label>
                             <label className={styles.label}>
-                              Confirm passkey
+                              {t("settingsPage.privacy.passkey.confirmPasskeyLabel")}
                               <div className={styles.inputGroup}>
                                 <input
                                   className={`${styles.input} ${styles.inputWithIcon}`}
                                   type={showPasskeyConfirm ? "text" : "password"}
                                   inputMode="numeric"
                                   maxLength={6}
-                                  placeholder="Re-enter passkey"
+                                  placeholder={t("settingsPage.privacy.passkey.confirmPasskeyPlaceholder")}
                                   value={passkeyConfirm}
                                   onChange={(e) =>
                                     setPasskeyConfirm(
@@ -3704,7 +3692,7 @@ export default function SettingsPage() {
                               </div>
                             </label>
                             <p className={styles.hint}>
-                              Passkey must be exactly 6 digits.
+                              {t("settingsPage.privacy.passkey.requirement")}
                             </p>
                             {passkeyError ? (
                               <p className={styles.error}>{passkeyError}</p>
@@ -3716,7 +3704,7 @@ export default function SettingsPage() {
                                 onClick={handleConfirmPasskey}
                                 disabled={passkeySubmitting}
                               >
-                                {passkeySubmitting ? "Saving..." : "Save"}
+                                {passkeySubmitting ? t("settingsPage.common.saving") : t("settingsPage.common.save")}
                               </button>
                             </div>
                           </div>
@@ -3726,7 +3714,7 @@ export default function SettingsPage() {
                       {passkeyStep === "done" ? (
                         <div className={styles.stepContent}>
                           <div className={styles.successBox}>
-                            {passkeySuccess ?? "Passkey updated successfully."}
+                            {passkeySuccess ?? t("settingsPage.privacy.passkey.updated")}
                           </div>
                         </div>
                       ) : null}
@@ -3738,10 +3726,10 @@ export default function SettingsPage() {
                   <div className={styles.sectionRowHeader}>
                     <div>
                       <h3 className={styles.sectionTitleSmall}>
-                        Where you’re logged in
+                        {t("settingsPage.privacy.devices.overlayTitle")}
                       </h3>
                       <p className={styles.sectionDesc}>
-                        Review devices that have accessed your account.
+                        {t("settingsPage.privacy.devices.overlaySubtitle")}
                       </p>
                     </div>
                     <button
@@ -3749,7 +3737,7 @@ export default function SettingsPage() {
                       className={styles.primary}
                       onClick={openLoginDevices}
                     >
-                      View devices
+                      {t("settingsPage.privacy.devices.viewDevices")}
                     </button>
                   </div>
                 </div>
@@ -3757,20 +3745,20 @@ export default function SettingsPage() {
             ) : activeKey === "notifications" ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Notifications</h2>
+                  <h2 className={styles.sectionTitle}>{t("settingsPage.notifications.title")}</h2>
                   <p className={styles.sectionDesc}>
-                    Control when you receive notification alerts.
+                    {t("settingsPage.notifications.desc")}
                   </p>
                 </div>
 
                 <div className={styles.sectionCard}>
                   <div className={styles.notificationRow}>
                     <div className={styles.notificationMeta}>
-                      <p className={styles.infoTitle}>Push notifications</p>
+                      <p className={styles.infoTitle}>{t("settingsPage.notifications.title")}</p>
                       <p className={styles.infoValue}>
                         {notificationLoading
-                          ? "Loading..."
-                          : notificationStatusLabel || "Enabled"}
+                          ? t("settingsPage.common.loading")
+                          : notificationStatusLabel || t("settingsPage.notifications.statusEnabled")}
                       </p>
                     </div>
                     <div className={styles.notificationActions}>
@@ -3781,7 +3769,7 @@ export default function SettingsPage() {
                           onClick={openNotificationOverlay}
                           disabled={notificationLoading || notificationSaving}
                         >
-                          Mute
+                          {t("settingsPage.notifications.muteBtn")}
                         </button>
                       ) : (
                         <>
@@ -3791,7 +3779,7 @@ export default function SettingsPage() {
                             onClick={openNotificationOverlay}
                             disabled={notificationSaving}
                           >
-                            Edit
+                            {t("settingsPage.notifications.editBtn")}
                           </button>
                           <button
                             type="button"
@@ -3799,15 +3787,14 @@ export default function SettingsPage() {
                             onClick={handleEnableNotifications}
                             disabled={notificationSaving}
                           >
-                            Enable
+                            {t("settingsPage.notifications.enableBtn")}
                           </button>
                         </>
                       )}
                     </div>
                   </div>
                   <p className={styles.hint}>
-                    When muted, new notifications are still saved but won’t
-                    alert you in real time.
+                    {t("settingsPage.notifications.mutedDesc")}
                   </p>
                   {notificationError ? (
                     <p className={styles.error}>{notificationError}</p>
@@ -3841,7 +3828,7 @@ export default function SettingsPage() {
                               onClick={() => openCategoryOverlay(category.key)}
                               disabled={notificationLoading || categorySaving}
                             >
-                              Mute
+                              {t("settingsPage.notifications.muteBtn")}
                             </button>
                           ) : (
                             <>
@@ -3853,7 +3840,7 @@ export default function SettingsPage() {
                                 }
                                 disabled={categorySaving}
                               >
-                                Edit
+                                {t("settingsPage.notifications.editBtn")}
                               </button>
                               <button
                                 type="button"
@@ -3865,7 +3852,7 @@ export default function SettingsPage() {
                                 }
                                 disabled={categorySaving}
                               >
-                                Enable
+                                {t("settingsPage.notifications.enableBtn")}
                               </button>
                             </>
                           )}
@@ -3881,9 +3868,9 @@ export default function SettingsPage() {
             ) : activeKey === "content" ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Content</h2>
+                  <h2 className={styles.sectionTitle}>{t("settingsPage.content.title")}</h2>
                   <p className={styles.sectionDesc}>
-                    Manage hidden posts and blocked accounts.
+                    {t("settingsPage.content.desc")}
                   </p>
                 </div>
 
@@ -3896,9 +3883,9 @@ export default function SettingsPage() {
                     aria-controls="content-activity-body"
                   >
                     <div>
-                      <h3 className={styles.sectionTitleSmall}>Activity log</h3>
+                      <h3 className={styles.sectionTitleSmall}>{t("settingsPage.content.activity.title")}</h3>
                       <p className={styles.sectionDesc}>
-                        Track all of your interactions across the platform.
+                        {t("settingsPage.content.activity.desc")}
                       </p>
                     </div>
                     <span
@@ -3907,7 +3894,7 @@ export default function SettingsPage() {
                       }`}
                       aria-hidden="true"
                     >
-                      ▾
+                      â–¾
                     </span>
                   </button>
 
@@ -3935,7 +3922,7 @@ export default function SettingsPage() {
                     </div>
 
                     {activityLoading ? (
-                      <p className={styles.hint}>Loading activity...</p>
+                      <p className={styles.hint}>{t("settingsPage.content.activity.loading")}</p>
                     ) : null}
                     {activityError ? (
                       <p className={styles.error}>{activityError}</p>
@@ -3960,20 +3947,20 @@ export default function SettingsPage() {
 
                           const title =
                             item.type === "post_like"
-                              ? `Liked ${authorName}`
+                              ? t("settingsPage.content.activity.likedPost", { name: authorName })
                               : item.type === "comment_like"
-                                ? `Liked a comment`
+                                ? t("settingsPage.content.activity.likedComment")
                                 : item.type === "comment"
-                                  ? `Commented on ${authorName}`
+                                  ? t("settingsPage.content.activity.commentedOn", { name: authorName })
                                   : item.type === "repost"
-                                    ? `Reposted ${authorName}`
+                                    ? t("settingsPage.content.activity.reposted", { name: authorName })
                                     : item.type === "save"
-                                      ? `Saved ${authorName}`
+                                      ? t("settingsPage.content.activity.saved", { name: authorName })
                                       : item.type === "follow"
-                                        ? `Followed ${targetName}`
+                                        ? t("settingsPage.content.activity.followed", { name: targetName })
                                         : item.type === "report_post"
-                                          ? `Reported ${authorName}`
-                                          : `Reported ${targetName}`;
+                                          ? t("settingsPage.content.activity.reportedPost", { name: authorName })
+                                          : t("settingsPage.content.activity.reportedUser", { name: targetName });
 
                           const subtitle =
                             item.type === "comment_like" ||
@@ -4041,7 +4028,7 @@ export default function SettingsPage() {
                                     {item.type === "follow" ||
                                     item.type === "report_user"
                                       ? getInitials(targetName)
-                                      : "📝"}
+                                      : "ðŸ“"}
                                   </span>
                                 )}
                               </div>
@@ -4050,7 +4037,7 @@ export default function SettingsPage() {
                         })}
                       </div>
                     ) : !activityLoading ? (
-                      <p className={styles.hint}>No activity yet.</p>
+                      <p className={styles.hint}>{t("settingsPage.content.activity.noActivity")}</p>
                     ) : null}
 
                     {canSeeMoreActivity ? (
@@ -4061,7 +4048,7 @@ export default function SettingsPage() {
                           onClick={handleSeeMoreActivity}
                           disabled={activityLoadingMore}
                         >
-                          {activityLoadingMore ? "Loading..." : "See more"}
+                          {activityLoadingMore ? t("settingsPage.content.activity.loadingMore") : t("settingsPage.content.activity.seeMore")}
                         </button>
                       </div>
                     ) : null}
@@ -4077,10 +4064,9 @@ export default function SettingsPage() {
                     aria-controls="content-hidden-body"
                   >
                     <div>
-                      <h3 className={styles.sectionTitleSmall}>Hidden posts</h3>
+                      <h3 className={styles.sectionTitleSmall}>{t("settingsPage.content.hidden.title")}</h3>
                       <p className={styles.sectionDesc}>
-                        Posts you hide are removed from your feed. You can
-                        unhide them anytime.
+                        {t("settingsPage.content.hidden.desc")}
                       </p>
                     </div>
                     <span
@@ -4089,7 +4075,7 @@ export default function SettingsPage() {
                       }`}
                       aria-hidden="true"
                     >
-                      ▾
+                      â–¾
                     </span>
                   </button>
 
@@ -4107,12 +4093,12 @@ export default function SettingsPage() {
                         onClick={loadContentSettings}
                         disabled={hiddenPostsLoading || blockedUsersLoading}
                       >
-                        Refresh
+                        {t("settingsPage.content.hidden.refreshBtn")}
                       </button>
                     </div>
 
                     {hiddenPostsLoading ? (
-                      <p className={styles.hint}>Loading hidden posts...</p>
+                      <p className={styles.hint}>{t("settingsPage.content.hidden.loading")}</p>
                     ) : null}
                     {hiddenPostsError ? (
                       <p className={styles.error}>{hiddenPostsError}</p>
@@ -4161,7 +4147,7 @@ export default function SettingsPage() {
                                   <span
                                     className={styles.contentThumbPlaceholder}
                                   >
-                                    📝
+                                    ðŸ“
                                   </span>
                                 )}
                               </div>
@@ -4189,8 +4175,8 @@ export default function SettingsPage() {
                                   )}
                                 >
                                   {postId && unhideSubmitting[postId]
-                                    ? "Unhiding..."
-                                    : "Unhide"}
+                                    ? t("settingsPage.content.hidden.unhiding")
+                                    : t("settingsPage.content.hidden.unhide")}
                                 </button>
                               </div>
                             </div>
@@ -4198,7 +4184,7 @@ export default function SettingsPage() {
                         })}
                       </div>
                     ) : !hiddenPostsLoading ? (
-                      <p className={styles.hint}>No hidden posts.</p>
+                      <p className={styles.hint}>{t("settingsPage.content.hidden.noHidden")}</p>
                     ) : null}
 
                     {canSeeMoreHiddenPosts ? (
@@ -4208,7 +4194,7 @@ export default function SettingsPage() {
                           className={styles.secondary}
                           onClick={handleSeeMoreHiddenPosts}
                         >
-                          See more
+                          {t("settingsPage.common.seeMore")}
                         </button>
                       </div>
                     ) : null}
@@ -4225,10 +4211,10 @@ export default function SettingsPage() {
                   >
                     <div>
                       <h3 className={styles.sectionTitleSmall}>
-                        Blocked users
+                        {t("settingsPage.content.blocked.title")}
                       </h3>
                       <p className={styles.sectionDesc}>
-                        People you block can’t see your profile or content.
+                        {t("settingsPage.content.blocked.desc")}
                       </p>
                     </div>
                     <span
@@ -4237,7 +4223,7 @@ export default function SettingsPage() {
                       }`}
                       aria-hidden="true"
                     >
-                      ▾
+                      â–¾
                     </span>
                   </button>
 
@@ -4252,7 +4238,7 @@ export default function SettingsPage() {
                     </div>
 
                     {blockedUsersLoading ? (
-                      <p className={styles.hint}>Loading blocked users...</p>
+                      <p className={styles.hint}>{t("settingsPage.content.blocked.loading")}</p>
                     ) : null}
                     {blockedUsersError ? (
                       <p className={styles.error}>{blockedUsersError}</p>
@@ -4293,8 +4279,8 @@ export default function SettingsPage() {
                                   )}
                                 >
                                   {user.userId && unblockSubmitting[user.userId]
-                                    ? "Unblocking..."
-                                    : "Unblock"}
+                                    ? t("settingsPage.content.blocked.unblocking")
+                                    : t("settingsPage.content.blocked.unblock")}
                                 </button>
                               </div>
                             </div>
@@ -4302,7 +4288,7 @@ export default function SettingsPage() {
                         })}
                       </div>
                     ) : !blockedUsersLoading ? (
-                      <p className={styles.hint}>No blocked users.</p>
+                      <p className={styles.hint}>{t("settingsPage.content.blocked.noBlocked")}</p>
                     ) : null}
                   </div>
                 </div>
@@ -4310,16 +4296,16 @@ export default function SettingsPage() {
             ) : activeKey === "violations" ? (
               <>
                 <div className={styles.sectionHeader}>
-                  <h2 className={styles.sectionTitle}>Violation Center</h2>
+                  <h2 className={styles.sectionTitle}>{t("settingsPage.violations.title")}</h2>
                   <p className={styles.sectionDesc}>
-                    Review moderation actions and your strike history.
+                    {t("settingsPage.violations.desc")}
                   </p>
                 </div>
 
                 <div className={styles.sectionCard}>
                   <div className={styles.notificationRow}>
                     <div className={styles.notificationMeta}>
-                      <p className={styles.infoTitle}>Current strike total</p>
+                      <p className={styles.infoTitle}>{t("settingsPage.violations.currentStrikes")}</p>
                       <p className={styles.infoValue}>{currentStrikeTotal}</p>
                     </div>
                     <div className={styles.notificationActions}>
@@ -4329,7 +4315,7 @@ export default function SettingsPage() {
                         onClick={loadViolationCenter}
                         disabled={violationLoading}
                       >
-                        {violationLoading ? "Refreshing..." : "Refresh"}
+                        {violationLoading ? t("settingsPage.violations.refreshing") : t("settingsPage.violations.refreshBtn")}
                       </button>
                     </div>
                   </div>
@@ -4337,7 +4323,7 @@ export default function SettingsPage() {
 
                 <div className={styles.sectionCard}>
                   {violationLoading ? (
-                    <p className={styles.hint}>Loading violation history...</p>
+                    <p className={styles.hint}>{t("settingsPage.violations.loading")}</p>
                   ) : null}
                   {violationError ? (
                     <p className={styles.error}>{violationError}</p>
@@ -4387,7 +4373,20 @@ export default function SettingsPage() {
                             <div className={styles.activityBody}>
                               <div className={styles.activityHeader}>
                                 <p className={styles.activityTitle}>
-                                  {formatActionLabel(item.action)} ·{" "}
+                                  {(() => {
+                                    const actionKeyMap: Record<string, string> = {
+                                      remove_post: "removePost",
+                                      restrict_post: "restrictPost",
+                                      delete_comment: "deleteComment",
+                                      warn: "warnUser",
+                                      warn_user: "warnUser",
+                                      mute_interaction: "muteInteraction",
+                                      suspend_user: "suspendUser",
+                                      limit_account: "limitAccount",
+                                    };
+                                    const key = actionKeyMap[item.action] ?? "policyAction";
+                                    return t(`settingsPage.violations.actions.${key}`);
+                                  })()} Â·{" "}
                                   {item.targetType.toUpperCase()}
                                 </p>
                                 <span className={styles.activityTime}>
@@ -4396,12 +4395,12 @@ export default function SettingsPage() {
                               </div>
                               <p className={styles.activitySubtitle}>
                                 {isMuteInteraction
-                                  ? `Interaction muted${
+                                  ? `${t("settingsPage.violations.interactionMuted")}${
                                       remainingMute
-                                        ? ` · Remaining ${remainingMute}`
-                                        : " · Until turn on"
+                                        ? ` Â· Remaining ${remainingMute}`
+                                        : ` Â· ${t("settingsPage.violations.untilTurnOn")}`
                                     }`
-                                  : `Severity ${formatSeverityLabel(item.severity)} · ${
+                                  : `Severity ${t(`settingsPage.violations.severity.${item.severity ?? "na"}`)} Â· ${
                                       isWarn
                                         ? "No strike added"
                                         : `Strike +${item.strikeDelta} (Total ${item.strikeTotalAfter})`
@@ -4412,7 +4411,7 @@ export default function SettingsPage() {
                               </p>
                               {canOpenDetail ? (
                                 <p className={styles.hint}>
-                                  Click to view violated content
+                                  {t("settingsPage.violations.detail.violatedContent")}
                                 </p>
                               ) : null}
                             </div>
@@ -4421,7 +4420,7 @@ export default function SettingsPage() {
                       })}
                     </div>
                   ) : !violationLoading ? (
-                    <p className={styles.hint}>No violations found.</p>
+                    <p className={styles.hint}>{t("settingsPage.violations.noViolations")}</p>
                   ) : null}
                 </div>
               </>
@@ -4456,7 +4455,7 @@ export default function SettingsPage() {
                             className={styles.languageCaret}
                             aria-hidden="true"
                           >
-                            ▾
+                            â–¾
                           </span>
                         </button>
                         {languageOpen ? (
@@ -4480,7 +4479,7 @@ export default function SettingsPage() {
                                 <span>{getLanguageLabel(value)}</span>
                                 {language === value ? (
                                   <span className={styles.languageCheck}>
-                                    ✓
+                                    âœ“
                                   </span>
                                 ) : null}
                               </button>
@@ -4527,9 +4526,9 @@ export default function SettingsPage() {
               </>
             ) : (
               <div className={styles.sectionCard}>
-                <h2 className={styles.sectionTitle}>Coming soon</h2>
+                <h2 className={styles.sectionTitle}>{t("settingsPage.common.comingSoon")}</h2>
                 <p className={styles.sectionDesc}>
-                  This section will be available soon.
+                  {t("settingsPage.common.comingSoonDesc")}
                 </p>
               </div>
             )}
@@ -4551,23 +4550,23 @@ export default function SettingsPage() {
           <div className={styles.overlayCard} role="dialog" aria-modal="true">
             <div className={styles.overlayHeader}>
               <div>
-                <p className={styles.kicker}>Notifications</p>
-                <h2 className={styles.overlayTitle}>Mute notifications</h2>
+                <p className={styles.kicker}>{t("settingsPage.notifications.title")}</p>
+                <h2 className={styles.overlayTitle}>{t("settingsPage.notifications.overlay.muteTitle")}</h2>
               </div>
               <div className={styles.overlayActions}>
                 <button
                   type="button"
                   className={styles.closeButton}
                   onClick={() => setNotificationOverlayOpen(false)}
-                  aria-label="Close"
+                  aria-label={t("settingsPage.notifications.overlay.closeAria")}
                 >
-                  ×
+                  Ã—
                 </button>
               </div>
             </div>
 
             <p className={styles.sectionDesc}>
-              Choose how long to mute notification.
+              {t("settingsPage.notifications.overlay.chooseHowLong")}
             </p>
 
             <div className={styles.notificationOptionGrid}>
@@ -4592,24 +4591,24 @@ export default function SettingsPage() {
             {notificationOption === "custom" ? (
               <div className={styles.notificationCustomRow}>
                 <div className={styles.notificationPicker}>
-                  <label className={styles.label}>Date</label>
+                  <label className={styles.label}>{t("settingsPage.notifications.overlay.dateLabel")}</label>
                   <DateSelect
                     value={notificationCustomDate}
                     onChange={setNotificationCustomDate}
                     minDate={new Date()}
                     maxDate={null}
-                    placeholder="yyyy-mm-dd"
+                    placeholder={t("settingsPage.notifications.overlay.datePlaceholder")}
                   />
                 </div>
                 <div className={styles.notificationPicker}>
-                  <label className={styles.label}>Time</label>
+                  <label className={styles.label}>{t("settingsPage.notifications.overlay.timeLabel")}</label>
                   <TimeSelect
                     value={notificationCustomTime}
                     onChange={setNotificationCustomTime}
                     selectedDate={notificationCustomDate}
                     minDateTime={new Date()}
                     disabled={!notificationCustomDate}
-                    placeholder="hh:mm"
+                    placeholder={t("settingsPage.notifications.overlay.timePlaceholder")}
                   />
                 </div>
               </div>
@@ -4626,7 +4625,7 @@ export default function SettingsPage() {
                 onClick={() => setNotificationOverlayOpen(false)}
                 disabled={notificationSaving}
               >
-                Cancel
+                {t("settingsPage.common.cancel")}
               </button>
               <button
                 type="button"
@@ -4634,7 +4633,7 @@ export default function SettingsPage() {
                 onClick={handleSaveNotificationMute}
                 disabled={notificationSaving}
               >
-                {notificationSaving ? "Saving..." : "Save"}
+                {notificationSaving ? t("settingsPage.common.saving") : t("settingsPage.common.save")}
               </button>
             </div>
           </div>
@@ -4646,14 +4645,9 @@ export default function SettingsPage() {
           <div className={styles.overlayCard} role="dialog" aria-modal="true">
             <div className={styles.overlayHeader}>
               <div>
-                <p className={styles.kicker}>Notifications</p>
+                <p className={styles.kicker}>{t("settingsPage.notifications.title")}</p>
                 <h2 className={styles.overlayTitle}>
-                  Mute{" "}
-                  {categoryKey === "mentions"
-                    ? "mentions & tags"
-                    : categoryKey === "system"
-                      ? "system notifications"
-                      : categoryKey}
+                  {t("settingsPage.notifications.overlay.categoryMuteTitle", { category: categoryKey ?? "" })}
                 </h2>
               </div>
               <div className={styles.overlayActions}>
@@ -4661,16 +4655,16 @@ export default function SettingsPage() {
                   type="button"
                   className={styles.closeButton}
                   onClick={() => setCategoryOverlayOpen(false)}
-                  aria-label="Close"
+                  aria-label={t("settingsPage.notifications.overlay.closeAria")}
                   disabled={categorySaving}
                 >
-                  ×
+                  Ã—
                 </button>
               </div>
             </div>
 
             <p className={styles.sectionDesc}>
-              Choose how long to mute this notification type.
+              {t("settingsPage.notifications.overlay.chooseHowLongCategory")}
             </p>
 
             <div className={styles.notificationOptionGrid}>
@@ -4695,24 +4689,24 @@ export default function SettingsPage() {
             {categoryOption === "custom" ? (
               <div className={styles.notificationCustomRow}>
                 <div className={styles.notificationPicker}>
-                  <label className={styles.label}>Date</label>
+                  <label className={styles.label}>{t("settingsPage.notifications.overlay.dateLabel")}</label>
                   <DateSelect
                     value={categoryCustomDate}
                     onChange={setCategoryCustomDate}
                     minDate={new Date()}
                     maxDate={null}
-                    placeholder="yyyy-mm-dd"
+                    placeholder={t("settingsPage.notifications.overlay.datePlaceholder")}
                   />
                 </div>
                 <div className={styles.notificationPicker}>
-                  <label className={styles.label}>Time</label>
+                  <label className={styles.label}>{t("settingsPage.notifications.overlay.timeLabel")}</label>
                   <TimeSelect
                     value={categoryCustomTime}
                     onChange={setCategoryCustomTime}
                     selectedDate={categoryCustomDate}
                     minDateTime={new Date()}
                     disabled={!categoryCustomDate}
-                    placeholder="hh:mm"
+                    placeholder={t("settingsPage.notifications.overlay.timePlaceholder")}
                   />
                 </div>
               </div>
@@ -4729,7 +4723,7 @@ export default function SettingsPage() {
                 onClick={() => setCategoryOverlayOpen(false)}
                 disabled={categorySaving}
               >
-                Cancel
+                {t("settingsPage.common.cancel")}
               </button>
               <button
                 type="button"
@@ -4737,7 +4731,7 @@ export default function SettingsPage() {
                 onClick={handleSaveCategoryMute}
                 disabled={categorySaving}
               >
-                {categorySaving ? "Saving..." : "Save"}
+                {categorySaving ? t("settingsPage.common.saving") : t("settingsPage.common.save")}
               </button>
             </div>
           </div>
@@ -4749,23 +4743,23 @@ export default function SettingsPage() {
           <div className={styles.overlayCard} role="dialog" aria-modal="true">
             <div className={styles.overlayHeader}>
               <div>
-                <p className={styles.kicker}>Security</p>
-                <h2 className={styles.overlayTitle}>Logged-in devices</h2>
+                <p className={styles.kicker}>{t("settingsPage.privacy.devices.overlayTitle")}</p>
+                <h2 className={styles.overlayTitle}>{t("settingsPage.privacy.devices.overlaySubtitle")}</h2>
               </div>
               <div className={styles.overlayActions}>
                 <button
                   type="button"
                   className={styles.closeButton}
                   onClick={() => setShowLoginDevices(false)}
-                  aria-label="Close"
+                  aria-label={t("settingsPage.privacy.devices.overlayClose")}
                 >
-                  ×
+                  Ã—
                 </button>
               </div>
             </div>
 
             {loginDevicesLoading ? (
-              <p className={styles.hint}>Loading devices...</p>
+              <p className={styles.hint}>{t("settingsPage.privacy.devices.loading")}</p>
             ) : null}
             {loginDevicesError ? (
               <p className={styles.error}>{loginDevicesError}</p>
@@ -4796,10 +4790,10 @@ export default function SettingsPage() {
                         >
                           <div className={styles.deviceIcon}>
                             {device.deviceType?.toLowerCase() === "mobile"
-                              ? "📱"
+                              ? "ðŸ“±"
                               : device.deviceType?.toLowerCase() === "tablet"
-                                ? "📟"
-                                : "💻"}
+                                ? "ðŸ“Ÿ"
+                                : "ðŸ’»"}
                           </div>
                           <div className={styles.deviceInfo}>
                             <div className={styles.deviceHeader}>
@@ -4838,7 +4832,7 @@ export default function SettingsPage() {
                                     setLogoutTarget(device);
                                   }}
                                 >
-                                  Log out
+                                  {t("settingsPage.privacy.devices.logOut")}
                                 </button>
                               ) : null}
                             </div>
@@ -4858,12 +4852,12 @@ export default function SettingsPage() {
                     }}
                     disabled={!hasOtherLoginDevices || loginDevicesLoading}
                   >
-                    Logout all devices
+                    {t("settingsPage.privacy.devices.logOutAll")}
                   </button>
                 </div>
               </>
             ) : loginDevicesLoading ? null : (
-              <p className={styles.hint}>No devices recorded yet.</p>
+              <p className={styles.hint}>{t("settingsPage.privacy.devices.noDevices")}</p>
             )}
           </div>
         </div>
@@ -4878,27 +4872,27 @@ export default function SettingsPage() {
           >
             <div className={styles.overlayHeader}>
               <div>
-                <p className={styles.kicker}>Violation Center</p>
-                <h2 className={styles.overlayTitle}>Violated content</h2>
+                <p className={styles.kicker}>{t("settingsPage.violations.title")}</p>
+                <h2 className={styles.overlayTitle}>{t("settingsPage.violations.detail.title")}</h2>
               </div>
               <div className={styles.overlayActions}>
                 <button
                   type="button"
                   className={styles.closeButton}
                   onClick={() => setSelectedViolation(null)}
-                  aria-label="Close"
+                  aria-label={t("settingsPage.violations.detail.closeAria")}
                 >
-                  ×
+                  Ã—
                 </button>
               </div>
             </div>
 
             <div className={styles.violationContentBlock}>
               {selectedViolation.targetType === "comment" ? (
-                <p className={styles.hint}>Your violated comment</p>
+                <p className={styles.hint}>{t("settingsPage.violations.detail.yourComment")}</p>
               ) : null}
               <p className={styles.violationContentText}>
-                {selectedViolation.previewText || "No text content captured."}
+                {selectedViolation.previewText || t("settingsPage.violations.detail.noText")}
               </p>
             </div>
 
@@ -4924,10 +4918,10 @@ export default function SettingsPage() {
             selectedViolation.relatedPostPreview ? (
               <>
                 <div className={styles.violationContentBlock}>
-                  <p className={styles.hint}>Parent post context</p>
+                  <p className={styles.hint}>{t("settingsPage.violations.detail.parentPost")}</p>
                   <p className={styles.violationContentText}>
                     {selectedViolation.relatedPostPreview.text ||
-                      "No captured."}
+                      t("settingsPage.violations.detail.noCaptured")}
                   </p>
                 </div>
 
@@ -4958,7 +4952,7 @@ export default function SettingsPage() {
                 className={styles.secondary}
                 onClick={() => setSelectedViolation(null)}
               >
-                Close
+                {t("settingsPage.common.close")}
               </button>
             </div>
           </div>
@@ -4967,10 +4961,9 @@ export default function SettingsPage() {
       {logoutTarget ? (
         <div className={styles.confirmBackdrop}>
           <div className={styles.confirmCard} role="dialog" aria-modal="true">
-            <h3 className={styles.confirmTitle}>Log out this device?</h3>
+            <h3 className={styles.confirmTitle}>{t("settingsPage.confirmDialogs.logoutDevice.title")}</h3>
             <p className={styles.confirmText}>
-              {resolveDeviceName(logoutTarget)} will be signed out. You can log
-              in again later if needed.
+              {t("settingsPage.confirmDialogs.logoutDevice.desc")}
             </p>
             {logoutError ? <p className={styles.error}>{logoutError}</p> : null}
             <div className={styles.confirmActions}>
@@ -4980,7 +4973,7 @@ export default function SettingsPage() {
                 onClick={() => setLogoutTarget(null)}
                 disabled={logoutSubmitting}
               >
-                Cancel
+                {t("settingsPage.confirmDialogs.logoutDevice.cancel")}
               </button>
               <button
                 type="button"
@@ -4988,7 +4981,7 @@ export default function SettingsPage() {
                 onClick={handleLogoutDevice}
                 disabled={logoutSubmitting}
               >
-                {logoutSubmitting ? "Logging out..." : "Log out"}
+                {logoutSubmitting ? t("settingsPage.common.loading") : t("settingsPage.confirmDialogs.logoutDevice.confirm")}
               </button>
             </div>
           </div>
@@ -4997,9 +4990,9 @@ export default function SettingsPage() {
       {logoutAllOpen ? (
         <div className={styles.confirmBackdrop}>
           <div className={styles.confirmCard} role="dialog" aria-modal="true">
-            <h3 className={styles.confirmTitle}>Log out all devices?</h3>
+            <h3 className={styles.confirmTitle}>{t("settingsPage.confirmDialogs.logoutAll.title")}</h3>
             <p className={styles.confirmText}>
-              All devices will be signed out except this one.
+              {t("settingsPage.confirmDialogs.logoutAll.desc")}
             </p>
             {logoutAllError ? (
               <p className={styles.error}>{logoutAllError}</p>
@@ -5011,7 +5004,7 @@ export default function SettingsPage() {
                 onClick={() => setLogoutAllOpen(false)}
                 disabled={logoutAllSubmitting}
               >
-                Cancel
+                {t("settingsPage.confirmDialogs.logoutAll.cancel")}
               </button>
               <button
                 type="button"
@@ -5019,7 +5012,7 @@ export default function SettingsPage() {
                 onClick={handleLogoutAllDevices}
                 disabled={logoutAllSubmitting}
               >
-                {logoutAllSubmitting ? "Logging out..." : "Log out all"}
+                {logoutAllSubmitting ? t("settingsPage.common.loading") : t("settingsPage.confirmDialogs.logoutAll.confirm")}
               </button>
             </div>
           </div>
@@ -5029,9 +5022,9 @@ export default function SettingsPage() {
       {confirmUnhide ? (
         <div className={styles.confirmBackdrop}>
           <div className={styles.confirmCard} role="dialog" aria-modal="true">
-            <h3 className={styles.confirmTitle}>Unhide this post?</h3>
+            <h3 className={styles.confirmTitle}>{t("settingsPage.confirmDialogs.unhidePost.title")}</h3>
             <p className={styles.confirmText}>
-              This post will appear in your feed again.
+              {t("settingsPage.confirmDialogs.unhidePost.desc")}
             </p>
             <div className={styles.confirmActions}>
               <button
@@ -5042,7 +5035,7 @@ export default function SettingsPage() {
                   confirmUnhide.id && unhideSubmitting[confirmUnhide.id],
                 )}
               >
-                Cancel
+                {t("settingsPage.confirmDialogs.unhidePost.cancel")}
               </button>
               <button
                 type="button"
@@ -5057,8 +5050,8 @@ export default function SettingsPage() {
                 )}
               >
                 {confirmUnhide.id && unhideSubmitting[confirmUnhide.id]
-                  ? "Unhiding..."
-                  : "Unhide"}
+                  ? t("settingsPage.content.hidden.unhiding")
+                  : t("settingsPage.confirmDialogs.unhidePost.confirm")}
               </button>
             </div>
           </div>
@@ -5068,9 +5061,9 @@ export default function SettingsPage() {
       {confirmUnblock ? (
         <div className={styles.confirmBackdrop}>
           <div className={styles.confirmCard} role="dialog" aria-modal="true">
-            <h3 className={styles.confirmTitle}>Unblock this account?</h3>
+            <h3 className={styles.confirmTitle}>{t("settingsPage.confirmDialogs.unblockUser.title")}</h3>
             <p className={styles.confirmText}>
-              They will be able to see your profile and content again.
+              {t("settingsPage.confirmDialogs.unblockUser.desc")}
             </p>
             <div className={styles.confirmActions}>
               <button
@@ -5082,7 +5075,7 @@ export default function SettingsPage() {
                   unblockSubmitting[confirmUnblock.userId],
                 )}
               >
-                Cancel
+                {t("settingsPage.confirmDialogs.unblockUser.cancel")}
               </button>
               <button
                 type="button"
@@ -5099,8 +5092,8 @@ export default function SettingsPage() {
               >
                 {confirmUnblock.userId &&
                 unblockSubmitting[confirmUnblock.userId]
-                  ? "Unblocking..."
-                  : "Unblock"}
+                  ? t("settingsPage.content.blocked.unblocking")
+                  : t("settingsPage.confirmDialogs.unblockUser.confirm")}
               </button>
             </div>
           </div>
@@ -5109,3 +5102,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

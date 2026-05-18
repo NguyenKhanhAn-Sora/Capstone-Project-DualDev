@@ -86,7 +86,6 @@
         }
       }
     },
-    "personalInfo": "Thông tin cá nhân",
     "profile": {
       "profilePage": "Trang cá nhân",
       "aboutThisUser": "Về người dùng này",
@@ -114,13 +113,26 @@
     "accountEmail": "Email tài khoản",
     "manageSignInEmail": "Quản lý email đăng nhập và các bước xác minh.",
     "currentEmail": "Email hiện tại",
-    "personalInfo": "Thông tin cá nhân",
+    "personalInfo": {
+      "displayName": "Tên hiển thị",
+      "username": "Tên người dùng",
+      "birthdate": "Ngày sinh",
+      "gender": "Giới tính",
+      "location": "Vị trí",
+      "workplace": "Nơi làm việc",
+      "bio": "Tiểu sử"
+    },
     "profileVisibility": "Quyền riêng tư hồ sơ",
     "controlWhoCanView": "Kiểm soát ai có thể xem hồ sơ, phần Giới thiệu và danh sách người theo dõi của bạn.",
     "profilePageDesc": "Ai có thể xem trang hồ sơ và các tab của bạn.",
     "aboutThisUserDesc": "Ai có thể mở overlay Giới thiệu trên hồ sơ của bạn.",
     "followersListDesc": "Ai có thể xem danh sách người theo dõi của bạn.",
     "followingListDesc": "Ai có thể xem các tài khoản bạn đang theo dõi.",
+    "visibility": {
+      "public": "Công khai",
+      "followers": "Chỉ người theo dõi",
+      "private": "Riêng tư"
+    },
     "emailStep": {
       "verifyPassword": "Bước 1 · Xác minh mật khẩu",
       "currentOtp": "Bước 2 · OTP email hiện tại",
@@ -473,9 +485,7 @@
     "visibility": {
       "public": "Công khai",
       "followers": "Người theo dõi",
-      "private": "Riêng tư",
-      "cancel": "Hủy",
-      "shareQuote": "Chia sẻ trích dẫn"
+      "private": "Riêng tư"
     },
     "liveNow": "Đang phát trực tiếp",
     "feed": {
@@ -540,10 +550,17 @@
       "contentHint": "Viết trích dẫn của bạn...",
       "hashtagsHint": "Hashtag (phân cách bằng dấu phẩy)",
       "locationHint": "Vị trí (tùy chọn)",
+      "searchingLocation": "Đang tìm vị trí...",
+      "noLocationSuggestions": "Không tìm thấy gợi ý",
+      "locationSearchFailed": "Không thể tìm kiếm vị trí",
       "visibilityHint": "Hiển thị",
+      "visibilityPublic": "Công khai",
+      "visibilityFollowers": "Người theo dõi",
+      "visibilityPrivate": "Riêng tư",
       "allowComments": "Cho phép bình luận",
       "allowDownloads": "Cho phép tải xuống (kế thừa bài gốc)",
-      "hideLikeCount": "Ẩn số lượt thích"
+      "hideLikeCount": "Ẩn số lượt thích",
+      "shareQuote": "Chia sẻ trích dẫn"
     },
     "suggestions": {
       "title": "Những người bạn có thể biết",

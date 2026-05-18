@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./report-problem.module.css";
 import {
   createReportProblem,
@@ -11,15 +12,14 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 
 export default function ReportProblemPage() {
   const canRender = useRequireAuth();
+  const t = useTranslations("reportProblem");
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<
     Array<{ id: string; file: File; previewUrl: string; isVideo: boolean }>
   >([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<ReportProblemAttachment[] | null>(
-    null
-  );
+  const [success, setSuccess] = useState<ReportProblemAttachment[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -65,9 +65,7 @@ export default function ReportProblemPage() {
   const handleRemoveFile = (id: string) => {
     setFiles((prev) => {
       const target = prev.find((entry) => entry.id === id);
-      if (target) {
-        URL.revokeObjectURL(target.previewUrl);
-      }
+      if (target) URL.revokeObjectURL(target.previewUrl);
       return prev.filter((entry) => entry.id !== id);
     });
   };
@@ -79,16 +77,14 @@ export default function ReportProblemPage() {
 
     const trimmed = description.trim();
     if (!trimmed) {
-      setError("Please describe the problem.");
+      setError(t("errorEmpty"));
       return;
     }
 
     const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("accessToken")
-        : null;
+      typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
     if (!token) {
-      setError("You need to sign in to report a problem.");
+      setError(t("errorSignIn"));
       return;
     }
 
@@ -104,7 +100,7 @@ export default function ReportProblemPage() {
       clearSelectedFiles();
     } catch (err) {
       const apiErr = err as ApiError | undefined;
-      setError(apiErr?.message || "Cannot send report now.");
+      setError(apiErr?.message || t("errorFallback"));
     } finally {
       setSubmitting(false);
     }
@@ -115,21 +111,19 @@ export default function ReportProblemPage() {
       <div className={styles.card}>
         <div className={styles.header}>
           <div>
-            <p className={styles.kicker}>Report</p>
-            <h1 className={styles.title}>Tell us what went wrong</h1>
-            <p className={styles.subtitle}>
-              Describe the issue and attach screenshots or a short video.
-            </p>
+            <p className={styles.kicker}>{t("kicker")}</p>
+            <h1 className={styles.title}>{t("title")}</h1>
+            <p className={styles.subtitle}>{t("subtitle")}</p>
           </div>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <label className={styles.label}>
-            Description
+            {t("descriptionLabel")}
             <textarea
               className={styles.textarea}
               rows={6}
-              placeholder="Explain what happened, where it happened, and any steps to reproduce."
+              placeholder={t("descriptionPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={2000}
@@ -138,7 +132,7 @@ export default function ReportProblemPage() {
 
           <div className={styles.row}>
             <label className={styles.label}>
-              Attachments (optional)
+              {t("attachmentsLabel")}
               <input
                 ref={fileInputRef}
                 className={styles.fileInput}
@@ -152,12 +146,13 @@ export default function ReportProblemPage() {
                 className={styles.fileButton}
                 onClick={() => fileInputRef.current?.click()}
               >
-                Select files
+                {t("selectFiles")}
               </button>
             </label>
             <div className={styles.hint}>
-              Up to 5 files · images or videos
-              {files.length ? ` · ${files.length}/5 selected` : ""}
+              {files.length
+                ? t("hintSelected", { count: files.length })
+                : t("hint")}
             </div>
           </div>
 
@@ -176,9 +171,7 @@ export default function ReportProblemPage() {
                       preload="auto"
                       onLoadedMetadata={(event) => {
                         const video = event.currentTarget;
-                        if (video.duration > 0.2) {
-                          video.currentTime = 0.1;
-                        }
+                        if (video.duration > 0.2) video.currentTime = 0.1;
                       }}
                     />
                   ) : (
@@ -192,8 +185,8 @@ export default function ReportProblemPage() {
                     type="button"
                     className={styles.removePreviewButton}
                     onClick={() => handleRemoveFile(entry.id)}
-                    aria-label="Remove selected file"
-                    title="Remove"
+                    aria-label={t("removeFile")}
+                    title={t("removeFile")}
                   >
                     ×
                   </button>
@@ -205,10 +198,8 @@ export default function ReportProblemPage() {
           {error ? <p className={styles.error}>{error}</p> : null}
           {success ? (
             <div className={styles.successBox}>
-              <p className={styles.successTitle}>Report sent</p>
-              <p className={styles.successText}>
-                Thank you. Our team will review it soon.
-              </p>
+              <p className={styles.successTitle}>{t("successTitle")}</p>
+              <p className={styles.successText}>{t("successText")}</p>
             </div>
           ) : null}
 
@@ -224,14 +215,14 @@ export default function ReportProblemPage() {
               }}
               disabled={submitting}
             >
-              Clear
+              {t("clear")}
             </button>
             <button
               type="submit"
               className={styles.primary}
               disabled={submitting}
             >
-              {submitting ? "Sending..." : "Send report"}
+              {submitting ? t("sending") : t("send")}
             </button>
           </div>
         </form>

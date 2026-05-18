@@ -86,7 +86,6 @@
         }
       }
     },
-    "personalInfo": "Personal info",
     "profile": {
       "profilePage": "Profile page",
       "aboutThisUser": "About this user",
@@ -114,13 +113,26 @@
     "accountEmail": "Account email",
     "manageSignInEmail": "Manage your sign-in email and verification steps.",
     "currentEmail": "Current email",
-    "personalInfo": "Personal info",
+    "personalInfo": {
+      "displayName": "Display name",
+      "username": "Username",
+      "birthdate": "Birthday",
+      "gender": "Gender",
+      "location": "Location",
+      "workplace": "Workplace",
+      "bio": "Bio"
+    },
     "profileVisibility": "Profile visibility",
     "controlWhoCanView": "Control who can view your profile, About section, and follower lists.",
     "profilePageDesc": "Who can view your profile page and tabs.",
     "aboutThisUserDesc": "Who can open the About overlay on your profile.",
     "followersListDesc": "Who can view your followers list.",
     "followingListDesc": "Who can view the accounts you follow.",
+    "visibility": {
+      "public": "Public",
+      "followers": "Followers only",
+      "private": "Private"
+    },
     "emailStep": {
       "verifyPassword": "Step 1 · Verify password",
       "currentOtp": "Step 2 · Current email OTP",
@@ -472,9 +484,7 @@
     "visibility": {
       "public": "Public",
       "followers": "Followers",
-      "private": "Private",
-      "cancel": "Cancel",
-      "shareQuote": "Share quote"
+      "private": "Private"
     },
     "liveNow": "Live now",
     "feed": {
@@ -539,10 +549,17 @@
       "contentHint": "Write your quote...",
       "hashtagsHint": "Hashtags (comma separated)",
       "locationHint": "Location (optional)",
+      "searchingLocation": "Searching location...",
+      "noLocationSuggestions": "No suggestions found",
+      "locationSearchFailed": "Unable to search location",
       "visibilityHint": "Visibility",
+      "visibilityPublic": "Public",
+      "visibilityFollowers": "Followers",
+      "visibilityPrivate": "Private",
       "allowComments": "Allow comments",
       "allowDownloads": "Allow downloads (inherits original)",
-      "hideLikeCount": "Hide like count"
+      "hideLikeCount": "Hide like count",
+      "shareQuote": "Share quote"
     },
     "suggestions": {
       "title": "People you may know",

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./profile-edit-overlay.module.css";
+import { useLanguage } from "@/component/language-provider";
 import { DateSelect } from "@/ui/date-select/date-select";
 import {
   apiFetch,
@@ -64,42 +65,9 @@ function LocationIcon() {
   );
 }
 
-function validateDisplayName(name: string): string | null {
-  if (!name) return "Display name is required";
-  const condensed = name.replace(/\s/g, "");
-  if (name.length < 3 || name.length > 30) {
-    return "At least 3 and maximum 30 characters";
-  }
-  if (condensed.length < 3) {
-    return "Display name needs at least 3 letters after removing spaces";
-  }
-  if (!/^[\p{L}\s]+$/u.test(name)) {
-    return "Display name can only contain letters and spaces";
-  }
-  return null;
-}
+const GENDER_VALUES = ["male", "female", "other", "prefer_not_to_say"] as const;
 
-function validateBirthdate(dateStr: string): string | null {
-  if (!dateStr) return null;
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return "Birthdate is invalid";
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const chosen = new Date(date);
-  chosen.setHours(0, 0, 0, 0);
-  if (chosen > today) return "Birthdate cannot be in the future";
-  return null;
-}
-
-const genderOptions = [
-  { value: "male" as const, label: "Male" },
-  { value: "female" as const, label: "Female" },
-  { value: "other" as const, label: "Other" },
-  { value: "prefer_not_to_say" as const, label: "Prefer not to say" },
-];
-
-type GenderValue = "" | (typeof genderOptions)[number]["value"];
+type GenderValue = "" | (typeof GENDER_VALUES)[number];
 
 type ProfileEditOverlayProps = {
   open: boolean;
@@ -118,6 +86,39 @@ export default function ProfileEditOverlay({
   onClose,
   onSaved,
 }: ProfileEditOverlayProps) {
+  const { t } = useLanguage();
+
+  const genderOptions = useMemo(
+    () => [
+      { value: "male" as const, label: t("profilePage.editOverlay.genderMale") },
+      { value: "female" as const, label: t("profilePage.editOverlay.genderFemale") },
+      { value: "other" as const, label: t("profilePage.editOverlay.genderOther") },
+      { value: "prefer_not_to_say" as const, label: t("profilePage.editOverlay.genderPreferNot") },
+    ],
+    [t],
+  );
+
+  const validateDisplayName = (name: string): string | null => {
+    if (!name) return t("profilePage.editOverlay.displayNameRequired");
+    const condensed = name.replace(/\s/g, "");
+    if (name.length < 3 || name.length > 30) return t("profilePage.editOverlay.displayNameLengthError");
+    if (condensed.length < 3) return t("profilePage.editOverlay.displayNameLettersError");
+    if (!/^[\p{L}\s]+$/u.test(name)) return t("profilePage.editOverlay.displayNameCharsError");
+    return null;
+  };
+
+  const validateBirthdate = (dateStr: string): string | null => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return t("profilePage.editOverlay.birthdateInvalid");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const chosen = new Date(date);
+    chosen.setHours(0, 0, 0, 0);
+    if (chosen > today) return t("profilePage.editOverlay.birthdateFuture");
+    return null;
+  };
+
   const [mounted, setMounted] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -260,7 +261,7 @@ export default function ProfileEditOverlay({
           typeof err === "object" && err && "message" in err
             ? String((err as { message?: unknown }).message)
             : "Unable to fetch suggestions";
-        setWorkplaceError(message || "Unable to fetch suggestions");
+        setWorkplaceError(message || t("profilePage.editOverlay.workplaceError"));
       } finally {
         if (!controller.signal.aborted) setWorkplaceLoading(false);
       }
@@ -321,7 +322,7 @@ export default function ProfileEditOverlay({
         setLocationSuggestions([]);
         setLocationOpen(false);
         setLocationHighlight(-1);
-        setLocationError("No suggestions found, try different keywords.");
+        setLocationError(t("profilePage.editOverlay.locationNoSuggestionsKeyword"));
       } finally {
         if (!controller.signal.aborted) setLocationLoading(false);
       }
@@ -549,8 +550,7 @@ export default function ProfileEditOverlay({
       setUsernameError(null);
       setFieldError((prev) => ({
         ...prev,
-        username:
-          "Username can only include letters, numbers, underscores, and dots",
+        username: t("profilePage.editOverlay.usernameCharsError"),
       }));
       return;
     }
@@ -574,10 +574,10 @@ export default function ProfileEditOverlay({
         });
 
         if (!res.available) {
-          setUsernameError("Username already taken");
+          setUsernameError(t("profilePage.editOverlay.usernameTaken"));
           setFieldError((prev) => ({
             ...prev,
-            username: "Username already taken",
+            username: t("profilePage.editOverlay.usernameTaken"),
           }));
         } else {
           setUsernameError(null);
@@ -648,7 +648,7 @@ export default function ProfileEditOverlay({
     if (!token) {
       setFieldError((prev) => ({
         ...prev,
-        form: "Session expired. Please sign in again.",
+        form: t("profilePage.editOverlay.formSessionExpired"),
       }));
       return;
     }
@@ -662,8 +662,7 @@ export default function ProfileEditOverlay({
     if (!USERNAME_REGEX.test(username)) {
       setFieldError((prev) => ({
         ...prev,
-        username:
-          "Username can only include letters, numbers, underscores, and dots",
+        username: t("profilePage.editOverlay.usernameCharsError"),
       }));
       return;
     }
@@ -677,7 +676,7 @@ export default function ProfileEditOverlay({
     if (!gender) {
       setFieldError((prev) => ({
         ...prev,
-        gender: "Please select your gender",
+        gender: t("profilePage.editOverlay.genderRequired"),
       }));
       return;
     }
@@ -704,7 +703,7 @@ export default function ProfileEditOverlay({
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: unknown }).message)
-          : "Update failed";
+          : t("profilePage.editOverlay.formUpdateFailed");
       setFieldError((prev) => ({ ...prev, form: message }));
     } finally {
       setSaving(false);
@@ -712,7 +711,7 @@ export default function ProfileEditOverlay({
   };
 
   const selectedGenderLabel =
-    genderOptions.find((o) => o.value === gender)?.label || "Select an option";
+    genderOptions.find((o) => o.value === gender)?.label || t("profilePage.editOverlay.genderPlaceholder");
 
   const bioCharCount = bio.length;
 
@@ -723,19 +722,19 @@ export default function ProfileEditOverlay({
       className={styles.backdrop}
       role="dialog"
       aria-modal="true"
-      aria-label="Edit profile"
+      aria-label={t("profilePage.editOverlay.title")}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div className={styles.sheet} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <div className={styles.title}>Edit profile</div>
+          <div className={styles.title}>{t("profilePage.editOverlay.title")}</div>
           <button
             type="button"
             className={styles.closeBtn}
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("profilePage.close")}
           >
             <IconClose />
           </button>
@@ -744,7 +743,7 @@ export default function ProfileEditOverlay({
         <div className={styles.body}>
           <div className={styles.gridTwoCols}>
             <div>
-              <label className={styles.label}>Display name</label>
+              <label className={styles.label}>{t("profilePage.editOverlay.displayNameLabel")}</label>
               <input
                 className={styles.input}
                 value={displayName}
@@ -755,7 +754,7 @@ export default function ProfileEditOverlay({
                     displayName: undefined,
                   }));
                 }}
-                placeholder="E.g. Cordigrammer"
+                placeholder={t("profilePage.editOverlay.displayNamePlaceholder")}
               />
               {fieldError.displayName ? (
                 <div className={styles.error}>{fieldError.displayName}</div>
@@ -763,7 +762,7 @@ export default function ProfileEditOverlay({
             </div>
 
             <div>
-              <label className={styles.label}>Username</label>
+              <label className={styles.label}>{t("profilePage.editOverlay.usernameLabel")}</label>
               <input
                 className={styles.input}
                 value={username}
@@ -776,7 +775,7 @@ export default function ProfileEditOverlay({
                     .slice(0, 30);
                   setUsername(cleaned);
                 }}
-                placeholder="username"
+                placeholder={t("profilePage.editOverlay.usernamePlaceholder")}
                 inputMode="text"
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -786,8 +785,7 @@ export default function ProfileEditOverlay({
                 <div className={styles.error}>{fieldError.username}</div>
               ) : (
                 <div className={styles.hint}>
-                  Username can only include letters, numbers, underscores, and
-                  dots
+                  {t("profilePage.editOverlay.usernameHint")}
                 </div>
               )}
             </div>
@@ -795,7 +793,7 @@ export default function ProfileEditOverlay({
 
           <div className={styles.gridTwoCols} style={{ marginTop: 12 }}>
             <div>
-              <label className={styles.label}>Birthdate</label>
+              <label className={styles.label}>{t("profilePage.editOverlay.birthdateLabel")}</label>
               <DateSelect
                 value={birthdate}
                 onChange={(next) => {
@@ -812,7 +810,7 @@ export default function ProfileEditOverlay({
             </div>
 
             <div>
-              <label className={styles.label}>Gender</label>
+              <label className={styles.label}>{t("profilePage.editOverlay.genderLabel")}</label>
               <div className={styles.selectShell} ref={genderRef}>
                 <button
                   type="button"
@@ -828,7 +826,7 @@ export default function ProfileEditOverlay({
                   <div
                     className={styles.selectMenu}
                     role="listbox"
-                    aria-label="Gender"
+                    aria-label={t("profilePage.editOverlay.genderLabel")}
                   >
                     {genderOptions.map((opt) => (
                       <button
@@ -861,7 +859,7 @@ export default function ProfileEditOverlay({
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <label className={styles.label}>Location</label>
+            <label className={styles.label}>{t("profilePage.editOverlay.locationLabel")}</label>
             <div className={styles.locationCombo}>
               <div className={styles.locationInputShell}>
                 <input
@@ -873,7 +871,7 @@ export default function ProfileEditOverlay({
                   onKeyDown={onLocationKeyDown}
                   onBlur={onLocationBlur}
                   onFocus={onLocationFocus}
-                  placeholder="Add a city, landmark, or place"
+                  placeholder={t("profilePage.editOverlay.locationPlaceholder")}
                   aria-autocomplete="list"
                   aria-expanded={locationOpen}
                   aria-haspopup="listbox"
@@ -883,7 +881,7 @@ export default function ProfileEditOverlay({
                   className={styles.locationButton}
                   onClick={requestCurrentLocation}
                   disabled={geoStatus === "requesting"}
-                  aria-label="Use current location"
+                  aria-label={t("profilePage.editOverlay.locationCurrentAria")}
                 >
                   <LocationIcon />
                 </button>
@@ -893,12 +891,12 @@ export default function ProfileEditOverlay({
                 <div className={styles.locationSuggestions} role="listbox">
                   {locationLoading ? (
                     <div className={styles.locationSuggestionMuted}>
-                      Searching...
+                      {t("profilePage.editOverlay.locationSearching")}
                     </div>
                   ) : null}
                   {!locationLoading && locationSuggestions.length === 0 ? (
                     <div className={styles.locationSuggestionMuted}>
-                      {locationError || "No suggestions found"}
+                      {locationError || t("profilePage.editOverlay.locationNoSuggestions")}
                     </div>
                   ) : null}
                   {!locationLoading &&
@@ -930,7 +928,7 @@ export default function ProfileEditOverlay({
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <label className={styles.label}>Workplace</label>
+            <label className={styles.label}>{t("profilePage.editOverlay.workplaceLabel")}</label>
             <div className={styles.selectShell}>
               <input
                 className={styles.input}
@@ -950,7 +948,7 @@ export default function ProfileEditOverlay({
                   // Let option clicks land before closing.
                   setTimeout(() => setWorkplaceOpen(false), 120);
                 }}
-                placeholder="Search company"
+                placeholder={t("profilePage.editOverlay.workplacePlaceholder")}
               />
 
               {workplaceOpen ? (
@@ -969,21 +967,21 @@ export default function ProfileEditOverlay({
                       aria-selected={false}
                     >
                       <span className={styles.locationSuggestionText}>
-                        Add &quot;{workplaceInput.trim()}&quot;
+                        {t("profilePage.editOverlay.workplaceAdd", { name: workplaceInput.trim() })}
                       </span>
                     </button>
                   ) : null}
                   {workplaceLoading ? (
                     <div className={styles.locationSuggestionMuted}>
-                      Searching...
+                      {t("profilePage.editOverlay.workplaceSearching")}
                     </div>
                   ) : null}
                   {!workplaceLoading && workplaceSuggestions.length === 0 ? (
                     <div className={styles.locationSuggestionMuted}>
                       {workplaceError ||
                         (workplaceInput.trim()
-                          ? "No matches yet — you can add it"
-                          : "No suggestions found")}
+                          ? t("profilePage.editOverlay.workplaceNoMatches")
+                          : t("profilePage.editOverlay.workplaceNoSuggestions"))}
                     </div>
                   ) : null}
                   {!workplaceLoading &&
@@ -1019,7 +1017,7 @@ export default function ProfileEditOverlay({
 
           <div style={{ marginTop: 12 }}>
             <div className={styles.labelRow}>
-              <label className={styles.label}>Bio</label>
+              <label className={styles.label}>{t("profilePage.editOverlay.bioLabel")}</label>
               <span className={styles.counter}>
                 {bioCharCount}/{BIO_CHAR_LIMIT}
               </span>
@@ -1031,7 +1029,7 @@ export default function ProfileEditOverlay({
               onChange={(e) => {
                 setBio(e.target.value.slice(0, BIO_CHAR_LIMIT));
               }}
-              placeholder="Tell others about yourself"
+              placeholder={t("profilePage.editOverlay.bioPlaceholder")}
             />
           </div>
 
@@ -1047,7 +1045,7 @@ export default function ProfileEditOverlay({
             onClick={onClose}
             disabled={saving}
           >
-            Cancel
+            {t("profilePage.editOverlay.cancel")}
           </button>
           <button
             type="button"
@@ -1055,7 +1053,7 @@ export default function ProfileEditOverlay({
             onClick={submit}
             disabled={!canSave}
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("profilePage.editOverlay.saving") : t("profilePage.editOverlay.save")}
           </button>
         </div>
       </div>

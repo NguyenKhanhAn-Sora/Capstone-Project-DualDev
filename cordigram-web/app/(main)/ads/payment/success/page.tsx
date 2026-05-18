@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   getStripeCheckoutSessionStatus,
   type StripeCheckoutSessionStatus,
@@ -10,6 +11,7 @@ import {
 import styles from "../payment-status.module.css";
 
 export default function AdsPaymentSuccessPage() {
+  const t = useTranslations("ads.payment.success");
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id") || "";
   const [loading, setLoading] = useState(true);
@@ -23,7 +25,7 @@ export default function AdsPaymentSuccessPage() {
         : null;
 
     if (!sessionId || !token) {
-      setError("Missing payment session information.");
+      setError(t("missingSession"));
       setLoading(false);
       return;
     }
@@ -62,7 +64,7 @@ export default function AdsPaymentSuccessPage() {
           return;
         }
 
-        setError(err instanceof Error ? err.message : "Failed to load payment status.");
+        setError(err instanceof Error ? err.message : t("loadFailed"));
         setLoading(false);
       }
     };
@@ -73,7 +75,7 @@ export default function AdsPaymentSuccessPage() {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   return (
     <div className={styles.page}>
@@ -91,31 +93,29 @@ export default function AdsPaymentSuccessPage() {
             </svg>
           </div>
           <div>
-            <span className={styles.successBadge}>Payment successful</span>
-            <h1 className={styles.title}>Payment Completed</h1>
-            <p className={styles.subtitle}>
-              Stripe checkout has returned successfully for your ads campaign.
-            </p>
+            <span className={styles.successBadge}>{t("badge")}</span>
+            <h1 className={styles.title}>{t("title")}</h1>
+            <p className={styles.subtitle}>{t("subtitle")}</p>
           </div>
         </div>
 
-        {loading ? <p className={styles.subtitle}>Loading payment details...</p> : null}
+        {loading ? <p className={styles.subtitle}>{t("loading")}</p> : null}
         {error ? <p className={styles.error}>{error}</p> : null}
 
         {status ? (
           <div className={styles.detailsCard}>
             <div className={styles.row}>
-              <span className={styles.rowLabel}>Payment ID</span>
+              <span className={styles.rowLabel}>{t("paymentId")}</span>
               <strong className={styles.rowValueIdentifier}>
                 {status.paymentIntentId || status.id}
               </strong>
             </div>
             <div className={styles.row}>
-              <span className={styles.rowLabel}>Payment status</span>
+              <span className={styles.rowLabel}>{t("paymentStatus")}</span>
               <strong className={styles.rowValueStatus}>{status.paymentStatus ?? "unknown"}</strong>
             </div>
             <div className={styles.row}>
-              <span className={styles.rowLabel}>Amount</span>
+              <span className={styles.rowLabel}>{t("amount")}</span>
               <strong className={styles.rowValueAmount}>
                 {(status.amountTotal ?? 0).toLocaleString("vi-VN")} {String(status.currency ?? "").toUpperCase()}
               </strong>
@@ -125,10 +125,10 @@ export default function AdsPaymentSuccessPage() {
 
         <div className={styles.actions}>
           <Link className={styles.secondaryBtn} href="/ads/create">
-            Back to create
+            {t("backToCreate")}
           </Link>
           <Link className={styles.primaryBtn} href="/ads">
-            Go to Ads dashboard
+            {t("goToDashboard")}
           </Link>
         </div>
       </div>

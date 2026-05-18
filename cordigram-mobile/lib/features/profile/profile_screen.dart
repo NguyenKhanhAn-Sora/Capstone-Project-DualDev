@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/config/app_config.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
@@ -1586,7 +1588,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           iconColor: _danger,
           title: LanguageController.instance.t('profile.cannotRender.title'),
           body: e.toString(),
-          buttonLabel: 'Retry',
+          buttonLabel: LanguageController.instance.t('profile.retry'),
           onButton: _loadProfile,
         ),
       );
@@ -2308,7 +2310,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) =>
-                    const SettingsScreen(initialTab: SettingsTab.profile),
+                    const SettingsScreen(),
               ),
             );
           },
@@ -2316,7 +2318,12 @@ class _ProfileScreenState extends State<ProfileScreen>
         const SizedBox(width: 8),
         _IconActionButton(
           icon: Icons.share_outlined,
-          onTap: () => _showToast(_t('profile.shareSoon')),
+          onTap: () async {
+            final url =
+                '${AppConfig.webBaseUrl}/profile/${p.userId}';
+            await Clipboard.setData(ClipboardData(text: url));
+            _showToast(_t('profile.linkCopied'));
+          },
         ),
       ],
     );
@@ -2582,18 +2589,19 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget _buildBlockedView() {
     IconData icon = Icons.lock_outline_rounded;
     Color iconColor = const Color(0xFF7A8BB0);
-    String title = 'Profile is not available';
+    final lc = LanguageController.instance;
+    String title = lc.t('profile.blocked.notAvailable');
     String body = _blockedMessage;
 
     if (_blockedViewKind == _BlockedViewKind.blockedByYou) {
       icon = Icons.block_rounded;
       iconColor = const Color(0xFFE53935);
-      title = 'You blocked this user';
+      title = lc.t('profile.blocked.youBlocked');
       body = _blockedMessage;
     } else if (_blockedViewKind == _BlockedViewKind.blockedByUser) {
       icon = Icons.gpp_bad_rounded;
       iconColor = const Color(0xFFF59E0B);
-      title = 'You cannot view this profile';
+      title = lc.t('profile.blocked.cannotView');
       body = _blockedMessage;
     } else if (_blockedViewKind == _BlockedViewKind.unavailable) {
       icon = Icons.person_off_rounded;
@@ -2607,30 +2615,31 @@ class _ProfileScreenState extends State<ProfileScreen>
       iconColor: iconColor,
       title: title,
       body: body,
-      buttonLabel: 'Go back',
+      buttonLabel: lc.t('profile.blocked.goBack'),
       onButton: () => Navigator.of(context).pop(),
     );
   }
 
   Widget _buildPrivateView() {
+    final lc = LanguageController.instance;
     return _SpecialStateView(
       icon: Icons.lock_rounded,
       iconColor: _accent,
-      title: LanguageController.instance.t('profile.privateProfile'),
-      body:
-          'The owner has limited access to their profile. Follow requests may be required to view their content.',
-      buttonLabel: 'Go back',
+      title: lc.t('profile.privateProfile'),
+      body: lc.t('profile.private.body'),
+      buttonLabel: lc.t('profile.goBack'),
       onButton: () => Navigator.of(context).pop(),
     );
   }
 
   Widget _buildErrorView({String? message}) {
+    final lc = LanguageController.instance;
     return _SpecialStateView(
       icon: Icons.error_outline_rounded,
       iconColor: _danger,
-      title: LanguageController.instance.t('profile.unableToLoad'),
-      body: message ?? _error ?? 'Something went wrong',
-      buttonLabel: 'Retry',
+      title: lc.t('profile.unableToLoad'),
+      body: message ?? _error ?? lc.t('profile.errorGeneric'),
+      buttonLabel: lc.t('profile.retry'),
       onButton: _loadProfile,
     );
   }
