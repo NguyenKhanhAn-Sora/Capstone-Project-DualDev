@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useCallSound } from "@/hooks/use-call-sound";
+import { useMessagesUiTone } from "@/hooks/use-messages-ui-tone";
 import styles from "./IncomingCallPopup.module.css";
 import { useLanguage } from "@/component/language-provider";
 
@@ -23,13 +24,14 @@ export default function IncomingCallPopup({
   status = "incoming",
 }: IncomingCallPopupProps) {
   const { t } = useLanguage();
+  const uiTone = useMessagesUiTone();
   const isCancelled = status === "cancelled";
 
   // ✅ Play incoming call ringtone (only when status is 'incoming')
   useCallSound("incoming", status === "incoming");
 
   return (
-    <div className={styles.overlay}>
+    <div className={styles.overlay} data-ui-tone={uiTone}>
       <div className={styles.popup}>
         <div className={styles.cardAccent} aria-hidden />
         {/* Avatar */}

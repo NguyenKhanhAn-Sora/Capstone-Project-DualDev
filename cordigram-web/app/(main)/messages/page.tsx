@@ -129,6 +129,7 @@ import {
   getMessagesShellTheme,
   type MessagesShellTheme,
 } from "@/lib/messages-shell-theme";
+import { useMessagesUiTone } from "@/hooks/use-messages-ui-tone";
 import { getDmSidebarPeersMode } from "@/lib/messages-dm-sidebar-prefs";
 import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
 
@@ -1446,6 +1447,9 @@ export default function MessagesPage() {
       window.removeEventListener("cordigram-chat-settings", onChatSettings);
     };
   }, []);
+
+  const messagesUiTone = useMessagesUiTone();
+  const isLightMessagesUi = messagesUiTone === "light";
 
   const [servers, setServers] = useState<BackendServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
@@ -8728,7 +8732,7 @@ export default function MessagesPage() {
                     minHeight: 0,
                     overflow: "auto",
                     background:
-                      "radial-gradient(900px 520px at 20% -10%, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent 55%), radial-gradient(900px 520px at 80% 0%, color-mix(in srgb, var(--color-primary-strong, var(--color-primary)) 14%, transparent), transparent 60%), var(--color-bg-home)",
+                      "radial-gradient(900px 520px at 20% -10%, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent 55%), radial-gradient(900px 520px at 80% 0%, color-mix(in srgb, var(--color-primary-strong, var(--color-primary)) 14%, transparent), transparent 60%), var(--color-bg)",
                     padding: 22,
                     color: "var(--color-text)",
                   }}
@@ -8739,10 +8743,13 @@ export default function MessagesPage() {
                       margin: "0 auto",
                       borderRadius: 18,
                       border: "1px solid var(--color-border)",
-                      background:
-                        "linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 30%, transparent), transparent)",
+                      background: isLightMessagesUi
+                        ? "linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)), var(--color-surface))"
+                        : "linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 30%, transparent), transparent)",
                       padding: "22px 18px",
-                      boxShadow: "0 20px 60px rgba(2, 6, 23, 0.18)",
+                      boxShadow: isLightMessagesUi
+                        ? "0 20px 60px rgba(15, 22, 41, 0.08)"
+                        : "0 20px 60px rgba(2, 6, 23, 0.18)",
                       display: "grid",
                       gap: 14,
                     }}
@@ -8760,8 +8767,12 @@ export default function MessagesPage() {
                           type="button"
                           onClick={() => undefined}
                           style={{
-                            border: "1px solid rgba(255,255,255,0.12)",
-                            background: "rgba(255,255,255,0.08)",
+                            border: isLightMessagesUi
+                              ? "1px solid var(--color-border)"
+                              : "1px solid rgba(255,255,255,0.12)",
+                            background: isLightMessagesUi
+                              ? "var(--color-surface-muted)"
+                              : "rgba(255,255,255,0.08)",
                             color: "var(--color-text)",
                             padding: "6px 10px",
                             borderRadius: 10,
@@ -8800,8 +8811,12 @@ export default function MessagesPage() {
                               fontWeight: 800,
                               padding: "6px 10px",
                               borderRadius: 999,
-                              border: "1px solid rgba(255,255,255,0.10)",
-                              background: "rgba(255,255,255,0.05)",
+                              border: isLightMessagesUi
+                                ? "1px solid var(--color-border)"
+                                : "1px solid rgba(255,255,255,0.10)",
+                              background: isLightMessagesUi
+                                ? "var(--color-surface-muted)"
+                                : "rgba(255,255,255,0.05)",
                             }}
                             title={t("chat.boostStore.expiresLabel")}
                           >
@@ -8829,8 +8844,12 @@ export default function MessagesPage() {
                             padding: "8px 12px",
                             fontSize: 12,
                             fontWeight: 900,
-                            border: "1px solid rgba(255,255,255,0.16)",
-                            background: "rgba(255,255,255,0.08)",
+                            border: isLightMessagesUi
+                              ? "1px solid var(--color-border)"
+                              : "1px solid rgba(255,255,255,0.16)",
+                            background: isLightMessagesUi
+                              ? "var(--color-surface-muted)"
+                              : "rgba(255,255,255,0.08)",
                             color: "var(--color-text)",
                             cursor: "pointer",
                           }}
@@ -8847,6 +8866,7 @@ export default function MessagesPage() {
                         textTransform: "uppercase",
                         lineHeight: 1.05,
                         letterSpacing: "0.02em",
+                        color: "var(--color-text)",
                       }}
                     >
                       {t("chat.boostStore.heroTitle")}
@@ -8917,7 +8937,9 @@ export default function MessagesPage() {
                     style={{
                       position: "fixed",
                       inset: 0,
-                      background: "rgba(0,0,0,0.55)",
+                      background: isLightMessagesUi
+                        ? "var(--color-overlay)"
+                        : "rgba(0,0,0,0.55)",
                       display: "grid",
                       placeItems: "center",
                       padding: 24,
@@ -8932,7 +8954,9 @@ export default function MessagesPage() {
                         border: "1px solid var(--color-border)",
                         background: "var(--color-surface)",
                         padding: 16,
-                        boxShadow: "0 20px 60px rgba(2,6,23,0.35)",
+                        boxShadow: isLightMessagesUi
+                          ? "0 20px 60px rgba(15, 22, 41, 0.12)"
+                          : "0 20px 60px rgba(2,6,23,0.35)",
                         color: "var(--color-text)",
                         display: "grid",
                         gap: 12,
