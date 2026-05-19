@@ -593,7 +593,7 @@ class MessagesController extends ChangeNotifier {
     if (list.any((m) => m.id == message.id)) return;
     list.add(message);
     _messagesByUser[peerId] = list;
-    _patchThreadLastMessage(peerId, message.content);
+    _bumpThreadToTop(peerId, lastMessage: message.content);
     // Mute affects alerts only; messages must still be received and shown.
     if (!isConversationMuted(peerId)) {
       MessageNotificationSound.play();
@@ -624,19 +624,42 @@ class MessagesController extends ChangeNotifier {
   }
 
   void _patchThreadLastMessage(String userId, String lastMessage) {
+    _bumpThreadToTop(
+      userId,
+      lastMessage: lastMessage,
+    );
+  }
+
+  /// Đẩy hội thoại lên đầu danh sách DM (sau các thread đã ghim).
+  void _bumpThreadToTop(
+    String userId, {
+    required String lastMessage,
+    bool incrementUnread = false,
+  }) {
     final idx = _threads.indexWhere((e) => e.id == userId);
-    if (idx == -1) return;
-    final current = _threads[idx];
-    _threads[idx] = MessageThread(
+    if (idx == -1) {
+      unawaited(refreshThreads());
+      return;
+    }
+    final current = _threads.removeAt(idx);
+    final updated = MessageThread(
       id: current.id,
       name: current.name,
       lastMessage: lastMessage,
       lastActiveLabel: 'now',
-      unreadCount: current.unreadCount,
+      unreadCount: incrementUnread
+          ? current.unreadCount + 1
+          : current.unreadCount,
       avatarUrl: current.avatarUrl,
       isOnline: current.isOnline,
       isPinned: current.isPinned,
     );
+    var insertAt = 0;
+    if (!updated.isPinned) {
+      final firstUnpinned = _threads.indexWhere((e) => !e.isPinned);
+      insertAt = firstUnpinned < 0 ? _threads.length : firstUnpinned;
+    }
+    _threads.insert(insertAt, updated);
   }
 
   String _formatRelative(DateTime? time) {

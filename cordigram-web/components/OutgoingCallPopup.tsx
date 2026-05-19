@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useCallSound } from "@/hooks/use-call-sound";
+import { useMessagesUiTone } from "@/hooks/use-messages-ui-tone";
 import styles from "./OutgoingCallPopup.module.css";
 import { useLanguage } from "@/component/language-provider";
 
@@ -21,6 +22,7 @@ export default function OutgoingCallPopup({
   status,
 }: OutgoingCallPopupProps) {
   const { t } = useLanguage();
+  const uiTone = useMessagesUiTone();
 
   // ✅ Play outgoing call dialing tone (only when status is 'calling')
   useCallSound("outgoing", status === "calling");
@@ -43,7 +45,7 @@ export default function OutgoingCallPopup({
   };
 
   return (
-    <div className={styles.overlay}>
+    <div className={styles.overlay} data-ui-tone={uiTone}>
       <div className={styles.popup}>
         <div className={styles.cardAccent} aria-hidden />
         {/* Avatar */}

@@ -1451,6 +1451,11 @@
   order: 2;
 }
 
+.callMessageWrap {
+  margin: 4px 0;
+  max-width: 100%;
+}
+
 .messageBubble {
   padding: 8px 12px;
   border-radius: 16px;

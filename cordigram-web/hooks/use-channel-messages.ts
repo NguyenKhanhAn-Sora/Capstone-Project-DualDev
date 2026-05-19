@@ -55,6 +55,7 @@ export interface ServerMemberProfileUpdatedEvent {
 
 export interface UserProfileStyleUpdatedEvent {
   userId: string;
+  profileContext?: "messaging" | "social";
   avatarUrl?: string | null;
   coverUrl?: string | null;
   displayNameFontId?: string;
@@ -66,6 +67,7 @@ export interface UserProfileStyleUpdatedEvent {
 
 export interface BoostEntitlementUpdatedEvent {
   userId: string;
+  scope?: "messages" | "social";
   tier?: "basic" | "boost" | null;
   active?: boolean;
   expiresAt?: string | null;

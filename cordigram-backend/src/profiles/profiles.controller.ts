@@ -287,9 +287,11 @@ export class ProfilesController {
     if (dto.coverUrl !== undefined) {
       const trimmed = (dto.coverUrl ?? '').trim();
       const isImageUrl = /^https?:\/\//i.test(trimmed);
-      const accountBoost = Boolean((user as any)?.settings?.accountBoost);
-      const ent = await this.boostService.getBoostStatus(user.userId);
-      const unlocked = accountBoost || Boolean(ent?.active);
+      const socialAccountBoost = Boolean(
+        (user as any)?.settings?.socialAccountBoost,
+      );
+      const ent = await this.boostService.getBoostStatus(user.userId, 'social');
+      const unlocked = socialAccountBoost || Boolean(ent?.active);
       if (isImageUrl && !unlocked) {
         throw new ForbiddenException('Boost required for banner image');
       }
@@ -444,12 +446,15 @@ export class ProfilesController {
     }
 
     const reqAny = req as Request & { user?: AuthenticatedUser };
-    const boost = await this.boostService.getBoostStatus(user.userId);
-    const maxAvatarBytes = isCordigramMessagesUpload(reqAny)
-      ? boost.active
+    const isMessagesUpload = isCordigramMessagesUpload(reqAny);
+    const boost = await this.boostService.getBoostStatus(
+      user.userId,
+      isMessagesUpload ? 'messages' : 'social',
+    );
+    const maxAvatarBytes =
+      isMessagesUpload && boost.active
         ? boost.limits.maxUploadBytes
-        : MAX_AVATAR_BYTES
-      : MAX_AVATAR_BYTES;
+        : MAX_AVATAR_BYTES;
     for (const f of [originalFile, croppedFile].filter(
       Boolean,
     ) as MulterFile[]) {
@@ -475,10 +480,18 @@ export class ProfilesController {
       originalFile.originalname?.toLowerCase?.().endsWith?.('.gif');
 
     if (isGif) {
-      const accountBoost = Boolean((user as any)?.settings?.accountBoost);
-      const unlocked = accountBoost || Boolean(boost?.active);
+      const socialAccountBoost = Boolean(
+        (user as any)?.settings?.socialAccountBoost,
+      );
+      const socialBoost = await this.boostService.getBoostStatus(
+        user.userId,
+        'social',
+      );
+      const unlocked = socialAccountBoost || Boolean(socialBoost?.active);
       if (!unlocked) {
-        throw new BadRequestException('Boost required for GIF avatar');
+        throw new BadRequestException(
+          'Social Boost required for GIF avatar',
+        );
       }
     }
 

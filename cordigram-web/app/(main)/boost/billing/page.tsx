@@ -54,6 +54,7 @@ export default function BoostBillingPage() {
           actionType,
           boostTier: tier,
           billingCycle: cycle,
+          boostScope: "social",
           recipientUserId:
             mode === "gift" ? recipientUserId ?? undefined : undefined,
           currency: "vnd",

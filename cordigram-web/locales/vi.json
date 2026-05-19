@@ -271,6 +271,19 @@
       "self": "Bạn đã xóa tin nhắn",
       "other": "{name} đã xóa tin nhắn"
     },
+    "callMessage": {
+      "missedVoice": "Đã bỏ lỡ cuộc gọi thoại",
+      "missedVideo": "Đã bỏ lỡ cuộc gọi video",
+      "outgoingMissedVoice": "Cuộc gọi thoại",
+      "outgoingMissedVideo": "Cuộc gọi video",
+      "completedVoice": "Cuộc gọi thoại",
+      "completedVideo": "Cuộc gọi video",
+      "callBack": "Gọi lại",
+      "durationSeconds": "{n} giây",
+      "durationMinutes": "{n} phút",
+      "durationMinutesSeconds": "{m} phút {s} giây",
+      "noAnswer": "Không trả lời"
+    },
     "toast": {
       "deletedForMe": "Bạn đã xóa một tin nhắn",
       "recalled": "Đã xóa tin nhắn với mọi người",
@@ -954,7 +967,7 @@
       "loading": "Đang tải…",
       "serverLabel": "Máy chủ",
       "selectServer": "— Chọn máy chủ —",
-      "serverHint": "Biểu ngữ và ảnh đại diện dùng chung với hồ sơ chính; xem trước hiển thị biệt danh trên máy chủ này.",
+      "serverHint": "Hồ sơ máy chủ (ảnh, biểu ngữ, kiểu tên) chỉ áp dụng trong máy chủ đã chọn — tách khỏi hồ sơ social và hồ sơ chính Messages. Xem trước hiển thị biệt danh trên máy chủ này.",
       "serverNickLabel": "Biệt danh máy chủ",
       "serverNickPlaceholder": "Tên hiển thị trong máy chủ",
       "displayNameLabel": "Tên hiển thị",

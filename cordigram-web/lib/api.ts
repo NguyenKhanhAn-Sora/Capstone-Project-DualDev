@@ -3722,7 +3722,10 @@ export async function getAvailableUsers(opts?: {
   });
 }
 
+export type BoostScope = "messages" | "social";
+
 export type BoostStatusResponse = {
+  scope?: BoostScope;
   tier?: "basic" | "boost" | null;
   active?: boolean;
   expiresAt?: string | null;
@@ -3731,6 +3734,7 @@ export type BoostStatusResponse = {
   limits?: any;
   // backwards compatible fields from older endpoint shape
   accountBoost?: boolean;
+  socialAccountBoost?: boolean;
   serverBoost?: boolean;
   unlocked?: boolean;
 };
@@ -3738,9 +3742,14 @@ export type BoostStatusResponse = {
 export async function fetchBoostStatus(opts: {
   token: string;
   serverId?: string | null;
+  /** Mặc định `messages` — gói Boost Social dùng `social`. */
+  scope?: BoostScope;
 }): Promise<BoostStatusResponse> {
-  const { token, serverId } = opts;
-  const qs = serverId ? `?serverId=${encodeURIComponent(serverId)}` : "";
+  const { token, serverId, scope = "messages" } = opts;
+  const params = new URLSearchParams();
+  if (serverId) params.set("serverId", serverId);
+  if (scope) params.set("scope", scope);
+  const qs = params.toString() ? `?${params.toString()}` : "";
   return apiFetch<BoostStatusResponse>({
     path: `/users/boost-status${qs}`,
     method: "GET",
@@ -4141,6 +4150,7 @@ export type CreateStripeCheckoutSessionRequest = {
   boostTier?: "basic" | "boost";
   billingCycle?: "monthly" | "yearly";
   recipientUserId?: string;
+  boostScope?: BoostScope;
   promotedPostId?: string;
   primaryText?: string;
   headline?: string;

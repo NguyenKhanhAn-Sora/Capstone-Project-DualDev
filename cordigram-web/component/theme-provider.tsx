@@ -33,6 +33,7 @@ const ACCENT_OVERRIDE_KEYS = [
   "--accent-active",
   "--accent-soft",
   "--color-bg",
+  "--color-bg-home",
   "--color-surface",
   "--color-surface-muted",
   "--color-border",
@@ -92,7 +93,7 @@ function rgbToHex(r: number, g: number, b: number) {
     .join("")}`.toUpperCase();
 }
 
-function getLuminance(color: string): number {
+export function getLuminance(color: string): number {
   const { r, g, b } = hexToRgb(color);
   const [rs, gs, bs] = [r, g, b].map((value) => {
     const channel = value / 255;
@@ -235,6 +236,7 @@ export function applyAccentColor(
     s.setProperty("--accent-active", active);
     s.setProperty("--accent-soft", soft);
     s.setProperty("--color-bg", bg);
+    s.setProperty("--color-bg-home", bg);
     s.setProperty("--color-surface", surface);
     s.setProperty("--color-surface-muted", surfaceMuted);
     s.setProperty("--color-border", border);

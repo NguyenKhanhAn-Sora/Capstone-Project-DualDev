@@ -14,6 +14,7 @@ interface ReplyMessagePreviewProps {
       | "gif"
       | "sticker"
       | "voice"
+      | "call"
       | "system"
       | "welcome";
   };
@@ -35,6 +36,9 @@ export default function ReplyMessagePreview({
     }
     if (message.messageType === "voice") {
       return "Tin nhắn thoại";
+    }
+    if (message.messageType === "call") {
+      return message.text || "Cuộc gọi";
     }
     return message.text.length > 100
       ? message.text.substring(0, 100) + "..."

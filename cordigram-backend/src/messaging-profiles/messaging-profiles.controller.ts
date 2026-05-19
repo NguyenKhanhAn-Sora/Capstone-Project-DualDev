@@ -118,7 +118,7 @@ export class MessagingProfilesController {
     }
 
     const reqAny = req as Request & { user?: AuthenticatedUser };
-    const boost = await this.boostService.getBoostStatus(user.userId);
+    const boost = await this.boostService.getBoostStatus(user.userId, 'messages');
     const maxAvatarBytes = isCordigramMessagesUpload(reqAny)
       ? boost.active
         ? boost.limits.maxUploadBytes
@@ -149,10 +149,14 @@ export class MessagingProfilesController {
       originalFile.originalname?.toLowerCase?.().endsWith?.('.gif');
 
     if (isGif) {
-      const accountBoost = Boolean((user as any)?.settings?.accountBoost);
-      const unlocked = accountBoost || Boolean(boost?.active);
+      const messagesAccountBoost = Boolean(
+        (user as any)?.settings?.accountBoost,
+      );
+      const unlocked = messagesAccountBoost || Boolean(boost?.active);
       if (!unlocked) {
-        throw new BadRequestException('Boost required for GIF avatar');
+        throw new BadRequestException(
+          'Messages Boost required for GIF avatar',
+        );
       }
     }
 

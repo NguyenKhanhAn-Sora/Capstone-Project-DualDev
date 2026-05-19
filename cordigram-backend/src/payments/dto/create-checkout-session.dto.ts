@@ -29,6 +29,11 @@ export class CreateCheckoutSessionDto {
   @IsString()
   recipientUserId?: string;
 
+  /** `messages` | `social` — gói Boost tách theo ngữ cảnh. Mặc định `messages`. */
+  @IsOptional()
+  @IsString()
+  boostScope?: string;
+
   @IsOptional()
   @IsString()
   targetCampaignId?: string;

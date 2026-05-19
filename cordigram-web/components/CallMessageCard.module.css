@@ -1,0 +1,80 @@
+.card {
+  min-width: 220px;
+  max-width: 280px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, #5b2d6e 55%, transparent);
+  border: 1px solid color-mix(in srgb, #c084fc 25%, transparent);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  user-select: none;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.iconCircle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.iconMissed {
+  background: #e53935;
+}
+
+.iconOk {
+  background: color-mix(in srgb, #7c4dff 70%, #3949ab);
+}
+
+.textCol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: color-mix(in srgb, #fff 65%, transparent);
+  line-height: 1.2;
+}
+
+.callBackBtn {
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 10px;
+  background: color-mix(in srgb, #8b5cf6 45%, #4c1d95);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.callBackBtn:hover {
+  background: color-mix(in srgb, #a78bfa 50%, #5b21b6);
+}
+
+.callBackBtn:active {
+  transform: scale(0.98);
+}

@@ -835,7 +835,9 @@ export class ServersController {
         : String(body?.coverUrl ?? '').trim();
     const isImageUrl = Boolean(next && /^https?:\/\//i.test(next));
     if (isImageUrl) {
-      const accountBoost = Boolean(req?.user?.settings?.accountBoost);
+      const messagesAccountBoost = Boolean(
+        req?.user?.settings?.accountBoost,
+      );
       const server = await this.serversService.getServerById(serverId);
       const boostedBy = Array.isArray((server as any)?.boostedByUserIds)
         ? (server as any).boostedByUserIds
@@ -843,7 +845,7 @@ export class ServersController {
       const serverBoost = boostedBy.some(
         (x: any) => String(x) === String(req.user.userId),
       );
-      const unlocked = accountBoost || serverBoost;
+      const unlocked = messagesAccountBoost || serverBoost;
       if (!unlocked) {
         throw new ForbiddenException('Boost required for banner image');
       }
@@ -887,7 +889,7 @@ export class ServersController {
       throw new BadRequestException('Thiếu file original');
     }
 
-    const boost = await this.boostService.getBoostStatus(userId);
+    const boost = await this.boostService.getBoostStatus(userId, 'messages');
     const maxAvatarBytes = isCordigramMessagesUpload(req as ExpressRequest)
       ? boost.active
         ? boost.limits.maxUploadBytes
@@ -919,15 +921,20 @@ export class ServersController {
       originalFile.originalname?.toLowerCase?.().endsWith?.('.gif');
 
     if (isGif) {
-      const accountBoost = Boolean(req?.user?.settings?.accountBoost);
+      const messagesAccountBoost = Boolean(
+        req?.user?.settings?.accountBoost,
+      );
       const boostedBy = req?.serverBoostedByUserIds as string[] | undefined;
       const serverBoost =
         Array.isArray(boostedBy) && userId
           ? boostedBy.some((x) => String(x) === userId)
           : false;
-      const unlocked = accountBoost || serverBoost || Boolean(boost?.active);
+      const unlocked =
+        messagesAccountBoost || serverBoost || Boolean(boost?.active);
       if (!unlocked) {
-        throw new BadRequestException('Boost required for GIF avatar');
+        throw new BadRequestException(
+          'Messages Boost required for GIF avatar',
+        );
       }
     }
 

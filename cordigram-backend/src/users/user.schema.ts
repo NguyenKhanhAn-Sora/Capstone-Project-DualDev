@@ -34,8 +34,10 @@ export type UserSettings = {
   showCordigramMemberSince?: boolean;
   /** Chia sẻ trạng thái online/idle/offline với người khác. */
   sharePresence?: boolean;
-  /** Nâng cấp Boost theo tài khoản (mở khóa tính năng cao cấp). */
+  /** Dev/admin: mở khóa Boost trong Messages (không áp dụng Social). */
   accountBoost?: boolean;
+  /** Dev/admin: mở khóa Boost trên Social (avatar GIF, banner, v.v.). */
+  socialAccountBoost?: boolean;
   /** Âm thanh thông báo tin (client có thể đọc). */
   chatSoundEnabled?: boolean;
   notifications?: {
@@ -192,6 +194,7 @@ export class User extends Document {
       showCordigramMemberSince: { type: Boolean, default: true },
       sharePresence: { type: Boolean, default: true },
       accountBoost: { type: Boolean, default: false },
+      socialAccountBoost: { type: Boolean, default: false },
       chatSoundEnabled: { type: Boolean, default: true },
       notifications: {
         mutedUntil: { type: Date, default: null },
@@ -228,6 +231,7 @@ export class User extends Document {
       showCordigramMemberSince: true,
       sharePresence: true,
       accountBoost: false,
+      socialAccountBoost: false,
       chatSoundEnabled: true,
       notifications: {
         mutedUntil: null,

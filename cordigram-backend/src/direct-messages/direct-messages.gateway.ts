@@ -44,6 +44,133 @@ export class DirectMessagesGateway
 
   private readonly IDLE_AFTER_MS = 60_000;
 
+  /** In-flight 1:1 calls — used to write a single call-log DM when the session ends. */
+  private activeCalls = new Map<
+    string,
+    {
+      initiatorId: string;
+      calleeId: string;
+      type: 'audio' | 'video';
+      answeredAt?: number;
+      logged: boolean;
+    }
+  >();
+
+  private callPairKey(userA: string, userB: string): string {
+    return [userA, userB].sort().join(':');
+  }
+
+  private clearActiveCall(userA: string, userB: string): void {
+    this.activeCalls.delete(this.callPairKey(userA, userB));
+  }
+
+  private async persistCallLogAndNotify(params: {
+    initiatorId: string;
+    peerId: string;
+    callType: 'audio' | 'video';
+    callStatus: 'missed' | 'completed' | 'declined' | 'cancelled';
+    durationSec?: number;
+  }): Promise<void> {
+    try {
+      const message = await this.directMessagesService.createCallLogMessage({
+        initiatorId: params.initiatorId,
+        peerId: params.peerId,
+        callType: params.callType,
+        callStatus: params.callStatus,
+        durationSec: params.durationSec,
+      });
+
+      const populatedMessage =
+        await this.directMessagesService.getDirectMessageById(
+          message._id.toString(),
+        );
+
+      const senderId = params.initiatorId;
+      const receiverId = params.peerId;
+
+      const receiverSockets = this.connectedUsers.get(receiverId);
+      if (receiverSockets?.size) {
+        for (const sid of receiverSockets) {
+          this.server.to(sid).emit('new-message', {
+            message: populatedMessage,
+            fromUser: {
+              userId: senderId,
+              username:
+                (populatedMessage as any).senderId?.['username'] ?? 'User',
+            },
+          });
+        }
+        await this.emitDmUnreadCount(receiverId, senderId);
+      }
+
+      const initiatorSockets = this.connectedUsers.get(senderId);
+      if (initiatorSockets?.size) {
+        for (const sid of initiatorSockets) {
+          this.server.to(sid).emit('message-sent', {
+            message: populatedMessage,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ [CALL] Failed to persist call log message:', error);
+    }
+  }
+
+  private async finalizeActiveCall(
+    userA: string,
+    userB: string,
+    endedByUserId: string,
+    explicitStatus?: 'missed' | 'completed' | 'declined' | 'cancelled',
+  ): Promise<void> {
+    const key = this.callPairKey(userA, userB);
+    const session = this.activeCalls.get(key);
+    if (!session || session.logged) {
+      this.activeCalls.delete(key);
+      return;
+    }
+
+    session.logged = true;
+    this.activeCalls.delete(key);
+
+    const { initiatorId, calleeId, type, answeredAt } = session;
+    const peerId = calleeId;
+
+    let callStatus: 'missed' | 'completed' | 'declined' | 'cancelled';
+    let durationSec: number | undefined;
+
+    if (explicitStatus) {
+      callStatus = explicitStatus;
+    } else if (answeredAt) {
+      callStatus = 'completed';
+      durationSec = Math.max(
+        1,
+        Math.floor((Date.now() - answeredAt) / 1000),
+      );
+    } else if (endedByUserId === calleeId) {
+      callStatus = 'declined';
+    } else if (endedByUserId === initiatorId) {
+      callStatus = 'cancelled';
+    } else {
+      callStatus = 'missed';
+    }
+
+    if (callStatus === 'cancelled' && answeredAt) {
+      callStatus = 'completed';
+      durationSec = Math.max(
+        1,
+        Math.floor((Date.now() - answeredAt) / 1000),
+      );
+    }
+
+    await this.persistCallLogAndNotify({
+      initiatorId,
+      peerId,
+      callType: type,
+      callStatus,
+      durationSec,
+    });
+  }
+
   private async emitDmUnreadCount(toUserId: string, fromUserId?: string) {
     const sockets = this.connectedUsers.get(toUserId);
     if (!sockets || sockets.size === 0) return;
@@ -614,6 +741,14 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
+      const key = this.callPairKey(senderId, data.receiverId);
+      this.activeCalls.set(key, {
+        initiatorId: senderId,
+        calleeId: data.receiverId,
+        type: data.type,
+        logged: false,
+      });
+
       if (receiverSocket && receiverSocket.size) {
         const payload = {
           from: senderId,
@@ -643,6 +778,12 @@ export class DirectMessagesGateway
     @MessageBody() data: { callerId: string; sdpOffer: any },
   ) {
     const userId = socket.data.userId;
+    const key = this.callPairKey(userId, data.callerId);
+    const session = this.activeCalls.get(key);
+    if (session) {
+      session.answeredAt = Date.now();
+    }
+
     const callerSocket = this.connectedUsers.get(data.callerId);
 
     if (callerSocket && callerSocket.size) {
@@ -656,7 +797,7 @@ export class DirectMessagesGateway
   }
 
   @SubscribeMessage('call-reject')
-  handleCallReject(
+  async handleCallReject(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: { callerId: string },
   ) {
@@ -670,6 +811,8 @@ export class DirectMessagesGateway
         });
       }
     }
+
+    await this.finalizeActiveCall(data.callerId, userId, userId, 'missed');
   }
 
   @SubscribeMessage('ice-candidate')
@@ -691,9 +834,14 @@ export class DirectMessagesGateway
   }
 
   @SubscribeMessage('call-end')
-  handleCallEnd(
+  async handleCallEnd(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: { peerId: string },
+    @MessageBody()
+    data: {
+      peerId: string;
+      status?: 'missed' | 'completed' | 'declined' | 'cancelled';
+      durationSec?: number;
+    },
   ) {
     const userId = socket.data.userId;
     const peerSocket = this.connectedUsers.get(data.peerId);
@@ -704,8 +852,38 @@ export class DirectMessagesGateway
           from: userId,
         });
       }
-    } else {
     }
+
+    const key = this.callPairKey(userId, data.peerId);
+    const session = this.activeCalls.get(key);
+
+    if (session && !session.logged) {
+      if (data.status === 'completed' && session.answeredAt) {
+        session.logged = true;
+        this.activeCalls.delete(key);
+        const durationSec =
+          data.durationSec ??
+          Math.max(1, Math.floor((Date.now() - session.answeredAt) / 1000));
+        await this.persistCallLogAndNotify({
+          initiatorId: session.initiatorId,
+          peerId: session.calleeId,
+          callType: session.type,
+          callStatus: 'completed',
+          durationSec,
+        });
+        return;
+      }
+
+      await this.finalizeActiveCall(
+        userId,
+        data.peerId,
+        userId,
+        data.status,
+      );
+      return;
+    }
+
+    this.clearActiveCall(userId, data.peerId);
   }
 
   getConnectedUsers() {

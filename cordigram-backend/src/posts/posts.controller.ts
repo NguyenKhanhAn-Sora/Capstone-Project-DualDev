@@ -296,10 +296,17 @@ export class PostsController {
     if (!file) {
       throw new BadRequestException('Missing file');
     }
-    const status = await this.boostService.getBoostStatus(user.userId);
+    const status = await this.boostService.getBoostStatus(
+      user.userId,
+      isCordigramMessagesUpload(req) ? 'messages' : 'social',
+    );
     const maxBytes = isCordigramMessagesUpload(req)
-      ? status.limits.maxUploadBytes
-      : FREE_MAX_UPLOAD_BYTES;
+      ? status.active
+        ? status.limits.maxUploadBytes
+        : FREE_MAX_UPLOAD_BYTES
+      : status.active
+        ? status.limits.maxUploadBytes
+        : FREE_MAX_UPLOAD_BYTES;
     if (typeof file.size === 'number' && file.size > maxBytes) {
       throw new BadRequestException(`File too large (max ${maxBytes} bytes)`);
     }
@@ -335,10 +342,17 @@ export class PostsController {
     if (!files || !files.length) {
       throw new BadRequestException('Missing files');
     }
-    const status = await this.boostService.getBoostStatus(user.userId);
+    const status = await this.boostService.getBoostStatus(
+      user.userId,
+      isCordigramMessagesUpload(req) ? 'messages' : 'social',
+    );
     const maxBytes = isCordigramMessagesUpload(req)
-      ? status.limits.maxUploadBytes
-      : FREE_MAX_UPLOAD_BYTES;
+      ? status.active
+        ? status.limits.maxUploadBytes
+        : FREE_MAX_UPLOAD_BYTES
+      : status.active
+        ? status.limits.maxUploadBytes
+        : FREE_MAX_UPLOAD_BYTES;
     const tooLarge = files.find(
       (f) => typeof f.size === 'number' && f.size > maxBytes,
     );

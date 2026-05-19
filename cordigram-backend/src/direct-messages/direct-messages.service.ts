@@ -38,6 +38,21 @@ export class DirectMessagesService {
     private readonly messagingProfilesService: MessagingProfilesService,
   ) {}
 
+  /** Tin nhận được, chưa đọc, chưa xóa với mọi người, và chưa ẩn "for me". */
+  private unreadReceiverMatch(userId: string, fromUserId?: string) {
+    const receiverId = new Types.ObjectId(userId);
+    const filter: Record<string, unknown> = {
+      receiverId,
+      isRead: { $ne: true },
+      isDeleted: false,
+      deletedFor: { $nin: [receiverId] },
+    };
+    if (fromUserId) {
+      filter.senderId = new Types.ObjectId(fromUserId);
+    }
+    return filter;
+  }
+
   async createDirectMessage(
     senderId: string,
     receiverId: string,
@@ -55,6 +70,62 @@ export class DirectMessagesService {
       replyTo: createDirectMessageDto.replyTo
         ? new Types.ObjectId(createDirectMessageDto.replyTo)
         : null,
+    });
+
+    return message.save();
+  }
+
+  /** Human-readable preview for conversation list / notifications. */
+  private buildCallLogContent(
+    callType: 'audio' | 'video',
+    callStatus: 'missed' | 'completed' | 'declined' | 'cancelled',
+    durationSec?: number,
+  ): string {
+    const media =
+      callType === 'video' ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+    if (callStatus === 'completed') {
+      const sec = Math.max(0, Math.floor(durationSec ?? 0));
+      if (sec < 60) return `${media} · ${sec} giây`;
+      const min = Math.floor(sec / 60);
+      const rem = sec % 60;
+      if (rem === 0) return `${media} · ${min} phút`;
+      return `${media} · ${min} phút ${rem} giây`;
+    }
+    if (callStatus === 'missed') {
+      return callType === 'video'
+        ? 'Đã bỏ lỡ cuộc gọi video'
+        : 'Đã bỏ lỡ cuộc gọi thoại';
+    }
+    if (callStatus === 'declined') return `${media} · Từ chối`;
+    return `${media} · Đã hủy`;
+  }
+
+  async createCallLogMessage(params: {
+    initiatorId: string;
+    peerId: string;
+    callType: 'audio' | 'video';
+    callStatus: 'missed' | 'completed' | 'declined' | 'cancelled';
+    durationSec?: number;
+  }): Promise<DirectMessage> {
+    const duration =
+      params.callStatus === 'completed'
+        ? Math.max(0, Math.floor(params.durationSec ?? 0))
+        : null;
+
+    const message = new this.directMessageModel({
+      senderId: new Types.ObjectId(params.initiatorId),
+      receiverId: new Types.ObjectId(params.peerId),
+      type: 'call',
+      callType: params.callType,
+      callStatus: params.callStatus,
+      callDuration: duration,
+      callInitiatorId: new Types.ObjectId(params.initiatorId),
+      content: this.buildCallLogContent(
+        params.callType,
+        params.callStatus,
+        duration ?? undefined,
+      ),
+      attachments: [],
     });
 
     return message.save();
@@ -447,7 +518,7 @@ export class DirectMessagesService {
       {
         receiverId: new Types.ObjectId(userId),
         senderId: new Types.ObjectId(fromUserId),
-        isRead: false,
+        isRead: { $ne: true },
         isDeleted: false,
       },
       {
@@ -458,23 +529,18 @@ export class DirectMessagesService {
   }
 
   async getUnreadCount(userId: string): Promise<number> {
-    return this.directMessageModel.countDocuments({
-      receiverId: new Types.ObjectId(userId),
-      isRead: false,
-      isDeleted: false,
-    });
+    return this.directMessageModel.countDocuments(
+      this.unreadReceiverMatch(userId),
+    );
   }
 
   async getUnreadCountByUser(
     userId: string,
     fromUserId: string,
   ): Promise<number> {
-    return this.directMessageModel.countDocuments({
-      receiverId: new Types.ObjectId(userId),
-      senderId: new Types.ObjectId(fromUserId),
-      isRead: false,
-      isDeleted: false,
-    });
+    return this.directMessageModel.countDocuments(
+      this.unreadReceiverMatch(userId, fromUserId),
+    );
   }
 
   async getConversationList(userId: string): Promise<any[]> {
@@ -488,6 +554,7 @@ export class DirectMessagesService {
             isDeleted: false,
           },
         },
+        { $sort: { createdAt: 1 } },
         {
           $group: {
             _id: {
@@ -507,7 +574,12 @@ export class DirectMessagesService {
                   {
                     $and: [
                       { $eq: ['$receiverId', user] },
-                      { $eq: ['$isRead', false] },
+                      { $ne: ['$isRead', true] },
+                      {
+                        $not: {
+                          $in: [user, { $ifNull: ['$deletedFor', []] }],
+                        },
+                      },
                     ],
                   },
                   1,

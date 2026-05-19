@@ -24,7 +24,11 @@ export interface DirectMessage {
     avatar?: string;
   };
   content: string;
-  type?: "text" | "gif" | "sticker" | "voice";
+  type?: "text" | "gif" | "sticker" | "voice" | "call";
+  callType?: "audio" | "video" | null;
+  callStatus?: "missed" | "completed" | "declined" | "cancelled" | null;
+  callDuration?: number | null;
+  callInitiatorId?: string | { _id: string } | null;
   giphyId?: string | null;
   voiceUrl?: string | null;
   voiceDuration?: number | null;
@@ -69,6 +73,7 @@ export interface CallEvent {
 
 export interface UserProfileStyleUpdatedEvent {
   userId: string;
+  profileContext?: "messaging" | "social";
   avatarUrl?: string | null;
   coverUrl?: string | null;
   displayNameFontId?: string;
@@ -78,8 +83,16 @@ export interface UserProfileStyleUpdatedEvent {
   updatedAt?: string;
 }
 
+export interface DmUnreadCountEvent {
+  totalUnread?: number;
+  fromUserId?: string | null;
+  conversationUnread?: number | null;
+  _seq?: number;
+}
+
 export interface BoostEntitlementUpdatedEvent {
   userId: string;
+  scope?: "messages" | "social";
   tier?: "basic" | "boost" | null;
   active?: boolean;
   expiresAt?: string | null;
@@ -96,6 +109,8 @@ export const useDirectMessages = ({
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [newMessage, setNewMessage] = useState<DirectMessageEvent | null>(null);
+  const [dmUnreadCountEvent, setDmUnreadCountEvent] =
+    useState<DmUnreadCountEvent | null>(null);
   const [messageSent, setMessageSent] = useState<DirectMessage | false>(false);
   const [userTyping, setUserTyping] = useState<{
     fromUserId: string;
@@ -191,6 +206,28 @@ export const useDirectMessages = ({
         fromUser?: { userId: string; username: string };
       }) => {
         setNewMessage(data);
+        setTimeout(() => setNewMessage(null), 400);
+      },
+    );
+
+    socket.on(
+      "dm-unread-count",
+      (data: {
+        totalUnread?: number;
+        fromUserId?: string | null;
+        conversationUnread?: number | null;
+      }) => {
+        if (!data || typeof data !== "object") return;
+        setDmUnreadCountEvent({
+          totalUnread:
+            typeof data.totalUnread === "number" ? data.totalUnread : undefined,
+          fromUserId: data.fromUserId ?? null,
+          conversationUnread:
+            typeof data.conversationUnread === "number"
+              ? data.conversationUnread
+              : null,
+          _seq: Date.now(),
+        });
       },
     );
 
@@ -543,6 +580,7 @@ export const useDirectMessages = ({
   return {
     isConnected,
     newMessage,
+    dmUnreadCountEvent,
     messageSent,
     userTyping,
     messagesRead,
