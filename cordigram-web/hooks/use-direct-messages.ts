@@ -24,7 +24,11 @@ export interface DirectMessage {
     avatar?: string;
   };
   content: string;
-  type?: "text" | "gif" | "sticker" | "voice";
+  type?: "text" | "gif" | "sticker" | "voice" | "call";
+  callType?: "audio" | "video" | null;
+  callStatus?: "missed" | "completed" | "declined" | "cancelled" | null;
+  callDuration?: number | null;
+  callInitiatorId?: string | { _id: string } | null;
   giphyId?: string | null;
   voiceUrl?: string | null;
   voiceDuration?: number | null;

@@ -18,6 +18,7 @@ import 'pinned_messages_screen.dart';
 import 'search/message_search_sheet.dart';
 import 'widgets/gif_toolbar_icon.dart';
 import 'widgets/sticker_toolbar_icon.dart';
+import 'widgets/dm_call_message_card.dart';
 import 'widgets/server_join_flow.dart';
 import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
@@ -1711,6 +1712,15 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   }
 
   Widget _buildMessageContent(DmMessage message) {
+    if (message.isCallMessage) {
+      final video = message.callType == 'video';
+      return DmCallMessageCard(
+        message: message,
+        viewerId: widget.controller.myUserId,
+        onCallBack: () => _onStartCall(video: video),
+      );
+    }
+
     final text = _normalizedText(message).trim();
     final pollMatch = _pollRegExp.firstMatch(text);
     final inviteUrl = _extractInviteUrl(text);
@@ -1936,6 +1946,39 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                               ? message.senderId == myId
                               : message.senderId != widget.thread.id;
                           final hi = _highlightMessageId == message.id;
+                          if (message.isCallMessage) {
+                            return KeyedSubtree(
+                              key: _keyForMessage(message.id),
+                              child: Align(
+                                alignment: isMine
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      if (!isMine) ...[
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 6,
+                                            bottom: 6,
+                                          ),
+                                          child: _senderAvatarForBubble(
+                                            message,
+                                          ),
+                                        ),
+                                      ],
+                                      _buildMessageContent(message),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
                           return KeyedSubtree(
                             key: _keyForMessage(message.id),
                             child: Align(

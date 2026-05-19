@@ -23,6 +23,10 @@ class DmMessage {
     this.receiverDisplayName,
     this.receiverUsername,
     this.receiverAvatarUrl,
+    this.callType,
+    this.callStatus,
+    this.callDurationSec,
+    this.callInitiatorId,
   });
 
   final String id;
@@ -46,6 +50,20 @@ class DmMessage {
   final String? receiverDisplayName;
   final String? receiverUsername;
   final String? receiverAvatarUrl;
+  final String? callType;
+  final String? callStatus;
+  final int? callDurationSec;
+  final String? callInitiatorId;
+
+  bool get isCallMessage => type == 'call';
+
+  bool isMissedCallFor(String? viewerId) {
+    if (!isCallMessage) return false;
+    final status = callStatus ?? 'missed';
+    if (status != 'missed' && status != 'declined') return false;
+    final initiator = callInitiatorId ?? senderId;
+    return viewerId != null && initiator != viewerId;
+  }
 
   bool isMine(String? viewerId) => viewerId != null && senderId == viewerId;
 
@@ -125,6 +143,12 @@ class DmMessage {
       receiverDisplayName: pickDisplayName(receiverRaw),
       receiverUsername: pickUsername(receiverRaw),
       receiverAvatarUrl: pickAvatar(receiverRaw),
+      callType: json['callType']?.toString(),
+      callStatus: json['callStatus']?.toString(),
+      callDurationSec: json['callDuration'] is num
+          ? (json['callDuration'] as num).toInt()
+          : null,
+      callInitiatorId: pickUserId(json['callInitiatorId']),
     );
   }
 }

@@ -60,6 +60,8 @@ import {
 import { getLiveKitToken, getDMRoomName, getVoiceChannelParticipants } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 import OutgoingCallPopup from "@/components/OutgoingCallPopup";
+import { CallMessageCard } from "@/components/CallMessageCard";
+import { extractDmCallFields } from "@/lib/dm-call-message";
 import GiphyPicker, {
   type GiphyPickerSelection,
   type MediaPickerTab,
@@ -241,7 +243,11 @@ interface UIMessage {
   isFromCurrentUser: boolean;
   type: "server" | "direct"; // Thêm field để phân biệt loại chat
   isRead?: boolean; // Trạng thái đã đọc
-  messageType?: "text" | "gif" | "sticker" | "voice" | "system" | "welcome";
+  messageType?: "text" | "gif" | "sticker" | "voice" | "call" | "system" | "welcome";
+  callType?: "audio" | "video";
+  callStatus?: "missed" | "completed" | "declined" | "cancelled";
+  callDurationSec?: number | null;
+  callInitiatorId?: string;
   giphyId?: string;
   customStickerUrl?: string;
   serverStickerId?: string;
@@ -257,7 +263,7 @@ interface UIMessage {
     senderId?: string;
     senderDisplayName?: string;
     senderName?: string;
-    messageType?: "text" | "gif" | "sticker" | "voice" | "system" | "welcome";
+    messageType?: "text" | "gif" | "sticker" | "voice" | "call" | "system" | "welcome";
     text: string;
   } | null;
   /** Biệt danh trong máy chủ (nếu có) — mở card hồ sơ từ kênh. */
@@ -913,7 +919,7 @@ const MessageItem = memo(
         )}
 
         <div className={styles.messageContent}>
-          {/* Name and timestamp */}
+          {message.messageType !== "call" && (
           <div className={styles.messageHeader}>
             <span 
               className={styles.messageSenderName}
@@ -934,9 +940,16 @@ const MessageItem = memo(
               {formatMessageTime(message.timestamp)}
             </span>
           </div>
+          )}
+
+          {message.messageType === "call" ? (
+            <div className={styles.callMessageWrap}>
+              {renderMessageContent(message)}
+            </div>
+          ) : null}
 
           {/* Message bubble */}
-          {message.replyToMessage && (
+          {message.messageType !== "call" && message.replyToMessage && (
             <div className={styles.replyContext}>
               <div className={styles.replyContextLine} />
               <div className={styles.replyContextContent}>
@@ -988,13 +1001,15 @@ const MessageItem = memo(
               </div>
             </div>
           )}
-          <div
-            className={`${styles.messageBubble} ${
-              alignAsSent ? styles.sent : styles.received
-            }`}
-          >
-            {renderMessageContent(message)}
-          </div>
+          {message.messageType !== "call" ? (
+            <div
+              className={`${styles.messageBubble} ${
+                alignAsSent ? styles.sent : styles.received
+              }`}
+            >
+              {renderMessageContent(message)}
+            </div>
+          ) : null}
 
           {/* Message Reactions (ẩn khi đang hiện ở thanh sticky phía trên) */}
           {!message.isDeletedForEveryone &&
@@ -1066,7 +1081,10 @@ const MessageItem = memo(
         </div>
 
         {/* Quick Reaction Bar on Hover — portal với position:fixed + z-index cao để đè lên chatHeader khi cần */}
-        {isHovered && !message.isDeletedForEveryone && (scrollContainerRef && fixedReactionPosition ? (
+        {isHovered &&
+          message.messageType !== "call" &&
+          !message.isDeletedForEveryone &&
+          (scrollContainerRef && fixedReactionPosition ? (
           createPortal(
             <div
               style={{
@@ -1363,6 +1381,17 @@ function mapReplyToMessage(raw: any): UIMessage["replyToMessage"] {
     senderName: typeof sender === "object" ? sender?.username || "" : "",
     messageType: raw.type || "text",
     text: raw.content || "",
+  };
+}
+
+function mapCallFieldsToUiMessage(msg: any): Partial<UIMessage> {
+  const call = extractDmCallFields(msg as Record<string, unknown>);
+  if (!call) return {};
+  return {
+    callType: call.callType,
+    callStatus: call.callStatus,
+    callDurationSec: call.callDurationSec,
+    callInitiatorId: call.callInitiatorId,
   };
 }
 
@@ -3608,6 +3637,7 @@ export default function MessagesPage() {
         type: "direct",
         isRead: msg.isRead || false,
         messageType: msg.type || "text",
+        ...mapCallFieldsToUiMessage(msg),
         giphyId: msg.giphyId || undefined,
         customStickerUrl: msg.customStickerUrl || undefined,
         serverStickerId:
@@ -3684,6 +3714,7 @@ export default function MessagesPage() {
         type: "direct",
         isRead: msg.isRead || false,
         messageType: msg.type || "text",
+        ...mapCallFieldsToUiMessage(msg),
         giphyId: msg.giphyId || undefined,
         customStickerUrl: msg.customStickerUrl || undefined,
         serverStickerId:
@@ -4199,6 +4230,7 @@ export default function MessagesPage() {
         type: "direct", // Phân biệt là message từ direct message
         isRead: msg.isRead || false, // Load initial read status
         messageType: msg.type || "text", // Type of message content
+        ...mapCallFieldsToUiMessage(msg),
         giphyId: msg.giphyId || undefined, // Giphy ID if it's a GIF/sticker
         customStickerUrl: msg.customStickerUrl || undefined,
         serverStickerId:
@@ -6238,6 +6270,20 @@ export default function MessagesPage() {
         );
       }
 
+      if (messageType === "call") {
+        return (
+          <CallMessageCard
+            callType={message.callType ?? "audio"}
+            callStatus={message.callStatus ?? "missed"}
+            callDurationSec={message.callDurationSec}
+            callInitiatorId={message.callInitiatorId}
+            currentUserId={currentUserId}
+            timestamp={message.timestamp}
+            onCallBack={() => handleStartCall(message.callType === "video")}
+          />
+        );
+      }
+
       if (messageType === "system") {
         return (
           <div style={{
@@ -6628,6 +6674,9 @@ export default function MessagesPage() {
       handleWaveSticker,
       serverEmojiRenderMap,
       boostStatus?.active,
+      currentUserId,
+      handleStartCall,
+      t,
     ],
   );
 

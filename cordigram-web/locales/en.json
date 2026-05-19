@@ -271,6 +271,19 @@
       "self": "You deleted a message",
       "other": "{name} deleted a message"
     },
+    "callMessage": {
+      "missedVoice": "Missed voice call",
+      "missedVideo": "Missed video call",
+      "outgoingMissedVoice": "Voice call",
+      "outgoingMissedVideo": "Video call",
+      "completedVoice": "Voice call",
+      "completedVideo": "Video call",
+      "callBack": "Call back",
+      "durationSeconds": "{n} sec",
+      "durationMinutes": "{n} min",
+      "durationMinutesSeconds": "{m} min {s} sec",
+      "noAnswer": "No answer"
+    },
     "toast": {
       "deletedForMe": "Message deleted for you",
       "recalled": "Message deleted for everyone",

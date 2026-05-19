@@ -10,9 +10,21 @@ export class CreateDirectMessageDto {
   @IsString()
   content: string;
 
-  @IsEnum(['text', 'gif', 'sticker', 'voice'])
+  @IsEnum(['text', 'gif', 'sticker', 'voice', 'call'])
   @IsOptional()
-  type?: 'text' | 'gif' | 'sticker' | 'voice';
+  type?: 'text' | 'gif' | 'sticker' | 'voice' | 'call';
+
+  @IsEnum(['audio', 'video'])
+  @IsOptional()
+  callType?: 'audio' | 'video';
+
+  @IsEnum(['missed', 'completed', 'declined', 'cancelled'])
+  @IsOptional()
+  callStatus?: 'missed' | 'completed' | 'declined' | 'cancelled';
+
+  @IsNumber()
+  @IsOptional()
+  callDuration?: number;
 
   @IsString()
   @IsOptional()

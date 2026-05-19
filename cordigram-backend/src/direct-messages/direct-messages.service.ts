@@ -60,6 +60,62 @@ export class DirectMessagesService {
     return message.save();
   }
 
+  /** Human-readable preview for conversation list / notifications. */
+  private buildCallLogContent(
+    callType: 'audio' | 'video',
+    callStatus: 'missed' | 'completed' | 'declined' | 'cancelled',
+    durationSec?: number,
+  ): string {
+    const media =
+      callType === 'video' ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+    if (callStatus === 'completed') {
+      const sec = Math.max(0, Math.floor(durationSec ?? 0));
+      if (sec < 60) return `${media} · ${sec} giây`;
+      const min = Math.floor(sec / 60);
+      const rem = sec % 60;
+      if (rem === 0) return `${media} · ${min} phút`;
+      return `${media} · ${min} phút ${rem} giây`;
+    }
+    if (callStatus === 'missed') {
+      return callType === 'video'
+        ? 'Đã bỏ lỡ cuộc gọi video'
+        : 'Đã bỏ lỡ cuộc gọi thoại';
+    }
+    if (callStatus === 'declined') return `${media} · Từ chối`;
+    return `${media} · Đã hủy`;
+  }
+
+  async createCallLogMessage(params: {
+    initiatorId: string;
+    peerId: string;
+    callType: 'audio' | 'video';
+    callStatus: 'missed' | 'completed' | 'declined' | 'cancelled';
+    durationSec?: number;
+  }): Promise<DirectMessage> {
+    const duration =
+      params.callStatus === 'completed'
+        ? Math.max(0, Math.floor(params.durationSec ?? 0))
+        : null;
+
+    const message = new this.directMessageModel({
+      senderId: new Types.ObjectId(params.initiatorId),
+      receiverId: new Types.ObjectId(params.peerId),
+      type: 'call',
+      callType: params.callType,
+      callStatus: params.callStatus,
+      callDuration: duration,
+      callInitiatorId: new Types.ObjectId(params.initiatorId),
+      content: this.buildCallLogContent(
+        params.callType,
+        params.callStatus,
+        duration ?? undefined,
+      ),
+      attachments: [],
+    });
+
+    return message.save();
+  }
+
   async getConversation(
     userId1: string,
     userId2: string,
