@@ -83,6 +83,12 @@ export interface UserProfileStyleUpdatedEvent {
   updatedAt?: string;
 }
 
+export interface DmUnreadCountEvent {
+  totalUnread?: number;
+  fromUserId?: string | null;
+  conversationUnread?: number | null;
+}
+
 export interface BoostEntitlementUpdatedEvent {
   userId: string;
   scope?: "messages" | "social";
@@ -102,6 +108,8 @@ export const useDirectMessages = ({
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [newMessage, setNewMessage] = useState<DirectMessageEvent | null>(null);
+  const [dmUnreadCountEvent, setDmUnreadCountEvent] =
+    useState<DmUnreadCountEvent | null>(null);
   const [messageSent, setMessageSent] = useState<DirectMessage | false>(false);
   const [userTyping, setUserTyping] = useState<{
     fromUserId: string;
@@ -197,6 +205,28 @@ export const useDirectMessages = ({
         fromUser?: { userId: string; username: string };
       }) => {
         setNewMessage(data);
+        setTimeout(() => setNewMessage(null), 400);
+      },
+    );
+
+    socket.on(
+      "dm-unread-count",
+      (data: {
+        totalUnread?: number;
+        fromUserId?: string | null;
+        conversationUnread?: number | null;
+      }) => {
+        if (!data || typeof data !== "object") return;
+        setDmUnreadCountEvent({
+          totalUnread:
+            typeof data.totalUnread === "number" ? data.totalUnread : undefined,
+          fromUserId: data.fromUserId ?? null,
+          conversationUnread:
+            typeof data.conversationUnread === "number"
+              ? data.conversationUnread
+              : null,
+        });
+        setTimeout(() => setDmUnreadCountEvent(null), 400);
       },
     );
 
@@ -549,6 +579,7 @@ export const useDirectMessages = ({
   return {
     isConnected,
     newMessage,
+    dmUnreadCountEvent,
     messageSent,
     userTyping,
     messagesRead,

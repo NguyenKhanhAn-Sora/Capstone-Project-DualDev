@@ -1959,6 +1959,12 @@ export default function MessagesPage() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingRef = useRef(false); // ✅ Track typing state
   const shouldAutoScrollRef = useRef(true); // Track if we should auto-scroll
+  /** Tránh xử lý lại cùng một tin socket khi effect re-run (gây badge 99+). */
+  const processedIncomingDmIdsRef = useRef<Set<string>>(new Set());
+  const friendsRef = useRef(friends);
+  friendsRef.current = friends;
+  const selectedDmFriendRef = useRef(selectedDirectMessageFriend);
+  selectedDmFriendRef.current = selectedDirectMessageFriend;
 
   // Use direct messages hook
   const {
@@ -1978,6 +1984,7 @@ export default function MessagesPage() {
     callEvent,
     callEnded,
     messageDeleted,
+    dmUnreadCountEvent,
     initiateCall,
     answerCall,
     rejectCall,
@@ -3668,7 +3675,7 @@ export default function MessagesPage() {
         const activity: Record<string, number> = {};
         list.forEach((c) => {
           if (!c.userId) return;
-          counts[c.userId] = c.unreadCount ?? 0;
+          counts[c.userId] = Math.max(0, Number(c.unreadCount) || 0);
           if (c.lastMessageTime) {
             const t = new Date(c.lastMessageTime).getTime();
             if (!Number.isNaN(t)) activity[c.userId] = t;
@@ -3705,6 +3712,21 @@ export default function MessagesPage() {
       });
     return () => { cancelled = true; };
   }, [token, selectedServer, selectedDirectMessageFriend?._id]);
+
+  // Đồng bộ badge từng hội thoại theo backend (socket dm-unread-count).
+  useEffect(() => {
+    if (!dmUnreadCountEvent) return;
+    const peerId = dmUnreadCountEvent.fromUserId
+      ? String(dmUnreadCountEvent.fromUserId)
+      : "";
+    const count = dmUnreadCountEvent.conversationUnread;
+    if (!peerId || typeof count !== "number" || !Number.isFinite(count)) return;
+    if (selectedDirectMessageFriend?._id === peerId) {
+      setDmUnreadCounts((prev) => ({ ...prev, [peerId]: 0 }));
+      return;
+    }
+    setDmUnreadCounts((prev) => ({ ...prev, [peerId]: Math.max(0, count) }));
+  }, [dmUnreadCountEvent, selectedDirectMessageFriend?._id]);
 
   // Mở server từ link /messages?server=xxx (sau khi join từ event link)
   useEffect(() => {
@@ -3817,19 +3839,29 @@ export default function MessagesPage() {
 
   // ✅ Handle new-message event (incoming messages from others)
   useEffect(() => {
-    if (newMessage) {
-      const msg = newMessage.message as any;
-      const rawSender = msg.senderId;
-      const senderIdStr =
-        typeof rawSender === "string" ? rawSender : rawSender?._id ?? "";
-      if (senderIdStr && senderIdStr === currentUserId) {
-        return;
-      }
-      const friendId =
-        typeof rawSender === "string" ? rawSender : rawSender?._id; // For incoming messages, friend is usually the sender
-      if (!friendId) return;
+    if (!newMessage) return;
+    const msg = newMessage.message as any;
+    const messageId = msg?._id != null ? String(msg._id) : "";
+    if (!messageId) return;
+    if (processedIncomingDmIdsRef.current.has(messageId)) return;
+    processedIncomingDmIdsRef.current.add(messageId);
+    if (processedIncomingDmIdsRef.current.size > 400) {
+      processedIncomingDmIdsRef.current = new Set(
+        Array.from(processedIncomingDmIdsRef.current).slice(-200),
+      );
+    }
 
-      const uiMessage: UIMessage = {
+    const rawSender = msg.senderId;
+    const senderIdStr =
+      typeof rawSender === "string" ? rawSender : rawSender?._id ?? "";
+    if (senderIdStr && senderIdStr === currentUserId) {
+      return;
+    }
+    const friendId =
+      typeof rawSender === "string" ? rawSender : rawSender?._id;
+    if (!friendId) return;
+
+    const uiMessage: UIMessage = {
         id: String(msg._id),
         text: msg.content,
         senderId: friendId,
@@ -3870,7 +3902,9 @@ export default function MessagesPage() {
 
 
       // ✅ Check if sender is in friends list
-      const isSenderInFriendsList = friends.some((f) => f._id === friendId);
+      const isSenderInFriendsList = friendsRef.current.some(
+        (f) => String(f._id) === String(friendId),
+      );
       if (!isSenderInFriendsList) {
         if (typeof rawSender === "object" && rawSender) {
           upsertFriendToDmList({
@@ -3897,15 +3931,8 @@ export default function MessagesPage() {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
 
-        // ⚠️ CRITICAL FIX: If we don't have conversation loaded yet,
-        // DON'T create empty conversation! Just add this single message.
-        // When user opens the chat, loadDirectMessages will load the full history.
-        if (!prev.has(friendId)) {
-        }
-
-        // Check for duplicates
         const isDuplicate = currentMessages.some(
-          (m) => String(m.id) === String(msg._id),
+          (m) => String(m.id) === messageId,
         );
         if (!isDuplicate) {
           playMessageNotificationSound();
@@ -3918,18 +3945,12 @@ export default function MessagesPage() {
         return newMap;
       });
 
-      // Increment unread indicator when receiving message in a conversation we're not viewing
-      if (selectedDirectMessageFriend?._id !== friendId) {
-        setDmUnreadCounts((prev) => ({
-          ...prev,
-          [friendId]: (prev[friendId] ?? 0) + 1,
-        }));
-      }
+      // Badge unread: đồng bộ qua socket dm-unread-count (không cộng local để tránh lệch / 99+).
 
       // Auto-scroll to bottom if viewing this conversation (instant for incoming messages)
       if (
-        selectedDirectMessageFriend &&
-        friendId === selectedDirectMessageFriend._id
+        selectedDmFriendRef.current &&
+        friendId === selectedDmFriendRef.current._id
       ) {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
@@ -3940,12 +3961,9 @@ export default function MessagesPage() {
           });
         });
       }
-    }
   }, [
     newMessage,
-    selectedDirectMessageFriend,
     currentUserId,
-    friends,
     loadAvailableUsers,
     bumpDmPeerToTop,
     upsertFriendToDmList,
