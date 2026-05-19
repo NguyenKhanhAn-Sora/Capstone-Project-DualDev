@@ -1693,6 +1693,7 @@ export default function MessagesPage() {
           actionType,
           boostTier,
           billingCycle: boostBillingCycle,
+          boostScope: "messages",
           currency: "vnd",
         };
         if (boostMode === "gift" && boostRecipientUserId) {
@@ -3243,7 +3244,7 @@ export default function MessagesPage() {
     void fetchUserSettings({ token })
       .then(setChatUserSettings)
       .catch(() => {});
-    void fetchBoostStatus({ token })
+    void fetchBoostStatus({ token, scope: "messages" })
       .then((b) => {
         setBoostStatus(b);
         const v = (b as any)?.limits?.maxUploadBytes;
@@ -3267,6 +3268,14 @@ export default function MessagesPage() {
     if (typeof window === "undefined") return;
     const onBoost = (e: Event) => {
       const detail = (e as CustomEvent<any>).detail;
+      if (
+        detail &&
+        typeof detail === "object" &&
+        detail.scope &&
+        detail.scope !== "messages"
+      ) {
+        return;
+      }
       if (detail && typeof detail === "object") {
         setBoostStatus((prev) => ({
           ...(prev ?? {}),

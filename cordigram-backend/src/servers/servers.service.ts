@@ -117,6 +117,7 @@ export class ServersService {
       assignedRaw === 'basic' || assignedRaw === 'boost' ? assignedRaw : null;
     const ownerBoost = await this.boostService.getBoostStatus(
       String(server.ownerId),
+      'messages',
     );
     if (!assigned || !ownerBoost.active || !ownerBoost.tier) {
       return {
@@ -4069,7 +4070,7 @@ export class ServersService {
       }>;
     }>;
   }> {
-    const boost = await this.boostService.getBoostStatus(userId);
+    const boost = await this.boostService.getBoostStatus(userId, 'messages');
     const hasBoost = Boolean(boost?.active);
 
     const userObjectId = new Types.ObjectId(userId);
@@ -4179,7 +4180,7 @@ export class ServersService {
       );
     }
 
-    const ownerBoost = await this.boostService.getBoostStatus(userId);
+    const ownerBoost = await this.boostService.getBoostStatus(userId, 'messages');
     const normalizedTier: 'basic' | 'boost' | null =
       tier === 'basic' || tier === 'boost' ? tier : null;
 
@@ -4313,7 +4314,7 @@ export class ServersService {
       }>;
     }>;
   }> {
-    const boost = await this.boostService.getBoostStatus(userId);
+    const boost = await this.boostService.getBoostStatus(userId, 'messages');
     const hasBoost = Boolean(boost?.active);
 
     const userObjectId = new Types.ObjectId(userId);

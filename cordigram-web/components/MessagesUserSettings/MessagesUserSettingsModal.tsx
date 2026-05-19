@@ -210,7 +210,7 @@ export default function MessagesUserSettingsModal({
       const [u, n, b] = await Promise.all([
         fetchUserSettings({ token }),
         fetchNotificationSettings({ token }),
-        fetchBoostStatus({ token }).catch(() => null),
+        fetchBoostStatus({ token, scope: "messages" }).catch(() => null),
       ]);
       setUserSettings(u);
       setNotif(n);

@@ -115,8 +115,12 @@ export class UsersService {
   async getBoostStatus(params: {
     userId: string;
     serverId?: string | null;
+    /** `messages` (mặc định) hoặc `social` — entitlement tách biệt. */
+    scope?: 'messages' | 'social';
   }): Promise<{
+    scope: 'messages' | 'social';
     accountBoost: boolean;
+    socialAccountBoost: boolean;
     serverBoost: boolean;
     unlocked: boolean;
     tier?: 'basic' | 'boost' | null;
@@ -126,16 +130,23 @@ export class UsersService {
     source?: 'purchase' | 'gift' | null;
     limits?: any;
   }> {
+    const scope =
+      params.scope === 'social' ? 'social' : ('messages' as const);
     const user = await this.userModel
       .findById(params.userId)
-      .select('settings.accountBoost')
+      .select('settings.accountBoost settings.socialAccountBoost')
       .lean()
       .exec();
-    const accountBoost = Boolean((user as any)?.settings?.accountBoost);
+    const messagesAccountBoost = Boolean(
+      (user as any)?.settings?.accountBoost,
+    );
+    const socialAccountBoost = Boolean(
+      (user as any)?.settings?.socialAccountBoost,
+    );
 
     let serverBoost = false;
     const serverId = String(params.serverId ?? '').trim();
-    if (serverId) {
+    if (serverId && scope === 'messages') {
       const server = await this.serverModel
         .findById(serverId)
         .select('boostedByUserIds')
@@ -147,11 +158,16 @@ export class UsersService {
         arr.some((id: any) => String(id) === params.userId);
     }
 
-    const ent = await this.boostService.getBoostStatus(params.userId);
-    const unlocked = accountBoost || serverBoost || ent.active;
+    const ent = await this.boostService.getBoostStatus(params.userId, scope);
+    const unlocked =
+      scope === 'social'
+        ? socialAccountBoost || ent.active
+        : messagesAccountBoost || serverBoost || ent.active;
 
     return {
-      accountBoost,
+      scope,
+      accountBoost: messagesAccountBoost,
+      socialAccountBoost,
       serverBoost,
       unlocked,
       tier: ent.tier,

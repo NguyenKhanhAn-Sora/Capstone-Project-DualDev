@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import {
   BoostBillingCycle,
   BoostEntitlement,
+  BoostScope,
   BoostTier,
 } from './boost-entitlement.schema';
 import { DirectMessagesGateway } from '../direct-messages/direct-messages.gateway';
@@ -18,6 +19,7 @@ export type BoostLimits = {
 };
 
 export type BoostStatusResponse = {
+  scope: BoostScope;
   tier: BoostTier | null;
   active: boolean;
   expiresAt: string | null;
@@ -68,13 +70,30 @@ export class BoostService {
     return FREE_LIMITS;
   }
 
-  async getBoostStatus(userId: string): Promise<BoostStatusResponse> {
+  private scopeFilter(scope: BoostScope): Record<string, unknown> {
+    if (scope === 'messages') {
+      return {
+        $or: [
+          { scope: 'messages' },
+          { scope: { $exists: false } },
+          { scope: null },
+        ],
+      };
+    }
+    return { scope: 'social' };
+  }
+
+  async getBoostStatus(
+    userId: string,
+    scope: BoostScope = 'messages',
+  ): Promise<BoostStatusResponse> {
     const now = new Date();
     const ent = await this.boostEntitlementModel
       .findOne({
         userId,
         status: 'active',
         expiresAt: { $gt: now },
+        ...this.scopeFilter(scope),
       })
       .sort({ expiresAt: -1 })
       .lean()
@@ -86,6 +105,7 @@ export class BoostService {
       ? new Date(ent.expiresAt).toISOString()
       : null;
     return {
+      scope,
       tier,
       active,
       expiresAt,
@@ -110,6 +130,7 @@ export class BoostService {
    */
   async finalizeBoostPurchaseAfterPayment(params: {
     userId: string;
+    scope?: BoostScope;
     tier: BoostTier;
     billingCycle: BoostBillingCycle;
     paidAt: Date;
@@ -128,14 +149,21 @@ export class BoostService {
       source,
       giftedByUserId,
     } = params;
+    const scope: BoostScope =
+      params.scope === 'social' ? 'social' : 'messages';
 
     const doc = await this.boostEntitlementModel
-      .findOne({ userId })
+      .findOne({
+        userId,
+        status: 'active',
+        ...this.scopeFilter(scope),
+      })
+      .sort({ expiresAt: -1 })
       .lean()
       .exec();
 
     if (doc?.latestSessionId === latestSessionId) {
-      return this.getBoostStatus(userId);
+      return this.getBoostStatus(userId, scope);
     }
 
     const now = paidAt;
@@ -162,12 +190,17 @@ export class BoostService {
       expiresAt = durationAnchor;
     }
 
+    const writeFilter = doc?._id
+      ? { _id: doc._id }
+      : { userId, scope };
+
     await this.boostEntitlementModel
       .updateOne(
-        { userId },
+        writeFilter,
         {
           $set: {
             userId,
+            scope,
             tier,
             billingCycle,
             status: 'active',
@@ -183,13 +216,14 @@ export class BoostService {
       )
       .exec();
 
-    const status = await this.getBoostStatus(userId);
+    const status = await this.getBoostStatus(userId, scope);
     this.emitBoostEntitlementUpdated(userId, status);
     return status;
   }
 
   async upsertActiveEntitlement(params: {
     userId: string;
+    scope?: BoostScope;
     tier: BoostTier;
     billingCycle: BoostBillingCycle;
     startsAt: Date;
@@ -200,13 +234,24 @@ export class BoostService {
     giftedByUserId?: string | null;
   }) {
     const { userId, tier, billingCycle, startsAt, expiresAt } = params;
+    const scope: BoostScope =
+      params.scope === 'social' ? 'social' : 'messages';
+
+    const existing = await this.boostEntitlementModel
+      .findOne({ userId, ...this.scopeFilter(scope) })
+      .lean()
+      .exec();
+    const writeFilter = existing?._id
+      ? { _id: existing._id }
+      : { userId, scope };
 
     await this.boostEntitlementModel
       .updateOne(
-        { userId },
+        writeFilter,
         {
           $set: {
             userId,
+            scope,
             tier,
             billingCycle,
             status: 'active',
@@ -222,7 +267,7 @@ export class BoostService {
       )
       .exec();
 
-    const status = await this.getBoostStatus(userId);
+    const status = await this.getBoostStatus(userId, scope);
     this.emitBoostEntitlementUpdated(userId, status);
     return status;
   }
@@ -230,6 +275,7 @@ export class BoostService {
   emitBoostEntitlementUpdated(userId: string, status: BoostStatusResponse) {
     const payload = {
       userId,
+      scope: status.scope,
       tier: status.tier,
       active: status.active,
       expiresAt: status.expiresAt,

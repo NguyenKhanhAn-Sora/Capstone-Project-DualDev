@@ -36,7 +36,7 @@ export default function ServerEmojiSection({ serverId, token, canManage, onEmoji
   useEffect(() => {
     if (!token || !canManage) return;
     let c = false;
-    void fetchBoostStatus({ token, serverId })
+    void fetchBoostStatus({ token, serverId, scope: "messages" })
       .then((b) => {
         if (c) return;
         const n = Number(b?.limits?.maxUploadBytes);

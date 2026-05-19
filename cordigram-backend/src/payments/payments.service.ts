@@ -1148,6 +1148,10 @@ export class PaymentsService {
         boostTier: boostTier ?? '',
         billingCycle: billingCycle ?? '',
         recipientUserId: recipientUserId ?? '',
+        boostScope:
+          String(dto.boostScope ?? '').trim().toLowerCase() === 'social'
+            ? 'social'
+            : 'messages',
         promotedPostId:
           actionType === 'campaign_upgrade' ? '' : (dto.promotedPostId ?? ''),
         durationDays: String(durationDays),
@@ -1293,9 +1297,15 @@ export class PaymentsService {
           const cycle =
             session.metadata?.billingCycle === 'yearly' ? 'yearly' : 'monthly';
           const paidAtDate = paidAt ?? new Date();
+          const boostScope =
+            String(session.metadata?.boostScope ?? '').toLowerCase() ===
+            'social'
+              ? 'social'
+              : 'messages';
           if (recipient) {
             await this.boostService.finalizeBoostPurchaseAfterPayment({
               userId: recipient,
+              scope: boostScope,
               tier: tier as any,
               billingCycle: cycle as any,
               paidAt: paidAtDate,
@@ -1421,9 +1431,14 @@ export class PaymentsService {
           const cycle =
             metadata.billingCycle === 'yearly' ? 'yearly' : 'monthly';
           const paidAtDate = paidAt ?? new Date();
+          const boostScope =
+            String(metadata.boostScope ?? '').toLowerCase() === 'social'
+              ? 'social'
+              : 'messages';
           if (recipient) {
             await this.boostService.finalizeBoostPurchaseAfterPayment({
               userId: recipient,
+              scope: boostScope,
               tier: tier as any,
               billingCycle: cycle as any,
               paidAt: paidAtDate,

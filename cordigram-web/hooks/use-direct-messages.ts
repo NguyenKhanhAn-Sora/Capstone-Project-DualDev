@@ -85,6 +85,7 @@ export interface UserProfileStyleUpdatedEvent {
 
 export interface BoostEntitlementUpdatedEvent {
   userId: string;
+  scope?: "messages" | "social";
   tier?: "basic" | "boost" | null;
   active?: boolean;
   expiresAt?: string | null;

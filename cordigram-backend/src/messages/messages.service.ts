@@ -723,7 +723,7 @@ export class MessagesService {
         (channel.serverId?.toString?.() ?? String(channel.serverId));
 
       if (isCrossServerSticker) {
-        const boost = await this.boostService.getBoostStatus(userId);
+        const boost = await this.boostService.getBoostStatus(userId, 'messages');
         if (!boost?.active) {
           throw new ForbiddenException(
             'Boost required to use server stickers across servers',

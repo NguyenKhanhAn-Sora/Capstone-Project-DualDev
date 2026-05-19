@@ -5,11 +5,16 @@ export type BoostTier = 'basic' | 'boost';
 export type BoostBillingCycle = 'monthly' | 'yearly';
 export type BoostEntitlementStatus = 'active' | 'expired' | 'canceled';
 export type BoostEntitlementSource = 'purchase' | 'gift';
+/** `messages` = Cordigram Messages; `social` = hồ sơ / feed social — không dùng chung entitlement. */
+export type BoostScope = 'messages' | 'social';
 
 @Schema({ timestamps: true })
 export class BoostEntitlement extends Document {
   @Prop({ type: String, required: true, index: true })
   userId!: string;
+
+  @Prop({ type: String, default: 'messages', index: true })
+  scope!: BoostScope;
 
   @Prop({ type: String, required: true })
   tier!: BoostTier;
@@ -43,3 +48,4 @@ export const BoostEntitlementSchema =
   SchemaFactory.createForClass(BoostEntitlement);
 
 BoostEntitlementSchema.index({ userId: 1, status: 1, expiresAt: -1 });
+BoostEntitlementSchema.index({ userId: 1, scope: 1 });

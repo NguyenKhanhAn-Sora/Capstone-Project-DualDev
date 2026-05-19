@@ -77,7 +77,7 @@ class MessagesMediaService {
     _boostStatusLoaded = true;
     try {
       final json = await ApiService.get(
-        '/users/boost-status',
+        '/users/boost-status?scope=messages',
         extraHeaders: _authHeaders,
       );
       final active = json['active'] == true;

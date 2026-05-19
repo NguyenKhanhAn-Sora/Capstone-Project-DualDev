@@ -90,14 +90,22 @@ export class UsersController {
   async getBoostStatus(
     @Req() req: Request & { user?: AuthenticatedUser },
     @Query('serverId') serverId?: string,
+    @Query('scope') scope?: string,
   ) {
     const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
     }
+    const normalizedScope =
+      String(scope || '')
+        .trim()
+        .toLowerCase() === 'social'
+        ? 'social'
+        : 'messages';
     return this.usersService.getBoostStatus({
       userId,
       serverId: serverId ?? null,
+      scope: normalizedScope,
     });
   }
 
