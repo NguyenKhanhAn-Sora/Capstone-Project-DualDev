@@ -18,6 +18,7 @@ import {
   uploadMedia,
   uploadMessagingProfileAvatar,
 } from "@/lib/api";
+import { emitCurrentProfileUpdated } from "@/lib/events";
 import * as serversApi from "@/lib/servers-api";
 import { optimizeBannerImageFile } from "@/lib/server-banner";
 import {
@@ -312,8 +313,11 @@ export default function MessagesProfileEditor({
     return `${u} • ${p}`;
   }, [username, pronouns]);
 
+  /** Hồ sơ máy chủ: chỉ avatar riêng của server, không fallback hồ sơ Messages/Social. */
   const effectiveAvatarUrl =
-    tab === "server" && serverId ? serverAvatarUrl || avatarUrl : avatarUrl;
+    tab === "server" && serverId
+      ? serverAvatarUrl || DEFAULT_AVATAR
+      : avatarUrl;
   const effectiveBannerImageUrl =
     tab === "server" && serverId ? serverBannerImageUrl : bannerImageUrl;
   const effectiveBannerSolidHex =
@@ -608,6 +612,7 @@ export default function MessagesProfileEditor({
       displayName: displayName.trim() || undefined,
       username: username.trim() || undefined,
     });
+    emitCurrentProfileUpdated();
     onToast?.(t("chat.profileEditor.updatedAvatar"));
     await loadProfile();
   };
@@ -736,7 +741,10 @@ export default function MessagesProfileEditor({
                         setServerAvatarUrl(null);
                       } else {
                         const res = await resetMessagingProfileAvatar({ token });
-                        setAvatarUrl(res.avatarUrl || DEFAULT_AVATAR);
+                        const nextUrl = res.avatarUrl || DEFAULT_AVATAR;
+                        setAvatarUrl(nextUrl);
+                        emitMessagingProfileUpdated({ avatarUrl: nextUrl });
+                        emitCurrentProfileUpdated();
                         await loadProfile();
                       }
                     onToast?.(t("chat.profileEditor.removeAvatarDone"));

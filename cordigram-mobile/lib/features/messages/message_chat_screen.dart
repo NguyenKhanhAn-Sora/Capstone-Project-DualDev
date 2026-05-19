@@ -125,11 +125,13 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     _loadConversation();
     _loadLanguage();
     unawaited(MessagesMediaService.refreshBoostStatus());
+    widget.controller.setActiveConversationPeer(widget.thread.id);
     widget.controller.markConversationRead(widget.thread.id);
   }
 
   @override
   void dispose() {
+    widget.controller.setActiveConversationPeer(null);
     _typingTimer?.cancel();
     _flushTyping(false);
     _inputController.removeListener(_onInputChanged);
@@ -1717,6 +1719,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       return DmCallMessageCard(
         message: message,
         viewerId: widget.controller.myUserId,
+        languageCode: widget.controller.languageCode,
         onCallBack: () => _onStartCall(video: video),
       );
     }

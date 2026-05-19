@@ -16,6 +16,13 @@ class MessageThreadTile extends StatelessWidget {
   final bool showActivityLabel;
   final String languageCode;
 
+  String get _unreadLabel {
+    final n = thread.unreadCount;
+    if (n <= 0) return '';
+    if (n > 99) return '99+';
+    return '$n';
+  }
+
   @override
   Widget build(BuildContext context) {
     final onlineText = languageCode == 'en' ? 'Online' : 'Trực tuyến';
@@ -23,6 +30,8 @@ class MessageThreadTile extends StatelessWidget {
     final nameLetter = thread.name.trim().isNotEmpty
         ? thread.name.trim().substring(0, 1).toUpperCase()
         : '?';
+    final preview = thread.lastMessage.trim();
+    final hasPreview = preview.isNotEmpty;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
@@ -56,8 +65,10 @@ class MessageThreadTile extends StatelessWidget {
                   color: const Color(0xFFFF2A45),
                   borderRadius: BorderRadius.circular(10),
                 ),
+                constraints: const BoxConstraints(minWidth: 16),
+                alignment: Alignment.center,
                 child: Text(
-                  '${thread.unreadCount}',
+                  _unreadLabel,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 8,
@@ -83,12 +94,35 @@ class MessageThreadTile extends StatelessWidget {
               ),
             ),
           ),
+          if (showActivityLabel && thread.lastActiveLabel.isNotEmpty)
+            Text(
+              thread.lastActiveLabel,
+              style: const TextStyle(
+                color: Color(0xFF7E8CA8),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
         ],
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 1),
-        child: showActivityLabel
-            ? Row(
+        child: hasPreview
+            ? Text(
+                preview,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: thread.unreadCount > 0
+                      ? Colors.white.withValues(alpha: 0.85)
+                      : const Color(0xFF7E8CA8),
+                  fontWeight: thread.unreadCount > 0
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                  fontSize: 12,
+                ),
+              )
+            : Row(
                 children: [
                   Icon(
                     Icons.circle,
@@ -111,8 +145,7 @@ class MessageThreadTile extends StatelessWidget {
                     ),
                   ),
                 ],
-              )
-            : const SizedBox(height: 10),
+              ),
       ),
     );
   }

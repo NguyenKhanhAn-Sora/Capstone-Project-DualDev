@@ -2,8 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { DiscordCard } from "discord-card-react";
-import "discord-card-react/styles";
 import { useTheme } from "@/component/theme-provider";
 import styles from "./ChannelUserProfileRoot.module.css";
 import type { Friend } from "@/lib/servers-api";
@@ -159,6 +157,56 @@ function toFriend(p: ProfileDetailResponse): Friend {
     email: "",
     bio: p.bio,
   };
+}
+
+function IconUserAdd({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M14 8a4 4 0 1 0-8 0 4 4 0 0 0 8 0Zm-6 6a6 6 0 0 0-6 6 1 1 0 0 0 1 1h10a1 1 0 0 0 1-1 6 6 0 0 0-6-6Zm9.5-2.5a1 1 0 0 0-1 1V13h-2.5a1 1 0 1 0 0 2H16v2.5a1 1 0 1 0 2 0V15h2.5a1 1 0 1 0 0-2H18v-2.5a1 1 0 0 0-1-1Z" />
+    </svg>
+  );
+}
+
+function IconMore({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  );
+}
+
+function IconMessage({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M4.5 5.5A3 3 0 0 1 7.5 2.5h9a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-5.2l-3.8 3.2a1 1 0 0 1-1.6-.8V15.5h-.5a3 3 0 0 1-3-3v-7Z" />
+    </svg>
+  );
+}
+
+function IconPhone({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M8.2 3.5c.4-.9 1.5-1.2 2.3-.6l1.4 1.1c.7.6.9 1.6.4 2.4l-.8 1.3c-.2.4-.1.9.2 1.2 1.5 1.5 3.2 2.8 5.1 3.8.4.2.9.1 1.2-.2l1.3-.8c.8-.5 1.8-.3 2.4.4l1.1 1.4c.6.8.3 1.9-.6 2.3-1.2.5-2.5.8-3.8.8-5.2 0-10.4-4.2-11.6-9.4-.2-.9-.2-1.8 0-2.7Z" />
+    </svg>
+  );
+}
+
+function IconSmile({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-4.5 8.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm7.5 0a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM8.2 15.8c1.1 1.4 2.6 2.2 3.8 2.2s2.7-.8 3.8-2.2a1 1 0 1 0-1.6-1.2c-.7.9-1.5 1.4-2.2 1.4s-1.5-.5-2.2-1.4a1 1 0 0 0-1.6 1.2Z" />
+    </svg>
+  );
+}
+
+function IconNote({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm8 1.5V9h4.5L14 4.5ZM8 13h8v2H8v-2Zm0 4h5v2H8v-2Z" />
+    </svg>
+  );
 }
 
 const MUTE_DURATION_OPTIONS: { key: MentionMuteDuration; label: string }[] = [
@@ -354,14 +402,10 @@ export default function ChannelUserProfileRoot({
   const avatarUrl = useMemo(
     () =>
       memberRow?.avatarUrl ||
-      profile?.avatarUrl ||
       context?.fallbackAvatarUrl ||
       AVATAR_FALLBACK,
-    [memberRow?.avatarUrl, profile?.avatarUrl, context?.fallbackAvatarUrl],
+    [memberRow?.avatarUrl, context?.fallbackAvatarUrl],
   );
-
-  const cardSurface = theme === "dark" ? "#1e1f22" : "#ebedef";
-  const messageAccent = theme === "dark" ? "#3f4147" : "#b2bac7";
 
   const connectionStatus = useMemo(
     () => deriveConnectionStatus(memberRow),
@@ -380,12 +424,6 @@ export default function ChannelUserProfileRoot({
     if (!memberRow?.joinedAt) return "—";
     return new Date(memberRow.joinedAt).toLocaleDateString("vi-VN");
   }, [memberRow?.joinedAt]);
-
-  const mutualLine = useMemo(() => {
-    const n = profile?.mutualServerCount ?? 0;
-    if (n <= 0) return null;
-    return { text: `${n} máy chủ chung` };
-  }, [profile?.mutualServerCount]);
 
   const handleSendMini = useCallback(async () => {
     const text = miniMessage.trim();
@@ -460,7 +498,7 @@ export default function ChannelUserProfileRoot({
   if (!open || !context || typeof document === "undefined") return null;
 
   const { anchorRect } = context;
-  const POPUP_MINI_W = 328;
+  const POPUP_MINI_W = 340;
   const miniPos = computePopoverPosition(anchorRect, POPUP_MINI_W, 500);
 
   const mutualFollowCount = profile?.mutualFollowCount ?? 0;
@@ -471,14 +509,56 @@ export default function ChannelUserProfileRoot({
   const serverAvatarOk = (url: string | null | undefined) =>
     Boolean(url && /^https?:\/\//i.test(url.trim()));
 
-  const miniMoreDropdown = profile && friend ? (
-    <div className={styles.dropdown}>
+  const isPlaceholderBanner = bannerUrl.startsWith("data:image/svg");
+
+  const handleFollow = async () => {
+    if (!profile) return;
+    try {
+      await followUser(profile.userId);
+      const p = await fetchProfileDetail({ token, id: profile.userId });
+      setProfile(p);
+      toast("Đã theo dõi.");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Không theo dõi được");
+    }
+  };
+
+  const handleUnfollow = async () => {
+    if (!profile) return;
+    try {
+      await unfollowUser(profile.userId);
+      const p = await fetchProfileDetail({ token, id: profile.userId });
+      setProfile(p);
+      toast("Đã bỏ theo dõi.");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Không bỏ theo dõi được");
+    }
+  };
+
+  const renderMoreMenu = (
+    placement: "miniAside" | "fullAside",
+    opts: { onViewFull?: () => void; closeMore: () => void },
+  ) =>
+    profile && friend ? (
+      <div className={`${styles.dropdown} ${styles[placement]}`}>
+        {opts.onViewFull ? (
+          <button
+            type="button"
+            className={styles.dropdownItem}
+            onClick={() => {
+              opts.onViewFull?.();
+              opts.closeMore();
+            }}
+          >
+            Xem hồ sơ đầy đủ
+          </button>
+        ) : null}
       <button
         type="button"
         className={`${styles.dropdownItem} ${styles.dropdownItemRow}`}
         onClick={() => {
           setInviteServerModalOpen(true);
-          setMoreOpen(false);
+          opts.closeMore();
           setMuteSubOpen(false);
         }}
       >
@@ -491,7 +571,7 @@ export default function ChannelUserProfileRoot({
           className={`${styles.dropdownItem} ${styles.dropdownItemRow}`}
           onClick={() => setMuteSubOpen((v) => !v)}
         >
-          <span>Tắt thông báo</span>
+          <span>Bỏ qua</span>
           <span className={styles.menuChevron}>›</span>
         </button>
         {muteSubOpen ? (
@@ -516,6 +596,18 @@ export default function ChannelUserProfileRoot({
         onClick={() => void handleBlock()}
       >
         Chặn
+      </button>
+      <button
+        type="button"
+        className={`${styles.dropdownItem} ${styles.danger}`}
+        onClick={() => {
+          opts.closeMore();
+          toast(
+            "Báo cáo: dùng mục Báo cáo trên tin nhắn hoặc Trung tâm hỗ trợ.",
+          );
+        }}
+      >
+        Báo cáo hồ sơ người dùng
       </button>
     </div>
   ) : null;
@@ -590,7 +682,9 @@ export default function ChannelUserProfileRoot({
         </button>
         <div className={styles.fullModalGrid}>
           <div className={styles.fullModalLeft}>
-            <div className={styles.fullModalBanner}>
+            <div
+              className={`${styles.fullModalBanner} ${isPlaceholderBanner ? styles.bannerFallback : ""}`}
+            >
               <img src={bannerUrl} alt="" className={styles.fullModalBannerImg} />
             </div>
             <div className={styles.fullModalAvatarWrap}>
@@ -600,10 +694,21 @@ export default function ChannelUserProfileRoot({
                 aria-hidden
               />
             </div>
-            <div>
-              <h2 className={styles.fullDisplayName} style={getDisplayNameTextStyle(profile)}>
+            <div className={styles.fullNameRow}>
+              <h2
+                className={styles.fullDisplayName}
+                style={getDisplayNameTextStyle(profile)}
+              >
                 {displayName}
               </h2>
+              <button
+                type="button"
+                className={styles.noteIconBtn}
+                aria-label="Ghi chú"
+                title="Ghi chú (chỉ hiển thị cho bạn)"
+              >
+                <IconNote />
+              </button>
             </div>
             <p className={styles.fullUsername}>@{usernameLabel}</p>
             <div className={styles.fullActionRow}>
@@ -611,23 +716,7 @@ export default function ChannelUserProfileRoot({
                 <button
                   type="button"
                   className={styles.followBtnSecondary}
-                  onClick={async () => {
-                    try {
-                      await unfollowUser(profile.userId);
-                      const p = await fetchProfileDetail({
-                        token,
-                        id: profile.userId,
-                      });
-                      setProfile(p);
-                      toast("Đã bỏ theo dõi.");
-                    } catch (e) {
-                      toast(
-                        e instanceof Error
-                          ? e.message
-                          : "Không bỏ theo dõi được",
-                      );
-                    }
-                  }}
+                  onClick={() => void handleUnfollow()}
                 >
                   Bỏ theo dõi
                 </button>
@@ -635,59 +724,73 @@ export default function ChannelUserProfileRoot({
                 <button
                   type="button"
                   className={styles.followBtn}
-                  onClick={async () => {
-                    try {
-                      await followUser(profile.userId);
-                      const p = await fetchProfileDetail({
-                        token,
-                        id: profile.userId,
-                      });
-                      setProfile(p);
-                      toast("Đã theo dõi.");
-                    } catch (e) {
-                      toast(
-                        e instanceof Error
-                          ? e.message
-                          : "Không theo dõi được",
-                      );
-                    }
-                  }}
+                  onClick={() => void handleFollow()}
                 >
-                  Theo dõi
+                  Thêm bạn
                 </button>
               )}
               <button
                 type="button"
-                className={styles.fullMsgBtn}
+                className={styles.fullIconActionBtn}
+                aria-label="Nhắn tin"
+                title="Nhắn tin"
                 onClick={() => {
                   onOpenDirectMessage(friend, {});
                   onClose();
                 }}
               >
-                Nhắn tin
+                <IconMessage />
               </button>
+              <div className={styles.moreWrap} ref={fullMoreRef}>
+                <button
+                  type="button"
+                  className={styles.fullIconActionBtn}
+                  aria-label="Thêm"
+                  onClick={() => setFullMoreOpen((v) => !v)}
+                >
+                  <IconMore />
+                </button>
+                {fullMoreOpen
+                  ? renderMoreMenu("fullAside", {
+                      closeMore: () => setFullMoreOpen(false),
+                    })
+                  : null}
+              </div>
             </div>
-            <p className={styles.fullJoinLine}>
-              <strong>{context.serverName}</strong>
-              {" · "}
-              Tham gia {serverJoinedLabel}
-            </p>
+            <div className={styles.fullJoinBlock}>
+              <p className={styles.fullJoinHeading}>Gia nhập từ</p>
+              {profile.cordigramMemberSince ? (
+                <p className={styles.fullJoinItem}>
+                  <span className={styles.joinDot} aria-hidden />
+                  {profile.cordigramMemberSince}
+                </p>
+              ) : null}
+              <p className={styles.fullJoinItem}>
+                <span className={styles.joinDotServer} aria-hidden />
+                {context.serverName} · {serverJoinedLabel}
+              </p>
+            </div>
             {roleItems.length > 0 ? (
               <div className={styles.fullRolesSection}>
-                <h4 className={styles.fullRolesTitle}>Vai trò trong máy chủ</h4>
+                <h4 className={styles.fullRolesTitle}>Vai trò</h4>
                 <div className={styles.fullRolesList}>
                   {roleItems.map((r, idx) => (
-                    <span
-                      key={`${r.name}-${idx}`}
-                      className={styles.roleChip}
-                      style={{ borderColor: r.color, color: r.color }}
-                    >
+                    <span key={`${r.name}-${idx}`} className={styles.roleChip}>
+                      <span
+                        className={styles.roleChipDot}
+                        style={{ backgroundColor: r.color }}
+                        aria-hidden
+                      />
                       {r.name}
                     </span>
                   ))}
                 </div>
               </div>
             ) : null}
+            <div className={styles.fullNotesSection}>
+              <h4 className={styles.fullRolesTitle}>Ghi chú (chỉ hiển thị cho bạn)</h4>
+              <p className={styles.fullNotesPlaceholder}>Nhấp để thêm ghi chú</p>
+            </div>
           </div>
           <div className={styles.fullModalRight}>
             <div className={styles.fullTabRow}>
@@ -711,7 +814,9 @@ export default function ChannelUserProfileRoot({
                 }
                 onClick={() => setFullTab("follow")}
               >
-                Follow chung ({mutualFollowCount})
+                {mutualFollowCount > 0
+                  ? `Follow chung (${mutualFollowCount})`
+                  : "Không có bạn chung"}
               </button>
               <button
                 type="button"
@@ -727,9 +832,25 @@ export default function ChannelUserProfileRoot({
             </div>
             <div className={styles.fullTabPanel}>
               {fullTab === "activity" ? (
-                <p className={styles.fullTabPlaceholder}>
-                  Phần hoạt động sẽ được bổ sung sau.
-                </p>
+                <div className={styles.activityEmpty}>
+                  <h3 className={styles.activityEmptyTitle}>
+                    {displayName} không có hoạt động nào để chia sẻ ở đây
+                  </h3>
+                  <p className={styles.activityEmptyDesc}>
+                    Hãy nhắn tin để bắt đầu trò chuyện với họ.
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.activityEmptyBtn}
+                    onClick={() => {
+                      onOpenDirectMessage(friend, {});
+                      onClose();
+                    }}
+                  >
+                    <IconMessage />
+                    Nhắn tin
+                  </button>
+                </div>
               ) : fullTab === "follow" ? (
                 mutualFollowCount === 0 ? (
                   <p className={styles.fullTabBody}>Không có follow chung.</p>
@@ -789,63 +910,6 @@ export default function ChannelUserProfileRoot({
             </div>
           </div>
         </div>
-        <div className={styles.fullModalToolbar}>
-          <div className={styles.moreWrap} ref={fullMoreRef}>
-            <button
-              type="button"
-              className={styles.profileIconBtn}
-              aria-label="Thêm"
-              onClick={() => setFullMoreOpen((v) => !v)}
-            >
-              ⋯
-            </button>
-            {fullMoreOpen ? (
-              <div className={styles.dropdown}>
-                <button
-                  type="button"
-                  className={styles.dropdownItem}
-                  onClick={() => {
-                    setFullMoreOpen(false);
-                    setView("mini");
-                  }}
-                >
-                  Xem hồ sơ chính
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.dropdownItem} ${styles.dropdownItemRow}`}
-                  onClick={() => {
-                    setFullMoreOpen(false);
-                    setInviteServerModalOpen(true);
-                  }}
-                >
-                  <span>Mời vào máy chủ</span>
-                  <span className={styles.menuChevron}>›</span>
-                </button>
-                <div className={styles.dropdownSep} />
-                <button
-                  type="button"
-                  className={`${styles.dropdownItem} ${styles.danger}`}
-                  onClick={() => void handleBlock()}
-                >
-                  Chặn
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.dropdownItem} ${styles.danger}`}
-                  onClick={() => {
-                    setFullMoreOpen(false);
-                    toast(
-                      "Báo cáo: dùng mục Báo cáo trên tin nhắn hoặc Trung tâm hỗ trợ.",
-                    );
-                  }}
-                >
-                  Báo cáo hồ sơ người dùng
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </div>
       </div>
     </div>
   ) : (
@@ -875,65 +939,136 @@ export default function ChannelUserProfileRoot({
         ) : loading || !profile ? (
           <div className={styles.loadingBox}>Đang tải…</div>
         ) : (
-          <div className={styles.miniCardShell}>
-            <div className={styles.cardTopActions}>
-              <button
-                type="button"
-                className={styles.profileTextBtn}
-                onClick={() => setView("full")}
-                title="Hồ sơ trong máy chủ"
-              >
-                Hồ sơ
-              </button>
-              <div className={styles.moreWrap} ref={moreRef}>
-                <button
-                  type="button"
-                  className={styles.profileIconBtn}
-                  aria-label="Thêm"
-                  onClick={() => setMoreOpen((v) => !v)}
-                >
-                  ⋯
-                </button>
-                {moreOpen ? miniMoreDropdown : null}
+          <div className={styles.miniCard}>
+            <div
+              className={`${styles.miniBanner} ${isPlaceholderBanner ? styles.bannerFallback : ""}`}
+            >
+              <img src={bannerUrl} alt="" className={styles.miniBannerImg} />
+              <div className={styles.miniBannerActions}>
+                {!profile.isFollowing ? (
+                  <button
+                    type="button"
+                    className={styles.bannerIconBtn}
+                    aria-label="Thêm bạn"
+                    title="Thêm bạn"
+                    onClick={() => void handleFollow()}
+                  >
+                    <IconUserAdd />
+                  </button>
+                ) : null}
+                <div className={styles.moreWrap} ref={moreRef}>
+                  <button
+                    type="button"
+                    className={styles.bannerIconBtn}
+                    aria-label="Thêm"
+                    onClick={() => setMoreOpen((v) => !v)}
+                  >
+                    <IconMore />
+                  </button>
+                  {moreOpen
+                    ? renderMoreMenu("miniAside", {
+                        onViewFull: () => setView("full"),
+                        closeMore: () => setMoreOpen(false),
+                      })
+                    : null}
+                </div>
               </div>
             </div>
-            <DiscordCard
-              imageUrl={avatarUrl}
-              bannerUrl={bannerUrl}
-              primaryColor={cardSurface}
-              accentColor={cardSurface}
-              connectionStatus={connectionStatus}
-              basicInfo={{
-                displayname: displayName,
-                username: usernameLabel,
-              }}
-              aboutMe={
-                mutualLine
-                  ? { title: "Máy chủ", items: [mutualLine] }
-                  : undefined
-              }
-              roles={
-                roleItems.length
-                  ? { title: "Vai trò", roles: roleItems }
-                  : undefined
-              }
-              message={{
-                message: miniMessage,
-                handleInput: (e) => setMiniMessage(e.target.value),
-                placeholder: `Tin nhắn @${displayName}`,
-                accentColor: messageAccent,
-              }}
-            >
-              <div className={styles.gifRow}>
+            <div className={styles.miniBody}>
+              <div className={styles.miniAvatarWrap}>
+                <img src={avatarUrl} alt="" className={styles.miniAvatarImg} />
+                <span
+                  className={`${styles.miniStatusDot} ${styles[`status_${connectionStatus}`]}`}
+                  aria-hidden
+                />
+              </div>
+              <h2
+                className={styles.miniDisplayName}
+                style={getDisplayNameTextStyle(profile)}
+              >
+                {displayName}
+              </h2>
+              <p className={styles.miniUsername}>{usernameLabel}</p>
+              {mutualServerCount > 0 ? (
+                <div className={styles.mutualRow}>
+                  <div className={styles.mutualIcons} aria-hidden>
+                    {mutualServersList.slice(0, 3).map((s) =>
+                      serverAvatarOk(s.avatarUrl) ? (
+                        <img
+                          key={s.serverId}
+                          src={s.avatarUrl!}
+                          alt=""
+                          className={styles.mutualIconImg}
+                        />
+                      ) : (
+                        <span key={s.serverId} className={styles.mutualIconPh}>
+                          {(s.name || "?").charAt(0).toUpperCase()}
+                        </span>
+                      ),
+                    )}
+                  </div>
+                  <span className={styles.mutualText}>
+                    {mutualServerCount} máy chủ chung
+                  </span>
+                </div>
+              ) : null}
+              <div className={styles.miniActionRow}>
                 <button
                   type="button"
-                  className={styles.gifBtn}
-                  onClick={handleGifMini}
+                  className={styles.miniActionBtn}
+                  onClick={() => {
+                    if (friend) onOpenDirectMessage(friend, {});
+                    onClose();
+                  }}
                 >
-                  GIF
+                  <IconMessage />
+                  Tin nhắn
+                </button>
+                <button
+                  type="button"
+                  className={styles.miniActionBtn}
+                  onClick={() => {
+                    if (friend) onOpenDirectMessage(friend, {});
+                    onClose();
+                  }}
+                >
+                  <IconPhone />
+                  Gọi
                 </button>
               </div>
-            </DiscordCard>
+              {roleItems.length > 0 ? (
+                <div className={styles.miniRoles}>
+                  {roleItems.map((r, idx) => (
+                    <span key={`${r.name}-${idx}`} className={styles.miniRoleChip}>
+                      <span
+                        className={styles.roleChipDot}
+                        style={{ backgroundColor: r.color }}
+                        aria-hidden
+                      />
+                      {r.name}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <div className={styles.miniMsgWrap}>
+                <textarea
+                  className={styles.miniMsgInput}
+                  value={miniMessage}
+                  onChange={(e) => setMiniMessage(e.target.value)}
+                  placeholder={`Tin nhắn @${displayName}`}
+                  rows={1}
+                />
+                <button
+                  type="button"
+                  className={styles.miniEmojiBtn}
+                  aria-label="GIF"
+                  title="GIF"
+                  onClick={handleGifMini}
+                >
+                  <IconSmile />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -942,3 +1077,4 @@ export default function ChannelUserProfileRoot({
 
   return createPortal(card, document.body);
 }
+

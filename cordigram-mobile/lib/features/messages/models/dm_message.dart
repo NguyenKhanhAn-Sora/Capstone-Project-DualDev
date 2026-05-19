@@ -60,7 +60,11 @@ class DmMessage {
   bool isMissedCallFor(String? viewerId) {
     if (!isCallMessage) return false;
     final status = callStatus ?? 'missed';
-    if (status != 'missed' && status != 'declined') return false;
+    if (status != 'missed' &&
+        status != 'declined' &&
+        status != 'cancelled') {
+      return false;
+    }
     final initiator = callInitiatorId ?? senderId;
     return viewerId != null && initiator != viewerId;
   }

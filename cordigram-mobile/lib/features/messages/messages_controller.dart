@@ -13,10 +13,16 @@ import 'services/direct_messages_service.dart';
 import 'services/inbox_service.dart';
 import 'services/message_notification_sound.dart';
 import 'services/messages_media_service.dart';
+import 'utils/dm_call_message_utils.dart';
 
 class MessagesController extends ChangeNotifier {
   final List<MessageThread> _threads = [];
   final Map<String, List<DmMessage>> _messagesByUser = {};
+  /// Peer → last activity (ms), giữ thứ tự đẩy lên đầu sau refresh (như web).
+  final Map<String, int> _peerLastActivityMs = {};
+  /// Hội thoại đã đánh dấu đọc — giữ badge 0 khi API chưa kịp cập nhật.
+  final Set<String> _readPeers = {};
+  String? _activeConversationPeerId;
   final Map<String, VoiceControlState> _voiceByContext = {};
   final Map<String, DateTime?> _conversationMutedUntil = {};
   final Set<String> _conversationMutedForever = {};
@@ -68,10 +74,9 @@ class MessagesController extends ChangeNotifier {
     _newMessageSub = DirectMessagesRealtimeService.newMessages.listen(
       _onNewMessage,
     );
-    _unreadSub = DirectMessagesRealtimeService.unreadCounts.listen((e) {
-      _totalUnread = e.totalUnread;
-      notifyListeners();
-    });
+    _unreadSub = DirectMessagesRealtimeService.unreadCounts.listen(
+      _onUnreadCount,
+    );
     _presenceSub = DirectMessagesRealtimeService.presences.listen(_onPresence);
     _reactionSub = DirectMessagesRealtimeService.reactions.listen(_onReactionEvent);
     _deletedSub = DirectMessagesRealtimeService.messageDeleted.listen(
@@ -140,6 +145,14 @@ class MessagesController extends ChangeNotifier {
         conversations =
             await DirectMessagesService.getFollowingAsConversations();
       }
+      for (final c in conversations) {
+        final peerId = c.userId;
+        if (c.lastMessageAt != null) {
+          final ms = c.lastMessageAt!.millisecondsSinceEpoch;
+          final prev = _peerLastActivityMs[peerId] ?? 0;
+          if (ms > prev) _peerLastActivityMs[peerId] = ms;
+        }
+      }
       _threads
         ..clear()
         ..addAll(
@@ -149,12 +162,16 @@ class MessagesController extends ChangeNotifier {
               name: c.title,
               lastMessage: c.lastMessage,
               lastActiveLabel: _formatRelative(c.lastMessageAt),
-              unreadCount: c.unreadCount,
+              unreadCount: _readPeers.contains(c.userId) ||
+                      _activeConversationPeerId == c.userId
+                  ? 0
+                  : c.unreadCount,
               avatarUrl: c.avatarUrl,
               isOnline: c.isOnline,
             ),
           ),
         );
+      _sortThreads();
       DirectMessagesRealtimeService.subscribePresence(
         _threads.map((e) => e.id).where((e) => e.isNotEmpty).toList(),
       );
@@ -180,14 +197,50 @@ class MessagesController extends ChangeNotifier {
     if (list.any((m) => m.id == message.id)) return;
     list.add(message);
     _messagesByUser[peerUserId] = list;
-    _patchThreadLastMessage(peerUserId, message.content);
+    _patchThreadLastMessage(
+      peerUserId,
+      DmCallMessageUtils.threadPreviewForMessage(
+        message,
+        viewerId: _myUserId,
+        languageCode: _languageCode,
+      ),
+      activityAt: message.createdAt,
+    );
     notifyListeners();
   }
 
+  void setActiveConversationPeer(String? peerId) {
+    final id = peerId?.trim();
+    _activeConversationPeerId =
+        (id == null || id.isEmpty) ? null : id;
+    if (_activeConversationPeerId != null) {
+      _readPeers.add(_activeConversationPeerId!);
+      final idx = _threads.indexWhere(
+        (e) => e.id == _activeConversationPeerId,
+      );
+      if (idx != -1) {
+        final t = _threads[idx];
+        _threads[idx] = MessageThread(
+          id: t.id,
+          name: t.name,
+          lastMessage: t.lastMessage,
+          lastActiveLabel: t.lastActiveLabel,
+          unreadCount: 0,
+          avatarUrl: t.avatarUrl,
+          isOnline: t.isOnline,
+          isPinned: t.isPinned,
+        );
+      }
+      notifyListeners();
+    }
+  }
+
   Future<void> markConversationRead(String userId) async {
-    await DirectMessagesService.markConversationRead(userId);
-    DirectMessagesRealtimeService.markAsRead(userId: userId);
-    final idx = _threads.indexWhere((e) => e.id == userId);
+    final peerId = userId.trim();
+    _readPeers.add(peerId);
+    await DirectMessagesService.markConversationRead(peerId);
+    DirectMessagesRealtimeService.markAsRead(userId: peerId);
+    final idx = _threads.indexWhere((e) => e.id == peerId);
     if (idx != -1) {
       _threads[idx] = MessageThread(
         id: _threads[idx].id,
@@ -593,7 +646,15 @@ class MessagesController extends ChangeNotifier {
     if (list.any((m) => m.id == message.id)) return;
     list.add(message);
     _messagesByUser[peerId] = list;
-    _bumpThreadToTop(peerId, lastMessage: message.content);
+    _bumpThreadToTop(
+      peerId,
+      lastMessage: DmCallMessageUtils.threadPreviewForMessage(
+        message,
+        viewerId: myId,
+        languageCode: _languageCode,
+      ),
+      activityAt: message.createdAt,
+    );
     // Mute affects alerts only; messages must still be received and shown.
     if (!isConversationMuted(peerId)) {
       MessageNotificationSound.play();
@@ -623,43 +684,90 @@ class MessagesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _patchThreadLastMessage(String userId, String lastMessage) {
+  void _patchThreadLastMessage(
+    String userId,
+    String lastMessage, {
+    DateTime? activityAt,
+  }) {
     _bumpThreadToTop(
       userId,
       lastMessage: lastMessage,
+      activityAt: activityAt,
     );
   }
 
-  /// Đẩy hội thoại lên đầu danh sách DM (sau các thread đã ghim).
+  void _onUnreadCount(DmUnreadCountEvent event) {
+    _totalUnread = event.totalUnread;
+    final peerId = event.fromUserId?.trim();
+    final convUnread = event.conversationUnread;
+    if (peerId != null &&
+        peerId.isNotEmpty &&
+        convUnread != null) {
+      if (convUnread <= 0) {
+        _readPeers.add(peerId);
+      } else {
+        _readPeers.remove(peerId);
+      }
+      final displayUnread =
+          _activeConversationPeerId == peerId ? 0 : convUnread.clamp(0, 999999);
+      final idx = _threads.indexWhere((e) => e.id == peerId);
+      if (idx != -1) {
+        final t = _threads[idx];
+        _threads[idx] = MessageThread(
+          id: t.id,
+          name: t.name,
+          lastMessage: t.lastMessage,
+          lastActiveLabel: t.lastActiveLabel,
+          unreadCount: displayUnread,
+          avatarUrl: t.avatarUrl,
+          isOnline: t.isOnline,
+          isPinned: t.isPinned,
+        );
+      }
+    }
+    notifyListeners();
+  }
+
+  void _sortThreads() {
+    _threads.sort((a, b) {
+      if (a.isPinned != b.isPinned) {
+        return a.isPinned ? -1 : 1;
+      }
+      final ta = _peerLastActivityMs[a.id] ?? 0;
+      final tb = _peerLastActivityMs[b.id] ?? 0;
+      if (tb != ta) return tb.compareTo(ta);
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+  }
+
+  /// Đẩy hội thoại lên đầu danh sách DM (sort theo hoạt động mới nhất).
   void _bumpThreadToTop(
     String userId, {
     required String lastMessage,
-    bool incrementUnread = false,
+    DateTime? activityAt,
   }) {
+    final at = activityAt ?? DateTime.now();
+    final ms = at.millisecondsSinceEpoch;
+    final prev = _peerLastActivityMs[userId] ?? 0;
+    if (ms >= prev) _peerLastActivityMs[userId] = ms;
+
     final idx = _threads.indexWhere((e) => e.id == userId);
     if (idx == -1) {
       unawaited(refreshThreads());
       return;
     }
-    final current = _threads.removeAt(idx);
-    final updated = MessageThread(
+    final current = _threads[idx];
+    _threads[idx] = MessageThread(
       id: current.id,
       name: current.name,
       lastMessage: lastMessage,
       lastActiveLabel: 'now',
-      unreadCount: incrementUnread
-          ? current.unreadCount + 1
-          : current.unreadCount,
+      unreadCount: current.unreadCount,
       avatarUrl: current.avatarUrl,
       isOnline: current.isOnline,
       isPinned: current.isPinned,
     );
-    var insertAt = 0;
-    if (!updated.isPinned) {
-      final firstUnpinned = _threads.indexWhere((e) => !e.isPinned);
-      insertAt = firstUnpinned < 0 ? _threads.length : firstUnpinned;
-    }
-    _threads.insert(insertAt, updated);
+    _sortThreads();
   }
 
   String _formatRelative(DateTime? time) {

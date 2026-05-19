@@ -2899,11 +2899,12 @@ export default function MessagesPage() {
     ]);
   };
 
-  /** Đổi avatar social không làm đổi hồ sơ Messages — chỉ làm mới bản ghi social. */
+  /** Avatar social đồng bộ sang messaging (backend); UI làm mới cả hai. */
   useEffect(() => {
     if (typeof window === "undefined" || !token) return;
     const onSocialProfileUpdated = () => {
       void loadSocialProfile(token);
+      void loadMessagingProfile(token);
     };
     window.addEventListener(CURRENT_PROFILE_UPDATED_EVENT, onSocialProfileUpdated);
     return () =>

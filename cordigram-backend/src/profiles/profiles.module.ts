@@ -11,12 +11,14 @@ import { Server, ServerSchema } from '../servers/server.schema';
 import { Block, BlockSchema } from '../users/block.schema';
 import { MessagesModule } from '../messages/messages.module';
 import { BoostModule } from '../boost/boost.module';
+import { MessagingProfilesModule } from '../messaging-profiles/messaging-profiles.module';
 
 @Module({
   imports: [
     CompaniesModule,
     forwardRef(() => MessagesModule),
     forwardRef(() => BoostModule),
+    forwardRef(() => MessagingProfilesModule),
     MongooseModule.forFeature([
       { name: Profile.name, schema: ProfileSchema },
       { name: Follow.name, schema: FollowSchema },

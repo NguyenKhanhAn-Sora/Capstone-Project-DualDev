@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/dm_message.dart';
+import '../utils/dm_call_message_utils.dart';
 
 /// Call log card in DM thread (missed / completed voice or video).
 class DmCallMessageCard extends StatelessWidget {
@@ -9,56 +10,31 @@ class DmCallMessageCard extends StatelessWidget {
     required this.message,
     required this.viewerId,
     required this.onCallBack,
+    this.languageCode = 'vi',
   });
 
   final DmMessage message;
   final String? viewerId;
   final VoidCallback onCallBack;
+  final String languageCode;
 
   bool get _isVideo => message.callType == 'video';
 
-  bool get _isMissed {
-    final s = message.callStatus ?? 'missed';
-    return s == 'missed' || s == 'declined';
-  }
-
-  bool get _isIncomingMissed => message.isMissedCallFor(viewerId);
-
-  String _title() {
-    if (_isMissed) {
-      if (_isIncomingMissed) {
-        return _isVideo ? 'Đã bỏ lỡ cuộc gọi video' : 'Đã bỏ lỡ cuộc gọi thoại';
-      }
-      return _isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
-    }
-    return _isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
-  }
-
-  String _subtitle() {
-    if ((message.callStatus ?? '') == 'completed' &&
-        message.callDurationSec != null) {
-      final sec = message.callDurationSec!.clamp(0, 86400);
-      if (sec < 60) return '$sec giây';
-      final min = sec ~/ 60;
-      final rem = sec % 60;
-      if (rem == 0) return '$min phút';
-      return '$min phút $rem giây';
-    }
-    final t = message.createdAt;
-    final h = t.hour.toString().padLeft(2, '0');
-    final m = t.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
-
-  IconData _icon() {
-    if (_isVideo) {
-      return _isMissed ? Icons.videocam_off_rounded : Icons.videocam_rounded;
-    }
-    return _isMissed ? Icons.phone_missed_rounded : Icons.phone_rounded;
-  }
+  bool get _isMissed => DmCallMessageUtils.isMissedStatus(message.callStatus);
 
   @override
   Widget build(BuildContext context) {
+    final title = DmCallMessageUtils.callCardTitle(
+      message,
+      viewerId,
+      languageCode: languageCode,
+    );
+    final subtitle = DmCallMessageUtils.callCardSubtitle(
+      message,
+      languageCode: languageCode,
+    );
+    final callBack = DmCallMessageUtils.callBackLabel(languageCode: languageCode);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -94,7 +70,7 @@ class DmCallMessageCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _title(),
+                          title,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -103,7 +79,7 @@ class DmCallMessageCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _subtitle(),
+                          subtitle,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.65),
                             fontSize: 12,
@@ -125,9 +101,12 @@ class DmCallMessageCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  'Gọi lại',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                child: Text(
+                  callBack,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ],
@@ -135,5 +114,12 @@ class DmCallMessageCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  IconData _icon() {
+    if (_isVideo) {
+      return _isMissed ? Icons.videocam_off_rounded : Icons.videocam_rounded;
+    }
+    return _isMissed ? Icons.phone_missed_rounded : Icons.phone_rounded;
   }
 }

@@ -3015,7 +3015,9 @@ export class ServersService {
         nickname: (m as any)?.nickname ?? null,
         displayName: profile?.displayName ?? 'Người dùng',
         username: profile?.username ?? uid,
-        avatarUrl: us?.serverAvatarUrl || profile?.avatarUrl || '',
+        avatarUrl:
+          us?.serverAvatarUrl ||
+          'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg',
         coverUrl: us?.serverCoverUrl ?? null,
         joinedAt:
           m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt),

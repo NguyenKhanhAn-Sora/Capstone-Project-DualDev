@@ -1,8 +1,10 @@
 import {
+  Inject,
   Injectable,
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, PipelineStage } from 'mongoose';
@@ -17,6 +19,7 @@ import type {
   ProfileFieldVisibility,
   ProfileVisibility,
 } from './profile.schema';
+import { MessagingProfilesService } from '../messaging-profiles/messaging-profiles.service';
 
 @Injectable()
 export class ProfilesService {
@@ -28,6 +31,8 @@ export class ProfilesService {
     @InjectModel(Server.name) private readonly serverModel: Model<Server>,
     @InjectModel(Block.name) private readonly blockModel: Model<Block>,
     private readonly companiesService: CompaniesService,
+    @Inject(forwardRef(() => MessagingProfilesService))
+    private readonly messagingProfilesService: MessagingProfilesService,
   ) {}
 
   private escapeRegex(input: string): string {
@@ -359,6 +364,15 @@ export class ProfilesService {
     profile.avatarOriginalPublicId = params.avatarOriginalPublicId;
     await profile.save();
 
+    try {
+      await this.messagingProfilesService.syncAvatarFromSocialProfile(
+        params.userId,
+        params,
+      );
+    } catch {
+      // best-effort
+    }
+
     return this.buildAvatarResponse(profile);
   }
 
@@ -558,6 +572,17 @@ export class ProfilesService {
     profile.avatarPublicId = '';
     profile.avatarOriginalPublicId = '';
     await profile.save();
+
+    try {
+      await this.messagingProfilesService.syncAvatarFromSocialProfile(userId, {
+        avatarUrl: this.DEFAULT_AVATAR_URL,
+        avatarOriginalUrl: this.DEFAULT_AVATAR_URL,
+        avatarPublicId: '',
+        avatarOriginalPublicId: '',
+      });
+    } catch {
+      // best-effort
+    }
 
     return this.buildAvatarResponse(profile);
   }

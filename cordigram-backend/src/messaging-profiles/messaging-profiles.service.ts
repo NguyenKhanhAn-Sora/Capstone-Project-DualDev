@@ -212,6 +212,45 @@ export class MessagingProfilesService {
     return this.getMine(userIdStr);
   }
 
+  /** Đồng bộ avatar sang hồ sơ social (dùng chung với messaging). */
+  private async syncAvatarToSocialProfile(
+    userId: string,
+    params: {
+      avatarUrl: string;
+      avatarOriginalUrl: string;
+      avatarPublicId: string;
+      avatarOriginalPublicId: string;
+    },
+  ): Promise<void> {
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(userId) })
+      .exec();
+    if (!profile) return;
+    profile.avatarUrl = params.avatarUrl;
+    profile.avatarOriginalUrl = params.avatarOriginalUrl;
+    profile.avatarPublicId = params.avatarPublicId;
+    profile.avatarOriginalPublicId = params.avatarOriginalPublicId;
+    await profile.save();
+  }
+
+  /** Đồng bộ avatar từ social sang messaging. */
+  async syncAvatarFromSocialProfile(
+    userId: string,
+    params: {
+      avatarUrl: string;
+      avatarOriginalUrl: string;
+      avatarPublicId: string;
+      avatarOriginalPublicId: string;
+    },
+  ): Promise<void> {
+    const mp = await this.ensureMessagingProfile(userId);
+    mp.avatarUrl = params.avatarUrl;
+    mp.avatarOriginalUrl = params.avatarOriginalUrl;
+    mp.avatarPublicId = params.avatarPublicId;
+    mp.avatarOriginalPublicId = params.avatarOriginalPublicId;
+    await mp.save();
+  }
+
   async updateAvatarForUser(params: {
     userId: string;
     avatarUrl: string;
@@ -230,6 +269,11 @@ export class MessagingProfilesService {
     mp.avatarPublicId = params.avatarPublicId;
     mp.avatarOriginalPublicId = params.avatarOriginalPublicId;
     await mp.save();
+    try {
+      await this.syncAvatarToSocialProfile(params.userId, params);
+    } catch {
+      // best-effort
+    }
     return {
       avatarUrl: mp.avatarUrl,
       avatarOriginalUrl: mp.avatarOriginalUrl,
@@ -250,6 +294,17 @@ export class MessagingProfilesService {
     mp.avatarPublicId = '';
     mp.avatarOriginalPublicId = '';
     await mp.save();
+    const fields = {
+      avatarUrl: DEFAULT_MESSAGING_AVATAR_URL,
+      avatarOriginalUrl: DEFAULT_MESSAGING_AVATAR_URL,
+      avatarPublicId: '',
+      avatarOriginalPublicId: '',
+    };
+    try {
+      await this.syncAvatarToSocialProfile(userId, fields);
+    } catch {
+      // best-effort
+    }
     return {
       avatarUrl: mp.avatarUrl,
       avatarOriginalUrl: mp.avatarOriginalUrl,
