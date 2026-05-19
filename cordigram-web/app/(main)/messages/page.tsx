@@ -1961,6 +1961,8 @@ export default function MessagesPage() {
   const shouldAutoScrollRef = useRef(true); // Track if we should auto-scroll
   /** Tránh xử lý lại cùng một tin socket khi effect re-run (gây badge 99+). */
   const processedIncomingDmIdsRef = useRef<Set<string>>(new Set());
+  /** Hội thoại đã mở/đánh dấu đọc — giữ badge 0 khi API chưa kịp cập nhật. */
+  const dmReadPeersRef = useRef<Set<string>>(new Set());
   const friendsRef = useRef(friends);
   friendsRef.current = friends;
   const selectedDmFriendRef = useRef(selectedDirectMessageFriend);
@@ -3225,7 +3227,8 @@ export default function MessagesPage() {
     setMessageText("");
     setSelectedServer(null);
     setSelectedChannel(null);
-    setDmUnreadCounts((prev) => ({ ...prev, [dmUserIdFromUrl]: 0 }));
+    setDmUnreadCounts((prev) => ({ ...prev, [String(dmUserIdFromUrl)]: 0 }));
+    dmReadPeersRef.current.add(String(dmUserIdFromUrl));
     shouldAutoScrollRef.current = true;
 
     try {
@@ -3674,17 +3677,17 @@ export default function MessagesPage() {
         const counts: Record<string, number> = {};
         const activity: Record<string, number> = {};
         list.forEach((c) => {
-          if (!c.userId) return;
-          counts[c.userId] = Math.max(0, Number(c.unreadCount) || 0);
+          const peerId = String(c.userId ?? "");
+          if (!peerId) return;
+          const apiCount = Math.max(0, Number(c.unreadCount) || 0);
+          counts[peerId] = dmReadPeersRef.current.has(peerId) ? 0 : apiCount;
           if (c.lastMessageTime) {
             const t = new Date(c.lastMessageTime).getTime();
-            if (!Number.isNaN(t)) activity[c.userId] = t;
+            if (!Number.isNaN(t)) activity[peerId] = t;
           }
         });
-        // If user is currently viewing a DM conversation, keep its unread at 0
-        // to avoid race where the list fetch completes before mark-as-read does.
-        const activeDmId = selectedDirectMessageFriend?._id;
-        if (activeDmId) counts[activeDmId] = 0;
+        const activeDmId = selectedDmFriendRef.current?._id;
+        if (activeDmId) counts[String(activeDmId)] = 0;
         setDmUnreadCounts(counts);
         if (Object.keys(activity).length > 0) {
           setDmPeerLastActivityAt((prev) => ({ ...prev, ...activity }));
@@ -3711,7 +3714,7 @@ export default function MessagesPage() {
         if (!cancelled) setDmUnreadCounts({});
       });
     return () => { cancelled = true; };
-  }, [token, selectedServer, selectedDirectMessageFriend?._id]);
+  }, [token, selectedServer]);
 
   // Đồng bộ badge từng hội thoại theo backend (socket dm-unread-count).
   useEffect(() => {
@@ -3721,12 +3724,18 @@ export default function MessagesPage() {
       : "";
     const count = dmUnreadCountEvent.conversationUnread;
     if (!peerId || typeof count !== "number" || !Number.isFinite(count)) return;
-    if (selectedDirectMessageFriend?._id === peerId) {
+    const normalized = Math.max(0, count);
+    if (normalized === 0) {
+      dmReadPeersRef.current.add(peerId);
+    } else {
+      dmReadPeersRef.current.delete(peerId);
+    }
+    if (String(selectedDmFriendRef.current?._id ?? "") === peerId) {
       setDmUnreadCounts((prev) => ({ ...prev, [peerId]: 0 }));
       return;
     }
-    setDmUnreadCounts((prev) => ({ ...prev, [peerId]: Math.max(0, count) }));
-  }, [dmUnreadCountEvent, selectedDirectMessageFriend?._id]);
+    setDmUnreadCounts((prev) => ({ ...prev, [peerId]: normalized }));
+  }, [dmUnreadCountEvent]);
 
   // Mở server từ link /messages?server=xxx (sau khi join từ event link)
   useEffect(() => {
@@ -4463,6 +4472,7 @@ export default function MessagesPage() {
   };
 
   const handleSelectDirectMessageFriend = async (friend: serversApi.Friend) => {
+    const peerId = String(friend._id);
     setJoinedVoiceChannelId(null);
     setVoiceChannelCallToken(null);
     setVoiceChannelCallServerUrl("");
@@ -4471,13 +4481,14 @@ export default function MessagesPage() {
     setMessageText("");
     setSelectedServer(null);
     setSelectedChannel(null);
-    setDmUnreadCounts((prev) => ({ ...prev, [friend._id]: 0 })); // Clear unread indicator when opening chat
+    dmReadPeersRef.current.add(peerId);
+    setDmUnreadCounts((prev) => ({ ...prev, [peerId]: 0 }));
     // Ensure backend read-state is updated immediately when opening the conversation
     try {
       // Fire socket for realtime (fast)
-      markAllAsRead?.(friend._id);
+      markAllAsRead?.(peerId);
       // Also call REST to avoid race with getConversationList refresh
-      if (token) await markDmConversationRead({ token, userId: friend._id });
+      if (token) await markDmConversationRead({ token, userId: peerId });
     } catch (_err) {}
     shouldAutoScrollRef.current = true; // ✅ Enable auto-scroll when switching conversations
     // Pre-scroll to bottom BEFORE loading (prevents visual jump)
@@ -7969,11 +7980,13 @@ export default function MessagesPage() {
                                 })()}
                               </p>
                             </div>
-                            {(dmUnreadCounts[friend._id] ?? 0) > 0 && (
+                            {(dmUnreadCounts[String(friend._id)] ?? 0) > 0 && (
                               <span className={styles.friendUnreadWrap}>
                                 <span className={styles.dmUnreadDot} aria-hidden />
                                 <span className={styles.dmUnreadBadge}>
-                                  {dmUnreadCounts[friend._id]! > 99 ? "99+" : dmUnreadCounts[friend._id]}
+                                  {(dmUnreadCounts[String(friend._id)] ?? 0) > 99
+                                    ? "99+"
+                                    : dmUnreadCounts[String(friend._id)]}
                                 </span>
                               </span>
                             )}

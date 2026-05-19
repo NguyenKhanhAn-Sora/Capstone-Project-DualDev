@@ -38,6 +38,21 @@ export class DirectMessagesService {
     private readonly messagingProfilesService: MessagingProfilesService,
   ) {}
 
+  /** Tin nhận được, chưa đọc, chưa xóa với mọi người, và chưa ẩn "for me". */
+  private unreadReceiverMatch(userId: string, fromUserId?: string) {
+    const receiverId = new Types.ObjectId(userId);
+    const filter: Record<string, unknown> = {
+      receiverId,
+      isRead: { $ne: true },
+      isDeleted: false,
+      deletedFor: { $nin: [receiverId] },
+    };
+    if (fromUserId) {
+      filter.senderId = new Types.ObjectId(fromUserId);
+    }
+    return filter;
+  }
+
   async createDirectMessage(
     senderId: string,
     receiverId: string,
@@ -503,7 +518,7 @@ export class DirectMessagesService {
       {
         receiverId: new Types.ObjectId(userId),
         senderId: new Types.ObjectId(fromUserId),
-        isRead: false,
+        isRead: { $ne: true },
         isDeleted: false,
       },
       {
@@ -514,23 +529,18 @@ export class DirectMessagesService {
   }
 
   async getUnreadCount(userId: string): Promise<number> {
-    return this.directMessageModel.countDocuments({
-      receiverId: new Types.ObjectId(userId),
-      isRead: false,
-      isDeleted: false,
-    });
+    return this.directMessageModel.countDocuments(
+      this.unreadReceiverMatch(userId),
+    );
   }
 
   async getUnreadCountByUser(
     userId: string,
     fromUserId: string,
   ): Promise<number> {
-    return this.directMessageModel.countDocuments({
-      receiverId: new Types.ObjectId(userId),
-      senderId: new Types.ObjectId(fromUserId),
-      isRead: false,
-      isDeleted: false,
-    });
+    return this.directMessageModel.countDocuments(
+      this.unreadReceiverMatch(userId, fromUserId),
+    );
   }
 
   async getConversationList(userId: string): Promise<any[]> {
@@ -564,7 +574,12 @@ export class DirectMessagesService {
                   {
                     $and: [
                       { $eq: ['$receiverId', user] },
-                      { $eq: ['$isRead', false] },
+                      { $ne: ['$isRead', true] },
+                      {
+                        $not: {
+                          $in: [user, { $ifNull: ['$deletedFor', []] }],
+                        },
+                      },
                     ],
                   },
                   1,

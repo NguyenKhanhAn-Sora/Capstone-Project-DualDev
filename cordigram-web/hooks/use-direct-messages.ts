@@ -87,6 +87,7 @@ export interface DmUnreadCountEvent {
   totalUnread?: number;
   fromUserId?: string | null;
   conversationUnread?: number | null;
+  _seq?: number;
 }
 
 export interface BoostEntitlementUpdatedEvent {
@@ -225,8 +226,8 @@ export const useDirectMessages = ({
             typeof data.conversationUnread === "number"
               ? data.conversationUnread
               : null,
+          _seq: Date.now(),
         });
-        setTimeout(() => setDmUnreadCountEvent(null), 400);
       },
     );
 

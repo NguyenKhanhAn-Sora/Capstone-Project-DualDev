@@ -186,23 +186,16 @@ export class DirectMessagesController {
       user.userId,
       fromUserId,
     );
-    // Best-effort: push realtime unread update to this user
+    // Best-effort: push realtime unread update to all tabs of this user
     try {
-      const socketId = this.directMessagesGateway.getSocketIdByUserId(
+      const count = await this.directMessagesService.getUnreadCount(
         user.userId,
       );
-      if (socketId) {
-        const count = await this.directMessagesService.getUnreadCount(
-          user.userId,
-        );
-        (this.directMessagesGateway as any).server
-          ?.to(socketId)
-          ?.emit?.('dm-unread-count', {
-            totalUnread: count,
-            fromUserId,
-            conversationUnread: 0,
-          });
-      }
+      this.directMessagesGateway.emitToUser(user.userId, 'dm-unread-count', {
+        totalUnread: count,
+        fromUserId,
+        conversationUnread: 0,
+      });
     } catch (_e) {}
     return { success: true };
   }
