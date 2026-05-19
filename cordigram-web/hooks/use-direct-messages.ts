@@ -73,6 +73,7 @@ export interface CallEvent {
 
 export interface UserProfileStyleUpdatedEvent {
   userId: string;
+  profileContext?: "messaging" | "social";
   avatarUrl?: string | null;
   coverUrl?: string | null;
   displayNameFontId?: string;

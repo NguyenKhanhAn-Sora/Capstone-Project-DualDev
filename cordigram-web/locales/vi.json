@@ -967,7 +967,7 @@
       "loading": "Đang tải…",
       "serverLabel": "Máy chủ",
       "selectServer": "— Chọn máy chủ —",
-      "serverHint": "Biểu ngữ và ảnh đại diện dùng chung với hồ sơ chính; xem trước hiển thị biệt danh trên máy chủ này.",
+      "serverHint": "Hồ sơ máy chủ (ảnh, biểu ngữ, kiểu tên) chỉ áp dụng trong máy chủ đã chọn — tách khỏi hồ sơ social và hồ sơ chính Messages. Xem trước hiển thị biệt danh trên máy chủ này.",
       "serverNickLabel": "Biệt danh máy chủ",
       "serverNickPlaceholder": "Tên hiển thị trong máy chủ",
       "displayNameLabel": "Tên hiển thị",

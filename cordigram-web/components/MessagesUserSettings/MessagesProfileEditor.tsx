@@ -169,26 +169,43 @@ export default function MessagesProfileEditor({
     [],
   );
 
-  const emitDisplayNameStyleUpdated = useCallback(
-    (style: DisplayNameStyleValue) => {
+  const emitMessagingProfileUpdated = useCallback(
+    (patch: {
+      avatarUrl?: string | null;
+      displayName?: string;
+      username?: string;
+      displayNameFontId?: string;
+      displayNameEffectId?: string;
+      displayNamePrimaryHex?: string;
+      displayNameAccentHex?: string;
+    }) => {
       if (typeof window === "undefined") return;
       window.dispatchEvent(
         new CustomEvent("cordigram-user-profile-style-updated", {
           detail: {
             profileContext: "messaging" as const,
             userId: currentUserId,
-            displayName: displayName.trim() || username.trim() || undefined,
-            /** Trong messaging, đây là `chatUsername` (dòng phụ chat), không phải username social. */
-            username: username.trim() || undefined,
-            displayNameFontId: style.fontId,
-            displayNameEffectId: style.effectId,
-            displayNamePrimaryHex: style.primaryHex,
-            displayNameAccentHex: style.accentHex,
+            ...patch,
           },
         }),
       );
     },
-    [currentUserId, displayName, username],
+    [currentUserId],
+  );
+
+  const emitDisplayNameStyleUpdated = useCallback(
+    (style: DisplayNameStyleValue) => {
+      emitMessagingProfileUpdated({
+        displayName: displayName.trim() || username.trim() || undefined,
+        /** Trong messaging, đây là `chatUsername` (dòng phụ chat), không phải username social. */
+        username: username.trim() || undefined,
+        displayNameFontId: style.fontId,
+        displayNameEffectId: style.effectId,
+        displayNamePrimaryHex: style.primaryHex,
+        displayNameAccentHex: style.accentHex,
+      });
+    },
+    [currentUserId, displayName, username, emitMessagingProfileUpdated],
   );
 
   useEffect(() => {
@@ -582,9 +599,15 @@ export default function MessagesProfileEditor({
       form,
       cordigramUploadContext: "messages",
     });
-    setAvatarUrl(res.avatarUrl || DEFAULT_AVATAR);
+    const nextUrl = res.avatarUrl || DEFAULT_AVATAR;
+    setAvatarUrl(nextUrl);
     if (res.avatarUrl) pushRecentProfileAvatar(res.avatarUrl);
     refreshRecent();
+    emitMessagingProfileUpdated({
+      avatarUrl: nextUrl,
+      displayName: displayName.trim() || undefined,
+      username: username.trim() || undefined,
+    });
     onToast?.(t("chat.profileEditor.updatedAvatar"));
     await loadProfile();
   };

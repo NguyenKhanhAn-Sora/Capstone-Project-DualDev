@@ -57,6 +57,7 @@ import {
   createStripeCheckoutSession,
   type CreateStripeCheckoutSessionRequest,
 } from "@/lib/api";
+import { CURRENT_PROFILE_UPDATED_EVENT } from "@/lib/events";
 import { getLiveKitToken, getDMRoomName, getVoiceChannelParticipants } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 import OutgoingCallPopup from "@/components/OutgoingCallPopup";
@@ -1652,6 +1653,10 @@ export default function MessagesPage() {
   const jumpHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Unread count per DM conversation (userId -> count). Updated from getConversationList; cleared when user opens chat. */
   const [dmUnreadCounts, setDmUnreadCounts] = useState<Record<string, number>>({});
+  /** Thời điểm tin nhắn DM gần nhất theo peer — dùng sắp xếp danh sách (mới nhất lên đầu). */
+  const [dmPeerLastActivityAt, setDmPeerLastActivityAt] = useState<
+    Record<string, number>
+  >({});
   const [loadingDirectMessages, setLoadingDirectMessages] = useState(false);
   const [token, setToken] = useState<string>("");
   const [showMessagesUserSettings, setShowMessagesUserSettings] =
@@ -1753,6 +1758,36 @@ export default function MessagesPage() {
       displayNameAccentHex: mp.displayNameAccentHex ?? base.displayNameAccentHex,
     };
   }, [currentUserProfile, currentMessagingProfile]);
+  /** Hồ sơ chính trong Messages (DM) — không dùng avatar/tên social. */
+  const selfMessagingIdentity = useMemo(() => {
+    const mp = currentMessagingProfile;
+    const social = currentUserProfile;
+    const displayName =
+      (mp?.displayName && mp.displayName.trim()) ||
+      social?.displayName ||
+      social?.username ||
+      "";
+    const chatUsername =
+      (mp?.chatUsername && mp.chatUsername.trim()) ||
+      social?.username ||
+      "";
+    const avatarUrl =
+      (mp?.avatarUrl && mp.avatarUrl.trim()) ||
+      social?.avatarUrl ||
+      social?.avatar ||
+      "";
+    return {
+      displayName,
+      chatUsername,
+      username: chatUsername,
+      avatarUrl,
+      avatar: avatarUrl,
+      displayNameFontId: mp?.displayNameFontId ?? social?.displayNameFontId,
+      displayNameEffectId: mp?.displayNameEffectId ?? social?.displayNameEffectId,
+      displayNamePrimaryHex: mp?.displayNamePrimaryHex ?? social?.displayNamePrimaryHex,
+      displayNameAccentHex: mp?.displayNameAccentHex ?? social?.displayNameAccentHex,
+    };
+  }, [currentMessagingProfile, currentUserProfile]);
   const resolveMessageSenderStyle = useCallback(
     (message: UIMessage): React.CSSProperties | undefined => {
       const directFriend =
@@ -1767,12 +1802,14 @@ export default function MessagesPage() {
           : null;
       const sidebarFriend = friends.find((f) => String(f._id) === String(message.senderId));
       const selfDmSource =
-        message.isFromCurrentUser && selectedDirectMessageFriend
-          ? currentMessagingProfile
+        message.isFromCurrentUser
+          ? selectedDirectMessageFriend
+            ? currentMessagingProfile
+            : selfMessagingIdentity
           : null;
       const baseProfile =
         selfDmSource ||
-        (message.isFromCurrentUser ? currentUserProfile : null) ||
+        (message.isFromCurrentUser ? selfMessagingIdentity : null) ||
         directProfile ||
         directFriend ||
         sidebarFriend ||
@@ -1798,7 +1835,7 @@ export default function MessagesPage() {
       return getDisplayNameTextStyle(source, messagesShellTheme);
     },
     [
-      currentUserProfile,
+      selfMessagingIdentity,
       currentMessagingProfile,
       dmProfileDetail,
       selectedDirectMessageFriend,
@@ -2826,21 +2863,42 @@ export default function MessagesPage() {
     }
   };
 
-  const loadCurrentUserProfile = async (token: string) => {
+  const loadSocialProfile = async (authToken: string) => {
     try {
-      const profile = await fetchCurrentProfile({ token });
+      const profile = await fetchCurrentProfile({ token: authToken });
       setCurrentUserProfile(profile);
     } catch (err) {
       console.error("❌ Failed to load current user profile", err);
     }
+  };
+
+  const loadMessagingProfile = async (authToken: string) => {
     try {
-      const mp = await fetchMessagingProfileMe({ token });
+      const mp = await fetchMessagingProfileMe({ token: authToken });
       setCurrentMessagingProfile(mp);
     } catch (err) {
       console.error("Failed to load messaging profile", err);
       setCurrentMessagingProfile(null);
     }
   };
+
+  const loadCurrentUserProfile = async (authToken: string) => {
+    await Promise.all([
+      loadSocialProfile(authToken),
+      loadMessagingProfile(authToken),
+    ]);
+  };
+
+  /** Đổi avatar social không làm đổi hồ sơ Messages — chỉ làm mới bản ghi social. */
+  useEffect(() => {
+    if (typeof window === "undefined" || !token) return;
+    const onSocialProfileUpdated = () => {
+      void loadSocialProfile(token);
+    };
+    window.addEventListener(CURRENT_PROFILE_UPDATED_EVENT, onSocialProfileUpdated);
+    return () =>
+      window.removeEventListener(CURRENT_PROFILE_UPDATED_EVENT, onSocialProfileUpdated);
+  }, [token]);
 
   const loadFollowing = async () => {
     try {
@@ -2862,6 +2920,29 @@ export default function MessagesPage() {
       loadFollowing();
     }
   }, [token]);
+
+  const bumpDmPeerToTop = useCallback(
+    (peerId: string, activityAt?: string | number | Date) => {
+      if (!peerId) return;
+      const ts =
+        activityAt instanceof Date
+          ? activityAt.getTime()
+          : typeof activityAt === "string"
+            ? new Date(activityAt).getTime() || Date.now()
+            : typeof activityAt === "number" && Number.isFinite(activityAt)
+              ? activityAt
+              : Date.now();
+      setDmPeerLastActivityAt((prev) => ({ ...prev, [peerId]: ts }));
+      setFriends((prev) => {
+        const idx = prev.findIndex((f) => String(f._id) === String(peerId));
+        if (idx < 0) return prev;
+        const next = prev.slice();
+        const [item] = next.splice(idx, 1);
+        return [item, ...next];
+      });
+    },
+    [],
+  );
 
   const upsertFriendToDmList = useCallback((friend: serversApi.Friend | null | undefined) => {
     if (!friend?._id) return;
@@ -2904,6 +2985,14 @@ export default function MessagesPage() {
         (f) => followingIds.has(f._id) || conversations.has(f._id),
       );
     }
+    list.sort((a, b) => {
+      const ta = dmPeerLastActivityAt[a._id] ?? 0;
+      const tb = dmPeerLastActivityAt[b._id] ?? 0;
+      if (tb !== ta) return tb - ta;
+      const na = (a.displayName || a.username || "").toLowerCase();
+      const nb = (b.displayName || b.username || "").toLowerCase();
+      return na.localeCompare(nb);
+    });
     return list;
   }, [
     friends,
@@ -2912,6 +3001,7 @@ export default function MessagesPage() {
     chatUserSettings?.dmListFrom,
     followingIds,
     conversations,
+    dmPeerLastActivityAt,
   ]);
 
   useEffect(() => {
@@ -2969,7 +3059,10 @@ export default function MessagesPage() {
               ? f
               : ({
                   ...f,
-                  avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? f.avatarUrl) : f.avatarUrl,
+                  avatarUrl:
+                    isMessaging && "avatarUrl" in d
+                      ? (d.avatarUrl ?? f.avatarUrl)
+                      : f.avatarUrl,
                   displayName: "displayName" in d ? (d.displayName ?? f.displayName) : f.displayName,
                   ...(isMessaging
                     ? {}
@@ -2991,7 +3084,10 @@ export default function MessagesPage() {
         if (!prev || String(prev._id) !== uid) return prev;
         return {
           ...prev,
-          avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? prev.avatarUrl) : prev.avatarUrl,
+          avatarUrl:
+            isMessaging && "avatarUrl" in d
+              ? (d.avatarUrl ?? prev.avatarUrl)
+              : prev.avatarUrl,
           displayName: d.displayName ?? prev.displayName,
           ...(isMessaging ? {} : { username: d.username ?? prev.username }),
           displayNameFontId:
@@ -3009,7 +3105,10 @@ export default function MessagesPage() {
         if (!prev || String((prev as any).userId) !== uid) return prev;
         return {
           ...(prev as any),
-          avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? (prev as any).avatarUrl) : (prev as any).avatarUrl,
+          avatarUrl:
+            isMessaging && "avatarUrl" in d
+              ? (d.avatarUrl ?? (prev as any).avatarUrl)
+              : (prev as any).avatarUrl,
           displayName: d.displayName ?? (prev as any).displayName,
           ...("username" in d
             ? { chatUsername: d.username ?? (prev as any).chatUsername }
@@ -3557,14 +3656,40 @@ export default function MessagesPage() {
       .then((list) => {
         if (cancelled) return;
         const counts: Record<string, number> = {};
+        const activity: Record<string, number> = {};
         list.forEach((c) => {
-          if (c.userId) counts[c.userId] = c.unreadCount ?? 0;
+          if (!c.userId) return;
+          counts[c.userId] = c.unreadCount ?? 0;
+          if (c.lastMessageTime) {
+            const t = new Date(c.lastMessageTime).getTime();
+            if (!Number.isNaN(t)) activity[c.userId] = t;
+          }
         });
         // If user is currently viewing a DM conversation, keep its unread at 0
         // to avoid race where the list fetch completes before mark-as-read does.
         const activeDmId = selectedDirectMessageFriend?._id;
         if (activeDmId) counts[activeDmId] = 0;
         setDmUnreadCounts(counts);
+        if (Object.keys(activity).length > 0) {
+          setDmPeerLastActivityAt((prev) => ({ ...prev, ...activity }));
+          const rank = new Map(
+            list.map((c, i) => [c.userId, i] as const),
+          );
+          setFriends((prev) =>
+            [...prev].sort((a, b) => {
+              const ra = rank.has(a._id)
+                ? rank.get(a._id)!
+                : Number.MAX_SAFE_INTEGER;
+              const rb = rank.has(b._id)
+                ? rank.get(b._id)!
+                : Number.MAX_SAFE_INTEGER;
+              if (ra !== rb) return ra - rb;
+              const na = (a.displayName || a.username || "").toLowerCase();
+              const nb = (b.displayName || b.username || "").toLowerCase();
+              return na.localeCompare(nb);
+            }),
+          );
+        }
       })
       .catch(() => {
         if (!cancelled) setDmUnreadCounts({});
@@ -3676,8 +3801,10 @@ export default function MessagesPage() {
 
         return newMap;
       });
+
+      bumpDmPeerToTop(friendId, msg.createdAt);
     }
-  }, [messageSent, currentUserId]);
+  }, [messageSent, currentUserId, bumpDmPeerToTop]);
 
   // ✅ Handle new-message event (incoming messages from others)
   useEffect(() => {
@@ -3736,9 +3863,25 @@ export default function MessagesPage() {
       // ✅ Check if sender is in friends list
       const isSenderInFriendsList = friends.some((f) => f._id === friendId);
       if (!isSenderInFriendsList) {
-        // Reload friends list to include the new conversation partner
-        loadAvailableUsers();
+        if (typeof rawSender === "object" && rawSender) {
+          upsertFriendToDmList({
+            _id: friendId,
+            displayName:
+              (rawSender as { displayName?: string }).displayName ||
+              (rawSender as { username?: string }).username ||
+              "",
+            username: (rawSender as { username?: string }).username || "",
+            avatarUrl:
+              (rawSender as { avatar?: string }).avatar ||
+              (rawSender as { avatarUrl?: string }).avatarUrl ||
+              "",
+            email: (rawSender as { email?: string }).email || "",
+          });
+        } else {
+          loadAvailableUsers();
+        }
       }
+      bumpDmPeerToTop(friendId, msg.createdAt);
 
       // ✅ Add incoming message to conversations Map
       setConversations((prev) => {
@@ -3795,6 +3938,8 @@ export default function MessagesPage() {
     currentUserId,
     friends,
     loadAvailableUsers,
+    bumpDmPeerToTop,
+    upsertFriendToDmList,
   ]);
 
   // ✅ Handle message-deleted event
@@ -4891,8 +5036,8 @@ export default function MessagesPage() {
       const senderDisplayNameResolved =
         myServerNickname ||
         (typeof newMessage.senderId === "string"
-          ? currentUserProfile?.displayName
-          : ((newMessage.senderId as any)?.displayName ?? currentUserProfile?.displayName)) ||
+          ? selfMessagingIdentity.displayName
+          : ((newMessage.senderId as any)?.displayName ?? selfMessagingIdentity.displayName)) ||
         undefined;
 
       const uiMessage: UIMessage = {
@@ -4908,13 +5053,13 @@ export default function MessagesPage() {
             : (newMessage.senderId as any)?.email ?? "",
         senderName:
           typeof newMessage.senderId === "string"
-            ? currentUserProfile?.username || ""
-            : (newMessage.senderId as any)?.username || (newMessage.senderId as any)?.email || currentUserProfile?.username || "",
+            ? selfMessagingIdentity.chatUsername || ""
+            : (newMessage.senderId as any)?.username || (newMessage.senderId as any)?.email || selfMessagingIdentity.chatUsername || "",
         senderDisplayName: senderDisplayNameResolved,
         senderAvatar:
           typeof newMessage.senderId === "string"
-            ? currentUserProfile?.avatar
-            : (newMessage.senderId as any)?.avatarUrl ?? (newMessage.senderId as any)?.avatar ?? currentUserProfile?.avatar,
+            ? selfMessagingIdentity.avatar
+            : (newMessage.senderId as any)?.avatarUrl ?? (newMessage.senderId as any)?.avatar ?? selfMessagingIdentity.avatar,
         timestamp: new Date(newMessage.createdAt),
         isFromCurrentUser: true,
         type: "server",
@@ -5091,6 +5236,7 @@ export default function MessagesPage() {
     const messageContent = messageText.trim();
     const friendId = selectedDirectMessageFriend._id;
     upsertFriendToDmList(selectedDirectMessageFriend);
+    bumpDmPeerToTop(friendId);
     let optimisticMessage: UIMessage | null = null;
 
     try {
@@ -5112,9 +5258,9 @@ export default function MessagesPage() {
         text: messageContent,
         senderId: currentUserId,
         senderEmail: "",
-        senderDisplayName: currentUserProfile?.displayName || undefined,
-        senderName: currentUserProfile?.username || "",
-        senderAvatar: currentUserProfile?.avatar,
+        senderDisplayName: selfMessagingIdentity.displayName || undefined,
+        senderName: selfMessagingIdentity.chatUsername || "",
+        senderAvatar: selfMessagingIdentity.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
         type: "direct",
@@ -5159,7 +5305,7 @@ export default function MessagesPage() {
           senderEmail: typeof created.senderId === "object" ? created.senderId?.email : "",
           senderDisplayName: typeof created.senderId === "object" ? (created.senderId?.displayName || undefined) : undefined,
           senderName: typeof created.senderId === "object" ? (created.senderId?.username || created.senderId?.email) : "",
-          senderAvatar: typeof created.senderId === "object" ? created.senderId?.avatar : currentUserProfile?.avatar,
+          senderAvatar: typeof created.senderId === "object" ? created.senderId?.avatar : selfMessagingIdentity.avatar,
           timestamp: new Date(created.createdAt),
           isFromCurrentUser: true,
           type: "direct",
@@ -5237,15 +5383,15 @@ export default function MessagesPage() {
           text: newMsg.content,
           senderId: typeof newMsg.senderId === "string" ? newMsg.senderId : newMsg.senderId._id,
           senderEmail: "",
-          senderName: currentUserProfile?.username || "",
+          senderName: selfMessagingIdentity.chatUsername || "",
           senderDisplayName:
             servers
               .find((s) => s._id === selectedServer)
               ?.members?.find((m) => String(m.userId) === String(currentUserId))
               ?.nickname?.trim() ||
-            currentUserProfile?.displayName ||
+            selfMessagingIdentity.displayName ||
             undefined,
-          senderAvatar: currentUserProfile?.avatar,
+          senderAvatar: selfMessagingIdentity.avatar,
           timestamp: new Date(newMsg.createdAt),
           isFromCurrentUser: true,
           type: "server",
@@ -5272,9 +5418,9 @@ export default function MessagesPage() {
         text: gif.title || `Sent a ${type}`,
         senderId: currentUserId,
         senderEmail: "",
-        senderDisplayName: currentUserProfile?.displayName || undefined,
-        senderName: currentUserProfile?.username || "",
-        senderAvatar: currentUserProfile?.avatar,
+        senderDisplayName: selfMessagingIdentity.displayName || undefined,
+        senderName: selfMessagingIdentity.chatUsername || "",
+        senderAvatar: selfMessagingIdentity.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
         type: "direct",
@@ -5346,7 +5492,7 @@ export default function MessagesPage() {
             ? newMsg.senderId
             : newMsg.senderId._id,
         senderEmail: "",
-        senderName: currentUserProfile?.username || "",
+        senderName: selfMessagingIdentity.chatUsername || "",
         senderDisplayName:
           servers
             .find((s) => s._id === selectedServer)
@@ -5354,7 +5500,7 @@ export default function MessagesPage() {
             ?.nickname?.trim() ||
           currentUserProfile?.displayName ||
           undefined,
-        senderAvatar: currentUserProfile?.avatar,
+        senderAvatar: selfMessagingIdentity.avatar,
         timestamp: new Date(newMsg.createdAt),
         isFromCurrentUser: true,
         type: "server",
@@ -5460,9 +5606,9 @@ export default function MessagesPage() {
           text: newMessage.content,
           senderId: typeof newMessage.senderId === "string" ? newMessage.senderId : (newMessage.senderId as any)?._id,
           senderEmail: typeof newMessage.senderId === "string" ? "" : (newMessage.senderId as any)?.email ?? "",
-          senderName: typeof newMessage.senderId === "string" ? currentUserProfile?.username || "" : (newMessage.senderId as any)?.username || "",
-          senderDisplayName: typeof newMessage.senderId === "string" ? currentUserProfile?.displayName || undefined : (newMessage.senderId as any)?.displayName ?? undefined,
-          senderAvatar: typeof newMessage.senderId === "string" ? currentUserProfile?.avatar : (newMessage.senderId as any)?.avatarUrl ?? (newMessage.senderId as any)?.avatar ?? currentUserProfile?.avatar,
+          senderName: typeof newMessage.senderId === "string" ? selfMessagingIdentity.chatUsername || "" : (newMessage.senderId as any)?.username || "",
+          senderDisplayName: typeof newMessage.senderId === "string" ? selfMessagingIdentity.displayName || undefined : (newMessage.senderId as any)?.displayName ?? undefined,
+          senderAvatar: typeof newMessage.senderId === "string" ? selfMessagingIdentity.avatar : (newMessage.senderId as any)?.avatarUrl ?? (newMessage.senderId as any)?.avatar ?? selfMessagingIdentity.avatar,
           timestamp: new Date(newMessage.createdAt),
           isFromCurrentUser: true,
           type: "server",
@@ -5526,9 +5672,9 @@ export default function MessagesPage() {
         text: "Tin nhắn thoại",
         senderId: currentUserId,
         senderEmail: "",
-        senderDisplayName: currentUserProfile?.displayName || undefined,
-        senderName: currentUserProfile?.username || "",
-        senderAvatar: currentUserProfile?.avatar,
+        senderDisplayName: selfMessagingIdentity.displayName || undefined,
+        senderName: selfMessagingIdentity.chatUsername || "",
+        senderAvatar: selfMessagingIdentity.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
         type: "direct",
@@ -6190,9 +6336,9 @@ export default function MessagesPage() {
               ? newMsg.senderId
               : newMsg.senderId._id,
           senderEmail: "",
-          senderName: currentUserProfile?.username || "",
-          senderDisplayName: currentUserProfile?.displayName || undefined,
-          senderAvatar: currentUserProfile?.avatar,
+          senderName: selfMessagingIdentity.chatUsername || "",
+          senderDisplayName: selfMessagingIdentity.displayName || undefined,
+          senderAvatar: selfMessagingIdentity.avatar,
           timestamp: new Date(newMsg.createdAt),
           isFromCurrentUser: true,
           type: "server",
@@ -6718,9 +6864,9 @@ export default function MessagesPage() {
             text: isImage ? `📤 Uploading image...` : `📤 Uploading video...`,
             senderId: currentUserId,
             senderEmail: "",
-            senderDisplayName: currentUserProfile?.displayName || undefined,
-            senderName: currentUserProfile?.username || "",
-            senderAvatar: currentUserProfile?.avatar,
+            senderDisplayName: selfMessagingIdentity.displayName || undefined,
+            senderName: selfMessagingIdentity.chatUsername || "",
+            senderAvatar: selfMessagingIdentity.avatar,
             timestamp: new Date(),
             isFromCurrentUser: true,
             type: selectedDirectMessageFriend ? "direct" : "server",
@@ -6783,9 +6929,9 @@ export default function MessagesPage() {
             text: mediaMessage,
             senderId: currentUserId,
             senderEmail: "",
-            senderDisplayName: currentUserProfile?.displayName || undefined,
-            senderName: currentUserProfile?.username || "",
-            senderAvatar: currentUserProfile?.avatar,
+            senderDisplayName: selfMessagingIdentity.displayName || undefined,
+            senderName: selfMessagingIdentity.chatUsername || "",
+            senderAvatar: selfMessagingIdentity.avatar,
             timestamp: new Date(),
             isFromCurrentUser: true,
             type: selectedDirectMessageFriend ? "direct" : "server",
@@ -6822,9 +6968,9 @@ export default function MessagesPage() {
     [
       maxUploadBytes,
       currentUserId,
-      currentUserProfile?.displayName,
-      currentUserProfile?.username,
-      currentUserProfile?.avatar,
+      selfMessagingIdentity.displayName,
+      selfMessagingIdentity.chatUsername,
+      selfMessagingIdentity.avatar,
       selectedDirectMessageFriend,
       selectedChannel,
       token,
@@ -6909,9 +7055,9 @@ export default function MessagesPage() {
         text: `📊 Creating poll...`,
         senderId: currentUserId,
         senderEmail: "",
-        senderDisplayName: currentUserProfile?.displayName || undefined,
-        senderName: currentUserProfile?.username || "",
-        senderAvatar: currentUserProfile?.avatar,
+        senderDisplayName: selfMessagingIdentity.displayName || undefined,
+        senderName: selfMessagingIdentity.chatUsername || "",
+        senderAvatar: selfMessagingIdentity.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
         type: selectedDirectMessageFriend ? "direct" : "server",
@@ -6959,9 +7105,9 @@ export default function MessagesPage() {
         text: pollMessage,
         senderId: currentUserId,
         senderEmail: "",
-        senderDisplayName: currentUserProfile?.displayName || undefined,
-        senderName: currentUserProfile?.username || "",
-        senderAvatar: currentUserProfile?.avatar,
+        senderDisplayName: selfMessagingIdentity.displayName || undefined,
+        senderName: selfMessagingIdentity.chatUsername || "",
+        senderAvatar: selfMessagingIdentity.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
         type: selectedDirectMessageFriend ? "direct" : "server",
@@ -7464,7 +7610,7 @@ export default function MessagesPage() {
           token={callToken}
           serverUrl={callServerUrl}
           onDisconnect={handleEndCall}
-          participantName={currentUserProfile?.username || currentUserProfile?.displayName || 'Người dùng'}
+          participantName={selfMessagingIdentity.chatUsername || selfMessagingIdentity.displayName || 'Người dùng'}
           isAudioOnly={isAudioOnly}
         />
       )} */}
@@ -7829,20 +7975,20 @@ export default function MessagesPage() {
                       className={styles.userAvatar}
                       style={{
                         backgroundImage: isValidAvatarUrl(
-                          currentUserProfile?.avatarUrl,
+                          selfMessagingIdentity.avatarUrl,
                         )
-                          ? `url(${currentUserProfile.avatarUrl})`
+                          ? `url(${selfMessagingIdentity.avatarUrl})`
                           : undefined,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
                       }}
                     >
-                      {!isValidAvatarUrl(currentUserProfile?.avatarUrl) && (
+                      {!isValidAvatarUrl(selfMessagingIdentity.avatarUrl) && (
                         <span>
-                          {currentUserProfile?.displayName
+                          {selfMessagingIdentity.displayName
                             ?.charAt(0)
                             ?.toUpperCase() ||
-                            currentUserProfile?.username
+                            selfMessagingIdentity.chatUsername
                               ?.charAt(0)
                               ?.toUpperCase() ||
                             "U"}
@@ -7858,12 +8004,12 @@ export default function MessagesPage() {
                           messagesShellTheme,
                         )}
                       >
-                        {currentUserProfile?.displayName ||
-                          currentUserProfile?.username ||
+                        {selfMessagingIdentity.displayName ||
+                          selfMessagingIdentity.chatUsername ||
                           t("chat.messagesPage.userFallback")}
                       </div>
                       <div className={styles.userUsername}>
-                        {currentUserProfile?.username || ""}
+                        {selfMessagingIdentity.chatUsername || ""}
                       </div>
                     </div>
                   </div>
@@ -8530,20 +8676,20 @@ export default function MessagesPage() {
                       className={styles.userAvatar}
                       style={{
                         backgroundImage: isValidAvatarUrl(
-                          currentUserProfile?.avatarUrl,
+                          selfMessagingIdentity.avatarUrl,
                         )
-                          ? `url(${currentUserProfile.avatarUrl})`
+                          ? `url(${selfMessagingIdentity.avatarUrl})`
                           : undefined,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
                       }}
                     >
-                      {!isValidAvatarUrl(currentUserProfile?.avatarUrl) && (
+                      {!isValidAvatarUrl(selfMessagingIdentity.avatarUrl) && (
                         <span>
-                          {(currentServerNickname || currentUserProfile?.displayName)
+                          {(currentServerNickname || selfMessagingIdentity.displayName)
                             ?.charAt(0)
                             ?.toUpperCase() ||
-                            currentUserProfile?.username
+                            selfMessagingIdentity.chatUsername
                               ?.charAt(0)
                               ?.toUpperCase() ||
                             "U"}
@@ -8560,12 +8706,12 @@ export default function MessagesPage() {
                         )}
                       >
                         {currentServerNickname ||
-                          currentUserProfile?.displayName ||
-                          currentUserProfile?.username ||
+                          selfMessagingIdentity.displayName ||
+                          selfMessagingIdentity.chatUsername ||
                           t("chat.sidebar.userFallback")}
                       </div>
                       <div className={styles.userUsername}>
-                        {currentUserProfile?.username || ""}
+                        {selfMessagingIdentity.chatUsername || ""}
                       </div>
                     </div>
                   </div>
@@ -9542,8 +9688,8 @@ export default function MessagesPage() {
                           micMuted={voiceMicMuted}
                           soundMuted={voiceSoundMuted}
                           participantName={
-                            currentUserProfile?.displayName ||
-                            currentUserProfile?.username ||
+                            selfMessagingIdentity.displayName ||
+                            selfMessagingIdentity.chatUsername ||
                             t("chat.sidebar.userFallback")
                           }
                           onDisconnect={leaveVoiceChannel}

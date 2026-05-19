@@ -544,6 +544,7 @@ export class DirectMessagesService {
             isDeleted: false,
           },
         },
+        { $sort: { createdAt: 1 } },
         {
           $group: {
             _id: {

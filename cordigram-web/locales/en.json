@@ -967,7 +967,7 @@
       "loading": "Loading…",
       "serverLabel": "Server",
       "selectServer": "— Select server —",
-      "serverHint": "Banner and avatar are shared with your main profile; preview shows your nickname on this server.",
+      "serverHint": "Server profile (avatar, banner, name style) applies only on the selected server — separate from social and your main Messages profile. Preview shows your nickname on this server.",
       "serverNickLabel": "Server nickname",
       "serverNickPlaceholder": "Display name in this server",
       "displayNameLabel": "Display name",
