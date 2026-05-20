@@ -1426,21 +1426,22 @@ export default function CreatePostPage() {
           onCaptionChange={handleCaptionChange}
           onCaptionKeyDown={onCaptionKeyDown}
           onEmojiSelect={insertEmoji}
-          onScheduleDateChange={(d) => {
+          onScheduleDateChange={(d: Date | null) => {
             if (!d) {
               setForm((prev) => ({ ...prev, scheduledAt: "" }));
               return;
             }
+            const dateStr = formatLocalDate(d);
             setForm((prev) => {
               const parts = splitSchedule(prev.scheduledAt);
               const nextTime = clampTimeForDate(
-                d,
+                dateStr,
                 parts.time || formatLocalTime(new Date()),
               );
-              return { ...prev, scheduledAt: buildSchedule(d, nextTime) };
+              return { ...prev, scheduledAt: buildSchedule(dateStr, nextTime) };
             });
           }}
-          onScheduleTimeChange={(t2) =>
+          onScheduleTimeChange={(t2: string) =>
             setForm((prev) => {
               const parts = splitSchedule(prev.scheduledAt);
               if (!parts.date) return prev;
