@@ -129,13 +129,8 @@ class GlobalCallOverlay extends StatelessWidget {
               );
             }
 
-            final outgoing = mgr.outgoing;
-            if (outgoing != null) {
-              final statusText = switch (outgoing.status) {
-                OutgoingCallStatus.calling => 'Đang gọi...',
-                OutgoingCallStatus.rejected => 'Cuộc gọi bị từ chối',
-                OutgoingCallStatus.noAnswer => 'Không có phản hồi',
-              };
+            final outgoings = mgr.outgoings;
+            if (outgoings.isNotEmpty) {
               return Stack(
                 fit: StackFit.expand,
                 children: [
@@ -143,15 +138,40 @@ class GlobalCallOverlay extends StatelessWidget {
                   Positioned.fill(
                     child: Material(
                       type: MaterialType.transparency,
-                      child: _CallPopupCard(
-                        title: outgoing.peerName,
-                        subtitle: outgoing.video ? 'Video call' : 'Voice call',
-                        statusText: statusText,
-                        avatarUrl: outgoing.peerAvatarUrl,
-                        acceptLabel: null,
-                        rejectLabel: 'Hủy',
-                        onAccept: null,
-                        onReject: mgr.cancelOutgoing,
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final outgoing in outgoings) ...[
+                                _CallPopupCard(
+                                  title: outgoing.peerName,
+                                  subtitle: outgoing.video
+                                      ? 'Video call'
+                                      : 'Voice call',
+                                  statusText: switch (outgoing.status) {
+                                    OutgoingCallStatus.calling =>
+                                      'Đang gọi...',
+                                    OutgoingCallStatus.rejected =>
+                                      'Cuộc gọi bị từ chối',
+                                    OutgoingCallStatus.noAnswer =>
+                                      'Không có phản hồi',
+                                  },
+                                  avatarUrl: outgoing.peerAvatarUrl,
+                                  acceptLabel: null,
+                                  rejectLabel: 'Hủy',
+                                  onAccept: null,
+                                  onReject: () => mgr.cancelOutgoingFor(
+                                    outgoing.peerUserId,
+                                  ),
+                                ),
+                                if (outgoing != outgoings.last)
+                                  const SizedBox(height: 12),
+                              ],
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),

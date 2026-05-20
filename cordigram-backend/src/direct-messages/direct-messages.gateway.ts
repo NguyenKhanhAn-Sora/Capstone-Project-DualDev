@@ -62,19 +62,6 @@ export class DirectMessagesGateway
     return [userA, userB].sort().join(':');
   }
 
-  /** Active (not yet logged) call involving this user as caller or callee. */
-  private findActiveCallForUser(userId: string) {
-    for (const [key, session] of this.activeCalls) {
-      if (
-        !session.logged &&
-        (session.initiatorId === userId || session.calleeId === userId)
-      ) {
-        return { key, session };
-      }
-    }
-    return null;
-  }
-
   private emitCallBusy(
     socket: Socket,
     payload: {
@@ -772,24 +759,11 @@ export class DirectMessagesGateway
         return;
       }
 
-      const senderBusy = this.findActiveCallForUser(senderId);
-      if (senderBusy) {
-        const peerId =
-          senderBusy.session.initiatorId === senderId
-            ? senderBusy.session.calleeId
-            : senderBusy.session.initiatorId;
+      const key = this.callPairKey(senderId, data.receiverId);
+      const existingPair = this.activeCalls.get(key);
+      if (existingPair && !existingPair.logged) {
         this.emitCallBusy(socket, {
           code: 'already_in_call',
-          receiverId: data.receiverId,
-          peerId,
-        });
-        return;
-      }
-
-      const receiverBusy = this.findActiveCallForUser(data.receiverId);
-      if (receiverBusy) {
-        this.emitCallBusy(socket, {
-          code: 'peer_busy',
           receiverId: data.receiverId,
           peerId: data.receiverId,
         });
@@ -815,7 +789,6 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
-      const key = this.callPairKey(senderId, data.receiverId);
       this.activeCalls.set(key, {
         initiatorId: senderId,
         calleeId: data.receiverId,

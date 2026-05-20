@@ -43,11 +43,11 @@ class DmCallManager extends ChangeNotifier {
   bool _callRouteOnStack = false;
 
   IncomingCallState? _incoming;
-  OutgoingCallState? _outgoing;
+  final Map<String, OutgoingCallState> _outgoings = {};
+  final Map<String, Timer> _outgoingTimers = {};
+  final Map<String, Timer> _rejectedTimers = {};
   ActiveCallState? _active;
-  Timer? _outgoingTimer;
   Timer? _incomingTimer;
-  Timer? _rejectedTimer;
   bool _isCallMinimized = false;
   /// True = only the small corner chip is shown (full mini card hidden).
   bool _miniCallTuckedToCorner = false;
@@ -77,7 +77,10 @@ class DmCallManager extends ChangeNotifier {
   NavigatorState? get rootNavigatorState => _navigatorKey?.currentState;
 
   IncomingCallState? get incoming => _incoming;
-  OutgoingCallState? get outgoing => _outgoing;
+  OutgoingCallState? get outgoing =>
+      _outgoings.isEmpty ? null : _outgoings.values.first;
+  List<OutgoingCallState> get outgoings =>
+      List<OutgoingCallState>.unmodifiable(_outgoings.values);
   ActiveCallState? get active => _active;
   bool get hasActiveCall => _active != null;
   bool get isCallMinimized => _isCallMinimized;
@@ -165,7 +168,15 @@ class DmCallManager extends ChangeNotifier {
     await ChannelMessagesRealtimeService.disconnect();
     _cancelTimers();
     _incoming = null;
-    _outgoing = null;
+    _outgoings.clear();
+    for (final t in _outgoingTimers.values) {
+      t.cancel();
+    }
+    _outgoingTimers.clear();
+    for (final t in _rejectedTimers.values) {
+      t.cancel();
+    }
+    _rejectedTimers.clear();
     _active = null;
     _callRouteOnStack = false;
     _activeCallStartedAt = null;
@@ -224,7 +235,8 @@ class DmCallManager extends ChangeNotifier {
     required bool video,
     String? myName,
   }) async {
-    if (_active != null || _outgoing != null || _incoming != null) return;
+    if (_incoming != null) return;
+    if (_outgoings.containsKey(peerUserId)) return;
     if ((AuthStorage.accessToken ?? '').isEmpty) {
       await AuthStorage.loadAll();
     }
@@ -250,7 +262,7 @@ class DmCallManager extends ChangeNotifier {
       isVideo: video,
     );
 
-    _outgoing = OutgoingCallState(
+    _outgoings[peerUserId] = OutgoingCallState(
       peerUserId: peerUserId,
       peerName: peerName,
       peerAvatarUrl: peerAvatarUrl,
@@ -258,24 +270,28 @@ class DmCallManager extends ChangeNotifier {
       myName: resolvedMyName,
       status: OutgoingCallStatus.calling,
     );
-    _outgoingTimer?.cancel();
-    _outgoingTimer = Timer(_outgoingTimeout, () {
-      if (_outgoing?.status == OutgoingCallStatus.calling) {
-        // Peer didn't pick up — tell them we're giving up, then close UI.
+    _outgoingTimers[peerUserId]?.cancel();
+    _outgoingTimers[peerUserId] = Timer(_outgoingTimeout, () {
+      final out = _outgoings[peerUserId];
+      if (out?.status == OutgoingCallStatus.calling) {
         DirectMessagesRealtimeService.endCall(peerUserId);
-        _updateOutgoingStatus(OutgoingCallStatus.noAnswer);
-        _scheduleOutgoingDismiss();
+        _updateOutgoingStatus(peerUserId, OutgoingCallStatus.noAnswer);
+        _scheduleOutgoingDismiss(peerUserId);
       }
     });
     notifyListeners();
   }
 
-  /// User tapped "Cancel" on the outgoing popup.
+  void cancelOutgoingFor(String peerUserId) {
+    if (!_outgoings.containsKey(peerUserId)) return;
+    DirectMessagesRealtimeService.endCall(peerUserId);
+    _cancelOutgoingFor(peerUserId);
+  }
+
+  /// User tapped "Cancel" on the outgoing popup (first / only entry).
   void cancelOutgoing() {
-    final out = _outgoing;
-    if (out == null) return;
-    DirectMessagesRealtimeService.endCall(out.peerUserId);
-    _cancelOutgoing();
+    if (_outgoings.isEmpty) return;
+    cancelOutgoingFor(_outgoings.keys.first);
   }
 
   /// User tapped "Accept" on the incoming popup.
@@ -515,32 +531,24 @@ class DmCallManager extends ChangeNotifier {
   }
 
   void _onCallBusy(DmCallBusyEvent event) {
-    final out = _outgoing;
-    if (out == null) return;
-    if (event.receiverId != null &&
-        event.receiverId!.isNotEmpty &&
-        event.receiverId != out.peerUserId) {
-      return;
-    }
-    _cancelOutgoing();
-    if (event.code == 'peer_busy') {
-      _showSnack('Người nhận đang bận cuộc gọi khác.');
-    } else {
-      _showSnack(
-        'Bạn đang có cuộc gọi từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
-      );
-    }
+    final peerId = event.receiverId ?? event.peerId;
+    if (peerId == null || peerId.isEmpty) return;
+    if (!_outgoings.containsKey(peerId)) return;
+    _cancelOutgoingFor(peerId);
+    _showSnack(
+      'Bạn đang gọi người này từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
+    );
   }
 
   Future<void> _handleAnswer(DmCallEvent event) async {
-    final out = _outgoing;
-    if (out == null || out.peerUserId != event.fromUserId) return;
+    final out = _outgoings[event.fromUserId];
+    if (out == null) return;
     if (_active != null || _callRouteOnStack) return;
 
     final roomName = event.payload?['sdpOffer']?['roomName']?.toString();
     if (roomName == null || roomName.isEmpty) return;
 
-    _outgoingTimer?.cancel();
+    _outgoingTimers[event.fromUserId]?.cancel();
 
     if (_myName == null || _myName!.isEmpty) {
       await _refreshMyName();
@@ -556,11 +564,11 @@ class DmCallManager extends ChangeNotifier {
       );
     } catch (err) {
       _showSnack('Không mở được cuộc gọi: $err');
-      _cancelOutgoing();
+      _cancelOutgoingFor(event.fromUserId);
       return;
     }
 
-    _outgoing = null;
+    _outgoings.remove(event.fromUserId);
     _startActiveCall(
       session: session,
       peerUserId: out.peerUserId,
@@ -571,11 +579,10 @@ class DmCallManager extends ChangeNotifier {
   }
 
   void _handleRejected(DmCallEvent event) {
-    final out = _outgoing;
-    if (out == null || out.peerUserId != event.fromUserId) return;
-    _outgoingTimer?.cancel();
-    _updateOutgoingStatus(OutgoingCallStatus.rejected);
-    _scheduleOutgoingDismiss();
+    if (!_outgoings.containsKey(event.fromUserId)) return;
+    _outgoingTimers[event.fromUserId]?.cancel();
+    _updateOutgoingStatus(event.fromUserId, OutgoingCallStatus.rejected);
+    _scheduleOutgoingDismiss(event.fromUserId);
   }
 
   void _onCallEnded(String fromUserId) {
@@ -585,8 +592,8 @@ class DmCallManager extends ChangeNotifier {
       _incoming = null;
       changed = true;
     }
-    if (_outgoing?.peerUserId == fromUserId) {
-      _cancelOutgoing(notify: false);
+    if (_outgoings.containsKey(fromUserId)) {
+      _cancelOutgoingFor(fromUserId, notify: false);
       changed = true;
     }
     if (_active?.peerUserId == fromUserId) {
@@ -664,34 +671,44 @@ class DmCallManager extends ChangeNotifier {
     });
   }
 
-  void _updateOutgoingStatus(OutgoingCallStatus status) {
-    final current = _outgoing;
+  void _updateOutgoingStatus(String peerUserId, OutgoingCallStatus status) {
+    final current = _outgoings[peerUserId];
     if (current == null) return;
-    _outgoing = current.copyWith(status: status);
+    _outgoings[peerUserId] = current.copyWith(status: status);
     notifyListeners();
   }
 
-  void _scheduleOutgoingDismiss() {
-    _rejectedTimer?.cancel();
-    _rejectedTimer = Timer(_rejectedLinger, () {
-      if (_outgoing?.status != OutgoingCallStatus.calling) {
-        _outgoing = null;
+  void _scheduleOutgoingDismiss(String peerUserId) {
+    _rejectedTimers[peerUserId]?.cancel();
+    _rejectedTimers[peerUserId] = Timer(_rejectedLinger, () {
+      final cur = _outgoings[peerUserId];
+      if (cur != null && cur.status != OutgoingCallStatus.calling) {
+        _outgoings.remove(peerUserId);
+        _rejectedTimers.remove(peerUserId);
         notifyListeners();
       }
     });
   }
 
-  void _cancelOutgoing({bool notify = true}) {
-    _outgoingTimer?.cancel();
-    _rejectedTimer?.cancel();
-    _outgoing = null;
+  void _cancelOutgoingFor(String peerUserId, {bool notify = true}) {
+    _outgoingTimers[peerUserId]?.cancel();
+    _outgoingTimers.remove(peerUserId);
+    _rejectedTimers[peerUserId]?.cancel();
+    _rejectedTimers.remove(peerUserId);
+    _outgoings.remove(peerUserId);
     if (notify) notifyListeners();
   }
 
   void _cancelTimers() {
-    _outgoingTimer?.cancel();
+    for (final t in _outgoingTimers.values) {
+      t.cancel();
+    }
+    _outgoingTimers.clear();
+    for (final t in _rejectedTimers.values) {
+      t.cancel();
+    }
+    _rejectedTimers.clear();
     _incomingTimer?.cancel();
-    _rejectedTimer?.cancel();
   }
 
   Future<void> _ensurePermissions({required bool video}) async {
