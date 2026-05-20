@@ -59,6 +59,101 @@ export class MessagesService {
     private readonly boostService: BoostService,
   ) {}
 
+  private readonly defaultAvatarUrl =
+    process.env.DEFAULT_AVATAR_URL?.trim() ||
+    'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
+
+  /** Avatar trong kênh server: ưu tiên hồ sơ máy chủ, không lấy social khi đã set server avatar. */
+  private resolveAvatarForServerChannel(
+    userId: string,
+    serverAvatarByUserId: Map<string, string>,
+    mainProfileAvatar?: string | null,
+  ): string {
+    const serverAv = serverAvatarByUserId.get(userId);
+    if (serverAv) return serverAv;
+    const main = typeof mainProfileAvatar === 'string' ? mainProfileAvatar.trim() : '';
+    if (main) return main;
+    return this.defaultAvatarUrl;
+  }
+
+  private async batchSenderProfiles(
+    userIds: string[],
+  ): Promise<
+    Map<
+      string,
+      {
+        username?: string;
+        displayName?: string;
+        avatarUrl?: string;
+      }
+    >
+  > {
+    if (!userIds.length) return new Map();
+    const profiles = await this.profileModel
+      .find({ userId: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
+      .select('userId username displayName avatarUrl')
+      .lean()
+      .exec();
+    return new Map(
+      profiles.map((p: any) => [
+        p.userId.toString(),
+        {
+          username: p.username,
+          displayName: p.displayName,
+          avatarUrl: p.avatarUrl,
+        },
+      ]),
+    );
+  }
+
+  private async batchServerAvatars(
+    serverId: string,
+    userIds: string[],
+  ): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (!serverId || !userIds.length) return map;
+    const rows = await this.userServerModel
+      .find({
+        serverId: new Types.ObjectId(serverId),
+        userId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+      })
+      .select('userId serverAvatarUrl')
+      .lean()
+      .exec();
+    for (const row of rows as any[]) {
+      const url =
+        typeof row.serverAvatarUrl === 'string' ? row.serverAvatarUrl.trim() : '';
+      if (url) map.set(row.userId.toString(), url);
+    }
+    return map;
+  }
+
+  private buildEnrichedSender(
+    rawSender: any,
+    profile:
+      | { username?: string; displayName?: string; avatarUrl?: string }
+      | undefined,
+    userId: string,
+    serverId: string | null,
+    serverAvatarByUserId: Map<string, string>,
+  ) {
+    const avatarUrl = serverId
+      ? this.resolveAvatarForServerChannel(
+          userId,
+          serverAvatarByUserId,
+          profile?.avatarUrl,
+        )
+      : profile?.avatarUrl ?? undefined;
+    return {
+      ...(typeof rawSender === 'object'
+        ? rawSender
+        : { _id: rawSender, email: '' }),
+      displayName: profile?.displayName ?? undefined,
+      username: profile?.username ?? undefined,
+      avatarUrl,
+    };
+  }
+
   private async handleMentionSpamViolation(
     server: any,
     userId: string,
@@ -1120,50 +1215,56 @@ export class MessagesService {
 
     if (!msg) return null;
 
+    const channelMeta = await this.channelModel
+      .findById(msg.channelId)
+      .select('serverId')
+      .lean()
+      .exec();
+    const serverId = channelMeta?.serverId?.toString() ?? null;
+
     const senderId = msg.senderId?._id ?? msg.senderId;
-    const senderUserId =
-      senderId != null ? new Types.ObjectId(senderId.toString()) : null;
-    const senderProfile = senderUserId
-      ? await this.profileModel
-          .findOne({ userId: senderUserId })
-          .select('username displayName avatarUrl')
-          .lean()
-          .exec()
-      : null;
+    const senderUserIdStr =
+      senderId != null ? senderId.toString() : '';
+    const senderProfile = senderUserIdStr
+      ? (await this.batchSenderProfiles([senderUserIdStr])).get(senderUserIdStr)
+      : undefined;
+    const serverAvatarByUserId =
+      serverId && senderUserIdStr
+        ? await this.batchServerAvatars(serverId, [senderUserIdStr])
+        : new Map<string, string>();
 
     const result: any = {
       ...msg,
-      senderId: {
-        ...(typeof msg.senderId === 'object'
-          ? msg.senderId
-          : { _id: msg.senderId, email: '' }),
-        displayName: senderProfile?.displayName ?? undefined,
-        username: senderProfile?.username ?? undefined,
-        avatarUrl: senderProfile?.avatarUrl ?? undefined,
-      },
+      senderId: this.buildEnrichedSender(
+        msg.senderId,
+        senderProfile,
+        senderUserIdStr,
+        serverId,
+        serverAvatarByUserId,
+      ),
     };
 
     const replyToRaw = msg.replyTo as any;
     if (replyToRaw && typeof replyToRaw === 'object') {
       const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
-      const rtUserId =
-        rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
-      const rtProfile = rtUserId
-        ? await this.profileModel
-            .findOne({ userId: rtUserId })
-            .select('username displayName avatarUrl')
-            .lean()
-            .exec()
-        : null;
+      const rtUserIdStr =
+        rtSenderId != null ? rtSenderId.toString() : '';
+      const rtProfile = rtUserIdStr
+        ? (await this.batchSenderProfiles([rtUserIdStr])).get(rtUserIdStr)
+        : undefined;
+      const rtServerAvatars =
+        serverId && rtUserIdStr
+          ? await this.batchServerAvatars(serverId, [rtUserIdStr])
+          : new Map<string, string>();
       result.replyTo = {
         ...replyToRaw,
-        senderId: {
-          ...(typeof replyToRaw.senderId === 'object'
-            ? replyToRaw.senderId
-            : { _id: replyToRaw.senderId, email: '' }),
-          displayName: rtProfile?.displayName ?? undefined,
-          username: rtProfile?.username ?? undefined,
-        },
+        senderId: this.buildEnrichedSender(
+          replyToRaw.senderId,
+          rtProfile,
+          rtUserIdStr,
+          serverId,
+          rtServerAvatars,
+        ),
       };
     }
 
@@ -1263,60 +1364,65 @@ export class MessagesService {
       .lean()
       .exec();
 
-    const enriched = await Promise.all(
-      messages.map(async (msg: any) => {
-        const senderId = msg.senderId?._id ?? msg.senderId;
-        const senderUserId =
-          senderId != null ? new Types.ObjectId(senderId.toString()) : null;
-        const senderProfile = senderUserId
-          ? await this.profileModel
-              .findOne({ userId: senderUserId })
-              .select('username displayName avatarUrl')
-              .lean()
-              .exec()
-          : null;
+    const channelMeta = await this.channelModel
+      .findById(channelId)
+      .select('serverId')
+      .lean()
+      .exec();
+    const serverIdForAvatars = channelMeta?.serverId?.toString() ?? null;
 
-        const result: any = {
-          ...msg,
-          senderId: {
-            ...(typeof msg.senderId === 'object'
-              ? msg.senderId
-              : { _id: msg.senderId, email: '' }),
-            displayName: senderProfile?.displayName ?? undefined,
-            username: senderProfile?.username ?? undefined,
-            avatarUrl: senderProfile?.avatarUrl ?? undefined,
-          },
+    const senderIdStrings = messages
+      .map((msg: any) => {
+        const sid = msg.senderId?._id ?? msg.senderId;
+        return sid != null ? sid.toString() : '';
+      })
+      .filter(Boolean);
+    const uniqueSenderIds = [...new Set(senderIdStrings)];
+
+    const profileMap = await this.batchSenderProfiles(uniqueSenderIds);
+    const serverAvatarByUserId = serverIdForAvatars
+      ? await this.batchServerAvatars(serverIdForAvatars, uniqueSenderIds)
+      : new Map<string, string>();
+
+    const enriched = messages.map((msg: any) => {
+      const senderId = msg.senderId?._id ?? msg.senderId;
+      const senderUserIdStr =
+        senderId != null ? senderId.toString() : '';
+      const senderProfile = senderUserIdStr
+        ? profileMap.get(senderUserIdStr)
+        : undefined;
+
+      const result: any = {
+        ...msg,
+        senderId: this.buildEnrichedSender(
+          msg.senderId,
+          senderProfile,
+          senderUserIdStr,
+          serverIdForAvatars,
+          serverAvatarByUserId,
+        ),
+      };
+
+      const replyToRaw = msg.replyTo;
+      if (replyToRaw && typeof replyToRaw === 'object') {
+        const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
+        const rtUserIdStr =
+          rtSenderId != null ? rtSenderId.toString() : '';
+        const rtProfile = rtUserIdStr ? profileMap.get(rtUserIdStr) : undefined;
+        result.replyTo = {
+          ...replyToRaw,
+          senderId: this.buildEnrichedSender(
+            replyToRaw.senderId,
+            rtProfile,
+            rtUserIdStr,
+            serverIdForAvatars,
+            serverAvatarByUserId,
+          ),
         };
+      }
 
-        const replyToRaw = msg.replyTo;
-        if (replyToRaw && typeof replyToRaw === 'object') {
-          const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
-          const rtUserId =
-            rtSenderId != null
-              ? new Types.ObjectId(rtSenderId.toString())
-              : null;
-          const rtProfile = rtUserId
-            ? await this.profileModel
-                .findOne({ userId: rtUserId })
-                .select('username displayName avatarUrl')
-                .lean()
-                .exec()
-            : null;
-          result.replyTo = {
-            ...replyToRaw,
-            senderId: {
-              ...(typeof replyToRaw.senderId === 'object'
-                ? replyToRaw.senderId
-                : { _id: replyToRaw.senderId, email: '' }),
-              displayName: rtProfile?.displayName ?? undefined,
-              username: rtProfile?.username ?? undefined,
-            },
-          };
-        }
-
-        return result;
-      }),
-    );
+      return result;
+    });
 
     const hasWelcome = enriched.some((m: any) => m.messageType === 'welcome');
     if (hasWelcome) {
@@ -1615,32 +1721,45 @@ export class MessagesService {
       .lean()
       .exec();
 
-    return Promise.all(
-      messages.map(async (msg: any) => {
-        const senderId = msg.senderId?._id ?? msg.senderId;
-        const senderUserId =
-          senderId != null ? new Types.ObjectId(senderId.toString()) : null;
-        const senderProfile = senderUserId
-          ? await this.profileModel
-              .findOne({ userId: senderUserId })
-              .select('username displayName avatarUrl')
-              .lean()
-              .exec()
-          : null;
+    const channelMeta = await this.channelModel
+      .findById(channelId)
+      .select('serverId')
+      .lean()
+      .exec();
+    const serverIdForAvatars = channelMeta?.serverId?.toString() ?? null;
 
-        return {
-          ...msg,
-          senderId: {
-            ...(typeof msg.senderId === 'object'
-              ? msg.senderId
-              : { _id: msg.senderId, email: '' }),
-            displayName: senderProfile?.displayName ?? undefined,
-            username: senderProfile?.username ?? undefined,
-            avatarUrl: senderProfile?.avatarUrl ?? undefined,
-          },
-        };
-      }),
-    );
+    const senderIdStrings = messages
+      .map((msg: any) => {
+        const sid = msg.senderId?._id ?? msg.senderId;
+        return sid != null ? sid.toString() : '';
+      })
+      .filter(Boolean);
+    const uniqueSenderIds = [...new Set(senderIdStrings)];
+
+    const profileMap = await this.batchSenderProfiles(uniqueSenderIds);
+    const serverAvatarByUserId = serverIdForAvatars
+      ? await this.batchServerAvatars(serverIdForAvatars, uniqueSenderIds)
+      : new Map<string, string>();
+
+    return messages.map((msg: any) => {
+      const senderId = msg.senderId?._id ?? msg.senderId;
+      const senderUserIdStr =
+        senderId != null ? senderId.toString() : '';
+      const senderProfile = senderUserIdStr
+        ? profileMap.get(senderUserIdStr)
+        : undefined;
+
+      return {
+        ...msg,
+        senderId: this.buildEnrichedSender(
+          msg.senderId,
+          senderProfile,
+          senderUserIdStr,
+          serverIdForAvatars,
+          serverAvatarByUserId,
+        ),
+      };
+    });
   }
 
   /** Đánh dấu toàn bộ tin nhắn trong kênh là đã đọc đến thời điểm hiện tại. */
@@ -1965,32 +2084,48 @@ export class MessagesService {
       messages = retry.messages;
     }
 
-    const results = await Promise.all(
-      messages.map(async (msg: any) => {
-        const sid = msg.senderId?._id ?? msg.senderId;
-        const senderUserId =
-          sid != null ? new Types.ObjectId(sid.toString()) : null;
-        const senderProfile = senderUserId
-          ? await this.profileModel
-              .findOne({ userId: senderUserId })
-              .select('username displayName avatarUrl')
-              .lean()
-              .exec()
-          : null;
+    let enrichServerId = serverId;
+    if (!enrichServerId && resolvedChannelId) {
+      const ch = await this.channelModel
+        .findById(resolvedChannelId)
+        .select('serverId')
+        .lean()
+        .exec();
+      enrichServerId = ch?.serverId?.toString();
+    }
 
-        return {
-          ...msg,
-          senderId: {
-            ...(typeof msg.senderId === 'object'
-              ? msg.senderId
-              : { _id: msg.senderId, email: '' }),
-            displayName: senderProfile?.displayName ?? undefined,
-            username: senderProfile?.username ?? undefined,
-            avatarUrl: senderProfile?.avatarUrl ?? undefined,
-          },
-        };
-      }),
-    );
+    const senderIdStrings = messages
+      .map((msg: any) => {
+        const sid = msg.senderId?._id ?? msg.senderId;
+        return sid != null ? sid.toString() : '';
+      })
+      .filter(Boolean);
+    const uniqueSenderIds = [...new Set(senderIdStrings)];
+
+    const profileMap = await this.batchSenderProfiles(uniqueSenderIds);
+    const serverAvatarByUserId =
+      enrichServerId && uniqueSenderIds.length
+        ? await this.batchServerAvatars(enrichServerId, uniqueSenderIds)
+        : new Map<string, string>();
+
+    const results = messages.map((msg: any) => {
+      const sid = msg.senderId?._id ?? msg.senderId;
+      const senderUserIdStr = sid != null ? sid.toString() : '';
+      const senderProfile = senderUserIdStr
+        ? profileMap.get(senderUserIdStr)
+        : undefined;
+
+      return {
+        ...msg,
+        senderId: this.buildEnrichedSender(
+          msg.senderId,
+          senderProfile,
+          senderUserIdStr,
+          enrichServerId ?? null,
+          serverAvatarByUserId,
+        ),
+      };
+    });
 
     return { results, totalCount, parsed };
   }

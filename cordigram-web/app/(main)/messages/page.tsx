@@ -2252,6 +2252,44 @@ export default function MessagesPage() {
     });
   }, [channelMessageDeleted]);
 
+  /** Cập nhật avatar tin nhắn kênh khi đổi hồ sơ máy chủ (không đụng social/messaging). */
+  useEffect(() => {
+    const onServerMemberProfileUpdated = (e: Event) => {
+      const d = (e as CustomEvent).detail as {
+        serverId?: string;
+        userId?: string;
+        avatarUrl?: string | null;
+      };
+      if (!d?.serverId || !d?.userId) return;
+      if (String(d.serverId) !== String(selectedServerRef.current ?? "")) return;
+
+      const uid = String(d.userId);
+      const nextAvatar =
+        typeof d.avatarUrl === "string" && d.avatarUrl.trim()
+          ? d.avatarUrl.trim()
+          : uid === String(currentUserId)
+            ? selfMessagingIdentity.avatar
+            : undefined;
+
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.type !== "server" || String(m.senderId) !== uid) return m;
+          if (!nextAvatar) return m;
+          return { ...m, senderAvatar: nextAvatar };
+        }),
+      );
+    };
+    window.addEventListener(
+      "cordigram-server-member-profile-updated",
+      onServerMemberProfileUpdated as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "cordigram-server-member-profile-updated",
+        onServerMemberProfileUpdated as EventListener,
+      );
+  }, [currentUserId, selfMessagingIdentity.avatar]);
+
   // ✅ New message in channel from WebSocket (thành viên khác gửi → hiện ngay không cần reload)
   useEffect(() => {
     if (!newMessageChannel?.message || !selectedChannel) return;

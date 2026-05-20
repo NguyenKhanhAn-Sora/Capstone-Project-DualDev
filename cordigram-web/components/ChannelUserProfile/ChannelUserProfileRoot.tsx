@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTheme } from "@/component/theme-provider";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 import styles from "./ChannelUserProfileRoot.module.css";
 import type { Friend } from "@/lib/servers-api";
 import { parseUserCover } from "@/lib/user-profile-cover";
@@ -209,13 +210,13 @@ function IconNote({ className }: { className?: string }) {
   );
 }
 
-const MUTE_DURATION_OPTIONS: { key: MentionMuteDuration; label: string }[] = [
-  { key: "15m", label: "Trong vòng 15 phút" },
-  { key: "1h", label: "Trong vòng 1 giờ" },
-  { key: "3h", label: "Trong vòng 3 giờ" },
-  { key: "8h", label: "Trong vòng 8 giờ" },
-  { key: "24h", label: "Trong vòng 24 giờ" },
-  { key: "forever", label: "Cho đến khi bật lại" },
+const MUTE_DURATION_KEYS: MentionMuteDuration[] = [
+  "15m",
+  "1h",
+  "3h",
+  "8h",
+  "24h",
+  "forever",
 ];
 
 export default function ChannelUserProfileRoot({
@@ -242,8 +243,18 @@ export default function ChannelUserProfileRoot({
   const fullMoreRef = useRef<HTMLDivElement>(null);
   const muteSubRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
+  const { t, language } = useLanguage();
   const [fullTab, setFullTab] = useState<"activity" | "follow" | "servers">(
     "activity",
+  );
+
+  const muteDurationOptions = useMemo(
+    () =>
+      MUTE_DURATION_KEYS.map((key) => ({
+        key,
+        label: t(`chat.channelUserProfile.mute.${key}`),
+      })),
+    [t],
   );
 
   useEffect(() => {
@@ -277,7 +288,9 @@ export default function ChannelUserProfileRoot({
       } catch (e) {
         if (!cancelled) {
           setLoadError(
-            e instanceof Error ? e.message : "Không tải được hồ sơ",
+            e instanceof Error
+              ? e.message
+              : t("chat.channelUserProfile.loadError"),
           );
         }
       } finally {
@@ -287,7 +300,7 @@ export default function ChannelUserProfileRoot({
     return () => {
       cancelled = true;
     };
-  }, [open, context, token]);
+  }, [open, context, token, t]);
 
   useEffect(() => {
     const onUpdated = (e: Event) => {
@@ -365,8 +378,8 @@ export default function ChannelUserProfileRoot({
         setFullMoreOpen(false);
       }
     };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("click", onDoc);
+    return () => document.removeEventListener("click", onDoc);
   }, [moreOpen, fullMoreOpen, inviteServerModalOpen]);
 
   const toast = useCallback(
@@ -422,13 +435,15 @@ export default function ChannelUserProfileRoot({
 
   const serverJoinedLabel = useMemo(() => {
     if (!memberRow?.joinedAt) return "—";
-    return new Date(memberRow.joinedAt).toLocaleDateString("vi-VN");
-  }, [memberRow?.joinedAt]);
+    return new Date(memberRow.joinedAt).toLocaleDateString(
+      localeTagForLanguage(language),
+    );
+  }, [memberRow?.joinedAt, language]);
 
   const handleSendMini = useCallback(async () => {
     const text = miniMessage.trim();
     if (!text || !friend) {
-      toast("Nhập tin nhắn trước khi gửi.");
+      toast(t("chat.channelUserProfile.toastMessageEmpty"));
       return;
     }
     try {
@@ -436,9 +451,11 @@ export default function ChannelUserProfileRoot({
       onOpenDirectMessage(friend, {});
       onClose();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Không gửi được tin nhắn");
+      toast(
+        e instanceof Error ? e.message : t("chat.channelUserProfile.toastMessageError"),
+      );
     }
-  }, [miniMessage, friend, token, onOpenDirectMessage, onClose, toast]);
+  }, [miniMessage, friend, token, onOpenDirectMessage, onClose, toast, t]);
 
   const handleGifMini = useCallback(() => {
     if (!friend) return;
@@ -451,15 +468,17 @@ export default function ChannelUserProfileRoot({
       if (!friend) return;
       try {
         await createServerInvite(serverId, friend._id);
-        toast("Đã gửi lời mời vào máy chủ.");
+        toast(t("chat.channelUserProfile.toastInvite"));
         setInviteServerModalOpen(false);
         setMoreOpen(false);
         setFullMoreOpen(false);
       } catch (e) {
-        toast(e instanceof Error ? e.message : "Không gửi được lời mời");
+        toast(
+          e instanceof Error ? e.message : t("chat.channelUserProfile.toastInviteError"),
+        );
       }
     },
-    [friend, toast],
+    [friend, toast, t],
   );
 
   const handleMuteApply = useCallback(
@@ -471,29 +490,33 @@ export default function ChannelUserProfileRoot({
           mutedUserId: friend._id,
           duration,
         });
-        toast("Đã tắt thông báo khi bị @ từ người này.");
+        toast(t("chat.channelUserProfile.toastMute"));
         setMuteSubOpen(false);
         setMoreOpen(false);
       } catch (e) {
-        toast(e instanceof Error ? e.message : "Không lưu được");
+        toast(
+          e instanceof Error ? e.message : t("chat.channelUserProfile.toastMuteError"),
+        );
       }
     },
-    [friend, token, toast],
+    [friend, token, toast, t],
   );
 
   const handleBlock = useCallback(async () => {
     if (!friend) return;
-    if (!window.confirm("Chặn người dùng này?")) return;
+    if (!window.confirm(t("chat.channelUserProfile.toastBlockConfirm"))) return;
     try {
       await blockUser({ token, userId: friend._id });
-      toast("Đã chặn.");
+      toast(t("chat.channelUserProfile.toastBlocked"));
       setMoreOpen(false);
       setFullMoreOpen(false);
       onClose();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Không chặn được");
+      toast(
+        e instanceof Error ? e.message : t("chat.channelUserProfile.toastBlockError"),
+      );
     }
-  }, [friend, token, onClose, toast]);
+  }, [friend, token, onClose, toast, t]);
 
   if (!open || !context || typeof document === "undefined") return null;
 
@@ -517,9 +540,9 @@ export default function ChannelUserProfileRoot({
       await followUser(profile.userId);
       const p = await fetchProfileDetail({ token, id: profile.userId });
       setProfile(p);
-      toast("Đã theo dõi.");
+      toast(t("chat.channelUserProfile.toastFollow"));
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Không theo dõi được");
+      toast(e instanceof Error ? e.message : t("chat.channelUserProfile.toastFollowError"));
     }
   };
 
@@ -529,9 +552,9 @@ export default function ChannelUserProfileRoot({
       await unfollowUser(profile.userId);
       const p = await fetchProfileDetail({ token, id: profile.userId });
       setProfile(p);
-      toast("Đã bỏ theo dõi.");
+      toast(t("chat.channelUserProfile.toastUnfollow"));
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Không bỏ theo dõi được");
+      toast(e instanceof Error ? e.message : t("chat.channelUserProfile.toastUnfollowError"));
     }
   };
 
@@ -550,7 +573,7 @@ export default function ChannelUserProfileRoot({
               opts.closeMore();
             }}
           >
-            Xem hồ sơ đầy đủ
+            {t("chat.channelUserProfile.viewFullProfile")}
           </button>
         ) : null}
       <button
@@ -562,7 +585,7 @@ export default function ChannelUserProfileRoot({
           setMuteSubOpen(false);
         }}
       >
-        <span>Mời vào máy chủ</span>
+        <span>{t("chat.channelUserProfile.inviteToServer")}</span>
         <span className={styles.menuChevron}>›</span>
       </button>
       <div className={styles.subMenuAnchor} ref={muteSubRef}>
@@ -571,12 +594,12 @@ export default function ChannelUserProfileRoot({
           className={`${styles.dropdownItem} ${styles.dropdownItemRow}`}
           onClick={() => setMuteSubOpen((v) => !v)}
         >
-          <span>Bỏ qua</span>
+          <span>{t("chat.channelUserProfile.ignore")}</span>
           <span className={styles.menuChevron}>›</span>
         </button>
         {muteSubOpen ? (
           <div className={styles.subDropdown}>
-            {MUTE_DURATION_OPTIONS.map((opt) => (
+            {muteDurationOptions.map((opt) => (
               <button
                 key={opt.key}
                 type="button"
@@ -595,7 +618,7 @@ export default function ChannelUserProfileRoot({
         className={`${styles.dropdownItem} ${styles.danger}`}
         onClick={() => void handleBlock()}
       >
-        Chặn
+        {t("chat.channelUserProfile.block")}
       </button>
       <button
         type="button"
@@ -603,11 +626,11 @@ export default function ChannelUserProfileRoot({
         onClick={() => {
           opts.closeMore();
           toast(
-            "Báo cáo: dùng mục Báo cáo trên tin nhắn hoặc Trung tâm hỗ trợ.",
+            t("chat.channelUserProfile.toastReport"),
           );
         }}
       >
-        Báo cáo hồ sơ người dùng
+        {t("chat.channelUserProfile.reportProfile")}
       </button>
     </div>
   ) : null;
@@ -625,14 +648,14 @@ export default function ChannelUserProfileRoot({
           className={styles.inviteModalCard}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <h3 className={styles.inviteModalTitle}>Mời vào máy chủ</h3>
+          <h3 className={styles.inviteModalTitle}>{t("chat.channelUserProfile.inviteModalTitle")}</h3>
           <p className={styles.inviteModalHint}>
-            Chọn máy chủ để gửi lời mời tới {displayName}.
+            {t("chat.channelUserProfile.inviteModalHint", { name: displayName })}
           </p>
           <ul className={styles.inviteServerList}>
             {inviteableServers.length === 0 ? (
               <li className={styles.inviteServerEmpty}>
-                Không có máy chủ khác để mời.
+                {t("chat.channelUserProfile.inviteEmpty")}
               </li>
             ) : (
               inviteableServers.map((s) => (
@@ -653,7 +676,7 @@ export default function ChannelUserProfileRoot({
             className={styles.inviteModalClose}
             onClick={() => setInviteServerModalOpen(false)}
           >
-            Đóng
+            {t("chat.channelUserProfile.inviteClose")}
           </button>
         </div>
       </div>
@@ -675,7 +698,7 @@ export default function ChannelUserProfileRoot({
         <button
           type="button"
           className={styles.fullModalCloseX}
-          aria-label="Đóng"
+          aria-label={t("chat.channelUserProfile.close")}
           onClick={onClose}
         >
           ×
@@ -704,8 +727,8 @@ export default function ChannelUserProfileRoot({
               <button
                 type="button"
                 className={styles.noteIconBtn}
-                aria-label="Ghi chú"
-                title="Ghi chú (chỉ hiển thị cho bạn)"
+                aria-label={t("chat.channelUserProfile.notesTitle")}
+                title={t("chat.channelUserProfile.notesTitle")}
               >
                 <IconNote />
               </button>
@@ -718,7 +741,7 @@ export default function ChannelUserProfileRoot({
                   className={styles.followBtnSecondary}
                   onClick={() => void handleUnfollow()}
                 >
-                  Bỏ theo dõi
+                  {t("chat.channelUserProfile.unfollow")}
                 </button>
               ) : (
                 <button
@@ -726,14 +749,14 @@ export default function ChannelUserProfileRoot({
                   className={styles.followBtn}
                   onClick={() => void handleFollow()}
                 >
-                  Thêm bạn
+                  {t("chat.channelUserProfile.follow")}
                 </button>
               )}
               <button
                 type="button"
                 className={styles.fullIconActionBtn}
-                aria-label="Nhắn tin"
-                title="Nhắn tin"
+                aria-label={t("chat.channelUserProfile.message")}
+                title={t("chat.channelUserProfile.message")}
                 onClick={() => {
                   onOpenDirectMessage(friend, {});
                   onClose();
@@ -745,8 +768,15 @@ export default function ChannelUserProfileRoot({
                 <button
                   type="button"
                   className={styles.fullIconActionBtn}
-                  aria-label="Thêm"
-                  onClick={() => setFullMoreOpen((v) => !v)}
+                  aria-label={t("chat.channelUserProfile.more")}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFullMoreOpen((v) => !v);
+                  }}
                 >
                   <IconMore />
                 </button>
@@ -758,7 +788,7 @@ export default function ChannelUserProfileRoot({
               </div>
             </div>
             <div className={styles.fullJoinBlock}>
-              <p className={styles.fullJoinHeading}>Gia nhập từ</p>
+              <p className={styles.fullJoinHeading}>{t("chat.channelUserProfile.joinedFrom")}</p>
               {profile.cordigramMemberSince ? (
                 <p className={styles.fullJoinItem}>
                   <span className={styles.joinDot} aria-hidden />
@@ -772,7 +802,7 @@ export default function ChannelUserProfileRoot({
             </div>
             {roleItems.length > 0 ? (
               <div className={styles.fullRolesSection}>
-                <h4 className={styles.fullRolesTitle}>Vai trò</h4>
+                <h4 className={styles.fullRolesTitle}>{t("chat.channelUserProfile.roles")}</h4>
                 <div className={styles.fullRolesList}>
                   {roleItems.map((r, idx) => (
                     <span key={`${r.name}-${idx}`} className={styles.roleChip}>
@@ -788,8 +818,8 @@ export default function ChannelUserProfileRoot({
               </div>
             ) : null}
             <div className={styles.fullNotesSection}>
-              <h4 className={styles.fullRolesTitle}>Ghi chú (chỉ hiển thị cho bạn)</h4>
-              <p className={styles.fullNotesPlaceholder}>Nhấp để thêm ghi chú</p>
+              <h4 className={styles.fullRolesTitle}>{t("chat.channelUserProfile.notesTitle")}</h4>
+              <p className={styles.fullNotesPlaceholder}>{t("chat.channelUserProfile.notesPlaceholder")}</p>
             </div>
           </div>
           <div className={styles.fullModalRight}>
@@ -803,7 +833,7 @@ export default function ChannelUserProfileRoot({
                 }
                 onClick={() => setFullTab("activity")}
               >
-                Hoạt động
+                {t("chat.channelUserProfile.tabActivity")}
               </button>
               <button
                 type="button"
@@ -815,8 +845,8 @@ export default function ChannelUserProfileRoot({
                 onClick={() => setFullTab("follow")}
               >
                 {mutualFollowCount > 0
-                  ? `Follow chung (${mutualFollowCount})`
-                  : "Không có bạn chung"}
+                  ? t("chat.channelUserProfile.tabMutualFollow", { count: mutualFollowCount })
+                  : t("chat.channelUserProfile.tabNoMutualFollow")}
               </button>
               <button
                 type="button"
@@ -827,17 +857,17 @@ export default function ChannelUserProfileRoot({
                 }
                 onClick={() => setFullTab("servers")}
               >
-                {mutualServerCount} máy chủ chung
+                {t("chat.channelUserProfile.tabMutualServers", { count: mutualServerCount })}
               </button>
             </div>
             <div className={styles.fullTabPanel}>
               {fullTab === "activity" ? (
                 <div className={styles.activityEmpty}>
                   <h3 className={styles.activityEmptyTitle}>
-                    {displayName} không có hoạt động nào để chia sẻ ở đây
+                    {t("chat.channelUserProfile.activityEmptyTitle", { name: displayName })}
                   </h3>
                   <p className={styles.activityEmptyDesc}>
-                    Hãy nhắn tin để bắt đầu trò chuyện với họ.
+                    {t("chat.channelUserProfile.activityEmptyDesc")}
                   </p>
                   <button
                     type="button"
@@ -848,12 +878,12 @@ export default function ChannelUserProfileRoot({
                     }}
                   >
                     <IconMessage />
-                    Nhắn tin
+                    {t("chat.channelUserProfile.message")}
                   </button>
                 </div>
               ) : fullTab === "follow" ? (
                 mutualFollowCount === 0 ? (
-                  <p className={styles.fullTabBody}>Không có follow chung.</p>
+                  <p className={styles.fullTabBody}>{t("chat.channelUserProfile.noMutualFollow")}</p>
                 ) : mutualFollowUsers.length > 0 ? (
                   <ul className={styles.mutualServerList}>
                     {mutualFollowUsers.map((u) => (
@@ -875,14 +905,15 @@ export default function ChannelUserProfileRoot({
                     ))}
                     {mutualFollowCount > mutualFollowUsers.length ? (
                       <li className={styles.mutualFollowMoreHint}>
-                        +{mutualFollowCount - mutualFollowUsers.length} người
-                        khác…
+                        {t("chat.channelUserProfile.mutualFollowMore", {
+                          count: mutualFollowCount - mutualFollowUsers.length,
+                        })}
                       </li>
                     ) : null}
                   </ul>
                 ) : (
                   <p className={styles.fullTabBody}>
-                    Có {mutualFollowCount} người theo dõi cả hai bạn.
+                    {t("chat.channelUserProfile.mutualFollowSummary", { count: mutualFollowCount })}
                   </p>
                 )
               ) : mutualServersList.length > 0 ? (
@@ -905,7 +936,7 @@ export default function ChannelUserProfileRoot({
                   ))}
                 </ul>
               ) : (
-                <p className={styles.fullTabBody}>Không có máy chủ chung.</p>
+                <p className={styles.fullTabBody}>{t("chat.channelUserProfile.noMutualServers")}</p>
               )}
             </div>
           </div>
@@ -937,20 +968,22 @@ export default function ChannelUserProfileRoot({
         {loadError ? (
           <div className={styles.errorBox}>{loadError}</div>
         ) : loading || !profile ? (
-          <div className={styles.loadingBox}>Đang tải…</div>
+          <div className={styles.loadingBox}>{t("chat.channelUserProfile.loading")}</div>
         ) : (
           <div className={styles.miniCard}>
             <div
               className={`${styles.miniBanner} ${isPlaceholderBanner ? styles.bannerFallback : ""}`}
             >
-              <img src={bannerUrl} alt="" className={styles.miniBannerImg} />
+              <div className={styles.miniBannerMedia}>
+                <img src={bannerUrl} alt="" className={styles.miniBannerImg} />
+              </div>
               <div className={styles.miniBannerActions}>
                 {!profile.isFollowing ? (
                   <button
                     type="button"
                     className={styles.bannerIconBtn}
-                    aria-label="Thêm bạn"
-                    title="Thêm bạn"
+                    aria-label={t("chat.channelUserProfile.addFriend")}
+                    title={t("chat.channelUserProfile.addFriend")}
                     onClick={() => void handleFollow()}
                   >
                     <IconUserAdd />
@@ -960,8 +993,15 @@ export default function ChannelUserProfileRoot({
                   <button
                     type="button"
                     className={styles.bannerIconBtn}
-                    aria-label="Thêm"
-                    onClick={() => setMoreOpen((v) => !v)}
+                    aria-label={t("chat.channelUserProfile.more")}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMoreOpen((v) => !v);
+                    }}
                   >
                     <IconMore />
                   </button>
@@ -1008,7 +1048,7 @@ export default function ChannelUserProfileRoot({
                     )}
                   </div>
                   <span className={styles.mutualText}>
-                    {mutualServerCount} máy chủ chung
+                    {t("chat.channelUserProfile.mutualServers", { count: mutualServerCount })}
                   </span>
                 </div>
               ) : null}
@@ -1022,7 +1062,7 @@ export default function ChannelUserProfileRoot({
                   }}
                 >
                   <IconMessage />
-                  Tin nhắn
+                  {t("chat.channelUserProfile.message")}
                 </button>
                 <button
                   type="button"
@@ -1033,7 +1073,7 @@ export default function ChannelUserProfileRoot({
                   }}
                 >
                   <IconPhone />
-                  Gọi
+                  {t("chat.channelUserProfile.call")}
                 </button>
               </div>
               {roleItems.length > 0 ? (
@@ -1055,14 +1095,14 @@ export default function ChannelUserProfileRoot({
                   className={styles.miniMsgInput}
                   value={miniMessage}
                   onChange={(e) => setMiniMessage(e.target.value)}
-                  placeholder={`Tin nhắn @${displayName}`}
+                  placeholder={t("chat.channelUserProfile.messagePlaceholder", { name: displayName })}
                   rows={1}
                 />
                 <button
                   type="button"
                   className={styles.miniEmojiBtn}
-                  aria-label="GIF"
-                  title="GIF"
+                  aria-label={t("chat.channelUserProfile.gif")}
+                  title={t("chat.channelUserProfile.gif")}
                   onClick={handleGifMini}
                 >
                   <IconSmile />
