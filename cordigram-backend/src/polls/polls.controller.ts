@@ -1,15 +1,17 @@
 import {
   Controller,
   Post,
+  Patch,
   Get,
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
 import { PollsService } from './polls.service';
-import { CreatePollDto, VotePollDto } from './dto/create-poll.dto';
+import { CreatePollDto, UpdatePollDto, VotePollDto } from './dto/create-poll.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('polls')
@@ -49,10 +51,28 @@ export class PollsController {
     return this.pollsService.getUserVote(id, userId);
   }
 
+  @Patch(':id')
+  async update(@Param('id') id: string, @Request() req, @Body() dto: UpdatePollDto) {
+    const userId = req.user.userId || req.user.sub;
+    return this.pollsService.update(id, userId, dto);
+  }
+
   @Delete(':id')
   async delete(@Param('id') id: string, @Request() req) {
     const userId = req.user.userId || req.user.sub;
     await this.pollsService.delete(id, userId);
     return { message: 'Poll deleted successfully' };
+  }
+
+  @Get(':id/voters')
+  async getVoters(
+    @Param('id') id: string,
+    @Request() req,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const viewerId = req.user?.userId || req.user?.sub || null;
+    const pageSize = Math.min(parseInt(limit ?? '20', 10) || 20, 50);
+    return this.pollsService.getVoters(id, viewerId, pageSize, cursor);
   }
 }

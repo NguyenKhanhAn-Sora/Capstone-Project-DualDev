@@ -142,7 +142,7 @@ export default function SearchAllPage() {
         if (cancelled) return;
         setPeople(filterProfilesByBlockedUsers(p.items ?? [], blockedIds));
         setHashtags((t.items ?? []).slice(0, 10));
-        setPosts(filterFeedItemsByBlockedAuthors(po.items ?? [], blockedIds));
+        setPosts(filterFeedItemsByBlockedAuthors(po.items ?? [], blockedIds).filter((item) => token ? true : !(item as any).pollId));
         setReels(filterFeedItemsByBlockedAuthors(r.items ?? [], blockedIds));
       } catch (err: any) {
         if (cancelled) return;

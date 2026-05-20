@@ -1,0 +1,314 @@
+.wrap {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--color-surface-muted);
+  margin: 4px 0 2px;
+}
+
+/* ── Header ────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pollBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: rgba(74, 163, 228, 0.1);
+  border: 1px solid rgba(74, 163, 228, 0.22);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.question {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.35;
+}
+
+/* ── Options ────────────────────────────────────────────── */
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Vote mode (buttons) */
+.optionVoteBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.optionVoteBtn:last-child {
+  border-bottom: none;
+}
+
+.optionVoteBtn:hover {
+  background: var(--color-surface);
+}
+
+.optionVoteBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.optionThumbWrap {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-border);
+}
+
+.optionThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.optionRadio {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.optionCheckbox {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.optionRadioSelected,
+.optionCheckboxSelected {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.optionRadioSelected::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.checkIcon {
+  color: #fff;
+  width: 11px;
+  height: 11px;
+}
+
+.optionVoteText {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  flex: 1;
+}
+
+/* Result mode (bars) */
+.optionResult {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  position: relative;
+}
+
+.optionResult:last-child {
+  border-bottom: none;
+}
+
+.optionResultBar {
+  position: absolute;
+  inset: 0 0 0 0;
+  border-radius: 0;
+  background: rgba(74, 163, 228, 0.09);
+  transform-origin: left;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.optionResultBarVoted {
+  background: rgba(74, 163, 228, 0.16);
+}
+
+.optionResultContent {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  z-index: 1;
+}
+
+.optionResultThumbWrap {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-border);
+}
+
+.optionResultThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.optionResultText {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.optionResultVotedDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.optionResultPct {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Footer ────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.footerMeta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.footerMetaClickable {
+  cursor: pointer;
+  text-underline-offset: 2px;
+  transition: color 120ms ease;
+}
+
+.footerMetaClickable:hover {
+  color: var(--color-title-primary);
+  text-decoration: underline;
+}
+
+.footerBadgeClosed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-border);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.footerBadgeLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Multi-vote submit button */
+.submitBtn {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.22);
+  cursor: pointer;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submitBtn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+/* Loading state */
+.loadingWrap {
+  padding: 18px 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}

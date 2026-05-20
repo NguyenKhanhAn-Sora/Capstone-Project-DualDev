@@ -1152,6 +1152,33 @@
   position: relative;
 }
 
+.pollOptionsEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pollOptionEditorRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pollOptionEditorThumb {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+}
+
+.pollOptionEditorRow .editInput {
+  flex: 1;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+}
+
 .mentionCombo {
   position: relative;
 }

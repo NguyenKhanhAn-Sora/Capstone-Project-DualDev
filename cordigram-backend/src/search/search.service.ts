@@ -11,6 +11,7 @@ import {
   InteractionType,
 } from '../posts/post-interaction.schema';
 import { Profile } from '../profiles/profile.schema';
+import { Poll, PollDocument } from '../polls/poll.schema';
 import {
   SearchHistory,
   SearchHistoryKind,
@@ -32,6 +33,7 @@ export class SearchService {
     private readonly postInteractionModel: Model<PostInteraction>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
+    @InjectModel(Poll.name) private readonly pollModel: Model<PollDocument>,
   ) {}
 
   private asObjectId(value: string, field: string) {
@@ -142,6 +144,7 @@ export class SearchService {
       following?: boolean;
       reposted?: boolean;
     } | null,
+    poll?: any,
   ) {
     return {
       kind: doc.kind,
@@ -191,9 +194,56 @@ export class SearchService {
         following: userFlags?.following ?? false,
         reposted: userFlags?.reposted ?? false,
       },
+      poll: poll ?? null,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };
+  }
+
+  private async batchFetchPollsLocal(posts: any[]): Promise<Map<string, any>> {
+    const pollIds = posts
+      .map((p) => p.pollId)
+      .filter(Boolean)
+      .map((id) => (typeof id === 'string' ? new Types.ObjectId(id) : id));
+
+    if (!pollIds.length) return new Map();
+
+    const polls = await this.pollModel
+      .find({ _id: { $in: pollIds }, isDeleted: false })
+      .lean()
+      .exec();
+
+    const map = new Map<string, any>();
+    for (const poll of polls) {
+      const now = new Date();
+      const isExpired = now > poll.expiresAt;
+      const uniqueVoters = new Set(poll.votes.map((v: any) => v.userId.toString())).size;
+      const totalVotes = uniqueVoters;
+      const totalSelections = poll.votes.length;
+      const results = poll.options.map((option: string, index: number) => {
+        const voteCount = poll.votes.filter((v: any) => v.optionIndex === index).length;
+        return {
+          option,
+          voteCount,
+          percentage: totalSelections > 0 ? Math.round((voteCount / totalSelections) * 100) : 0,
+        };
+      });
+      const timeLeft = poll.expiresAt.getTime() - now.getTime();
+      map.set(poll._id.toString(), {
+        id: poll._id.toString(),
+        question: poll.question,
+        options: poll.options,
+        optionImages: poll.optionImages ?? [],
+        allowMultipleAnswers: poll.allowMultipleAnswers,
+        expiresAt: poll.expiresAt,
+        isExpired,
+        results,
+        totalVotes,
+        uniqueVoters,
+        hoursLeft: Math.max(0, Math.ceil(timeLeft / (1000 * 60 * 60))),
+      });
+    }
+    return map;
   }
 
   async searchPosts(params: {
@@ -291,6 +341,7 @@ export class SearchService {
       repostOf: 1,
       serverId: 1,
       channelId: 1,
+      pollId: 1,
       createdAt: 1,
       updatedAt: 1,
     };
@@ -402,13 +453,16 @@ export class SearchService {
       interactionMap.set(key, current);
     });
 
+    const pollMap = await this.batchFetchPollsLocal(posts);
+
     const items = posts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
       const flags = interactionMap.get(post._id?.toString?.() ?? '') || {};
       const following = post.authorId
         ? followeeSet.has(post.authorId.toString())
         : false;
-      return this.toPostResponse(post, profile, { ...flags, following });
+      const poll = post.pollId ? pollMap.get(post.pollId.toString()) || null : null;
+      return this.toPostResponse(post, profile, { ...flags, following }, poll);
     });
 
     return { page, limit, hasMore: posts.length === limit, items };

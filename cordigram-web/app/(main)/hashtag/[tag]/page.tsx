@@ -50,6 +50,7 @@ import { formatRelativeTime } from "@/lib/relative-time";
 import { useLanguage } from "@/component/language-provider";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 import { useTranslations } from "next-intl";
+import PollWidget from "@/ui/poll-widget/poll-widget";
 
 const REPORT_ANIMATION_MS = 200;
 const QUOTE_CHAR_LIMIT = 500;
@@ -1863,15 +1864,17 @@ function HashtagPostCard({
                         {isFollowing ? t("menu.unfollow") : t("menu.follow")}
                       </button>
                     ) : null}
-                    <button
-                      className={feedStyles.menuItem}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onSave(item.id, !saved);
-                      }}
-                    >
-                      {saved ? t("menu.unsave") : t("menu.save")}
-                    </button>
+                    {!item.poll ? (
+                      <button
+                        className={feedStyles.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onSave(item.id, !saved);
+                        }}
+                      >
+                        {saved ? t("menu.unsave") : t("menu.save")}
+                      </button>
+                    ) : null}
                     <button
                       className={feedStyles.menuItem}
                       onClick={() => {
@@ -1953,6 +1956,12 @@ function HashtagPostCard({
           ) : null}
         </div>
       )}
+
+      {item.poll ? (
+        <div style={{ padding: "0 14px 2px" }}>
+          <PollWidget poll={item.poll} token={getStoredAccessToken()} viewerId={viewerId} />
+        </div>
+      ) : null}
 
       {current ? (
         <div className={feedStyles.mediaCarousel}>
@@ -2063,29 +2072,33 @@ function HashtagPostCard({
           <IconComment size={20} />
           <span>{t("actions.comment")}</span>
         </button>
-        <button
-          className={`${feedStyles.actionBtn} ${
-            saved ? feedStyles.actionBtnActive : ""
-          }`}
-          onClick={() => onSave(item.id, !saved)}
-        >
-          <IconSave size={20} filled={saved} />
-          <span>{saved ? t("actions.saved") : t("actions.save")}</span>
-        </button>
-        <button
-          className={`${feedStyles.actionBtn} ${
-            reposted ? feedStyles.actionBtnActive : ""
-          }`}
-          onClick={() =>
-            onShare(
-              item.id,
-              item.authorUsername || item.author?.username || t("block.thisUser"),
-            )
-          }
-        >
-          <IconReup size={20} />
-          <span>{reposted ? t("actions.reposted") : t("actions.repost")}</span>
-        </button>
+        {!item.poll ? (
+          <button
+            className={`${feedStyles.actionBtn} ${
+              saved ? feedStyles.actionBtnActive : ""
+            }`}
+            onClick={() => onSave(item.id, !saved)}
+          >
+            <IconSave size={20} filled={saved} />
+            <span>{saved ? t("actions.saved") : t("actions.save")}</span>
+          </button>
+        ) : null}
+        {!item.poll ? (
+          <button
+            className={`${feedStyles.actionBtn} ${
+              reposted ? feedStyles.actionBtnActive : ""
+            }`}
+            onClick={() =>
+              onShare(
+                item.id,
+                item.authorUsername || item.author?.username || t("block.thisUser"),
+              )
+            }
+          >
+            <IconReup size={20} />
+            <span>{reposted ? t("actions.reposted") : t("actions.repost")}</span>
+          </button>
+        ) : null}
       </div>
 
       {muteModalOpen ? (

@@ -12,6 +12,7 @@ import {
 } from '../posts/post-interaction.schema';
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
+import { Poll, PollSchema } from '../polls/poll.schema';
 import { SearchHistory, SearchHistorySchema } from './search-history.schema';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
@@ -33,6 +34,7 @@ import { DirectMessagesModule } from '../direct-messages/direct-messages.module'
       { name: PostInteraction.name, schema: PostInteractionSchema },
       { name: Follow.name, schema: FollowSchema },
       { name: Profile.name, schema: ProfileSchema },
+      { name: Poll.name, schema: PollSchema },
     ]),
   ],
   controllers: [SearchController],

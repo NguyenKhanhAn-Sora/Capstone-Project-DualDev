@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import styles from "./post-likes-overlay.module.css";
 import {
   fetchPostLikes,
@@ -215,7 +216,7 @@ export default function PostLikesOverlay(props: Props) {
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className={styles.backdrop}
       role="dialog"
@@ -311,6 +312,7 @@ export default function PostLikesOverlay(props: Props) {
           <div ref={sentinelRef} className={styles.sentinel} />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

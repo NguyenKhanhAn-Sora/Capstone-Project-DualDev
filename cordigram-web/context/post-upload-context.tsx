@@ -12,6 +12,7 @@ import {
   uploadPostMedia,
   createPost,
   createReel,
+  createPoll,
   fetchPostDetail,
   type CreatePostRequest,
   type FeedItem,
@@ -46,10 +47,33 @@ export type UploadJobInput = {
   publishMode: "now" | "schedule";
 };
 
+export type PollOption = {
+  text: string;
+  imageFile: File | null;
+};
+
+export type PollUploadJobInput = {
+  question: string;
+  options: PollOption[];
+  allowMultipleAnswers: boolean;
+  payload: {
+    content?: string;
+    hashtags?: string[];
+    mentions?: string[];
+    location?: string;
+    visibility?: "public" | "followers" | "private";
+    allowComments?: boolean;
+    hideLikeCount?: boolean;
+    scheduledAt?: string;
+  };
+  token: string;
+  publishMode: "now" | "schedule";
+};
+
 export type UploadStatus = "uploading" | "done" | "error" | "cancelled";
 
 export type UploadState = {
-  mode: "post" | "reel";
+  mode: "post" | "reel" | "poll";
   status: UploadStatus;
   progress: number;
   totalFiles: number;
@@ -62,6 +86,7 @@ type PostUploadContextValue = {
   upload: UploadState | null;
   newPost: FeedItem | null;
   startUpload: (input: UploadJobInput) => void;
+  startPollUpload: (input: PollUploadJobInput) => void;
   cancelUpload: () => void;
   clearNewPost: () => void;
 };
@@ -281,6 +306,129 @@ export function PostUploadProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
+  const startPollUpload = useCallback((input: PollUploadJobInput) => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    cancelledRef.current = false;
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Count files that actually have an image
+    const imageOptions = input.options.filter((o) => o.imageFile !== null);
+    const totalFiles = imageOptions.length;
+
+    setUpload({
+      mode: "poll",
+      status: "uploading",
+      progress: totalFiles === 0 ? 50 : 0,
+      totalFiles,
+      uploadedFiles: 0,
+      publishMode: input.publishMode,
+    });
+    setNewPost(null);
+    simProgressRef.current = totalFiles === 0 ? 50 : 0;
+
+    (async () => {
+      try {
+        // Phase 1 (0–50%): upload option images
+        const optionImages: (string | null)[] = input.options.map(() => null);
+
+        if (totalFiles > 0) {
+          let uploadedCount = 0;
+          for (let i = 0; i < input.options.length; i++) {
+            if (cancelledRef.current) return;
+            const opt = input.options[i];
+            if (!opt.imageFile) continue;
+
+            const fileSlice = FILE_UPLOAD_WEIGHT * 0.5 / totalFiles;
+            const fileStart = (uploadedCount / totalFiles) * FILE_UPLOAD_WEIGHT * 0.5;
+            const maxSim = fileStart + fileSlice * 0.88;
+            simProgressRef.current = fileStart;
+
+            const simInterval = setInterval(() => {
+              if (cancelledRef.current) { clearInterval(simInterval); return; }
+              const cur = simProgressRef.current;
+              if (cur >= maxSim) return;
+              const next = Math.min(cur + Math.max((maxSim - cur) * 0.07, 0.15), maxSim);
+              simProgressRef.current = next;
+              setUpload((prev) => prev ? { ...prev, progress: Math.round(next) } : null);
+            }, 100);
+
+            let uploaded: Awaited<ReturnType<typeof uploadPostMedia>>;
+            try {
+              uploaded = await uploadPostMedia({
+                token: input.token,
+                file: opt.imageFile,
+                signal: abortController.signal,
+              });
+            } finally {
+              clearInterval(simInterval);
+            }
+
+            if (cancelledRef.current) return;
+            optionImages[i] = uploaded.secureUrl || uploaded.url;
+            uploadedCount++;
+            const snapped = Math.round((uploadedCount / totalFiles) * FILE_UPLOAD_WEIGHT * 0.5);
+            simProgressRef.current = snapped;
+            setUpload((prev) => prev ? { ...prev, uploadedFiles: uploadedCount, progress: snapped } : null);
+          }
+        }
+
+        if (cancelledRef.current) return;
+
+        // Phase 2 (50–80%): create poll
+        setUpload((prev) => prev ? { ...prev, progress: 55 } : null);
+        const poll = await createPoll({
+          token: input.token,
+          question: input.question,
+          options: input.options.map((o) => o.text),
+          optionImages,
+          durationHours: 24,
+          allowMultipleAnswers: input.allowMultipleAnswers,
+        });
+
+        if (cancelledRef.current) return;
+
+        // Phase 3 (80–100%): create post with pollId
+        setUpload((prev) => prev ? { ...prev, progress: 80 } : null);
+        const scheduledAtIso = input.publishMode === "schedule" && input.payload.scheduledAt
+          ? input.payload.scheduledAt
+          : undefined;
+
+        const result = await createPost({
+          token: input.token,
+          payload: {
+            ...input.payload,
+            scheduledAt: scheduledAtIso,
+            pollId: poll._id,
+            media: [],
+          },
+        });
+
+        if (cancelledRef.current) return;
+
+        setUpload((prev) => prev ? { ...prev, progress: 100, status: "done" } : null);
+
+        if (input.publishMode === "now") {
+          try {
+            const detail = await fetchPostDetail({ token: input.token, postId: result.id });
+            if (!cancelledRef.current) setNewPost(detail);
+          } catch {
+            // silent — post appears on next feed refresh
+          }
+        }
+
+        hideTimerRef.current = setTimeout(() => setUpload(null), 2500);
+      } catch (err) {
+        if (!cancelledRef.current) {
+          const message = (err as { message?: string } | null)?.message || "Could not publish poll. Please try again.";
+          setUpload((prev) => prev ? { ...prev, status: "error", error: message } : null);
+          hideTimerRef.current = setTimeout(() => setUpload(null), 4000);
+        }
+      }
+    })();
+  }, []);
+
   const cancelUpload = useCallback(() => {
     cancelledRef.current = true;
     abortControllerRef.current?.abort();
@@ -295,7 +443,7 @@ export function PostUploadProvider({ children }: { children: ReactNode }) {
 
   return (
     <PostUploadContext.Provider
-      value={{ upload, newPost, startUpload, cancelUpload, clearNewPost }}
+      value={{ upload, newPost, startUpload, startPollUpload, cancelUpload, clearNewPost }}
     >
       {children}
     </PostUploadContext.Provider>

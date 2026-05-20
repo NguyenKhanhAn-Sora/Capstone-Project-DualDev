@@ -325,6 +325,7 @@ export type CreatePostRequest = {
   channelId?: string;
   repostOf?: string;
   scheduledAt?: string;
+  pollId?: string;
 };
 
 export type UpdatePostRequest = {
@@ -416,8 +417,28 @@ export type CreateReelRequest = {
   durationSeconds?: number;
 };
 
+export type PollFeedData = {
+  id: string;
+  question: string;
+  options: string[];
+  optionImages: (string | null)[];
+  allowMultipleAnswers: boolean;
+  expiresAt: string;
+  isExpired: boolean;
+  results: Array<{
+    option: string;
+    voteCount: number;
+    percentage: number;
+  }>;
+  totalVotes: number;
+  uniqueVoters: number;
+  hoursLeft: number;
+  userVotes?: number[];
+};
+
 export type FeedItem = CreatePostResponse & {
   repostOf?: string | null;
+  poll?: PollFeedData;
   sponsored?: boolean;
   repostSourceContent?: string | null;
   repostSourceMedia?: Array<{
@@ -1729,6 +1750,24 @@ export async function fetchPostLikes(opts: {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function fetchPollVoters(opts: {
+  token: string;
+  pollId: string;
+  limit?: number;
+  cursor?: string;
+}): Promise<PostLikeListResponse> {
+  const { token, pollId, limit, cursor } = opts;
+  const query = new URLSearchParams();
+  if (limit) query.set("limit", String(limit));
+  if (cursor) query.set("cursor", cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch<PostLikeListResponse>({
+    path: `/polls/${pollId}/voters${suffix}`,
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 
@@ -3847,6 +3886,7 @@ export interface Poll {
   };
   question: string;
   options: string[];
+  optionImages?: (string | null)[];
   durationHours: number;
   allowMultipleAnswers: boolean;
   expiresAt: string;
@@ -3881,6 +3921,7 @@ export async function createPoll(opts: {
   token: string;
   question: string;
   options: string[];
+  optionImages?: (string | null)[];
   durationHours?: number;
   allowMultipleAnswers?: boolean;
 }): Promise<Poll> {
@@ -3900,6 +3941,28 @@ export async function createPoll(opts: {
     throw new Error(error.message || "Failed to create poll");
   }
 
+  return response.json();
+}
+
+export async function updatePoll(opts: {
+  token: string;
+  pollId: string;
+  allowMultipleAnswers?: boolean;
+  options?: string[];
+}): Promise<Poll> {
+  const { token, pollId, ...data } = opts;
+  const response = await fetch(`${apiBaseUrl}/polls/${pollId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to update poll");
+  }
   return response.json();
 }
 

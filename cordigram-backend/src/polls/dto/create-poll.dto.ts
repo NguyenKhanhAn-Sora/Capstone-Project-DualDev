@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsBoolean,
   IsOptional,
+  IsUrl,
   MaxLength,
   ArrayMinSize,
   Min,
@@ -29,6 +30,21 @@ export class CreatePollDto {
   @IsBoolean()
   @IsOptional()
   allowMultipleAnswers?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  optionImages?: (string | null)[];
+}
+
+export class UpdatePollDto {
+  @IsBoolean()
+  @IsOptional()
+  allowMultipleAnswers?: boolean;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  options?: string[];
 }
 
 export class VotePollDto {

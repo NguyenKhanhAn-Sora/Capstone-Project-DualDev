@@ -702,6 +702,50 @@
   min-height: 140px;
   padding-bottom: 15px;
   resize: vertical;
+  line-height: 1.55;
+}
+
+/* ── Mention highlight overlay ───────────────────────────── */
+.captionWrapper {
+  position: relative;
+  width: 100%;
+  flex: 1;
+}
+
+/* When highlights are active, textarea text is invisible — overlay renders it */
+.captionHighlightTextarea {
+  color: transparent !important;
+  caret-color: var(--color-text);
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+.captionHighlightOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1.55;
+  color: var(--color-text);
+  padding-bottom: 15px;
+  z-index: 0;
+}
+
+.captionHighlightOverlay::-webkit-scrollbar {
+  display: none;
+}
+
+.captionMentionToken {
+  color: var(--color-primary);
+  font-weight: 700;
 }
 
 .locationSuggestions {
@@ -1240,4 +1284,271 @@
     width: 100%;
     justify-content: stretch;
   }
+}
+
+/* ─── Poll creation form ──────────────────────────────────────── */
+
+.pollGrid {
+  display: grid;
+  grid-template-columns: 1.05fr 1.1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .pollGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pollFormCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.pollOptionsCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.pollSectionLabel {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Option rows */
+.pollOptionRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.pollOptionIndex {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  min-width: 20px;
+  text-align: center;
+}
+
+.pollOptionInput {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--color-text);
+  width: 100%;
+}
+
+.pollOptionInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.pollOptionActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Image thumbnail inside option row */
+.pollOptionThumbBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--color-border);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.12s;
+  flex-shrink: 0;
+}
+
+.pollOptionThumbBtn:hover {
+  border-color: var(--color-primary);
+}
+
+.pollOptionThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pollOptionRemoveBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+
+.pollOptionRemoveBtn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.pollAddOptionBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 1.5px dashed var(--color-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+  width: 100%;
+}
+
+.pollAddOptionBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.pollAddOptionBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Poll preview card (right side) */
+.pollPreviewCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pollPreviewHeader {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pollPreviewBody {
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+  flex: 1;
+}
+
+.pollPreviewQuestion {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.pollPreviewOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: var(--color-surface-muted);
+}
+
+.pollPreviewOptionThumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+.pollPreviewOptionThumbEmpty {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+.pollPreviewOptionRadio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.pollPreviewOptionCheckbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 2px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.pollPreviewOptionText {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  flex: 1;
+}
+
+.pollPreviewOptionTextFilled {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.pollPreviewFooter {
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pollLiveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+/* Hidden file input for option images */
+.pollImageInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }

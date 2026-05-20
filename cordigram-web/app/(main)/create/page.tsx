@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import EmojiPicker from "emoji-picker-react";
 import styles from "./create.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -13,7 +13,10 @@ import {
   type ProfileSearchItem,
 } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { usePostUpload } from "@/context/post-upload-context";
+import {
+  usePostUpload,
+  type PollOption,
+} from "@/context/post-upload-context";
 import { useTranslations } from "next-intl";
 
 function LocationIcon() {
@@ -122,6 +125,19 @@ function TabLivestreamIcon() {
     </svg>
   );
 }
+
+function TabPollIcon() {
+  return (
+    <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="2" y="14" width="4" height="8" rx="1" />
+      <rect x="10" y="8" width="4" height="14" rx="1" />
+      <rect x="18" y="2" width="4" height="20" rx="1" />
+    </svg>
+  );
+}
+
+const MAX_POLL_OPTIONS = 10;
+const MIN_POLL_OPTIONS = 2;
 
 const REEL_MAX_DURATION_SECONDS = 90;
 const REEL_MAX_BYTES = 50 * 1024 * 1024;
@@ -239,9 +255,9 @@ const initialForm: FormState = {
 export default function CreatePostPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
-  const { startUpload } = usePostUpload();
+  const { startUpload, startPollUpload } = usePostUpload();
   const t = useTranslations("create");
-  const [mode, setMode] = useState<"post" | "reel" | "livestream">("post");
+  const [mode, setMode] = useState<"post" | "reel" | "livestream" | "poll">("post");
   const [step, setStep] = useState<Step>("select");
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [form, setForm] = useState<FormState>(initialForm);
@@ -285,10 +301,22 @@ export default function CreatePostPage() {
     until: null,
     indefinitely: false,
   });
+  const [confirmedMentions, setConfirmedMentions] = useState<Set<string>>(new Set());
+  const captionOverlayRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const captionRef = useRef<HTMLTextAreaElement | null>(null);
   const audienceRef = useRef<HTMLDivElement | null>(null);
   const emojiRef = useRef<HTMLDivElement | null>(null);
+
+  // Poll-specific state
+  const [pollOptions, setPollOptions] = useState<PollOption[]>([
+    { text: "", imageFile: null },
+    { text: "", imageFile: null },
+  ]);
+  const [pollAllowMultiple, setPollAllowMultiple] = useState(false);
+  const [pollSubmitError, setPollSubmitError] = useState("");
+  const pollImageInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [pollOptionPreviews, setPollOptionPreviews] = useState<(string | null)[]>([null, null]);
 
   const audienceOptions = useMemo(
     () => [
@@ -554,6 +582,15 @@ export default function CreatePostPage() {
     const value = event.target.value;
     const caret = event.target.selectionStart ?? value.length;
     setForm((prev) => ({ ...prev, caption: value }));
+    // Remove any confirmed mention whose @handle no longer appears intact in the text
+    setConfirmedMentions((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set<string>();
+      for (const handle of prev) {
+        if (new RegExp(`@${handle}(?=\\W|$)`, "i").test(value)) next.add(handle);
+      }
+      return next.size === prev.size ? prev : next;
+    });
 
     const active = findActiveMention(value, caret);
     if (active) {
@@ -622,8 +659,107 @@ export default function CreatePostPage() {
     setMentionError("");
     setMentionHighlight(-1);
     setActiveMentionRange(null);
+    setConfirmedMentions(new Set());
     setStep("select");
     setSubmitError("");
+    // Reset poll
+    setPollOptions([{ text: "", imageFile: null }, { text: "", imageFile: null }]);
+    setPollOptionPreviews([null, null]);
+    setPollAllowMultiple(false);
+    setPollSubmitError("");
+  };
+
+  const addPollOption = useCallback(() => {
+    if (pollOptions.length >= MAX_POLL_OPTIONS) return;
+    setPollOptions((prev) => [...prev, { text: "", imageFile: null }]);
+    setPollOptionPreviews((prev) => [...prev, null]);
+  }, [pollOptions.length]);
+
+  const removePollOption = useCallback((idx: number) => {
+    if (pollOptions.length <= MIN_POLL_OPTIONS) return;
+    setPollOptions((prev) => prev.filter((_, i) => i !== idx));
+    setPollOptionPreviews((prev) => {
+      const next = [...prev];
+      if (next[idx]) URL.revokeObjectURL(next[idx]!);
+      return next.filter((_, i) => i !== idx);
+    });
+  }, [pollOptions.length]);
+
+  const updatePollOptionText = useCallback((idx: number, text: string) => {
+    setPollOptions((prev) => prev.map((o, i) => i === idx ? { ...o, text } : o));
+  }, []);
+
+  const handlePollOptionImage = useCallback((idx: number, file: File) => {
+    const url = URL.createObjectURL(file);
+    setPollOptions((prev) => prev.map((o, i) => i === idx ? { ...o, imageFile: file } : o));
+    setPollOptionPreviews((prev) => {
+      const next = [...prev];
+      if (next[idx]) URL.revokeObjectURL(next[idx]!);
+      next[idx] = url;
+      return next;
+    });
+  }, []);
+
+  const removePollOptionImage = useCallback((idx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPollOptions((prev) => prev.map((o, i) => i === idx ? { ...o, imageFile: null } : o));
+    setPollOptionPreviews((prev) => {
+      const next = [...prev];
+      if (next[idx]) URL.revokeObjectURL(next[idx]!);
+      next[idx] = null;
+      return next;
+    });
+  }, []);
+
+  const handlePollSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPollSubmitError("");
+
+    const filledOptions = pollOptions.filter((o) => o.text.trim());
+    if (filledOptions.length < MIN_POLL_OPTIONS) {
+      setPollSubmitError(`Cần ít nhất ${MIN_POLL_OPTIONS} lựa chọn.`);
+      return;
+    }
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!token) { setPollSubmitError(t("errorMissingToken")); return; }
+
+    const normalizedHashtags = Array.from(
+      new Set((form.hashtags || []).map((tag) => normalizeHashtag(tag.toString()))),
+    ).filter(Boolean);
+
+    const normalizedMentions = Array.from(
+      new Set([
+        ...extractMentionsFromCaption(form.caption || ""),
+        ...(form.mentions || []).map((m) => m.toString().trim().replace(/^@/, "").toLowerCase()),
+      ].filter(Boolean)),
+    );
+
+    const scheduledAtIso =
+      form.publishMode === "schedule" && form.scheduledAt
+        ? new Date(form.scheduledAt).toISOString()
+        : undefined;
+
+    startPollUpload({
+      question: form.caption.trim() || "Bình chọn",
+      options: filledOptions,
+      allowMultipleAnswers: pollAllowMultiple,
+      payload: {
+        content: form.caption || undefined,
+        hashtags: normalizedHashtags,
+        mentions: normalizedMentions,
+        location: form.location.trim() || undefined,
+        visibility: form.audience as "public" | "followers" | "private",
+        allowComments: form.allowComments,
+        hideLikeCount: form.hideLikeCount,
+        scheduledAt: scheduledAtIso,
+      },
+      token,
+      publishMode: form.publishMode,
+    });
+
+    resetSelection();
+    router.push("/");
   };
 
   const removeMedia = (index: number) => {
@@ -965,6 +1101,7 @@ export default function CreatePostPage() {
       mentions: nextMentions,
     }));
 
+    setConfirmedMentions((prev) => new Set([...prev, handle]));
     setMentionDraft("");
     setMentionSuggestions([]);
     setMentionOpen(false);
@@ -1070,6 +1207,33 @@ export default function CreatePostPage() {
 
   if (!canRender) return null;
 
+  const renderHighlightedCaption = (text: string): React.ReactNode[] => {
+    const nodes: React.ReactNode[] = [];
+    const regex = /@(\w+)/g;
+    let lastIdx = 0;
+    let m: RegExpExecArray | null;
+    let key = 0;
+    while ((m = regex.exec(text)) !== null) {
+      if (m.index > lastIdx) nodes.push(<span key={key++}>{text.slice(lastIdx, m.index)}</span>);
+      const handle = m[1].toLowerCase();
+      if (confirmedMentions.has(handle)) {
+        nodes.push(<span key={key++} className={styles.captionMentionToken}>@{m[1]}</span>);
+      } else {
+        nodes.push(<span key={key++}>@{m[1]}</span>);
+      }
+      lastIdx = regex.lastIndex;
+    }
+    if (lastIdx < text.length) nodes.push(<span key={key++}>{text.slice(lastIdx)}</span>);
+    if (text.endsWith("\n")) nodes.push(<span key={key++}>{"​"}</span>);
+    return nodes;
+  };
+
+  const syncOverlayScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (captionOverlayRef.current) {
+      captionOverlayRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  };
+
   if (accountLimited.active) {
     const untilLabel = accountLimited.indefinitely
       ? t("limitUntilModerator")
@@ -1094,14 +1258,16 @@ export default function CreatePostPage() {
       <div className={styles.headerRow}>
         <div>
           <p className={styles.eyebrow}>
-            {mode === "reel" ? t("eyebrowReel") : mode === "livestream" ? t("eyebrowLivestream") : t("eyebrowPost")}
+            {mode === "reel" ? t("eyebrowReel") : mode === "livestream" ? t("eyebrowLivestream") : mode === "poll" ? "Tạo nội dung" : t("eyebrowPost")}
           </p>
           <h1 className={styles.title}>
             {mode === "reel"
               ? t("titleReel")
               : mode === "livestream"
                 ? t("titleLivestream")
-                : t("titlePost")}
+                : mode === "poll"
+                  ? "Cuộc bình chọn"
+                  : t("titlePost")}
           </h1>
           <div className={styles.modeSwitch}>
             <button
@@ -1152,9 +1318,25 @@ export default function CreatePostPage() {
                 <span>{t("tabLivestream")}</span>
               </span>
             </button>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${
+                mode === "poll" ? styles.modeButtonActive : ""
+              }`}
+              onClick={() => {
+                setMode("poll");
+                setError("");
+                resetSelection();
+              }}
+            >
+              <span className={styles.modeButtonInner}>
+                <TabPollIcon />
+                <span>Bình chọn</span>
+              </span>
+            </button>
           </div>
         </div>
-        {mode !== "livestream" ? (
+        {mode !== "livestream" && mode !== "poll" ? (
           <div className={styles.stepper}>
             <div
               className={`${styles.step} ${
@@ -1182,6 +1364,92 @@ export default function CreatePostPage() {
 
       {mode === "livestream" ? (
         <LivestreamCreatePanel />
+      ) : mode === "poll" ? (
+        <PollCreateForm
+          form={form}
+          setForm={setForm}
+          pollOptions={pollOptions}
+          pollOptionPreviews={pollOptionPreviews}
+          pollAllowMultiple={pollAllowMultiple}
+          setPollAllowMultiple={setPollAllowMultiple}
+          pollSubmitError={pollSubmitError}
+          pollImageInputRefs={pollImageInputRefs}
+          audienceOptions={audienceOptions}
+          selectedAudience={selectedAudience}
+          audienceOpen={audienceOpen}
+          setAudienceOpen={setAudienceOpen}
+          audienceRef={audienceRef}
+          locationInput={locationInput}
+          setLocationInput={setLocationInput}
+          locationQuery={locationQuery}
+          setLocationQuery={setLocationQuery}
+          locationSuggestions={locationSuggestions}
+          locationLoading={locationLoading}
+          locationOpen={locationOpen}
+          setLocationOpen={setLocationOpen}
+          locationHighlight={locationHighlight}
+          setLocationHighlight={setLocationHighlight}
+          locationError={locationError}
+          hashtagDraft={hashtagDraft}
+          setHashtagDraft={setHashtagDraft}
+          mentionDraft={mentionDraft}
+          setMentionDraft={setMentionDraft}
+          mentionSuggestions={mentionSuggestions}
+          mentionOpen={mentionOpen}
+          mentionLoading={mentionLoading}
+          mentionError={mentionError}
+          mentionHighlight={mentionHighlight}
+          setMentionHighlight={setMentionHighlight}
+          activeMentionRange={activeMentionRange}
+          showEmojiPicker={showEmojiPicker}
+          setShowEmojiPicker={setShowEmojiPicker}
+          emojiRef={emojiRef}
+          captionRef={captionRef}
+          scheduledDate={scheduledDate}
+          scheduledTime={scheduledTime}
+          addPollOption={addPollOption}
+          removePollOption={removePollOption}
+          updatePollOptionText={updatePollOptionText}
+          handlePollOptionImage={handlePollOptionImage}
+          removePollOptionImage={removePollOptionImage}
+          handlePollSubmit={handlePollSubmit}
+          onCancel={resetSelection}
+          onAudienceSelect={handleAudienceSelect}
+          onHashtagKey={onHashtagKeyDown}
+          onMentionSelect={selectMention}
+          confirmedMentions={confirmedMentions}
+          captionOverlayRef={captionOverlayRef}
+          renderHighlightedCaption={renderHighlightedCaption}
+          syncOverlayScroll={syncOverlayScroll}
+          onLocationSelect={selectLocation}
+          onRequestLocation={requestCurrentLocation}
+          onCaptionChange={handleCaptionChange}
+          onCaptionKeyDown={onCaptionKeyDown}
+          onEmojiSelect={insertEmoji}
+          onScheduleDateChange={(d) => {
+            if (!d) {
+              setForm((prev) => ({ ...prev, scheduledAt: "" }));
+              return;
+            }
+            setForm((prev) => {
+              const parts = splitSchedule(prev.scheduledAt);
+              const nextTime = clampTimeForDate(
+                d,
+                parts.time || formatLocalTime(new Date()),
+              );
+              return { ...prev, scheduledAt: buildSchedule(d, nextTime) };
+            });
+          }}
+          onScheduleTimeChange={(t2) =>
+            setForm((prev) => {
+              const parts = splitSchedule(prev.scheduledAt);
+              if (!parts.date) return prev;
+              const nextTime = clampTimeForDate(parts.date, t2);
+              return { ...prev, scheduledAt: buildSchedule(parts.date, nextTime) };
+            })
+          }
+          geoStatus={geoStatus}
+        />
       ) : (
         <>
           <input
@@ -1409,23 +1677,36 @@ export default function CreatePostPage() {
               <div
                 className={`${styles.inputShell} ${styles.textareaShell} ${styles.mentionCombo}`}
               >
-                <textarea
-                  id="caption"
-                  name="caption"
-                  ref={captionRef}
-                  placeholder={t("captionPlaceholder")}
-                  value={form.caption}
-                  onChange={handleCaptionChange}
-                  onKeyDown={onCaptionKeyDown}
-                  onBlur={() => {
-                    setTimeout(() => {
-                      setMentionOpen(false);
-                      setMentionHighlight(-1);
-                      setActiveMentionRange(null);
-                    }, 120);
-                  }}
-                  maxLength={2200}
-                />
+                <div className={styles.captionWrapper}>
+                  {confirmedMentions.size > 0 && (
+                    <div
+                      ref={captionOverlayRef}
+                      className={styles.captionHighlightOverlay}
+                      aria-hidden
+                    >
+                      {renderHighlightedCaption(form.caption)}
+                    </div>
+                  )}
+                  <textarea
+                    id="caption"
+                    name="caption"
+                    ref={captionRef}
+                    placeholder={t("captionPlaceholder")}
+                    value={form.caption}
+                    onChange={handleCaptionChange}
+                    onKeyDown={onCaptionKeyDown}
+                    onScroll={confirmedMentions.size > 0 ? syncOverlayScroll : undefined}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        setMentionOpen(false);
+                        setMentionHighlight(-1);
+                        setActiveMentionRange(null);
+                      }, 120);
+                    }}
+                    maxLength={2200}
+                    className={confirmedMentions.size > 0 ? styles.captionHighlightTextarea : undefined}
+                  />
+                </div>
                 <span className={styles.charCount}>
                   {form.caption.length}/2200
                 </span>
@@ -1840,5 +2121,432 @@ export default function CreatePostPage() {
         </>
       )}
     </div>
+  );
+}
+
+// ─── Poll Create Form component ────────────────────────────────────────────────
+function PollCreateForm({
+  form, setForm,
+  pollOptions, pollOptionPreviews, pollAllowMultiple, setPollAllowMultiple,
+  pollSubmitError, pollImageInputRefs,
+  audienceOptions, selectedAudience, audienceOpen, setAudienceOpen, audienceRef,
+  locationInput, setLocationInput, locationQuery, setLocationQuery,
+  locationSuggestions, locationLoading, locationOpen, setLocationOpen,
+  locationHighlight, setLocationHighlight, locationError,
+  hashtagDraft, setHashtagDraft, mentionDraft, setMentionDraft,
+  mentionSuggestions, mentionOpen, mentionLoading, mentionError, mentionHighlight, setMentionHighlight,
+  activeMentionRange, showEmojiPicker, setShowEmojiPicker, emojiRef, captionRef,
+  scheduledDate, scheduledTime,
+  addPollOption, removePollOption, updatePollOptionText,
+  handlePollOptionImage, removePollOptionImage, handlePollSubmit, onCancel,
+  onAudienceSelect, onHashtagKey, onMentionSelect, onLocationSelect,
+  onRequestLocation, onCaptionChange, onCaptionKeyDown, onEmojiSelect,
+  onScheduleDateChange, onScheduleTimeChange, geoStatus,
+  confirmedMentions, captionOverlayRef, renderHighlightedCaption, syncOverlayScroll,
+}: any) {
+  const t = useTranslations("create");
+  const hasImages = pollOptionPreviews.some(Boolean);
+
+  return (
+    <form onSubmit={handlePollSubmit}>
+      <div className={styles.pollGrid}>
+        {/* LEFT: Post settings + Options */}
+        <div style={{ display: "grid", gap: 16 }}>
+
+          {/* Caption + Hashtag + Location + Visibility — single card */}
+          <div className={styles.formCard}>
+            <div>
+              <p className={styles.cardEyebrow}>Câu hỏi &amp; Caption</p>
+            </div>
+
+            {/* Caption */}
+            <div className={styles.formGroup}>
+              <div className={styles.labelRow}>
+                <label htmlFor="pollCaption">{t("captionLabel")}</label>
+                <div className={styles.emojiWrap} ref={emojiRef}>
+                  <button
+                    type="button"
+                    className={styles.emojiButton}
+                    onClick={() => setShowEmojiPicker((p: boolean) => !p)}
+                    aria-label={t("addEmojiAria")}
+                  >
+                    <svg aria-label="Emoji icon" fill="currentColor" height="20" role="img" viewBox="0 0 24 24" width="20">
+                      <title>Emoji icon</title>
+                      <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z" />
+                    </svg>
+                  </button>
+                  {showEmojiPicker && (
+                    <div className={styles.emojiPopover}>
+                      <EmojiPicker
+                        onEmojiClick={(emojiData) => { onEmojiSelect(emojiData.emoji || ""); }}
+                        searchDisabled={false}
+                        skinTonesDisabled={false}
+                        lazyLoadEmojis
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className={`${styles.inputShell} ${styles.textareaShell} ${styles.mentionCombo}`}>
+                <div className={styles.captionWrapper}>
+                  {confirmedMentions?.size > 0 && (
+                    <div ref={captionOverlayRef} className={styles.captionHighlightOverlay} aria-hidden>
+                      {renderHighlightedCaption?.(form.caption)}
+                    </div>
+                  )}
+                  <textarea
+                    id="pollCaption"
+                    name="caption"
+                    ref={captionRef}
+                    placeholder="Đặt câu hỏi bình chọn… Nhập @ để gắn thẻ bạn bè"
+                    value={form.caption}
+                    onChange={onCaptionChange}
+                    onKeyDown={onCaptionKeyDown}
+                    onScroll={confirmedMentions?.size > 0 ? syncOverlayScroll : undefined}
+                    onBlur={() => { setTimeout(() => setMentionHighlight(-1), 120); }}
+                    maxLength={2200}
+                    className={confirmedMentions?.size > 0 ? styles.captionHighlightTextarea : undefined}
+                  />
+                </div>
+                <span className={styles.charCount}>{form.caption.length}/2200</span>
+                {mentionOpen && (
+                  <div className={styles.mentionSuggestions}>
+                    {mentionLoading && <div className={styles.mentionSuggestionMuted}>{t("searchingUsers")}</div>}
+                    {!mentionLoading && mentionSuggestions.length === 0 && mentionError && (
+                      <div className={styles.mentionSuggestionMuted}>{mentionError}</div>
+                    )}
+                    {!mentionLoading && mentionSuggestions.map((opt: any, idx: number) => (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        className={`${styles.mentionSuggestion} ${idx === mentionHighlight ? styles.mentionSuggestionActive : ""}`}
+                        onMouseDown={(e) => { e.preventDefault(); onMentionSelect(opt); }}
+                        onMouseEnter={() => setMentionHighlight(idx)}
+                      >
+                        <img src={opt.avatarUrl} alt="" className={styles.mentionAvatar} />
+                        <div className={styles.mentionMeta}>
+                          <span className={styles.mentionName}>{opt.displayName}</span>
+                          <span className={styles.mentionUsername}>@{opt.username}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <p className={styles.helper}>{t("captionHelper")}</p>
+            </div>
+
+            {/* Hashtags */}
+            <div className={styles.formGroup}>
+              <label>{t("hashtagsLabel")}</label>
+              <div className={styles.chipShell}>
+                <div className={styles.chips}>
+                  {form.hashtags.map((tag: string) => (
+                    <span key={tag} className={styles.chip}>
+                      #{tag}
+                      <button
+                        type="button"
+                        className={styles.chipRemove}
+                        onClick={() => setForm((p: any) => ({ ...p, hashtags: p.hashtags.filter((h: string) => h !== tag) }))}
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+                <input
+                  className={styles.chipInput}
+                  placeholder="#hashtag"
+                  value={hashtagDraft}
+                  onChange={(e) => setHashtagDraft(e.target.value)}
+                  onKeyDown={onHashtagKey}
+                />
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className={styles.formGroup}>
+              <label>{t("locationLabel")}</label>
+              <div className={styles.inputShell} style={{ position: "relative" }}>
+                <input
+                  className={styles.input}
+                  placeholder={t("locationPlaceholder")}
+                  value={locationInput}
+                  onChange={(e) => { setLocationInput(e.target.value); setLocationQuery(e.target.value); }}
+                  onFocus={() => setLocationOpen(true)}
+                />
+                <button type="button" className={styles.locationGeoBtn} onClick={onRequestLocation} aria-label="Lấy vị trí hiện tại">
+                  <LocationIcon />
+                </button>
+                {locationOpen && locationSuggestions.length > 0 && (
+                  <div className={styles.locationSuggestions}>
+                    {locationSuggestions.map((s: any, i: number) => (
+                      <button
+                        key={s.label}
+                        type="button"
+                        className={`${styles.locationSuggestion} ${i === locationHighlight ? styles.locationSuggestionHighlighted : ""}`}
+                        onMouseDown={(e) => { e.preventDefault(); onLocationSelect(s); }}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {locationError && <p className={styles.error}>{locationError}</p>}
+            </div>
+
+          {/* Visibility + toggles */}
+            <div className={styles.formGroup}>
+              <label htmlFor="pollAudience">{t("visibilityLabel")}</label>
+              <div className={styles.dropdownShell} ref={audienceRef}>
+                <button
+                  type="button"
+                  id="pollAudience"
+                  className={`${styles.dropdownButton} ${audienceOpen ? styles.dropdownButtonOpen : ""}`}
+                  aria-haspopup="listbox"
+                  aria-expanded={audienceOpen}
+                  onClick={() => setAudienceOpen((p: boolean) => !p)}
+                >
+                  <div className={styles.dropdownText}>
+                    <span className={styles.dropdownLabel}>{selectedAudience?.label}</span>
+                  </div>
+                  <span className={`${styles.dropdownChevron} ${audienceOpen ? styles.dropdownChevronOpen : ""}`} aria-hidden>▼</span>
+                </button>
+                {audienceOpen && (
+                  <div className={styles.dropdownMenu} role="listbox" aria-label={t("visibilityAria")}>
+                    {audienceOptions.map((opt: any) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`${styles.dropdownOption} ${form.audience === opt.value ? styles.dropdownOptionActive : ""}`}
+                        role="option"
+                        aria-selected={form.audience === opt.value}
+                        onClick={() => onAudienceSelect(opt.value)}
+                      >
+                        <span>{opt.label}</span>
+                        <span className={`${styles.dropdownCheck} ${form.audience === opt.value ? styles.dropdownCheckActive : ""}`} aria-hidden>
+                          {form.audience === opt.value ? "✓" : ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={styles.switchGroup}>
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={form.allowComments}
+                  onChange={() => setForm((p: any) => ({ ...p, allowComments: !p.allowComments }))}
+                />
+                <div>
+                  <p className={styles.switchTitle}>{t("allowCommentsTitle")}</p>
+                  <p className={styles.switchHint}>{t("allowCommentsHint")}</p>
+                </div>
+              </label>
+
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={form.hideLikeCount}
+                  onChange={() => setForm((p: any) => ({ ...p, hideLikeCount: !p.hideLikeCount }))}
+                />
+                <div>
+                  <p className={styles.switchTitle}>{t("hideLikeTitle")}</p>
+                  <p className={styles.switchHint}>{t("hideLikeHint")}</p>
+                </div>
+              </label>
+
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={pollAllowMultiple}
+                  onChange={(e) => setPollAllowMultiple(e.target.checked)}
+                />
+                <div>
+                  <p className={styles.switchTitle}>Cho phép chọn nhiều</p>
+                  <p className={styles.switchHint}>Người dùng có thể chọn nhiều lựa chọn cùng lúc</p>
+                </div>
+              </label>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>{t("publishTimeLabel")}</label>
+              <div className={styles.radioRow}>
+                <label className={styles.radioOption}>
+                  <input
+                    type="radio"
+                    name="pollPublishMode"
+                    value="now"
+                    checked={form.publishMode === "now"}
+                    onChange={() => setForm((p: any) => ({ ...p, publishMode: "now" }))}
+                  />
+                  <span>{t("postNow")}</span>
+                </label>
+                <label className={styles.radioOption}>
+                  <input
+                    type="radio"
+                    name="pollPublishMode"
+                    value="schedule"
+                    checked={form.publishMode === "schedule"}
+                    onChange={() =>
+                      setForm((prev: any) => {
+                        const now = new Date();
+                        const parts = splitSchedule(prev.scheduledAt);
+                        const nextDate = parts.date || formatLocalDate(now);
+                        const nextTime = clampTimeForDate(nextDate, parts.time || formatLocalTime(now));
+                        return { ...prev, publishMode: "schedule", scheduledAt: buildSchedule(nextDate, nextTime) };
+                      })
+                    }
+                  />
+                  <span>{t("schedule")}</span>
+                </label>
+                <span className={styles.helper}>{t("publishAutoHelper")}</span>
+              </div>
+
+              {form.publishMode === "schedule" && (
+                <div className={styles.schedulerCard}>
+                  <div className={styles.schedulerHeader}>
+                    <div>
+                      <p className={styles.schedulerLabel}>{t("schedulerLabel")}</p>
+                      <p className={styles.schedulerTitle}>{t("chooseDatetime")}</p>
+                    </div>
+                  </div>
+                  <div className={styles.schedulerGrid}>
+                    <div className={styles.schedulerField}>
+                      <label className={styles.schedulerFieldLabel}>{t("dateLabel")}</label>
+                      <DateSelect value={scheduledDate} minDate={new Date()} maxDate={null} minYear={new Date().getFullYear()} placeholder="mm/dd/yyyy" onChange={onScheduleDateChange} />
+                    </div>
+                    <div className={styles.schedulerField}>
+                      <label className={styles.schedulerFieldLabel}>{t("timeLabel")}</label>
+                      <TimeSelect value={scheduledTime} selectedDate={scheduledDate} minDateTime={new Date()} disabled={!scheduledDate} onChange={onScheduleTimeChange} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>{/* end formCard */}
+        </div>{/* end left column */}
+
+        {/* RIGHT: Options input + preview */}
+        <div style={{ display: "grid", gap: 16 }}>
+
+          {/* Options input */}
+          <div className={styles.pollOptionsCard}>
+            <p className={styles.pollSectionLabel}>Các lựa chọn <span style={{ fontWeight: 400, textTransform: "none", fontSize: 12 }}>({pollOptions.length}/{MAX_POLL_OPTIONS})</span></p>
+            {pollOptions.map((opt: PollOption, idx: number) => (
+              <div key={idx} className={styles.pollOptionRow}>
+                <span className={styles.pollOptionIndex}>{idx + 1}</span>
+                <input
+                  className={styles.pollOptionInput}
+                  placeholder={`Lựa chọn ${idx + 1}`}
+                  value={opt.text}
+                  maxLength={120}
+                  onChange={(e) => updatePollOptionText(idx, e.target.value)}
+                />
+                <div className={styles.pollOptionActions}>
+                  {/* Image picker */}
+                  <div
+                    className={styles.pollOptionThumbBtn}
+                    onClick={() => pollImageInputRefs.current[idx]?.click()}
+                    title="Thêm ảnh cho lựa chọn"
+                  >
+                    {pollOptionPreviews[idx] ? (
+                      <>
+                        <img src={pollOptionPreviews[idx]!} alt="" className={styles.pollOptionThumb} />
+                      </>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <rect x="3" y="3" width="18" height="18" rx="3" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21,15 16,10 5,21" />
+                      </svg>
+                    )}
+                  </div>
+                  {pollOptionPreviews[idx] && (
+                    <button type="button" className={styles.pollOptionRemoveBtn} onClick={(e) => removePollOptionImage(idx, e)} title="Xoá ảnh">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                        <line x1="1" y1="1" x2="11" y2="11" /><line x1="11" y1="1" x2="1" y2="11" />
+                      </svg>
+                    </button>
+                  )}
+                  {/* Hidden file input */}
+                  <input
+                    ref={(el) => { pollImageInputRefs.current[idx] = el; }}
+                    type="file"
+                    accept="image/*"
+                    className={styles.pollImageInput}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePollOptionImage(idx, f); e.target.value = ""; }}
+                  />
+                  {/* Remove option */}
+                  {pollOptions.length > MIN_POLL_OPTIONS && (
+                    <button type="button" className={styles.pollOptionRemoveBtn} onClick={() => removePollOption(idx)} title="Xoá lựa chọn">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                        <line x1="1" y1="1" x2="11" y2="11" /><line x1="11" y1="1" x2="1" y2="11" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {pollOptions.length < MAX_POLL_OPTIONS && (
+              <button type="button" className={styles.pollAddOptionBtn} onClick={addPollOption}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Thêm lựa chọn
+              </button>
+            )}
+
+            {pollSubmitError && <p className={styles.error} role="alert">{pollSubmitError}</p>}
+          </div>
+
+          {/* Live Preview */}
+          <div className={styles.pollPreviewCard}>
+            <p className={styles.pollPreviewHeader}>Xem trước</p>
+            <div className={styles.pollPreviewBody}>
+              <p className={styles.pollPreviewQuestion}>
+                {form.caption.trim() || "Câu hỏi của bạn…"}
+              </p>
+              {pollOptions.map((opt: PollOption, idx: number) => (
+                <div key={idx} className={styles.pollPreviewOption}>
+                  {hasImages && (
+                    pollOptionPreviews[idx]
+                      ? <img src={pollOptionPreviews[idx]!} alt="" className={styles.pollPreviewOptionThumb} />
+                      : <div className={styles.pollPreviewOptionThumbEmpty} />
+                  )}
+                  {pollAllowMultiple
+                    ? <span className={styles.pollPreviewOptionCheckbox} />
+                    : <span className={styles.pollPreviewOptionRadio} />}
+                  <span className={`${styles.pollPreviewOptionText} ${opt.text.trim() ? styles.pollPreviewOptionTextFilled : ""}`}>
+                    {opt.text.trim() || `Lựa chọn ${idx + 1}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className={styles.pollPreviewFooter}>
+              <span className={styles.pollLiveDot} />
+              Kết thúc sau 24 giờ
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+            <button type="button" className={styles.secondaryButton} onClick={onCancel}>
+              {t("cancel")}
+            </button>
+            <button
+              type="submit"
+              className={styles.primaryButton}
+              disabled={pollOptions.filter((o: PollOption) => o.text.trim()).length < MIN_POLL_OPTIONS}
+            >
+              {t("finish")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
   );
 }

@@ -49,6 +49,9 @@ export class Post extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Post', default: null })
   repostOf?: Types.ObjectId | null;
 
+  @Prop({ type: Types.ObjectId, ref: 'Poll', default: null })
+  pollId?: Types.ObjectId | null;
+
   @Prop({ type: String, trim: false, maxlength: 2200, default: '' })
   content: string;
 

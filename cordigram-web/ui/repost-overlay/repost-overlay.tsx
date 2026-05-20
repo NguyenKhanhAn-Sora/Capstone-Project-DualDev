@@ -2,6 +2,7 @@
 
 import EmojiPicker from "emoji-picker-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import styles from "./repost-overlay.module.css";
 import { useTranslations } from "next-intl";
 
@@ -414,7 +415,7 @@ export default function RepostOverlay({
   }`;
 
   if (view === "quote") {
-    return (
+    return createPortal(
       <div
         className={overlayClass}
         role="dialog"
@@ -702,11 +703,12 @@ export default function RepostOverlay({
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body,
     );
   }
 
-  return (
+  return createPortal(
     <div
       className={overlayClass}
       role="dialog"
@@ -750,6 +752,7 @@ export default function RepostOverlay({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

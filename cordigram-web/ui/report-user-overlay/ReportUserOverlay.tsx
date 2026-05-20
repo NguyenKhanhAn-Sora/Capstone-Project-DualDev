@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { reportUser } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
@@ -130,7 +131,7 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
     ? targetHandle.startsWith("@") ? targetHandle : `@${targetHandle}`
     : "";
 
-  return (
+  return createPortal(
     <div
       className={`${styles.overlay} ${isClosing ? styles.overlayClosing : styles.overlayVisible}`}
       role="dialog"
@@ -255,7 +256,8 @@ export default function ReportUserOverlay({ open, targetUserId, targetHandle, on
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
