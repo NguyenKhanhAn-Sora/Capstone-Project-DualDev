@@ -173,6 +173,11 @@ export function evaluateChannelChatGate(input: {
     }
   }
 
+  // Đã là thành viên máy chủ: mức xác minh chỉ áp dụng trước khi vào, không áp dụng ngược.
+  if (input.memberJoinedAt != null) {
+    return { allowed: true };
+  }
+
   if (
     !passesVerificationLevels({
       verificationLevel: input.verificationLevel,

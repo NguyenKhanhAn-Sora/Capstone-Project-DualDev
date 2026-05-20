@@ -403,13 +403,20 @@ export default function ChannelUserProfileRoot({
 
   const usernameLabel = profile?.username || context?.fallbackUsername || "";
 
-  const bannerUrl = useMemo(() => {
-    // Prefer per-server cover if user has set it.
-    const cover = serverCoverOverride ?? null;
-    const parsed = parseUserCover(cover || "");
-    if (parsed.bannerImageUrl) return parsed.bannerImageUrl;
-    // Fallback: use neutral banner (SVG) rather than main profile cover.
-    return theme === "dark" ? BANNER_WHITE_SVG : BANNER_BLACK_SVG;
+  const bannerPresentation = useMemo(() => {
+    const cover = (serverCoverOverride ?? "").trim();
+    const parsed = parseUserCover(cover);
+    if (parsed.bannerImageUrl) {
+      return { kind: "image" as const, src: parsed.bannerImageUrl };
+    }
+    if (cover.startsWith("data:image/svg+xml")) {
+      return {
+        kind: "solid" as const,
+        style: { background: parsed.bannerSolidHex } as React.CSSProperties,
+      };
+    }
+    const placeholder = theme === "dark" ? BANNER_WHITE_SVG : BANNER_BLACK_SVG;
+    return { kind: "placeholder" as const, src: placeholder };
   }, [theme, serverCoverOverride]);
 
   const avatarUrl = useMemo(
@@ -532,7 +539,7 @@ export default function ChannelUserProfileRoot({
   const serverAvatarOk = (url: string | null | undefined) =>
     Boolean(url && /^https?:\/\//i.test(url.trim()));
 
-  const isPlaceholderBanner = bannerUrl.startsWith("data:image/svg");
+  const isPlaceholderBanner = bannerPresentation.kind === "placeholder";
 
   const handleFollow = async () => {
     if (!profile) return;
@@ -707,8 +714,19 @@ export default function ChannelUserProfileRoot({
           <div className={styles.fullModalLeft}>
             <div
               className={`${styles.fullModalBanner} ${isPlaceholderBanner ? styles.bannerFallback : ""}`}
+              style={
+                bannerPresentation.kind === "solid"
+                  ? bannerPresentation.style
+                  : undefined
+              }
             >
-              <img src={bannerUrl} alt="" className={styles.fullModalBannerImg} />
+              {bannerPresentation.kind !== "solid" ? (
+                <img
+                  src={bannerPresentation.src}
+                  alt=""
+                  className={styles.fullModalBannerImg}
+                />
+              ) : null}
             </div>
             <div className={styles.fullModalAvatarWrap}>
               <img src={avatarUrl} alt="" className={styles.fullModalAvatarImg} />
@@ -973,10 +991,21 @@ export default function ChannelUserProfileRoot({
           <div className={styles.miniCard}>
             <div
               className={`${styles.miniBanner} ${isPlaceholderBanner ? styles.bannerFallback : ""}`}
+              style={
+                bannerPresentation.kind === "solid"
+                  ? bannerPresentation.style
+                  : undefined
+              }
             >
+              {bannerPresentation.kind !== "solid" ? (
               <div className={styles.miniBannerMedia}>
-                <img src={bannerUrl} alt="" className={styles.miniBannerImg} />
+                <img
+                  src={bannerPresentation.src}
+                  alt=""
+                  className={styles.miniBannerImg}
+                />
               </div>
+              ) : null}
               <div className={styles.miniBannerActions}>
                 {!profile.isFollowing ? (
                   <button

@@ -114,9 +114,13 @@ export default function MessagesProfileEditor({
   const [displayNameStyle, setDisplayNameStyle] = useState<DisplayNameStyleValue>({
     ...DEFAULT_DISPLAY_NAME_STYLE,
   });
-  const [demoDisplayNameStyle, setDemoDisplayNameStyle] = useState<DisplayNameStyleValue>({
+  const [demoMainDisplayNameStyle, setDemoMainDisplayNameStyle] = useState<DisplayNameStyleValue>({
     ...DEMO_DISPLAY_NAME_STYLE,
   });
+  const [demoServerDisplayNameStyle, setDemoServerDisplayNameStyle] =
+    useState<DisplayNameStyleValue>({
+      ...DEMO_DISPLAY_NAME_STYLE,
+    });
   const [styleModalOpen, setStyleModalOpen] = useState(false);
   const [styleModalBaseline, setStyleModalBaseline] =
     useState<DisplayNameStyleValue>(DEFAULT_DISPLAY_NAME_STYLE);
@@ -192,6 +196,29 @@ export default function MessagesProfileEditor({
       );
     },
     [currentUserId],
+  );
+
+  const emitServerProfileUpdated = useCallback(
+    (patch: {
+      coverUrl?: string | null;
+      avatarUrl?: string | null;
+      displayNameFontId?: string;
+      displayNameEffectId?: string;
+      displayNamePrimaryHex?: string;
+      displayNameAccentHex?: string;
+    }) => {
+      if (typeof window === "undefined" || !serverId) return;
+      window.dispatchEvent(
+        new CustomEvent("cordigram-server-member-profile-updated", {
+          detail: {
+            serverId,
+            userId: currentUserId,
+            ...patch,
+          },
+        }),
+      );
+    },
+    [currentUserId, serverId],
   );
 
   const emitDisplayNameStyleUpdated = useCallback(
@@ -325,6 +352,8 @@ export default function MessagesProfileEditor({
 
   const appliedDisplayNameStyle =
     tab === "server" && serverId ? serverDisplayNameStyle : displayNameStyle;
+  const demoDisplayNameStyle =
+    tab === "server" && serverId ? demoServerDisplayNameStyle : demoMainDisplayNameStyle;
   const effectiveNameStyle = boostUnlocked ? appliedDisplayNameStyle : demoDisplayNameStyle;
 
   const openDisplayNameStyleModal = useCallback(() => {
@@ -426,6 +455,17 @@ export default function MessagesProfileEditor({
             }
           : {}),
       });
+      emitServerProfileUpdated({
+        coverUrl: coverUrl || null,
+        ...(boostUnlocked
+          ? {
+              displayNameFontId: serverDisplayNameStyle.fontId,
+              displayNameEffectId: serverDisplayNameStyle.effectId,
+              displayNamePrimaryHex: serverDisplayNameStyle.primaryHex,
+              displayNameAccentHex: serverDisplayNameStyle.accentHex,
+            }
+          : {}),
+      });
       onToast?.(t("chat.profileEditor.savedProfile"));
     } catch (e) {
       onToast?.(
@@ -451,8 +491,12 @@ export default function MessagesProfileEditor({
 
   const applyDisplayNameStyle = async (next: DisplayNameStyleValue) => {
     if (!boostUnlocked) {
-      setDemoDisplayNameStyle(next);
-      emitDisplayNameStyleUpdated(next);
+      if (tab === "server" && serverId) {
+        setDemoServerDisplayNameStyle(next);
+      } else {
+        setDemoMainDisplayNameStyle(next);
+        emitDisplayNameStyleUpdated(next);
+      }
       return;
     }
 
@@ -460,6 +504,12 @@ export default function MessagesProfileEditor({
       setServerDisplayNameStyle(next);
       try {
         await serversApi.updateMyServerProfile(serverId, {
+          displayNameFontId: next.fontId,
+          displayNameEffectId: next.effectId,
+          displayNamePrimaryHex: next.primaryHex,
+          displayNameAccentHex: next.accentHex,
+        });
+        emitServerProfileUpdated({
           displayNameFontId: next.fontId,
           displayNameEffectId: next.effectId,
           displayNamePrimaryHex: next.primaryHex,
@@ -575,6 +625,19 @@ export default function MessagesProfileEditor({
       if (tab === "server" && serverId) {
         setServerBannerImageUrl(url);
         setServerBannerSolidHex(serverBannerSolidHex);
+        const coverUrl = buildUserCoverUrlForSave({
+          bannerImageUrl: url,
+          bannerSolidHex: serverBannerSolidHex,
+        });
+        try {
+          await serversApi.updateMyServerProfile(serverId, { coverUrl: coverUrl || null });
+          emitServerProfileUpdated({ coverUrl: coverUrl || null });
+        } catch (e) {
+          onToast?.(
+            e instanceof Error ? e.message : t("chat.profileEditor.errorSaveProfile"),
+          );
+          return;
+        }
       } else {
         setBannerImageUrl(url);
         setBannerSolidHex(bannerSolidHex);

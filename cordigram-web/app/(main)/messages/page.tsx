@@ -1397,13 +1397,16 @@ function mapCallFieldsToUiMessage(msg: any): Partial<UIMessage> {
   };
 }
 
-/** Đồng bộ logic `passesVerificationLevels` — backend có thể trả `chatViewBlocked: false` cho đơn apply đã duyệt dù chưa đủ OTP/thời gian. */
+/** Đồng bộ logic gate xác minh — thành viên đã trong máy chủ không bị chặn ngược. */
 function isServerAccessVerificationSatisfied(
   s: serversApi.MyServerAccessStatus | null | undefined,
 ): boolean {
   if (!s) return false;
   const lvl = s.verificationLevel ?? "none";
   if (lvl === "none") return true;
+  if (s.chatBlockReason !== "verification" && s.chatViewBlocked !== true) {
+    return true;
+  }
   const c = s.verificationChecks;
   if (!c) return false;
   if (lvl === "low") return Boolean(c.emailVerified);
@@ -1745,6 +1748,12 @@ export default function MessagesPage() {
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [currentMessagingProfile, setCurrentMessagingProfile] =
     useState<MessagingProfileCardResponse | null>(null);
+  const [myServerChannelDisplayStyle, setMyServerChannelDisplayStyle] = useState<{
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
+  } | null>(null);
   /** Kiểu tên Boost lưu ở hồ sơ messaging; ghép vào nguồn style thanh sidebar để khớp token nền sáng/tối. */
   const selfSidebarDisplayStyleSource = useMemo(() => {
     const base = currentUserProfile;
@@ -1806,7 +1815,23 @@ export default function MessagesPage() {
         message.isFromCurrentUser
           ? selectedDirectMessageFriend
             ? currentMessagingProfile
-            : selfMessagingIdentity
+            : selectedServer && myServerChannelDisplayStyle
+              ? {
+                  ...selfMessagingIdentity,
+                  displayNameFontId:
+                    myServerChannelDisplayStyle.displayNameFontId ??
+                    selfMessagingIdentity.displayNameFontId,
+                  displayNameEffectId:
+                    myServerChannelDisplayStyle.displayNameEffectId ??
+                    selfMessagingIdentity.displayNameEffectId,
+                  displayNamePrimaryHex:
+                    myServerChannelDisplayStyle.displayNamePrimaryHex ??
+                    selfMessagingIdentity.displayNamePrimaryHex,
+                  displayNameAccentHex:
+                    myServerChannelDisplayStyle.displayNameAccentHex ??
+                    selfMessagingIdentity.displayNameAccentHex,
+                }
+              : selfMessagingIdentity
           : null;
       const baseProfile =
         selfDmSource ||
@@ -1838,6 +1863,8 @@ export default function MessagesPage() {
     [
       selfMessagingIdentity,
       currentMessagingProfile,
+      myServerChannelDisplayStyle,
+      selectedServer,
       dmProfileDetail,
       selectedDirectMessageFriend,
       friends,
@@ -3092,6 +3119,8 @@ export default function MessagesPage() {
       const uid = d?.userId ? String(d.userId) : "";
       if (!uid) return;
 
+      if (d.profileContext === "server") return;
+
       const isMessaging = d.profileContext === "messaging";
       const hasIdentityPatch =
         "avatarUrl" in d || "displayName" in d || "username" in d;
@@ -3515,6 +3544,89 @@ export default function MessagesPage() {
       cancelled = true;
     };
   }, [selectedServer, selectedDirectMessageFriend]);
+
+  useEffect(() => {
+    if (!selectedServer || selectedDirectMessageFriend) {
+      setMyServerChannelDisplayStyle(null);
+      return;
+    }
+    let cancelled = false;
+    void serversApi
+      .getMyServerProfile(selectedServer)
+      .then((res) => {
+        if (cancelled) return;
+        const hasServerStyle = Boolean(
+          res.displayNameFontId ||
+            res.displayNameEffectId ||
+            res.displayNamePrimaryHex ||
+            res.displayNameAccentHex,
+        );
+        setMyServerChannelDisplayStyle(
+          hasServerStyle
+            ? {
+                displayNameFontId: res.displayNameFontId ?? null,
+                displayNameEffectId: res.displayNameEffectId ?? null,
+                displayNamePrimaryHex: res.displayNamePrimaryHex ?? null,
+                displayNameAccentHex: res.displayNameAccentHex ?? null,
+              }
+            : null,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setMyServerChannelDisplayStyle(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedServer, selectedDirectMessageFriend]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !selectedServer) return;
+    const onServerProfile = (e: Event) => {
+      const d = (e as CustomEvent).detail as {
+        serverId?: string;
+        userId?: string;
+        displayNameFontId?: string | null;
+        displayNameEffectId?: string | null;
+        displayNamePrimaryHex?: string | null;
+        displayNameAccentHex?: string | null;
+      };
+      if (!d?.serverId || String(d.serverId) !== String(selectedServer)) return;
+      if (String(d.userId) !== String(currentUserId)) return;
+      const hasStyle =
+        "displayNameFontId" in d ||
+        "displayNameEffectId" in d ||
+        "displayNamePrimaryHex" in d ||
+        "displayNameAccentHex" in d;
+      if (!hasStyle) return;
+      setMyServerChannelDisplayStyle((prev) => ({
+        ...(prev ?? {}),
+        displayNameFontId:
+          "displayNameFontId" in d ? (d.displayNameFontId ?? null) : prev?.displayNameFontId,
+        displayNameEffectId:
+          "displayNameEffectId" in d
+            ? (d.displayNameEffectId ?? null)
+            : prev?.displayNameEffectId,
+        displayNamePrimaryHex:
+          "displayNamePrimaryHex" in d
+            ? (d.displayNamePrimaryHex ?? null)
+            : prev?.displayNamePrimaryHex,
+        displayNameAccentHex:
+          "displayNameAccentHex" in d
+            ? (d.displayNameAccentHex ?? null)
+            : prev?.displayNameAccentHex,
+      }));
+    };
+    window.addEventListener(
+      "cordigram-server-member-profile-updated",
+      onServerProfile as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "cordigram-server-member-profile-updated",
+        onServerProfile as EventListener,
+      );
+  }, [selectedServer, currentUserId]);
 
   // Khi bị chặn bởi mức xác minh (thời gian), refetch trạng thái để mở chat khi đủ điều kiện.
   useEffect(() => {

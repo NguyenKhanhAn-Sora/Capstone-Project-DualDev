@@ -489,7 +489,9 @@ export class MessagesService {
       (server as any).safetySettings?.spamProtection?.verificationLevel,
     );
 
-    const isServerEmailVerified = Boolean((usDoc as any)?.serverEmailVerified);
+    const isServerEmailVerified =
+      Boolean((usDoc as any)?.serverEmailVerified) ||
+      Boolean((userRow as any)?.isVerified);
 
     const gate = evaluateChannelChatGate({
       isAgeRestricted: Boolean((server as any).isAgeRestricted),
@@ -502,11 +504,6 @@ export class MessagesService {
       isBypass,
     });
 
-    const applyAccepted =
-      accessMode === 'apply' && (usDoc as any)?.status === 'accepted';
-    if (!gate.allowed && gate.reason === 'verification' && applyAccepted) {
-      return { allowed: true };
-    }
     return gate;
   }
 

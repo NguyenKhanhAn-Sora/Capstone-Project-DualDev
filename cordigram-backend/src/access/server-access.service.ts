@@ -1062,18 +1062,30 @@ export class ServerAccessService {
     const accountCreatedAt = new Date(
       (userRow as any)?.createdAt || Date.now(),
     );
-    const isServerEmailVerified = Boolean((doc as any)?.serverEmailVerified);
-    const verificationChecks = computeVerificationChecks({
-      isVerified: isServerEmailVerified,
-      accountCreatedAt,
-      memberJoinedAt,
-    });
-    const verificationWait = getVerificationWaitSeconds({
-      level: verificationLevel,
-      isBypass,
-      accountCreatedAt,
-      memberJoinedAt,
-    });
+    const isServerEmailVerified =
+      Boolean((doc as any)?.serverEmailVerified) ||
+      Boolean((userRow as any)?.isVerified);
+    const verificationChecks =
+      rawMemberJoinedAt != null && !isBypass
+        ? {
+            emailVerified: true,
+            accountOver5Min: true,
+            memberOver10Min: true,
+          }
+        : computeVerificationChecks({
+            isVerified: isServerEmailVerified,
+            accountCreatedAt,
+            memberJoinedAt,
+          });
+    const verificationWait =
+      rawMemberJoinedAt != null && !isBypass
+        ? { waitAccountSec: null, waitMemberSec: null }
+        : getVerificationWaitSeconds({
+            level: verificationLevel,
+            isBypass,
+            accountCreatedAt,
+            memberJoinedAt,
+          });
     const ageAckForGate =
       isBypass ||
       Boolean((doc as any)?.ageRestrictedAcknowledged) ||

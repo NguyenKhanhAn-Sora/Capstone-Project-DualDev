@@ -55,6 +55,11 @@
   background: linear-gradient(135deg, #4a5c6e 0%, #3d4a58 100%);
 }
 
+.bannerFallback .miniBannerImg,
+.bannerFallback .fullModalBannerImg {
+  opacity: 0;
+}
+
 .miniBannerImg {
   width: 100%;
   height: 100%;
