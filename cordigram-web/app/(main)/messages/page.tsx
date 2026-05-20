@@ -3119,8 +3119,6 @@ export default function MessagesPage() {
       const uid = d?.userId ? String(d.userId) : "";
       if (!uid) return;
 
-      if (d.profileContext === "server") return;
-
       const isMessaging = d.profileContext === "messaging";
       const hasIdentityPatch =
         "avatarUrl" in d || "displayName" in d || "username" in d;

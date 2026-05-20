@@ -202,14 +202,6 @@ function IconSmile({ className }: { className?: string }) {
   );
 }
 
-function IconNote({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm8 1.5V9h4.5L14 4.5ZM8 13h8v2H8v-2Zm0 4h5v2H8v-2Z" />
-    </svg>
-  );
-}
-
 const MUTE_DURATION_KEYS: MentionMuteDuration[] = [
   "15m",
   "1h",
@@ -735,22 +727,12 @@ export default function ChannelUserProfileRoot({
                 aria-hidden
               />
             </div>
-            <div className={styles.fullNameRow}>
-              <h2
-                className={styles.fullDisplayName}
-                style={getDisplayNameTextStyle(profile)}
-              >
-                {displayName}
-              </h2>
-              <button
-                type="button"
-                className={styles.noteIconBtn}
-                aria-label={t("chat.channelUserProfile.notesTitle")}
-                title={t("chat.channelUserProfile.notesTitle")}
-              >
-                <IconNote />
-              </button>
-            </div>
+            <h2
+              className={styles.fullDisplayName}
+              style={getDisplayNameTextStyle(profile)}
+            >
+              {displayName}
+            </h2>
             <p className={styles.fullUsername}>@{usernameLabel}</p>
             <div className={styles.fullActionRow}>
               {profile.isFollowing ? (
