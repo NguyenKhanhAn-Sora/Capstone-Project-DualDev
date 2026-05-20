@@ -53,11 +53,37 @@ export class DirectMessagesGateway
       type: 'audio' | 'video';
       answeredAt?: number;
       logged: boolean;
+      /** Socket that started the ring — call-answer is sent here only. */
+      initiatorSocketId?: string;
     }
   >();
 
   private callPairKey(userA: string, userB: string): string {
     return [userA, userB].sort().join(':');
+  }
+
+  /** Active (not yet logged) call involving this user as caller or callee. */
+  private findActiveCallForUser(userId: string) {
+    for (const [key, session] of this.activeCalls) {
+      if (
+        !session.logged &&
+        (session.initiatorId === userId || session.calleeId === userId)
+      ) {
+        return { key, session };
+      }
+    }
+    return null;
+  }
+
+  private emitCallBusy(
+    socket: Socket,
+    payload: {
+      code: 'already_in_call' | 'peer_busy';
+      receiverId?: string;
+      peerId?: string;
+    },
+  ): void {
+    socket.emit('call-busy', payload);
   }
 
   private clearActiveCall(userA: string, userB: string): void {
@@ -448,6 +474,29 @@ export class DirectMessagesGateway
       if (!stillOnline) {
         this.setPresence(userId, 'offline');
         this.dmPresenceSubs.delete(userId);
+        // Tear down unanswered rings when the initiator goes fully offline.
+        for (const [, session] of [...this.activeCalls]) {
+          if (
+            session.initiatorId === userId &&
+            !session.logged &&
+            !session.answeredAt
+          ) {
+            const calleeSockets = this.connectedUsers.get(session.calleeId);
+            if (calleeSockets?.size) {
+              for (const sid of calleeSockets) {
+                this.server.to(sid).emit('call-ended', {
+                  from: session.initiatorId,
+                });
+              }
+            }
+            await this.finalizeActiveCall(
+              session.initiatorId,
+              session.calleeId,
+              session.initiatorId,
+              'cancelled',
+            );
+          }
+        }
       }
     }
   }
@@ -722,6 +771,31 @@ export class DirectMessagesGateway
         console.warn('📞 [CALL] Ignoring call-initiate to self');
         return;
       }
+
+      const senderBusy = this.findActiveCallForUser(senderId);
+      if (senderBusy) {
+        const peerId =
+          senderBusy.session.initiatorId === senderId
+            ? senderBusy.session.calleeId
+            : senderBusy.session.initiatorId;
+        this.emitCallBusy(socket, {
+          code: 'already_in_call',
+          receiverId: data.receiverId,
+          peerId,
+        });
+        return;
+      }
+
+      const receiverBusy = this.findActiveCallForUser(data.receiverId);
+      if (receiverBusy) {
+        this.emitCallBusy(socket, {
+          code: 'peer_busy',
+          receiverId: data.receiverId,
+          peerId: data.receiverId,
+        });
+        return;
+      }
+
       const receiverSocket = this.connectedUsers.get(data.receiverId);
 
       // Get sender's profile for username and avatar
@@ -747,6 +821,7 @@ export class DirectMessagesGateway
         calleeId: data.receiverId,
         type: data.type,
         logged: false,
+        initiatorSocketId: socket.id,
       });
 
       if (receiverSocket && receiverSocket.size) {
@@ -785,13 +860,20 @@ export class DirectMessagesGateway
     }
 
     const callerSocket = this.connectedUsers.get(data.callerId);
+    const answerPayload = {
+      from: userId,
+      sdpOffer: data.sdpOffer,
+    };
 
     if (callerSocket && callerSocket.size) {
-      for (const sid of callerSocket) {
-        this.server.to(sid).emit('call-answer', {
-          from: userId,
-          sdpOffer: data.sdpOffer,
-        });
+      const initiatorSid = session?.initiatorSocketId;
+      if (initiatorSid && callerSocket.has(initiatorSid)) {
+        this.server.to(initiatorSid).emit('call-answer', answerPayload);
+      } else {
+        const firstSid = callerSocket.values().next().value as string | undefined;
+        if (firstSid) {
+          this.server.to(firstSid).emit('call-answer', answerPayload);
+        }
       }
     }
   }

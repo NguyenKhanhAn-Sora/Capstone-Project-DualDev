@@ -18,6 +18,13 @@ import {
   isIceCandidateEvent,
   isIncomingRingEvent,
 } from "@/lib/call-event-guards";
+import {
+  getCallTabId,
+  tryAcquireOutboundCallLock,
+  ownsOutboundCallLock,
+  releaseOutboundCallLock,
+  subscribeOutboundCallLock,
+} from "@/lib/call-tab-coordination";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
@@ -1974,6 +1981,10 @@ export default function MessagesPage() {
 
   /** Refs for call socket effect — avoid wrong incoming UI / stale deps (glare, self) */
   const outgoingCallRef = useRef(outgoingCall);
+  const callTabIdRef = useRef<string>("");
+  if (!callTabIdRef.current && typeof window !== "undefined") {
+    callTabIdRef.current = getCallTabId();
+  }
   const currentUserIdRef = useRef(currentUserId);
   useEffect(() => {
     outgoingCallRef.current = outgoingCall;
@@ -2011,6 +2022,7 @@ export default function MessagesPage() {
     markAsRead,
     markAllAsRead,
     callEvent,
+    callBusy,
     callEnded,
     messageDeleted,
     dmUnreadCountEvent,
@@ -2432,20 +2444,24 @@ export default function MessagesPage() {
         return;
       }
 
-      try {
+      const tabId = callTabIdRef.current || getCallTabId();
+      callTabIdRef.current = tabId;
+      const peerId = selectedDirectMessageFriend._id;
 
-        // Get room name first
-        const { roomName } = await getDMRoomName(
-          selectedDirectMessageFriend._id,
-          token,
+      if (!tryAcquireOutboundCallLock(tabId, peerId)) {
+        setError(
+          "Bạn đang có cuộc gọi từ tab hoặc cửa sổ trình duyệt khác. Hãy dùng tab đó hoặc kết thúc cuộc gọi trước.",
         );
+        return;
+      }
 
-        // Drop any stale incoming UI (e.g. peer called you earlier and you never cleared)
+      try {
+        const { roomName } = await getDMRoomName(peerId, token);
+
         setIncomingCall(null);
 
-        // Show outgoing call popup
         setOutgoingCall({
-          to: selectedDirectMessageFriend._id,
+          to: peerId,
           toUser: {
             displayName:
               selectedDirectMessageFriend.displayName ||
@@ -2458,12 +2474,9 @@ export default function MessagesPage() {
           roomName,
         });
 
-        // Notify receiver via socket
-        initiateCall(
-          selectedDirectMessageFriend._id,
-          isVideo ? "video" : "audio",
-        );
+        initiateCall(peerId, isVideo ? "video" : "audio");
       } catch (error) {
+        releaseOutboundCallLock(tabId);
         console.error("❌ [CALL] Failed to start call:", error);
         setError("Không thể bắt đầu cuộc gọi");
       }
@@ -2535,11 +2548,8 @@ export default function MessagesPage() {
   const handleCancelCall = useCallback(() => {
     if (!outgoingCall) return;
 
-
-    // Notify receiver that call was cancelled
     endCall(outgoingCall.to);
-
-    // Close popup
+    releaseOutboundCallLock(callTabIdRef.current);
     setOutgoingCall(null);
   }, [outgoingCall, endCall]);
 
@@ -2549,6 +2559,11 @@ export default function MessagesPage() {
   // over BroadcastChannel when the user hangs up.
   const openCallTab = useCallback(async () => {
     if (!outgoingCall || !currentUserProfile) return;
+    const tabId = callTabIdRef.current || getCallTabId();
+    if (!ownsOutboundCallLock(tabId, outgoingCall.to)) {
+      setOutgoingCall(null);
+      return;
+    }
 
     try {
       const participantName =
@@ -2564,12 +2579,34 @@ export default function MessagesPage() {
 
       window.open(callUrl, "_blank", "noopener,noreferrer");
 
-      // Close outgoing popup
+      releaseOutboundCallLock(tabId);
       setOutgoingCall(null);
     } catch (error) {
       console.error("❌ [CALLER] Failed to open call window:", error);
     }
   }, [outgoingCall, currentUserProfile, token]);
+
+  useEffect(() => {
+    const tabId = callTabIdRef.current || getCallTabId();
+    callTabIdRef.current = tabId;
+    return subscribeOutboundCallLock(tabId, () => {
+      setOutgoingCall(null);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!callBusy) return;
+    const tabId = callTabIdRef.current;
+    releaseOutboundCallLock(tabId);
+    setOutgoingCall(null);
+    if (callBusy.code === "peer_busy") {
+      setError("Người nhận đang bận cuộc gọi khác.");
+    } else {
+      setError(
+        "Bạn đang có cuộc gọi từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
+      );
+    }
+  }, [callBusy]);
 
   // ✅ Handle incoming call & call events
   useEffect(() => {
@@ -2662,7 +2699,14 @@ export default function MessagesPage() {
       } catch (_) {}
     }
 
-    // Auto-close after 3 seconds if call was cancelled
+    setOutgoingCall((prev) => {
+      if (prev && String(prev.to) === String(callEnded.from)) {
+        releaseOutboundCallLock(callTabIdRef.current);
+        return null;
+      }
+      return prev;
+    });
+
     const timer = setTimeout(() => {
       setIncomingCall((prev) => {
         if (
@@ -2698,9 +2742,8 @@ export default function MessagesPage() {
         | null;
       if (!data || typeof data !== "object") return;
       if (data.type === "self-ended" && data.peerId) {
-        // Our call tab just hung up. Emit the matching socket signal so the
-        // peer (web or mobile) stops their own LiveKit session + UI.
         endCall(data.peerId);
+        releaseOutboundCallLock(callTabIdRef.current);
         setIncomingCall(null);
         setOutgoingCall(null);
       }
@@ -2729,6 +2772,8 @@ export default function MessagesPage() {
       });
 
       // Auto-close popup after 3 seconds
+      releaseOutboundCallLock(callTabIdRef.current);
+
       const timer = setTimeout(() => {
         setOutgoingCall((prev) => {
           if (prev && prev.status === "rejected") {

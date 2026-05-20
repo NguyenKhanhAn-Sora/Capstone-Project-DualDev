@@ -71,6 +71,12 @@ export interface CallEvent {
   };
 }
 
+export interface CallBusyEvent {
+  code: "already_in_call" | "peer_busy";
+  receiverId?: string;
+  peerId?: string;
+}
+
 export interface UserProfileStyleUpdatedEvent {
   userId: string;
   profileContext?: "messaging" | "social";
@@ -128,6 +134,7 @@ export const useDirectMessages = ({
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceStatus>>({});
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
+  const [callBusy, setCallBusy] = useState<CallBusyEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
   const [messageDeleted, setMessageDeleted] = useState<{
     messageId: string;
@@ -368,6 +375,12 @@ export const useDirectMessages = ({
       scheduleClearCallEvent(evt);
     });
 
+    socket.on("call-busy", (data: CallBusyEvent) => {
+      if (!data?.code) return;
+      setCallBusy(data);
+      setTimeout(() => setCallBusy(null), 2000);
+    });
+
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
       const evt: CallEvent = {
         from: data.from,
@@ -589,6 +602,7 @@ export const useDirectMessages = ({
     presenceByUserId,
     subscribePresence,
     callEvent,
+    callBusy,
     callEnded,
     messageDeleted,
     userProfileStyleUpdated,

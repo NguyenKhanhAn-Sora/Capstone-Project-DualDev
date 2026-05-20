@@ -38,7 +38,9 @@ class DmCallManager extends ChangeNotifier {
 
   StreamSubscription<DmCallEvent>? _callSub;
   StreamSubscription<String>? _endedSub;
+  StreamSubscription<DmCallBusyEvent>? _busySub;
   bool _initialized = false;
+  bool _callRouteOnStack = false;
 
   IncomingCallState? _incoming;
   OutgoingCallState? _outgoing;
@@ -123,6 +125,7 @@ class DmCallManager extends ChangeNotifier {
     _callSub = DirectMessagesRealtimeService.callEvents.listen(_onCallEvent);
     _endedSub =
         DirectMessagesRealtimeService.callEnded.listen(_onCallEnded);
+    _busySub = DirectMessagesRealtimeService.callBusy.listen(_onCallBusy);
     unawaited(_refreshMyName());
   }
 
@@ -164,6 +167,7 @@ class DmCallManager extends ChangeNotifier {
     _incoming = null;
     _outgoing = null;
     _active = null;
+    _callRouteOnStack = false;
     _activeCallStartedAt = null;
     clearMinimizedPipVideoTracks();
     _isCallMinimized = false;
@@ -203,6 +207,7 @@ class DmCallManager extends ChangeNotifier {
     _cancelTimers();
     _callSub?.cancel();
     _endedSub?.cancel();
+    _busySub?.cancel();
     super.dispose();
   }
 
@@ -509,10 +514,28 @@ class DmCallManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _onCallBusy(DmCallBusyEvent event) {
+    final out = _outgoing;
+    if (out == null) return;
+    if (event.receiverId != null &&
+        event.receiverId!.isNotEmpty &&
+        event.receiverId != out.peerUserId) {
+      return;
+    }
+    _cancelOutgoing();
+    if (event.code == 'peer_busy') {
+      _showSnack('Người nhận đang bận cuộc gọi khác.');
+    } else {
+      _showSnack(
+        'Bạn đang có cuộc gọi từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
+      );
+    }
+  }
+
   Future<void> _handleAnswer(DmCallEvent event) async {
     final out = _outgoing;
     if (out == null || out.peerUserId != event.fromUserId) return;
-    if (_active != null) return;
+    if (_active != null || _callRouteOnStack) return;
 
     final roomName = event.payload?['sdpOffer']?['roomName']?.toString();
     if (roomName == null || roomName.isEmpty) return;
@@ -569,6 +592,7 @@ class DmCallManager extends ChangeNotifier {
     if (_active?.peerUserId == fromUserId) {
       _active = null;
       _activeCallStartedAt = null;
+      _callRouteOnStack = false;
       clearMinimizedPipVideoTracks();
       _isCallMinimized = false;
       _miniCallTuckedToCorner = false;
@@ -610,29 +634,34 @@ class DmCallManager extends ChangeNotifier {
   }
 
   void _pushCallScreen() {
+    if (_callRouteOnStack) return;
     final key = _navigatorKey;
     if (key == null) return;
     final navigator = key.currentState;
     if (navigator == null) {
-      // Navigator not yet mounted; retry on the next frame.
       WidgetsBinding.instance.addPostFrameCallback((_) => _pushCallScreen());
       return;
     }
     final act = _active;
     if (act == null) return;
-    navigator.push<void>(
-      MaterialPageRoute(
-        settings: const RouteSettings(name: activeCallRouteName),
-        fullscreenDialog: true,
-        builder: (_) => NativeCallScreen(
-          session: act.session,
-          title: act.peerName.isNotEmpty ? act.peerName : 'Cuộc gọi',
-          peerAvatarUrl: act.peerAvatarUrl,
-          localDisplayName: _myName,
-          onHangup: hangupActive,
-        ),
-      ),
-    );
+    _callRouteOnStack = true;
+    navigator
+        .push<void>(
+          MaterialPageRoute(
+            settings: const RouteSettings(name: activeCallRouteName),
+            fullscreenDialog: true,
+            builder: (_) => NativeCallScreen(
+              session: act.session,
+              title: act.peerName.isNotEmpty ? act.peerName : 'Cuộc gọi',
+              peerAvatarUrl: act.peerAvatarUrl,
+              localDisplayName: _myName,
+              onHangup: hangupActive,
+            ),
+          ),
+        )
+        .whenComplete(() {
+      _callRouteOnStack = false;
+    });
   }
 
   void _updateOutgoingStatus(OutgoingCallStatus status) {

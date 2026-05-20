@@ -35,6 +35,18 @@ class DmCallEvent {
   final Map<String, dynamic>? callerInfo;
 }
 
+class DmCallBusyEvent {
+  const DmCallBusyEvent({
+    required this.code,
+    this.receiverId,
+    this.peerId,
+  });
+
+  final String code; // already_in_call | peer_busy
+  final String? receiverId;
+  final String? peerId;
+}
+
 class DirectMessagesRealtimeService {
   DirectMessagesRealtimeService._();
 
@@ -53,6 +65,8 @@ class DirectMessagesRealtimeService {
       StreamController<DmCallEvent>.broadcast();
   static final StreamController<String> _callEndedController =
       StreamController<String>.broadcast();
+  static final StreamController<DmCallBusyEvent> _callBusyController =
+      StreamController<DmCallBusyEvent>.broadcast();
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messagesReadController =
@@ -66,6 +80,7 @@ class DirectMessagesRealtimeService {
       _reactionController.stream;
   static Stream<DmCallEvent> get callEvents => _callController.stream;
   static Stream<String> get callEnded => _callEndedController.stream;
+  static Stream<DmCallBusyEvent> get callBusy => _callBusyController.stream;
   static Stream<Map<String, dynamic>> get messageDeleted =>
       _messageDeletedController.stream;
   static Stream<Map<String, dynamic>> get messagesRead =>
@@ -178,6 +193,17 @@ class DirectMessagesRealtimeService {
         ),
       );
     });
+    socket.on('call-busy', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      _callBusyController.add(
+        DmCallBusyEvent(
+          code: (data['code'] ?? 'already_in_call').toString(),
+          receiverId: data['receiverId']?.toString(),
+          peerId: data['peerId']?.toString(),
+        ),
+      );
+    });
     socket.on('ice-candidate', (payload) {
       if (payload is! Map) return;
       final data = Map<String, dynamic>.from(payload);
@@ -264,6 +290,7 @@ class DirectMessagesRealtimeService {
       socket.off('call-incoming');
       socket.off('call-answer');
       socket.off('call-rejected');
+      socket.off('call-busy');
       socket.off('ice-candidate');
       socket.off('call-ended');
       socket.off('message-deleted');
