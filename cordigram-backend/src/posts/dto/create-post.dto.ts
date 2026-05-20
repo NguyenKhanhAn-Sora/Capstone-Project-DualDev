@@ -93,4 +93,8 @@ export class CreatePostDto {
   @IsOptional()
   @IsISO8601()
   scheduledAt?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  pollId?: string;
 }

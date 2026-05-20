@@ -568,8 +568,9 @@
 }
 
 .hostControlBtn {
-  color: #111827;
-  background: linear-gradient(135deg, #22c55e, #14b8a6);
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.22);
 }
 
 .hostControlGhost {
@@ -925,8 +926,9 @@
   padding: 9px 12px;
   font-weight: 700;
   cursor: pointer;
-  color: #0f172a;
-  background: linear-gradient(135deg, #22c55e, #14b8a6);
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+  box-shadow: 0 10px 24px rgba(14, 165, 233, 0.22);
   justify-self: start;
   min-width: 160px;
 }
@@ -1715,8 +1717,9 @@
 }
 
 .modBtn {
-  color: #0f172a;
-  background: linear-gradient(135deg, #22c55e, #14b8a6);
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.22);
 }
 
 .modBtnSecondary {

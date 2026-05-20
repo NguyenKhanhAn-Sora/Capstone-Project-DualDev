@@ -39,6 +39,7 @@ import { PaymentTransaction } from '../payments/payment-transaction.schema';
 import { ReportPost } from '../reportpost/reportpost.schema';
 import { AdEngagementEvent } from '../payments/ad-engagement-event.schema';
 import { UsersService } from '../users/users.service';
+import { Poll } from '../polls/poll.schema';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -139,6 +140,7 @@ export class PostsService {
     private readonly reportPostModel: Model<ReportPost>,
     @InjectModel(AdEngagementEvent.name)
     private readonly adEngagementEventModel: Model<AdEngagementEvent>,
+    @InjectModel(Poll.name) private readonly pollModel: Model<Poll>,
     private readonly blocksService: BlocksService,
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
@@ -341,9 +343,9 @@ export class PostsService {
 
     let repostOf: Types.ObjectId | null = null;
 
-    if (!media.length && !dto.repostOf) {
+    if (!media.length && !dto.repostOf && !dto.pollId) {
       throw new BadRequestException(
-        'Please provide media or a repostOf target',
+        'Please provide media, a repostOf target, or a pollId',
       );
     }
 
@@ -403,6 +405,7 @@ export class PostsService {
       serverId: dto.serverId ? new Types.ObjectId(dto.serverId) : null,
       channelId: dto.channelId ? new Types.ObjectId(dto.channelId) : null,
       repostOf,
+      pollId: dto.pollId ? new Types.ObjectId(dto.pollId) : null,
       content: typeof dto.content === 'string' ? dto.content : '',
       media,
       primaryVideoDurationMs,
@@ -466,7 +469,10 @@ export class PostsService {
       });
     }
 
-    return this.toResponse(doc);
+    const pollData = (doc as any).pollId
+      ? await this.pollModel.findById((doc as any).pollId).lean()
+      : null;
+    return this.toResponse(doc, undefined, undefined, undefined, undefined, pollData);
   }
 
   async update(authorId: string, postId: string, dto: UpdatePostDto) {
@@ -965,6 +971,19 @@ export class PostsService {
     );
   }
 
+  private async batchFetchPolls(posts: any[]): Promise<Map<string, any>> {
+    const pollIds = posts
+      .map((p) => p.pollId?.toString?.())
+      .filter((id): id is string => Boolean(id));
+    if (!pollIds.length) return new Map();
+    const polls = await this.pollModel
+      .find({ _id: { $in: pollIds.map((id) => new Types.ObjectId(id)) } })
+      .lean();
+    const map = new Map<string, any>();
+    polls.forEach((poll) => map.set((poll._id as Types.ObjectId).toString(), poll));
+    return map;
+  }
+
   private toResponse(
     doc: Post,
     profile?: {
@@ -992,6 +1011,7 @@ export class PostsService {
       media?: Post['media'];
       kind?: string;
     } | null,
+    poll?: any | null,
   ) {
     return {
       kind: doc.kind,
@@ -1059,6 +1079,37 @@ export class PostsService {
       repostSourceKind: repostSourcePost?.kind ?? null,
       primaryVideoDurationMs: doc.primaryVideoDurationMs ?? null,
       pinnedAt: doc.pinnedAt ?? null,
+      pollId: (doc as any).pollId?.toString?.() ?? null,
+      poll: poll
+        ? (() => {
+            const votes: Array<{ userId: any; optionIndex: number }> = poll.votes ?? [];
+            const uniqueVoters = new Set(votes.map((v) => v.userId?.toString?.())).size;
+            const totalVotes = uniqueVoters;
+            const totalSelections = votes.length;
+            const now = new Date();
+            const expiresAt = new Date(poll.expiresAt);
+            const msLeft = expiresAt.getTime() - now.getTime();
+            const hoursLeft = Math.max(0, msLeft / (1000 * 60 * 60));
+            const results = (poll.options as string[]).map((option, idx) => {
+              const voteCount = votes.filter((v) => v.optionIndex === idx).length;
+              const percentage = totalSelections > 0 ? Math.round((voteCount / totalSelections) * 100) : 0;
+              return { option, voteCount, percentage };
+            });
+            return {
+              id: (poll._id as Types.ObjectId)?.toString?.(),
+              question: poll.question,
+              options: poll.options,
+              optionImages: (poll as any).optionImages ?? null,
+              allowMultipleAnswers: poll.allowMultipleAnswers,
+              expiresAt: poll.expiresAt,
+              isExpired: now > expiresAt,
+              results,
+              totalVotes,
+              uniqueVoters,
+              hoursLeft,
+            };
+          })()
+        : null,
       flags: {
         liked: userFlags?.liked ?? false,
         saved: userFlags?.saved ?? false,
@@ -2399,6 +2450,7 @@ export class PostsService {
     });
 
     const sponsoredPostIdSet = new Set(sponsoredBoostByPostId.keys());
+    const pollMap = await this.batchFetchPolls(pagePosts);
 
     return pagePosts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
@@ -2412,12 +2464,14 @@ export class PostsService {
       const repostSourcePost = post.repostOf
         ? repostSourcePostMap.get(post.repostOf.toString()) || null
         : null;
+      const poll = post.pollId ? pollMap.get(post.pollId.toString()) || null : null;
       const response = this.toResponse(
         post,
         profile,
         { ...baseFlags, following },
         repostProfile,
         repostSourcePost,
+        poll,
       );
       const postId = post._id?.toString?.() ?? '';
       const repostSourceId = post.repostOf?.toString?.() ?? '';
@@ -2703,6 +2757,7 @@ export class PostsService {
     });
 
     const sponsoredPostIdSet = new Set(sponsoredBoostByPostId.keys());
+    const pollMap = await this.batchFetchPolls(topPosts);
 
     return topPosts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
@@ -2716,12 +2771,14 @@ export class PostsService {
       const repostSourcePost = post.repostOf
         ? repostSourcePostMap.get(post.repostOf.toString()) || null
         : null;
+      const poll = post.pollId ? pollMap.get(post.pollId.toString()) || null : null;
       const response = this.toResponse(
         post,
         profile,
         { ...baseFlags, following },
         repostProfile,
         repostSourcePost,
+        poll,
       );
       const postId = post._id?.toString?.() ?? '';
       const repostSourceId = post.repostOf?.toString?.() ?? '';
@@ -3006,10 +3063,13 @@ export class PostsService {
       interactionMap.set(key, current);
     });
 
+    const pollMap = await this.batchFetchPolls(pagePosts);
+
     return pagePosts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
       const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
-      return this.toResponse(post, profile, baseFlags);
+      const poll = post.pollId ? pollMap.get(post.pollId.toString()) || null : null;
+      return this.toResponse(post, profile, baseFlags, null, null, poll);
     });
   }
 
@@ -3359,13 +3419,16 @@ export class PostsService {
       interactionMap.set(key, current);
     });
 
+    const pollMap = await this.batchFetchPolls(pagePosts);
+
     return pagePosts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
       const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
       const following = post.authorId
         ? followeeSet.has(post.authorId.toString())
         : false;
-      return this.toResponse(post, profile, { ...baseFlags, following });
+      const poll = post.pollId ? pollMap.get(post.pollId.toString()) || null : null;
+      return this.toResponse(post, profile, { ...baseFlags, following }, null, null, poll);
     });
   }
 
@@ -3609,9 +3672,12 @@ export class PostsService {
       .limit(limit)
       .lean();
 
-    return docs.map((doc) =>
-      this.toResponse(this.postModel.hydrate(doc) as Post),
-    );
+    const pollMap = await this.batchFetchPolls(docs);
+
+    return docs.map((doc) => {
+      const poll = doc.pollId ? pollMap.get(doc.pollId.toString()) || null : null;
+      return this.toResponse(this.postModel.hydrate(doc) as Post, null, {}, null, null, poll);
+    });
   }
 
   async getUserReels(params: {
@@ -4055,10 +4121,17 @@ export class PostsService {
       }
     }
 
+    const pollData = (post as any).pollId
+      ? await this.pollModel.findById((post as any).pollId).lean()
+      : null;
+
     return this.toResponse(
       this.postModel.hydrate(post) as Post,
       profile || null,
       flags,
+      null,
+      null,
+      pollData,
     );
   }
 

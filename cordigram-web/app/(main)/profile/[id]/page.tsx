@@ -441,7 +441,8 @@ function PostGrid({
     <div className={styles.grid}>
       {items.map((item) => {
         const media = item.media?.[0];
-        if (!media) return null;
+        const isPoll = Boolean((item as any).poll);
+        if (!media && !isPoll) return null;
         const isPinned = pinnedIds.has(item.id);
         const isSelected = selectedIds.has(item.id);
         return (
@@ -451,7 +452,34 @@ function PostGrid({
             className={`${styles.tile} ${isSelected ? styles.tileSelected : ""}`}
             onClick={() => onSelect(item)}
           >
-            {media.type === "video" ? (
+            {isPoll ? (() => {
+              const poll = (item as any).poll;
+              const firstImg = (poll?.optionImages ?? []).find(Boolean) as string | undefined;
+              return firstImg ? (
+                <img
+                  className={styles.tileMedia}
+                  src={firstImg}
+                  alt={poll?.question ?? "Bình chọn"}
+                  loading="lazy"
+                />
+              ) : (
+                <div className={styles.pollTilePlaceholder}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <rect x="2" y="14" width="4" height="8" rx="1" />
+                    <rect x="10" y="8" width="4" height="14" rx="1" />
+                    <rect x="18" y="2" width="4" height="20" rx="1" />
+                  </svg>
+                  <span className={styles.pollTileQuestion}>
+                    {poll?.question ?? "Bình chọn"}
+                  </span>
+                  <span className={styles.pollTileStats}>
+                    {poll?.totalVotes
+                      ? `${poll.totalVotes.toLocaleString("vi-VN")} lượt bình chọn`
+                      : "Chưa có lượt bình chọn"}
+                  </span>
+                </div>
+              );
+            })() : media?.type === "video" ? (
               <video
                 className={styles.tileMedia}
                 src={media.url}
@@ -461,13 +489,23 @@ function PostGrid({
                 onMouseEnter={!manageMode ? handleEnter : undefined}
                 onMouseLeave={!manageMode ? handleLeave : undefined}
               />
-            ) : (
+            ) : media ? (
               <img
                 className={styles.tileMedia}
                 src={media.url}
                 alt="post media"
                 loading="lazy"
               />
+            ) : null}
+            {isPoll && (
+              <div className={styles.pollTileBadge}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <rect x="2" y="14" width="4" height="8" rx="1" />
+                  <rect x="10" y="8" width="4" height="14" rx="1" />
+                  <rect x="18" y="2" width="4" height="20" rx="1" />
+                </svg>
+                Bình chọn
+              </div>
             )}
             {isPinned && (
               <div className={styles.pinnedBadge}>

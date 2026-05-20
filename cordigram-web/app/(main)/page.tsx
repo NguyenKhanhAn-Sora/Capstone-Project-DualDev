@@ -33,6 +33,7 @@ import {
   unfollowUser,
   updatePostVisibility,
   updatePost,
+  updatePoll,
   fetchCurrentProfile,
   searchProfiles,
   searchPosts,
@@ -65,6 +66,7 @@ import { videoVolumeStore } from "@/hooks/use-video-volume";
 import styles from "./home-feed.module.css";
 import { usePostUpload } from "@/context/post-upload-context";
 import PostUploadBanner from "@/ui/post-upload-banner/post-upload-banner";
+import PollWidget from "@/ui/poll-widget/poll-widget";
 
 type LocalFlags = {
   liked?: boolean;
@@ -886,7 +888,9 @@ export default function HomePage({
         return false;
       }
       if (!Array.isArray(cached.items) || !cached.items.length) return false;
-      const filteredItems = onlyPostViews(cached.items || []);
+      const filteredItems = onlyPostViews(cached.items || []).filter(
+        (p) => viewerId ? true : !(p.item as any).pollId,
+      );
       if (!filteredItems.length) return false;
       setItems(filteredItems);
       setPage(cached.page ?? 1);
@@ -957,7 +961,7 @@ export default function HomePage({
       const posts = filterFeedItemsByBlockedAuthors(
         onlyPostItems(Array.isArray(data) ? data : []),
         blockedIds,
-      ).filter(shouldRenderInHomeFeed);
+      ).filter(shouldRenderInHomeFeed).filter((item) => viewerId ? true : !(item as any).pollId);
       const map = new Map(posts.map((item) => [item.id, item]));
       setItems((prev) =>
         prev.map((p) => {
@@ -1062,7 +1066,7 @@ export default function HomePage({
         const posts = filterFeedItemsByBlockedAuthors(
           onlyPostItems(rawItems),
           blockedIds,
-        ).filter(shouldRenderInHomeFeed);
+        ).filter(shouldRenderInHomeFeed).filter((item) => viewerId ? true : !(item as any).pollId);
         // If a full page came back there are likely more items
         const nextHasMore = Array.isArray(data)
           ? rawItems.length >= pageSize
@@ -2465,6 +2469,12 @@ function FeedCard({
   const [locationError, setLocationError] = useState("");
   const [locationHighlight, setLocationHighlight] = useState(-1);
   const [editAllowComments, setEditAllowComments] = useState(allowComments);
+  const [editAllowMultiple, setEditAllowMultiple] = useState(
+    data.poll?.allowMultipleAnswers ?? false,
+  );
+  const [editPollOptions, setEditPollOptions] = useState<string[]>(
+    data.poll?.options ?? [],
+  );
   const [editAllowDownload, setEditAllowDownload] = useState(
     allowDownload ?? false,
   );
@@ -2553,6 +2563,8 @@ function FeedCard({
     setLocationError("");
     setLocationHighlight(-1);
     setEditAllowComments(allowComments);
+    setEditAllowMultiple(data.poll?.allowMultipleAnswers ?? false);
+    setEditPollOptions(data.poll?.options ?? []);
     setEditAllowDownload(allowDownload ?? false);
     setEditHideLikeCount(hideLikeCount);
     setEditError("");
@@ -2972,13 +2984,23 @@ function FeedCard({
       hideLikeCount: editHideLikeCount,
     };
 
-    if (!isRepost) {
+    if (!isRepost && !data.poll) {
       payload.allowDownload = editAllowDownload;
     }
 
     try {
       setEditSaving(true);
-      const updated = await updatePost({ token, postId: id, payload });
+      const [updated] = await Promise.all([
+        updatePost({ token, postId: id, payload }),
+        data.poll
+          ? updatePoll({
+              token,
+              pollId: data.poll.id,
+              allowMultipleAnswers: editAllowMultiple,
+              options: editPollOptions,
+            })
+          : Promise.resolve(null),
+      ]);
       onRemoteUpdate(id, updated);
       setEditSuccess(t("edit.updated"));
       setEditOpen(false);
@@ -3738,6 +3760,43 @@ function FeedCard({
             ) : null}
           </div>
 
+          {data.poll && data.poll.options.length > 0 && (
+            <div className={styles.editField}>
+              <div className={styles.editLabelRow}>
+                <span className={styles.editLabelText}>Lựa chọn bình chọn</span>
+              </div>
+              <div className={styles.pollOptionsEditor}>
+                {data.poll.options.map((_, idx) => {
+                  const imgUrl = (data.poll!.optionImages ?? [])[idx] ?? null;
+                  return (
+                    <div key={idx} className={styles.pollOptionEditorRow}>
+                      {imgUrl && (
+                        <img
+                          src={imgUrl}
+                          alt=""
+                          className={styles.pollOptionEditorThumb}
+                        />
+                      )}
+                      <input
+                        className={styles.editInput}
+                        value={editPollOptions[idx] ?? ""}
+                        onChange={(e) =>
+                          setEditPollOptions((prev) => {
+                            const next = [...prev];
+                            next[idx] = e.target.value;
+                            return next;
+                          })
+                        }
+                        maxLength={100}
+                        placeholder={`Lựa chọn ${idx + 1}`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className={styles.switchGroup}>
             <label className={styles.switchRow}>
               <input
@@ -3755,32 +3814,46 @@ function FeedCard({
               </div>
             </label>
 
-            <label className={styles.switchRow}>
-              <input
-                type="checkbox"
-                checked={
-                  repostOf
-                    ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
-                    : editAllowDownload
-                }
-                disabled={Boolean(repostOf)}
-                onChange={
-                  repostOf ? undefined : () => setEditAllowDownload((p) => !p)
-                }
-              />
-              <div>
-                <p className={styles.switchTitle}>
-                  {t("edit.allowDownloads.title")}
-                </p>
-                <p className={styles.switchHint}>
-                  {repostOf
-                    ? lockedEditAllowDownloadLoading
-                      ? t("edit.allowDownloads.inheritedLoading")
-                      : t("edit.allowDownloads.inheritedLocked")
-                    : t("edit.allowDownloads.hint")}
-                </p>
-              </div>
-            </label>
+            {data.poll ? (
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={editAllowMultiple}
+                  onChange={() => setEditAllowMultiple((p) => !p)}
+                />
+                <div>
+                  <p className={styles.switchTitle}>Cho phép chọn nhiều</p>
+                  <p className={styles.switchHint}>Người dùng có thể chọn nhiều lựa chọn cùng lúc</p>
+                </div>
+              </label>
+            ) : (
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={
+                    repostOf
+                      ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
+                      : editAllowDownload
+                  }
+                  disabled={Boolean(repostOf)}
+                  onChange={
+                    repostOf ? undefined : () => setEditAllowDownload((p) => !p)
+                  }
+                />
+                <div>
+                  <p className={styles.switchTitle}>
+                    {t("edit.allowDownloads.title")}
+                  </p>
+                  <p className={styles.switchHint}>
+                    {repostOf
+                      ? lockedEditAllowDownloadLoading
+                        ? t("edit.allowDownloads.inheritedLoading")
+                        : t("edit.allowDownloads.inheritedLocked")
+                      : t("edit.allowDownloads.hint")}
+                  </p>
+                </div>
+              </label>
+            )}
 
             <label className={styles.switchRow}>
               <input
@@ -4247,21 +4320,23 @@ function FeedCard({
                           : t("follow.follow")}
                       </button>
                     ) : null}
-                    <button
-                      className={styles.menuItem}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onSave(id, !saved);
-                      }}
-                    >
-                      {isAdLikePost
-                        ? saved
-                          ? "Unsave this ads"
-                          : "Save this ads"
-                        : saved
-                          ? t("menu.unsave")
-                          : t("menu.save")}
-                    </button>
+                    {!data.poll ? (
+                      <button
+                        className={styles.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onSave(id, !saved);
+                        }}
+                      >
+                        {isAdLikePost
+                          ? saved
+                            ? "Unsave this ads"
+                            : "Save this ads"
+                          : saved
+                            ? t("menu.unsave")
+                            : t("menu.save")}
+                      </button>
+                    ) : null}
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -4363,6 +4438,12 @@ function FeedCard({
           )}
         </div>
       )}
+
+      {data.poll ? (
+        <div style={{ padding: "0 14px 2px" }}>
+          <PollWidget poll={data.poll} token={token} viewerId={viewerId} />
+        </div>
+      ) : null}
 
       {isSponsoredRepost ? (
         <div className={styles.repostAdEmbed}>
@@ -4697,16 +4778,18 @@ function FeedCard({
           <IconComment size={20} />
           <span>{t("actions.comment")}</span>
         </button>
-        <button
-          className={`${styles.actionBtn} ${
-            saved ? styles.actionBtnActive : ""
-          }`}
-          onClick={() => onSave(id, !saved)}
-        >
-          <IconSave size={20} filled={saved} />
-          <span>{saved ? t("actions.saved") : t("actions.save")}</span>
-        </button>
-        {canRepost ? (
+        {!data.poll ? (
+          <button
+            className={`${styles.actionBtn} ${
+              saved ? styles.actionBtnActive : ""
+            }`}
+            onClick={() => onSave(id, !saved)}
+          >
+            <IconSave size={20} filled={saved} />
+            <span>{saved ? t("actions.saved") : t("actions.save")}</span>
+          </button>
+        ) : null}
+        {canRepost && !data.poll ? (
           <button
             className={styles.actionBtn}
             onClick={(e) =>

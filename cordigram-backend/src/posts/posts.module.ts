@@ -42,6 +42,7 @@ import {
   AdEngagementEvent,
   AdEngagementEventSchema,
 } from '../payments/ad-engagement-event.schema';
+import { Poll, PollSchema } from '../polls/poll.schema';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import {
       { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
       { name: ReportPost.name, schema: ReportPostSchema },
       { name: AdEngagementEvent.name, schema: AdEngagementEventSchema },
+      { name: Poll.name, schema: PollSchema },
     ]),
   ],
   controllers: [PostsController, ReelsController, ExploreController],

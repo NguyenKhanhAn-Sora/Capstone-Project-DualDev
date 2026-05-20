@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import styles from "./followers-overlay.module.css";
 import {
   fetchFollowers,
@@ -298,7 +299,7 @@ export default function FollowersOverlay(props: Props) {
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className={styles.backdrop}
       role="dialog"
@@ -420,6 +421,7 @@ export default function FollowersOverlay(props: Props) {
           <div ref={sentinelRef} className={styles.sentinel} />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

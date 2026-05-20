@@ -462,6 +462,41 @@
   align-items: stretch;
 }
 
+/* Poll post with no images — only show the right info pane */
+.contentGridPollOnly {
+  display: grid;
+  grid-template-columns: minmax(420px, 600px);
+  justify-content: center;
+  align-items: stretch;
+}
+
+/* Poll option image carousel */
+.pollCarouselImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: opacity 0.2s;
+}
+
+.pollCarouselImg:hover {
+  opacity: 0.9;
+}
+
+.pollCarouselLabel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 8px 16px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+  pointer-events: none;
+}
+
 .mediaPane {
   display: flex;
   flex-direction: column;
@@ -2004,6 +2039,10 @@
 
 @media (max-width: 900px) {
   .contentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .contentGridPollOnly {
     grid-template-columns: 1fr;
   }
 

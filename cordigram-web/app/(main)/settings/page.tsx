@@ -1701,7 +1701,7 @@ export default function SettingsPage() {
                   <span>{option.label}</span>
                   {active ? (
                     <span className={styles.visibilityCheck} aria-hidden>
-                      âœ“
+                      âœ"
                     </span>
                   ) : null}
                 </button>
@@ -4028,7 +4028,7 @@ export default function SettingsPage() {
                                     {item.type === "follow" ||
                                     item.type === "report_user"
                                       ? getInitials(targetName)
-                                      : "ðŸ“"}
+                                      : null}
                                   </span>
                                 )}
                               </div>
@@ -4147,7 +4147,7 @@ export default function SettingsPage() {
                                   <span
                                     className={styles.contentThumbPlaceholder}
                                   >
-                                    ðŸ“
+                                    
                                   </span>
                                 )}
                               </div>
@@ -4479,7 +4479,7 @@ export default function SettingsPage() {
                                 <span>{getLanguageLabel(value)}</span>
                                 {language === value ? (
                                   <span className={styles.languageCheck}>
-                                    âœ“
+                                    âœ"
                                   </span>
                                 ) : null}
                               </button>
@@ -4789,11 +4789,19 @@ export default function SettingsPage() {
                           }`}
                         >
                           <div className={styles.deviceIcon}>
-                            {device.deviceType?.toLowerCase() === "mobile"
-                              ? "ðŸ“±"
-                              : device.deviceType?.toLowerCase() === "tablet"
-                                ? "ðŸ“Ÿ"
-                                : "ðŸ’»"}
+                            {device.deviceType?.toLowerCase() === "mobile" ? (
+                              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+                                <path d="M15.5 2h-7A2.5 2.5 0 0 0 6 4.5v15A2.5 2.5 0 0 0 8.5 22h7a2.5 2.5 0 0 0 2.5-2.5v-15A2.5 2.5 0 0 0 15.5 2ZM12 21a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm4-4H8V5h8Z" />
+                              </svg>
+                            ) : device.deviceType?.toLowerCase() === "tablet" ? (
+                              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+                                <path d="M18.5 2h-13A2.5 2.5 0 0 0 3 4.5v15A2.5 2.5 0 0 0 5.5 22h13a2.5 2.5 0 0 0 2.5-2.5v-15A2.5 2.5 0 0 0 18.5 2ZM12 21a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm5-4H7V5h10Z" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+                                <path d="M20 3H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h6v2H7v2h10v-2h-3v-2h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm0 13H4V5h16Z" />
+                              </svg>
+                            )}
                           </div>
                           <div className={styles.deviceInfo}>
                             <div className={styles.deviceHeader}>

@@ -16,6 +16,9 @@ export class Poll {
   @Prop({ type: [String], required: true })
   options: string[];
 
+  @Prop({ type: [String], default: null })
+  optionImages?: (string | null)[];
+
   @Prop({ type: Number, required: true, default: 24 })
   durationHours: number;
 

@@ -6,11 +6,17 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Poll, PollDocument } from './poll.schema';
-import { CreatePollDto, VotePollDto } from './dto/create-poll.dto';
+import { CreatePollDto, UpdatePollDto, VotePollDto } from './dto/create-poll.dto';
+import { Follow } from '../users/follow.schema';
+import { Profile } from '../profiles/profile.schema';
 
 @Injectable()
 export class PollsService {
-  constructor(@InjectModel(Poll.name) private pollModel: Model<PollDocument>) {}
+  constructor(
+    @InjectModel(Poll.name) private pollModel: Model<PollDocument>,
+    @InjectModel(Profile.name) private profileModel: Model<Profile & { _id: Types.ObjectId }>,
+    @InjectModel(Follow.name) private followModel: Model<Follow & { _id: Types.ObjectId }>,
+  ) {}
 
   async create(userId: string, dto: CreatePollDto): Promise<Poll> {
     const durationHours = dto.durationHours || 24;
@@ -21,6 +27,7 @@ export class PollsService {
       creatorId: new Types.ObjectId(userId),
       question: dto.question,
       options: dto.options,
+      optionImages: dto.optionImages ?? null,
       durationHours,
       allowMultipleAnswers: dto.allowMultipleAnswers || false,
       expiresAt,
@@ -95,16 +102,17 @@ export class PollsService {
   async getResults(pollId: string): Promise<any> {
     const poll = await this.findById(pollId);
 
-    const totalVotes = poll.votes.length;
     const uniqueVoters = new Set(poll.votes.map((v) => v.userId.toString()))
       .size;
+    const totalVotes = uniqueVoters;
+    const totalSelections = poll.votes.length;
 
     const results = poll.options.map((option, index) => {
       const voteCount = poll.votes.filter(
         (v) => v.optionIndex === index,
       ).length;
       const percentage =
-        totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+        totalSelections > 0 ? Math.round((voteCount / totalSelections) * 100) : 0;
 
       return {
         option,
@@ -147,6 +155,22 @@ export class PollsService {
       .map((v) => v.optionIndex);
   }
 
+  async update(pollId: string, userId: string, dto: UpdatePollDto): Promise<Poll> {
+    const poll = await this.pollModel.findOne({
+      _id: new Types.ObjectId(pollId),
+      isDeleted: false,
+    });
+    if (!poll) throw new Error('Poll not found');
+    if (poll.creatorId.toString() !== userId) throw new Error('Forbidden');
+    if (typeof dto.allowMultipleAnswers === 'boolean') {
+      poll.allowMultipleAnswers = dto.allowMultipleAnswers;
+    }
+    if (Array.isArray(dto.options) && dto.options.length === poll.options.length) {
+      poll.options = dto.options.map((o, i) => o.trim() || poll.options[i]);
+    }
+    return poll.save();
+  }
+
   async delete(pollId: string, userId: string): Promise<void> {
     const poll = await this.pollModel.findOne({
       _id: new Types.ObjectId(pollId),
@@ -163,5 +187,85 @@ export class PollsService {
 
     poll.isDeleted = true;
     await poll.save();
+  }
+
+  async getVoters(
+    pollId: string,
+    viewerId: string | null,
+    limit: number,
+    cursor?: string,
+  ): Promise<{ items: any[]; nextCursor: string | null }> {
+    const poll = await this.pollModel
+      .findOne({ _id: new Types.ObjectId(pollId), isDeleted: false })
+      .lean()
+      .exec();
+    if (!poll) throw new NotFoundException('Poll not found');
+
+    // Deduplicate: keep the most recent vote timestamp per user
+    const voterMap = new Map<string, number>();
+    for (const vote of poll.votes) {
+      const uid = vote.userId.toString();
+      const ts = new Date(vote.votedAt).getTime();
+      if (!voterMap.has(uid) || ts > voterMap.get(uid)!) {
+        voterMap.set(uid, ts);
+      }
+    }
+
+    // Sort by votedAt desc (most recent voter first), then by uid for stability
+    const sortedVoters = [...voterMap.entries()]
+      .sort(([aId, aTs], [bId, bTs]) => bTs - aTs || aId.localeCompare(bId))
+      .map(([uid]) => uid);
+
+    // Apply cursor: find its position and start after it
+    let startIndex = 0;
+    if (cursor) {
+      const idx = sortedVoters.indexOf(cursor);
+      startIndex = idx >= 0 ? idx + 1 : 0;
+    }
+
+    const slice = sortedVoters.slice(startIndex, startIndex + limit);
+    const nextCursor =
+      startIndex + limit < sortedVoters.length
+        ? (slice[slice.length - 1] ?? null)
+        : null;
+
+    if (slice.length === 0) return { items: [], nextCursor: null };
+
+    const userIds = slice.map((id) => new Types.ObjectId(id));
+    const profiles = await this.profileModel
+      .find({ userId: { $in: userIds } })
+      .select('userId username displayName avatarUrl')
+      .lean()
+      .exec();
+
+    const userMap = new Map(profiles.map((p: any) => [p.userId.toString(), p]));
+
+    let followingSet = new Set<string>();
+    if (viewerId) {
+      const follows = await this.followModel
+        .find({
+          followerId: new Types.ObjectId(viewerId),
+          followeeId: { $in: userIds },
+        })
+        .lean()
+        .exec();
+      followingSet = new Set(follows.map((f: any) => f.followeeId.toString()));
+    }
+
+    const items = slice
+      .map((uid) => {
+        const user = userMap.get(uid) as any;
+        if (!user) return null;
+        return {
+          userId: uid,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+          isFollowing: followingSet.has(uid),
+        };
+      })
+      .filter(Boolean);
+
+    return { items, nextCursor };
   }
 }

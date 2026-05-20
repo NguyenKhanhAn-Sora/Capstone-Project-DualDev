@@ -3,26 +3,25 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import styles from "./comment-likes-overlay.module.css";
+import styles from "./poll-voters-overlay.module.css";
 import {
-  fetchCommentLikes,
+  fetchPollVoters,
   followUser,
   unfollowUser,
-  type CommentLikeItem,
+  type PostLikeItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 
 type Props = {
   open: boolean;
   closing?: boolean;
-  postId: string;
-  commentId: string;
+  pollId: string;
   viewerId?: string;
   onClose: () => void;
 };
 
 type ListState = {
-  items: CommentLikeItem[];
+  items: PostLikeItem[];
   nextCursor: string | null;
   loading: boolean;
   error: string;
@@ -46,12 +45,12 @@ function IconClose() {
   );
 }
 
-function toProfileHref(item: { userId: string; username?: string }) {
+function toProfileHref(item: { userId: string }) {
   return `/profile/${encodeURIComponent(item.userId)}`;
 }
 
-export default function CommentLikesOverlay(props: Props) {
-  const { open, closing, postId, commentId, viewerId, onClose } = props;
+export default function PollVotersOverlay(props: Props) {
+  const { open, closing, pollId, viewerId, onClose } = props;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -64,7 +63,6 @@ export default function CommentLikesOverlay(props: Props) {
   });
   const [search, setSearch] = useState("");
 
-  const title = useMemo(() => "Likes", []);
   const filteredItems = useMemo(() => {
     const trimmed = search.trim().toLowerCase();
     if (!trimmed) return state.items;
@@ -84,61 +82,12 @@ export default function CommentLikesOverlay(props: Props) {
     };
   }, [open]);
 
-  const loadFirstPage = async () => {
+  const loadMore = async (cursor: string) => {
     const token = getStoredAccessToken();
-    if (!token) {
-      setState((p) => ({ ...p, loading: false, error: "Session expired." }));
-      return;
-    }
-
-    setState((p) => ({ ...p, loading: true, error: "" }));
-    try {
-      const res = await fetchCommentLikes({
-        token,
-        postId,
-        commentId,
-        limit: PAGE_SIZE,
-      });
-      setState({
-        items: res.items ?? [],
-        nextCursor: res.nextCursor ?? null,
-        loading: false,
-        error: "",
-        loadingMore: false,
-      });
-    } catch (err: any) {
-      console.error(err);
-      setState((p) => ({
-        ...p,
-        loading: false,
-        error: err?.message || "Failed to load likes",
-      }));
-    }
-  };
-
-  const loadMore = async () => {
-    if (!open) return;
-    if (state.loading || state.loadingMore) return;
-    if (!state.nextCursor) return;
-
-    const token = getStoredAccessToken();
-    if (!token) {
-      setState((p) => ({ ...p, error: "Session expired." }));
-      return;
-    }
-
-    const cursor = state.nextCursor;
+    if (!token) return;
     setState((p) => ({ ...p, loadingMore: true, error: "" }));
-
     try {
-      const res = await fetchCommentLikes({
-        token,
-        postId,
-        commentId,
-        limit: PAGE_SIZE,
-        cursor,
-      });
-
+      const res = await fetchPollVoters({ token, pollId, limit: PAGE_SIZE, cursor });
       setState((p) => ({
         ...p,
         items: [...p.items, ...(res.items ?? [])],
@@ -146,52 +95,69 @@ export default function CommentLikesOverlay(props: Props) {
         loadingMore: false,
       }));
     } catch (err: any) {
-      console.error(err);
       setState((p) => ({
         ...p,
         loadingMore: false,
-        error: err?.message || "Failed to load more",
+        error: err?.message || "Không thể tải thêm.",
       }));
     }
   };
 
-  useEffect(() => {
-    if (!open) return;
-    if (state.items.length || state.loading) return;
-    void loadFirstPage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, postId, commentId]);
-
+  // Reset + load in a single effect to avoid state-flip race between two separate effects
   useEffect(() => {
     if (!open) return;
     setSearch("");
-  }, [open, postId, commentId]);
+    setState({ items: [], nextCursor: null, loading: true, error: "", loadingMore: false });
+    let cancelled = false;
+    const token = getStoredAccessToken();
+    if (!token) {
+      setState((p) => ({ ...p, loading: false, error: "Session expired." }));
+      return;
+    }
+    fetchPollVoters({ token, pollId, limit: PAGE_SIZE })
+      .then((res) => {
+        if (cancelled) return;
+        setState({
+          items: res.items ?? [],
+          nextCursor: res.nextCursor ?? null,
+          loading: false,
+          error: "",
+          loadingMore: false,
+        });
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        setState((p) => ({
+          ...p,
+          loading: false,
+          error: err?.message || "Không thể tải danh sách.",
+        }));
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pollId]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !state.nextCursor || state.loading || state.loadingMore) return;
     const root = scrollRef.current;
     const target = sentinelRef.current;
     if (!root || !target) return;
-
+    const cursor = state.nextCursor;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          loadMore();
-        }
+        if (entries.some((e) => e.isIntersecting)) void loadMore(cursor);
       },
       { root, rootMargin: "700px 0px", threshold: 0.01 },
     );
-
     observer.observe(target);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, state.nextCursor, state.loading, state.loadingMore]);
 
-  const toggleFollow = async (item: CommentLikeItem) => {
+  const toggleFollow = async (item: PostLikeItem) => {
     const token = getStoredAccessToken();
     if (!token) return;
     if (viewerId && item.userId === viewerId) return;
-
     const next = !item.isFollowing;
     setState((p) => ({
       ...p,
@@ -199,15 +165,13 @@ export default function CommentLikesOverlay(props: Props) {
         u.userId === item.userId ? { ...u, isFollowing: next } : u,
       ),
     }));
-
     try {
       if (next) {
         await followUser({ token, userId: item.userId });
       } else {
         await unfollowUser({ token, userId: item.userId });
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setState((p) => ({
         ...p,
         items: p.items.map((u) =>
@@ -237,7 +201,7 @@ export default function CommentLikesOverlay(props: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.header}>
-          <div className={styles.title}>{title}</div>
+          <div className={styles.title}>Lượt bình chọn</div>
           <button
             className={styles.close}
             type="button"
@@ -252,32 +216,29 @@ export default function CommentLikesOverlay(props: Props) {
           <input
             className={styles.searchInput}
             type="search"
-            placeholder="Search username"
+            placeholder="Tìm tên người dùng"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search username"
+            aria-label="Tìm tên người dùng"
           />
         </div>
 
         <div className={styles.list} ref={scrollRef}>
           {state.loading ? (
-            <div className={styles.loading}>Loading…</div>
+            <div className={styles.loading}>Đang tải…</div>
           ) : null}
           {state.error && !state.loading ? (
             <div className={styles.error}>{state.error}</div>
           ) : null}
           {!state.loading && !state.error && !filteredItems.length ? (
             <div className={styles.loading}>
-              {search.trim() ? "No matching users" : "No likes yet"}
+              {search.trim() ? "Không tìm thấy người dùng" : "Chưa có lượt bình chọn"}
             </div>
           ) : null}
 
           {filteredItems.map((item) => (
             <div key={item.userId} className={styles.row}>
-              <Link
-                href={toProfileHref(item)}
-                aria-label={`View ${item.username} profile`}
-              >
+              <Link href={toProfileHref(item)} aria-label={`Xem hồ sơ ${item.username}`}>
                 <img
                   className={styles.avatar}
                   src={item.avatarUrl || DEFAULT_AVATAR_URL}
@@ -293,9 +254,7 @@ export default function CommentLikesOverlay(props: Props) {
               </div>
               <button
                 type="button"
-                className={`${styles.followBtn} ${
-                  item.isFollowing ? "" : styles.followBtnPrimary
-                }`}
+                className={`${styles.followBtn} ${item.isFollowing ? "" : styles.followBtnPrimary}`}
                 onClick={() => toggleFollow(item)}
                 disabled={Boolean(viewerId && item.userId === viewerId)}
               >
@@ -307,10 +266,11 @@ export default function CommentLikesOverlay(props: Props) {
               </button>
             </div>
           ))}
-          <div ref={sentinelRef} />
+
           {state.loadingMore ? (
-            <div className={styles.loading}>Loading more…</div>
+            <div className={styles.loading}>Đang tải thêm…</div>
           ) : null}
+          <div ref={sentinelRef} className={styles.sentinel} />
         </div>
       </div>
     </div>,

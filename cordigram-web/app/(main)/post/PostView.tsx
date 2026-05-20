@@ -34,6 +34,7 @@ import {
   unfollowUser,
   unsavePost,
   updatePost,
+  updatePoll,
   updatePostVisibility,
   updatePostNotificationMute,
   pinComment,
@@ -69,6 +70,8 @@ import {
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 import { useGuestAuth } from "@/context/guest-auth-context";
 import CustomVideoPlayer, { VideoQuality } from "@/ui/custom-video-player/CustomVideoPlayer";
+import PollWidget from "@/ui/poll-widget/poll-widget";
+import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
 import { videoVolumeStore } from "@/hooks/use-video-volume";
 
 function upsertById(list: CommentItem[], incoming: CommentItem): CommentItem[] {
@@ -562,6 +565,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [lockedEditAllowDownloadLoading, setLockedEditAllowDownloadLoading] =
     useState(false);
   const [editHideLikeCount, setEditHideLikeCount] = useState(false);
+  const [editAllowMultiple, setEditAllowMultiple] = useState(false);
+  const [editPollOptions, setEditPollOptions] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
@@ -651,6 +656,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       ),
     );
     setEditHideLikeCount(Boolean(current?.hideLikeCount));
+    setEditAllowMultiple(Boolean((current as any)?.poll?.allowMultipleAnswers));
+    setEditPollOptions((current as any)?.poll?.options ?? []);
     setEditError("");
     setEditSuccess("");
     setVisibilityError("");
@@ -1109,6 +1116,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     const trimmedLocation = editLocation.trim();
 
     const isRepost = Boolean(post?.repostOf);
+    const isPollPost = Boolean((post as any)?.poll);
     const payload: any = {
       content: editCaption || "",
       hashtags: normalizedHashtags,
@@ -1118,17 +1126,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       hideLikeCount: editHideLikeCount,
     };
 
-    if (!isRepost) {
+    if (!isRepost && !isPollPost) {
       payload.allowDownload = editAllowDownload;
     }
 
     try {
       setEditSaving(true);
-      const updated = await updatePost({
-        token,
-        postId,
-        payload,
-      });
+      const pollId = (post as any)?.poll?.id;
+      const [updated] = await Promise.all([
+        updatePost({ token, postId, payload }),
+        pollId
+          ? updatePoll({ token, pollId, allowMultipleAnswers: editAllowMultiple, options: editPollOptions })
+          : Promise.resolve(null),
+      ]);
       setPost((prev) => (prev ? { ...prev, ...updated } : updated));
       setEditSuccess("Post updated");
       setEditOpen(false);
@@ -3288,6 +3298,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     }
   };
 
+  const [pollImageViewer, setPollImageViewer] = useState<string | null>(null);
+  const [pollMediaIndex, setPollMediaIndex] = useState(0);
+
   const media = post?.media ?? [];
   const currentMedia = media[mediaIndex];
   const currentMediaKey = currentMedia?.url || `media-${mediaIndex}`;
@@ -4993,6 +5006,43 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             ) : null}
           </div>
 
+          {(post as any)?.poll?.options?.length > 0 && (
+            <div className={feedStyles.editField}>
+              <div className={feedStyles.editLabelRow}>
+                <span className={feedStyles.editLabelText}>Lựa chọn bình chọn</span>
+              </div>
+              <div className={feedStyles.pollOptionsEditor}>
+                {((post as any).poll.options as string[]).map((_: string, idx: number) => {
+                  const imgUrl = ((post as any).poll.optionImages ?? [])[idx] ?? null;
+                  return (
+                    <div key={idx} className={feedStyles.pollOptionEditorRow}>
+                      {imgUrl && (
+                        <img
+                          src={imgUrl}
+                          alt=""
+                          className={feedStyles.pollOptionEditorThumb}
+                        />
+                      )}
+                      <input
+                        className={feedStyles.editInput}
+                        value={editPollOptions[idx] ?? ""}
+                        onChange={(e) =>
+                          setEditPollOptions((prev) => {
+                            const next = [...prev];
+                            next[idx] = e.target.value;
+                            return next;
+                          })
+                        }
+                        maxLength={100}
+                        placeholder={`Lựa chọn ${idx + 1}`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className={feedStyles.switchGroup}>
             <label className={feedStyles.switchRow}>
               <input
@@ -5008,32 +5058,46 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               </div>
             </label>
 
-            <label className={feedStyles.switchRow}>
-              <input
-                type="checkbox"
-                checked={
-                  post?.repostOf
-                    ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
-                    : editAllowDownload
-                }
-                disabled={Boolean(post?.repostOf)}
-                onChange={
-                  post?.repostOf
-                    ? undefined
-                    : () => setEditAllowDownload((prev) => !prev)
-                }
-              />
-              <div>
-                <p className={feedStyles.switchTitle}>Allow downloads</p>
-                <p className={feedStyles.switchHint}>
-                  {post?.repostOf
-                    ? lockedEditAllowDownloadLoading
-                      ? "Inherited from original post (loading…)"
-                      : "Inherited from the original post (can’t be changed)"
-                    : "Share the original file with people you trust"}
-                </p>
-              </div>
-            </label>
+            {(post as any)?.poll ? (
+              <label className={feedStyles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={editAllowMultiple}
+                  onChange={() => setEditAllowMultiple((p) => !p)}
+                />
+                <div>
+                  <p className={feedStyles.switchTitle}>Cho phép chọn nhiều</p>
+                  <p className={feedStyles.switchHint}>Người dùng có thể chọn nhiều lựa chọn cùng lúc</p>
+                </div>
+              </label>
+            ) : (
+              <label className={feedStyles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={
+                    post?.repostOf
+                      ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
+                      : editAllowDownload
+                  }
+                  disabled={Boolean(post?.repostOf)}
+                  onChange={
+                    post?.repostOf
+                      ? undefined
+                      : () => setEditAllowDownload((prev) => !prev)
+                  }
+                />
+                <div>
+                  <p className={feedStyles.switchTitle}>Allow downloads</p>
+                  <p className={feedStyles.switchHint}>
+                    {post?.repostOf
+                      ? lockedEditAllowDownloadLoading
+                        ? "Inherited from original post (loading…)"
+                        : "Inherited from the original post (can’t be changed)"
+                      : "Share the original file with people you trust"}
+                  </p>
+                </div>
+              </label>
+            )}
 
             <label className={feedStyles.switchRow}>
               <input
@@ -5496,23 +5560,25 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    className={styles.moreMenuItem}
-                    role="menuitem"
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      toggleSave();
-                    }}
-                  >
-                    {isSponsoredPostUi
-                      ? saved
-                        ? "Unsave this ads"
-                        : "Save this ads"
-                      : saved
-                        ? "Unsave this post"
-                        : "Save this post"}
-                  </button>
+                  {!post?.poll ? (
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        toggleSave();
+                      }}
+                    >
+                      {isSponsoredPostUi
+                        ? saved
+                          ? "Unsave this ads"
+                          : "Save this ads"
+                        : saved
+                          ? "Unsave this post"
+                          : "Save this post"}
+                    </button>
+                  ) : null}
                   {post?.authorId ? (
                     <button
                       type="button"
@@ -5637,9 +5703,70 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           <div className={styles.stateBox}>Loading post...</div>
         ) : postError ? (
           <div className={styles.stateBox}>{postError}</div>
-        ) : post ? (
-          <div className={styles.contentGrid}>
+        ) : post ? (() => {
+          const isPoll = Boolean(post.poll);
+          const pollImages: string[] = (post.poll?.optionImages ?? []).filter((u): u is string => Boolean(u));
+          const hasPollImages = pollImages.length > 0;
+          return (
+          <>
+          <div className={isPoll && !hasPollImages ? styles.contentGridPollOnly : styles.contentGrid}>
+            {!(isPoll && !hasPollImages) && (
             <div className={styles.mediaPane}>
+              {isPoll && hasPollImages ? (() => {
+                const clampedPollIdx = Math.min(pollMediaIndex, pollImages.length - 1);
+                // Map pollImages back to original option indices
+                const pollImageEntries: { imgUrl: string; label: string }[] = [];
+                (post.poll!.optionImages ?? []).forEach((u, i) => {
+                  if (u) pollImageEntries.push({ imgUrl: u, label: post.poll!.options[i] ?? "" });
+                });
+                const entry = pollImageEntries[clampedPollIdx];
+                return (
+                <div className={styles.mediaCarousel}>
+                  <img
+                    src={entry?.imgUrl}
+                    alt={entry?.label}
+                    className={styles.pollCarouselImg}
+                    onClick={() => entry?.imgUrl && setPollImageViewer(entry.imgUrl)}
+                    style={{ cursor: "zoom-in" }}
+                  />
+                  {entry?.label && (
+                    <div className={styles.pollCarouselLabel}>{entry.label}</div>
+                  )}
+                  {pollImages.length > 1 && (
+                    <>
+                      <button
+                        className={`${styles.mediaNavBtn} ${styles.mediaNavLeft}`}
+                        onClick={() => setPollMediaIndex((i) => (i - 1 + pollImages.length) % pollImages.length)}
+                        aria-label="Previous image"
+                      >
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+                          <path d="M14.791 5.207 8 12l6.793 6.793a1 1 0 1 1-1.415 1.414l-7.5-7.5a1 1 0 0 1 0-1.414l7.5-7.5a1 1 0 1 1 1.415 1.414z"></path>
+                        </svg>
+                      </button>
+                      <button
+                        className={`${styles.mediaNavBtn} ${styles.mediaNavRight}`}
+                        onClick={() => setPollMediaIndex((i) => (i + 1) % pollImages.length)}
+                        aria-label="Next image"
+                      >
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+                          <path d="M9.207 18.793 16 12 9.207 5.207a1 1 0 1 1 1.415-1.414l7.5 7.5a1 1 0 0 1 0 1.414l-7.5 7.5a1 1 0 0 1-1.415-1.414z"></path>
+                        </svg>
+                      </button>
+                      <div className={styles.mediaDots}>
+                        {pollImages.map((_, di) => (
+                          <button
+                            key={di}
+                            className={`${styles.mediaDot} ${di === clampedPollIdx ? styles.mediaDotActive : ""}`}
+                            onClick={() => setPollMediaIndex(di)}
+                            aria-label={`Image ${di + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                );
+              })() : (
               <div className={styles.mediaCarousel}>
                 {renderMedia()}
                 {isCurrentBlurredByModeration && !shouldRevealCurrentMedia ? (
@@ -5699,7 +5826,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   </>
                 ) : null}
               </div>
+              )}{/* end non-poll carousel */}
             </div>
+            )}{/* end mediaPane conditional */}
 
             <div className={styles.infoPane}>
               <div className={styles.infoScrollArea}>
@@ -5790,6 +5919,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       ) : null}
                     </div>
                   )}
+
+                  {post.poll ? (
+                    <div style={{ marginBottom: 8 }}>
+                      <PollWidget poll={post.poll} token={token} viewerId={viewer?.userId || viewer?.id} />
+                    </div>
+                  ) : null}
+
                   <div className={styles.statsRow}>
                     <div className={styles.statItem}>
                       <button
@@ -5867,42 +6003,44 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         {post.stats?.views ?? post.stats?.impressions ?? 0}
                       </span>
                     </span>
-                    <button
-                      type="button"
-                      className={`${styles.statItem} ${styles.statButton}`}
-                      aria-label="Repost"
-                      onClick={() => {
-                        if (!post) return;
-                        const canRepost = (post as any).canRepost !== false;
-                        if (!canRepost) return;
-                        setRepostTarget({
-                          postId: post.id,
-                          label: `@${post.authorUsername} · ${post.kind ?? "post"}`,
-                          kind: (post.kind as "post" | "reel") ?? "post",
-                          originalAllowDownload: Boolean(
-                            (post as any).allowDownload ?? (post as any).allowDownloads,
-                          ),
-                        });
-                      }}
-                    >
-                      <svg
-                        aria-hidden="true"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="var(--color-text-muted)"
-                        xmlns="http://www.w3.org/2000/svg"
+                    {!post.poll ? (
+                      <button
+                        type="button"
+                        className={`${styles.statItem} ${styles.statButton}`}
+                        aria-label="Repost"
+                        onClick={() => {
+                          if (!post) return;
+                          const canRepost = (post as any).canRepost !== false;
+                          if (!canRepost) return;
+                          setRepostTarget({
+                            postId: post.id,
+                            label: `@${post.authorUsername} · ${post.kind ?? "post"}`,
+                            kind: (post.kind as "post" | "reel") ?? "post",
+                            originalAllowDownload: Boolean(
+                              (post as any).allowDownload ?? (post as any).allowDownloads,
+                            ),
+                          });
+                        }}
                       >
-                        <path
-                          stroke="none"
-                          strokeWidth="1"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
-                        ></path>
-                      </svg>
-                      <span>{repostCount ?? (post.stats?.reposts ?? post.stats?.shares ?? 0)}</span>
-                    </button>
+                        <svg
+                          aria-hidden="true"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="var(--color-text-muted)"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            stroke="none"
+                            strokeWidth="1"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
+                          ></path>
+                        </svg>
+                        <span>{repostCount ?? (post.stats?.reposts ?? post.stats?.shares ?? 0)}</span>
+                      </button>
+                    ) : null}
                   </div>
 
                   <div className={styles.commentsSection}>
@@ -6452,7 +6590,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               )}
             </div>
           </div>
-        ) : (
+
+          {pollImageViewer && (
+            <ImageViewerOverlay
+              url={pollImageViewer}
+              mediaType="image"
+              onClose={() => setPollImageViewer(null)}
+            />
+          )}
+          </>
+        );
+        })() : (
           <div className={styles.stateBox}>Post not found</div>
         )}
       </div>
