@@ -1032,6 +1032,7 @@
       "bannerColorLabel": "横幅颜色",
       "changeBannerColorAria": "选择横幅颜色",
       "uploadBanner": "上传横幅图片",
+      "boostRequiredBanner": "主资料横幅需要 Boost。服务器资料不需要 Boost。",
       "removeBanner": "删除横幅图片",
       "bioLabel": "个人简介",
       "bioHint": "你可以使用 Markdown 和链接。",

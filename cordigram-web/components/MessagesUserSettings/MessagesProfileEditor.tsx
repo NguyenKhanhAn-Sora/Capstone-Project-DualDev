@@ -847,10 +847,10 @@ export default function MessagesProfileEditor({
               <button
                 type="button"
                 className={styles.btnPrimary}
-                disabled={!boostUnlocked}
+                disabled={tab !== "server" && !boostUnlocked}
                 onClick={() => {
-                  if (!boostUnlocked) {
-                    onToast?.("Cần Boost để upload banner.");
+                  if (tab !== "server" && !boostUnlocked) {
+                    onToast?.(t("chat.profileEditor.boostRequiredBanner"));
                     return;
                   }
                   setPickerMode("banner");

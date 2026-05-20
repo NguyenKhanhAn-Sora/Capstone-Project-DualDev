@@ -1032,6 +1032,7 @@
       "bannerColorLabel": "バナーカラー",
       "changeBannerColorAria": "バナーカラーを選択",
       "uploadBanner": "バナー画像をアップロード",
+      "boostRequiredBanner": "メインプロフィールのバナー画像にはBoostが必要です。サーバープロフィールには不要です。",
       "removeBanner": "バナー画像を削除",
       "bioLabel": "自己紹介",
       "bioHint": "マークダウンやリンクを使用できます。",

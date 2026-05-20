@@ -1045,6 +1045,7 @@
       "bannerColorLabel": "Banner Color",
       "changeBannerColorAria": "Pick banner color",
       "uploadBanner": "Upload banner image",
+      "boostRequiredBanner": "Boost is required to upload a banner image on your main profile. Server profiles do not require Boost.",
       "removeBanner": "Remove banner image",
       "bioLabel": "About me",
       "bioHint": "You can use markdown and links if you want.",

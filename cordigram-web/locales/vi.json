@@ -1045,6 +1045,7 @@
       "bannerColorLabel": "Màu Biểu Ngữ",
       "changeBannerColorAria": "Chọn màu biểu ngữ",
       "uploadBanner": "Tải ảnh biểu ngữ",
+      "boostRequiredBanner": "Cần Boost để tải ảnh biểu ngữ (hồ sơ chính). Hồ sơ máy chủ không cần Boost.",
       "removeBanner": "Xóa ảnh biểu ngữ",
       "bioLabel": "Tiểu sử",
       "bioHint": "Bạn có thể sử dụng các mã đánh dấu và đường liên kết nếu muốn.",

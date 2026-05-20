@@ -833,23 +833,6 @@ export class ServersController {
       (body?.coverUrl ?? null) === null
         ? null
         : String(body?.coverUrl ?? '').trim();
-    const isImageUrl = Boolean(next && /^https?:\/\//i.test(next));
-    if (isImageUrl) {
-      const messagesAccountBoost = Boolean(
-        req?.user?.settings?.accountBoost,
-      );
-      const server = await this.serversService.getServerById(serverId);
-      const boostedBy = Array.isArray((server as any)?.boostedByUserIds)
-        ? (server as any).boostedByUserIds
-        : [];
-      const serverBoost = boostedBy.some(
-        (x: any) => String(x) === String(req.user.userId),
-      );
-      const unlocked = messagesAccountBoost || serverBoost;
-      if (!unlocked) {
-        throw new ForbiddenException('Boost required for banner image');
-      }
-    }
     await this.serversService.updateMyServerProfile(serverId, req.user.userId, {
       coverUrl: body?.coverUrl ?? null,
       profileThemePrimaryHex: body?.profileThemePrimaryHex ?? null,
