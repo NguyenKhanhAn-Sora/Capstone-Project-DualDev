@@ -63,7 +63,8 @@ class ApiService {
 
       switch (defaultTargetPlatform) {
         case TargetPlatform.android:
-          final info = await _deviceInfoPlugin.androidInfo;
+          final info = await _deviceInfoPlugin.androidInfo
+              .timeout(const Duration(seconds: 3));
           final brand = info.brand.trim();
           final model = info.model.trim();
           final parts = <String>[
@@ -75,7 +76,8 @@ class ApiService {
           }
           break;
         case TargetPlatform.iOS:
-          final info = await _deviceInfoPlugin.iosInfo;
+          final info = await _deviceInfoPlugin.iosInfo
+              .timeout(const Duration(seconds: 3));
           final model = info.model.trim();
           final name = info.name.trim();
           final parts = <String>[

@@ -102,11 +102,13 @@
             android:screenOrientation="portrait"
             android:theme="@style/Ucrop.CropTheme" />
 
-        <!-- flutter_web_auth_2: intercepts cordigram:// deep-link from OAuth callback -->
+        <!-- Intercepts cordigram:// OAuth callback, forwards to MainActivity via onNewIntent
+             so flutter_web_auth_2 resolves the authenticate() Future and Chrome closes. -->
         <activity
-            android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
-            android:exported="true">
-            <intent-filter android:label="flutter_web_auth_2">
+            android:name=".OAuthCallbackActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter android:label="cordigram_oauth">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
