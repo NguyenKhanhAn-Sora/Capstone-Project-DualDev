@@ -27,6 +27,7 @@ import {
 } from '../explore/impression-event.schema';
 import { ActivityModule } from '../activity/activity.module';
 import { PostSchedulerService } from './post-scheduler.service';
+import { CaptionsModule } from '../captions/captions.module';
 import { User, UserSchema } from '../users/user.schema';
 import { MediaModerationService } from './media-moderation.service';
 import {
@@ -52,6 +53,7 @@ import { Poll, PollSchema } from '../polls/poll.schema';
     UsersModule,
     NotificationsModule,
     ActivityModule,
+    CaptionsModule,
     MongooseModule.forFeature([
       { name: Post.name, schema: PostSchema },
       { name: PostInteraction.name, schema: PostInteractionSchema },

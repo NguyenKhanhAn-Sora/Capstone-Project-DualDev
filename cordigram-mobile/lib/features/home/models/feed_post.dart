@@ -26,6 +26,8 @@ class FeedMedia {
     this.originalSecureUrl,
     this.moderationDecision,
     this.metadata,
+    this.captionUrl,
+    this.captionLanguage,
   });
 
   final String type; // "image" | "video"
@@ -34,6 +36,8 @@ class FeedMedia {
   final String? originalSecureUrl;
   final String? moderationDecision;
   final Map<String, dynamic>? metadata;
+  final String? captionUrl;
+  final String? captionLanguage;
 
   List<VideoQuality>? get qualities {
     final raw = metadata?['qualities'];
@@ -108,6 +112,9 @@ class FeedMedia {
     final originalSecure = originalSecureRaw?.trim();
     final original = originalRaw?.trim();
 
+    final captionUrlRaw = (json['captionUrl'] as String?)?.trim();
+    final captionLangRaw = (json['captionLanguage'] as String?)?.trim();
+
     return FeedMedia(
       type: (json['type'] as String?) ?? 'image',
       url: url,
@@ -117,6 +124,8 @@ class FeedMedia {
       originalUrl: (original != null && original.isNotEmpty) ? original : null,
       moderationDecision: decisionRaw?.trim(),
       metadata: metadata,
+      captionUrl: (captionUrlRaw != null && captionUrlRaw.isNotEmpty) ? captionUrlRaw : null,
+      captionLanguage: (captionLangRaw != null && captionLangRaw.isNotEmpty) ? captionLangRaw : null,
     );
   }
 }

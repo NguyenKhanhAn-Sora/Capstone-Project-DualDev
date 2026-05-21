@@ -349,6 +349,9 @@ export type CreatePostResponse = {
     type: "image" | "video";
     url: string;
     metadata?: Record<string, unknown> | null;
+    captionUrl?: string | null;
+    captionLanguage?: string | null;
+    captionStatus?: "pending" | "done" | "failed" | null;
   }>;
   hashtags: string[];
   mentions: string[];
@@ -445,6 +448,9 @@ export type FeedItem = CreatePostResponse & {
     type: "image" | "video";
     url: string;
     metadata?: Record<string, unknown> | null;
+    captionUrl?: string | null;
+    captionLanguage?: string | null;
+    captionStatus?: "pending" | "done" | "failed" | null;
   }> | null;
   spamScore?: number;
   qualityScore?: number;

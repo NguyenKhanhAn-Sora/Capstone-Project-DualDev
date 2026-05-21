@@ -51,6 +51,7 @@ import { useLanguage } from "@/component/language-provider";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 import { useTranslations } from "next-intl";
 import PollWidget from "@/ui/poll-widget/poll-widget";
+import CustomVideoPlayer, { VideoQuality } from "@/ui/custom-video-player/CustomVideoPlayer";
 
 const REPORT_ANIMATION_MS = 200;
 const QUOTE_CHAR_LIMIT = 500;
@@ -1966,15 +1967,17 @@ function HashtagPostCard({
       {current ? (
         <div className={feedStyles.mediaCarousel}>
           {current.type === "video" ? (
-            <video
-              className={feedStyles.mediaVisual}
+            <CustomVideoPlayer
+              key={`${item.id}-${mediaIndex}`}
               src={current.url}
-              muted
+              className={feedStyles.mediaVisual}
+              allowDownload={false}
+              qualities={(current.metadata?.qualities as VideoQuality[] | undefined) ?? null}
+              expectedDuration={(current.metadata?.duration as number | undefined) ?? null}
+              autoPlayOnIntersect
               playsInline
-              controls
-              controlsList="nodownload noremoteplayback"
-              onContextMenu={(e) => e.preventDefault()}
-              onClick={() => router.push(`/post/${item.id}`)}
+              captionUrl={current.captionUrl ?? null}
+              captionLang={current.captionLanguage ?? null}
             />
           ) : (
             <img

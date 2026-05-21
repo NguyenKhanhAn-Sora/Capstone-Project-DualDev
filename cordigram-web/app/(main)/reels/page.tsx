@@ -425,6 +425,13 @@ const IconArrow = ({ up }: { up?: boolean }) => (
   </svg>
 );
 
+const IconCc = ({ active }: { active: boolean }) => (
+  <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill={active ? "#4f8ef7" : "currentColor"}>
+    <rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke={active ? "#4f8ef7" : "currentColor"} strokeWidth="1.8" />
+    <text x="5" y="16" fontSize="8" fontWeight="700" fontFamily="Arial,sans-serif" fill={active ? "#4f8ef7" : "currentColor"} stroke="none">CC</text>
+  </svg>
+);
+
 function ReelVideo({
   item,
   autoplay,
@@ -444,7 +451,10 @@ function ReelVideo({
   const [duration, setDuration] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
+  const [showSubtitles, setShowSubtitles] = useState(false);
   const captionRef = useRef<HTMLDivElement | null>(null);
+  const reelCaptionUrl = item.media?.[0]?.captionUrl ?? null;
+  const reelCaptionLang = item.media?.[0]?.captionLanguage ?? null;
   const authorOwnerId = item.authorId || item.author?.id;
   const isSelf = Boolean(viewerId && authorOwnerId === viewerId);
   const isFollowing = Boolean(
@@ -473,7 +483,21 @@ function ReelVideo({
   useEffect(() => {
     setExpanded(false);
     setCanExpand(false);
+    setShowSubtitles(false);
   }, [item.id]);
+
+  // Sync subtitle track mode with showSubtitles state
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !reelCaptionUrl) return;
+    const sync = () => {
+      const track = video.textTracks?.[0];
+      if (track) track.mode = showSubtitles ? "showing" : "hidden";
+    };
+    sync();
+    const t = setTimeout(sync, 100);
+    return () => clearTimeout(t);
+  }, [showSubtitles, reelCaptionUrl, item.id]);
 
   useEffect(() => {
     const el = captionRef.current;
@@ -744,7 +768,28 @@ function ReelVideo({
         preload="metadata"
         muted={muted}
         controls={false}
-      />
+        crossOrigin="anonymous"
+      >
+        {reelCaptionUrl && (
+          <track
+            kind="subtitles"
+            src={reelCaptionUrl}
+            srcLang={reelCaptionLang ?? "und"}
+            label="Auto"
+          />
+        )}
+      </video>
+      {reelCaptionUrl && (
+        <button
+          className={`${styles.volumeBtn} ${showSubtitles ? styles.ccActive : ""}`}
+          style={{ bottom: "calc(var(--reel-vol-bottom, 56px) + 52px)" }}
+          onClick={(e) => { e.stopPropagation(); setShowSubtitles((p) => !p); }}
+          aria-label={showSubtitles ? "Hide subtitles" : "Show subtitles"}
+          aria-pressed={showSubtitles}
+        >
+          <IconCc active={showSubtitles} />
+        </button>
+      )}
       <button
         className={styles.volumeBtn}
         onClick={toggleMute}

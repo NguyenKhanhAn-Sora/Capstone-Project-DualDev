@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import '../models/feed_post.dart';
 import '../../../core/services/language_controller.dart';
 import '../../../core/services/video_volume_store.dart';
+import 'vtt_utils.dart';
 
 bool _isVideoMediaType(String type) {
   final normalized = type.trim().toLowerCase();
@@ -604,6 +605,8 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                                   onDownload: widget.allowDownload
                                       ? () => widget.onDownloadRequested(item)
                                       : null,
+                                  captionUrl: item.captionUrl,
+                                  captionLanguage: item.captionLanguage,
                                 )
                               : _ZoomableImage(
                                   url: mediaUrl,
@@ -910,6 +913,8 @@ class _MediaItem extends StatelessWidget {
         expectedDuration: expectedDuration,
         onDownload: onDownload,
         onFullscreen: onFullscreen,
+        captionUrl: media.captionUrl,
+        captionLanguage: media.captionLanguage,
       );
     }
 
@@ -969,6 +974,8 @@ class _InlineVideoPreview extends StatefulWidget {
     this.expectedDuration,
     this.onDownload,
     this.onFullscreen,
+    this.captionUrl,
+    this.captionLanguage,
   });
 
   final String url;
@@ -979,6 +986,8 @@ class _InlineVideoPreview extends StatefulWidget {
   final double? expectedDuration;
   final VoidCallback? onDownload;
   final VoidCallback? onFullscreen;
+  final String? captionUrl;
+  final String? captionLanguage;
 
   @override
   State<_InlineVideoPreview> createState() => _InlineVideoPreviewState();
@@ -1007,11 +1016,34 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   // Speed
   double _speed = 1.0;
 
+  // Captions (CC)
+  List<VttCue> _cues = [];
+  bool _captionsLoaded = false;
+  bool _showCaptions = false;
+
+  VttCue? get _activeCue {
+    final pos = _controller?.value.position;
+    if (pos == null || !_showCaptions) return null;
+    return activeCue(_cues, pos);
+  }
+
+  Future<void> _loadCaptions() async {
+    final url = widget.captionUrl;
+    if (url == null || url.isEmpty) return;
+    final cues = await fetchAndParseVtt(url);
+    if (!mounted) return;
+    setState(() {
+      _cues = cues;
+      _captionsLoaded = true;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _volumeUnsub = VideoVolumeStore.instance.subscribe(_onVolumeChanged);
     _initController(widget.url);
+    _loadCaptions();
   }
 
   void _onVolumeChanged() {
@@ -1450,6 +1482,37 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
             ),
           ),
 
+          // Caption overlay (above controls)
+          if (_showCaptions)
+            Positioned(
+              left: 8, right: 8, bottom: 52,
+              child: IgnorePointer(
+                child: Builder(
+                  builder: (_) {
+                    final cue = _activeCue;
+                    if (cue == null) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.72),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        cue.text,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          height: 1.4,
+                          shadows: [Shadow(blurRadius: 2, color: Colors.black)],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
           // Bottom controls — Positioned must be a direct child of Stack
           Positioned(
             left: 0, right: 0, bottom: 0,
@@ -1511,6 +1574,25 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
                                   : '${_speed}x',
                               onTap: _showSpeedSheet,
                             ),
+
+                            // CC button (only when caption is available)
+                            if (_captionsLoaded && _cues.isNotEmpty)
+                              GestureDetector(
+                                onTap: () => setState(() => _showCaptions = !_showCaptions),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Text(
+                                    'CC',
+                                    style: TextStyle(
+                                      color: _showCaptions
+                                          ? const Color(0xFF4F8EF7)
+                                          : Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
 
                             // Download
                             if (widget.allowDownload && widget.onDownload != null)
@@ -1577,6 +1659,8 @@ class _OverlayVideoPlayer extends StatefulWidget {
     this.qualities,
     this.expectedDuration,
     this.onDownload,
+    this.captionUrl,
+    this.captionLanguage,
   });
   final String url;
   final String playbackKey;
@@ -1584,6 +1668,8 @@ class _OverlayVideoPlayer extends StatefulWidget {
   final List<VideoQuality>? qualities;
   final double? expectedDuration;
   final VoidCallback? onDownload;
+  final String? captionUrl;
+  final String? captionLanguage;
 
   @override
   State<_OverlayVideoPlayer> createState() => _OverlayVideoPlayerState();
@@ -1606,11 +1692,31 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
   void Function()? _volumeUnsub;
   double _speed = 1.0;
 
+  // Captions (CC)
+  List<VttCue> _cues = [];
+  bool _captionsLoaded = false;
+  bool _showCaptions = false;
+
+  VttCue? get _activeCue {
+    final pos = _controller?.value.position;
+    if (pos == null || !_showCaptions) return null;
+    return activeCue(_cues, pos);
+  }
+
+  Future<void> _loadCaptions() async {
+    final url = widget.captionUrl;
+    if (url == null || url.isEmpty) return;
+    final cues = await fetchAndParseVtt(url);
+    if (!mounted) return;
+    setState(() { _cues = cues; _captionsLoaded = true; });
+  }
+
   @override
   void initState() {
     super.initState();
     _volumeUnsub = VideoVolumeStore.instance.subscribe(_onVolumeChanged);
     _initController(widget.url);
+    _loadCaptions();
   }
 
   void _onVolumeChanged() {
@@ -1975,6 +2081,37 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
               ),
             ),
 
+          // Caption overlay
+          if (_showCaptions)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.of(context).padding.bottom + 80,
+              child: IgnorePointer(
+                child: Builder(builder: (_) {
+                  final cue = _activeCue;
+                  if (cue == null) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      cue.text,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        height: 1.4,
+                        shadows: [Shadow(blurRadius: 2, color: Colors.black)],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+
           // Controls overlay
           AnimatedOpacity(
             opacity: _showControls ? 1.0 : 0.0,
@@ -2076,6 +2213,22 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
                                         : '${_speed}x',
                                     onTap: _showSpeedSheet,
                                   ),
+                                  // CC button
+                                  if (_captionsLoaded && _cues.isNotEmpty)
+                                    GestureDetector(
+                                      onTap: () => setState(() => _showCaptions = !_showCaptions),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        child: Text(
+                                          'CC',
+                                          style: TextStyle(
+                                            color: _showCaptions ? const Color(0xFF4F8EF7) : Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   if (widget.allowDownload &&
                                       widget.onDownload != null)
                                     _IconBtn(

@@ -16,6 +16,18 @@ export class Media {
 
   @Prop({ type: SchemaTypes.Mixed, default: null })
   metadata?: Record<string, unknown> | null;
+
+  /** Cloudinary URL of the generated WebVTT caption file (null = not yet generated) */
+  @Prop({ type: String, default: null })
+  captionUrl?: string | null;
+
+  /** BCP-47 language code detected by Whisper (e.g. 'vi', 'en', 'ja') */
+  @Prop({ type: String, default: null })
+  captionLanguage?: string | null;
+
+  /** Caption generation pipeline state */
+  @Prop({ type: String, enum: ['pending', 'done', 'failed', null], default: null })
+  captionStatus?: 'pending' | 'done' | 'failed' | null;
 }
 
 const MediaSchema = SchemaFactory.createForClass(Media);

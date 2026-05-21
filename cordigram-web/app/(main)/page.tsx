@@ -4508,6 +4508,8 @@ function FeedCard({
                       autoPlayOnIntersect
                       playsInline
                       onPlay={() => onView(id, 1000)}
+                      captionUrl={current.captionUrl ?? null}
+                      captionLang={current.captionLanguage ?? null}
                     />
                   );
                 }
@@ -4597,6 +4599,8 @@ function FeedCard({
                   autoPlayOnIntersect
                   playsInline
                   onPlay={() => onView(id, 1000)}
+                  captionUrl={current.captionUrl ?? null}
+                  captionLang={current.captionLanguage ?? null}
                 />
               );
             }

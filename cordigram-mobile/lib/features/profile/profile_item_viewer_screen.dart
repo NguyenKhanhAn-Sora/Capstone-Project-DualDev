@@ -22,6 +22,7 @@ import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart' show ReelCommentSheet;
+import '../home/widgets/vtt_utils.dart';
 import '../report/report_post_sheet.dart';
 
 Map<String, dynamic>? _asStringKeyMap(dynamic raw) {
@@ -899,6 +900,33 @@ class _ItemPageState extends State<_ItemPage> {
   bool _following = false;
   final Map<String, bool> _revealedMediaKeys = {};
 
+  // Captions (CC)
+  List<VttCue> _cues = [];
+  bool _captionsLoaded = false;
+  bool _showCaptions = false;
+
+  String? get _captionUrl {
+    final media = widget.item['media'] as List?;
+    if (media == null || media.isEmpty) return null;
+    final first = media[0] as Map?;
+    final raw = first?['captionUrl'] as String?;
+    return (raw != null && raw.isNotEmpty) ? raw : null;
+  }
+
+  VttCue? get _activeCue {
+    final pos = widget.controller?.value.position;
+    if (pos == null || !_showCaptions) return null;
+    return activeCue(_cues, pos);
+  }
+
+  Future<void> _loadCaptions() async {
+    final url = _captionUrl;
+    if (url == null) return;
+    final cues = await fetchAndParseVtt(url);
+    if (!mounted) return;
+    setState(() { _cues = cues; _captionsLoaded = true; });
+  }
+
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -924,6 +952,7 @@ class _ItemPageState extends State<_ItemPage> {
     _mediaPageController = PageController();
     widget.controller?.addListener(_onControllerUpdate);
     _bootstrapReelState();
+    _loadCaptions();
   }
 
   @override
@@ -1995,6 +2024,24 @@ class _ItemPageState extends State<_ItemPage> {
                         ctrl?.setVolume(_muted ? 0.0 : 1.0);
                       },
                     ),
+                    if (_captionsLoaded && _cues.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => setState(() => _showCaptions = !_showCaptions),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                          child: Text(
+                            'CC',
+                            style: TextStyle(
+                              color: _showCaptions ? const Color(0xFF4F8EF7) : Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              shadows: const [Shadow(blurRadius: 2, color: Colors.black)],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 6),
                   ],
                 ),
@@ -2004,14 +2051,78 @@ class _ItemPageState extends State<_ItemPage> {
             Positioned(
               top: MediaQuery.of(context).padding.top + 12,
               left: 12,
-              child: _VolumeControl(
-                muted: _muted,
-                onToggle: () {
-                  setState(() => _muted = !_muted);
-                  ctrl?.setVolume(_muted ? 0.0 : 1.0);
-                },
+              child: Row(
+                children: [
+                  _VolumeControl(
+                    muted: _muted,
+                    onToggle: () {
+                      setState(() => _muted = !_muted);
+                      ctrl?.setVolume(_muted ? 0.0 : 1.0);
+                    },
+                  ),
+                  if (_captionsLoaded && _cues.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => setState(() => _showCaptions = !_showCaptions),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _showCaptions
+                              ? const Color(0xFF4F8EF7).withValues(alpha: 0.25)
+                              : Colors.black.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: _showCaptions
+                                ? const Color(0xFF4F8EF7)
+                                : Colors.white.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          'CC',
+                          style: TextStyle(
+                            color: _showCaptions ? const Color(0xFF4F8EF7) : Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
+
+          // ── Caption overlay ───────────────────────────────────────────────
+          if (_showCaptions)
+            Positioned(
+              left: 16,
+              right: 96,
+              bottom: 120 + MediaQuery.of(context).viewPadding.bottom,
+              child: IgnorePointer(
+                child: Builder(builder: (_) {
+                  final cue = _activeCue;
+                  if (cue == null) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      cue.text,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        height: 1.4,
+                        shadows: [Shadow(blurRadius: 2, color: Colors.black)],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+
           Positioned(
             bottom: 28 + MediaQuery.of(context).viewPadding.bottom,
             left: 16,

@@ -31,6 +31,7 @@ import '../post/utils/repost_flow_utils.dart';
 import '../report/report_comment_sheet.dart';
 import '../report/report_post_sheet.dart';
 import '../../core/services/language_controller.dart';
+import '../home/widgets/vtt_utils.dart';
 
 // ── Reels screen ──────────────────────────────────────────────────────────────
 
@@ -1050,11 +1051,40 @@ class _ReelPageState extends State<_ReelPage> {
   bool _showPauseIcon = false;
   Timer? _pauseIconTimer;
 
+  // Captions (CC)
+  List<VttCue> _cues = [];
+  bool _captionsLoaded = false;
+  bool _showCaptions = false;
+
+  String? get _captionUrl => widget.state.post.media.isNotEmpty
+      ? widget.state.post.media[0].captionUrl
+      : null;
+
+  VttCue? get _activeCue {
+    final pos = widget.controller?.value.position;
+    if (pos == null || !_showCaptions) return null;
+    return activeCue(_cues, pos);
+  }
+
+  Future<void> _loadCaptions() async {
+    final url = _captionUrl;
+    if (url == null || url.isEmpty) return;
+    final cues = await fetchAndParseVtt(url);
+    if (!mounted) return;
+    setState(() { _cues = cues; _captionsLoaded = true; });
+  }
+
   void _openUserProfile(String userId) {
     if (userId.isEmpty) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: userId)),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCaptions();
   }
 
   @override
@@ -1658,15 +1688,78 @@ class _ReelPageState extends State<_ReelPage> {
             ),
           ),
 
-          // ── Volume control (top-left) ─────────────────────────────────────
+          // ── Volume + CC controls (top-left) ──────────────────────────────
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             left: 12,
-            child: _VolumeControl(
-              muted: widget.muted,
-              onToggle: widget.onMuteToggle,
+            child: Row(
+              children: [
+                _VolumeControl(
+                  muted: widget.muted,
+                  onToggle: widget.onMuteToggle,
+                ),
+                if (_captionsLoaded && _cues.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _showCaptions = !_showCaptions),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _showCaptions
+                            ? const Color(0xFF4F8EF7).withValues(alpha: 0.25)
+                            : Colors.black.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: _showCaptions
+                              ? const Color(0xFF4F8EF7)
+                              : Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        'CC',
+                        style: TextStyle(
+                          color: _showCaptions ? const Color(0xFF4F8EF7) : Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
+
+          // ── Caption overlay (above progress bar) ─────────────────────────
+          if (_showCaptions)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 18,
+              child: IgnorePointer(
+                child: Builder(builder: (_) {
+                  final cue = _activeCue;
+                  if (cue == null) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      cue.text,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        height: 1.4,
+                        shadows: [Shadow(blurRadius: 2, color: Colors.black)],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
 
           // ── Video progress bar (bottom edge) ────────────────────────────────
           if (ctrl != null)

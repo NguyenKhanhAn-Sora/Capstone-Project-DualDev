@@ -549,6 +549,14 @@
   transform: translateY(0);
 }
 
+.ccActive {
+  color: #4f8ef7 !important;
+  background: rgba(79, 142, 247, 0.18) !important;
+  border-color: rgba(79, 142, 247, 0.35) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
 .volumeBtn input[type="range"] {
   -webkit-appearance: none;
   appearance: none;

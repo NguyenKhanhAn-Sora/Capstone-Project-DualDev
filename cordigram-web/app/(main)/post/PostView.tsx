@@ -3602,6 +3602,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           qualities={currentMediaQualities}
           expectedDuration={currentMediaExpectedDuration}
           playsInline
+          captionUrl={currentMedia.captionUrl ?? null}
+          captionLang={currentMedia.captionLanguage ?? null}
         />
       );
     }

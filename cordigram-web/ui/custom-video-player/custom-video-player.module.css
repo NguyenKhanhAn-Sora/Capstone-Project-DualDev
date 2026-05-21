@@ -146,6 +146,17 @@
   transform: scale(0.96);
 }
 
+/* CC button active state (captions visible) */
+.ccActive {
+  color: #4f8ef7;
+  background: rgba(79, 142, 247, 0.15);
+  border-radius: 6px;
+}
+
+.ccActive:hover {
+  background: rgba(79, 142, 247, 0.25);
+}
+
 /* ─── Time display ───────────────────────────────────────────────────────── */
 
 .timeDisplay {

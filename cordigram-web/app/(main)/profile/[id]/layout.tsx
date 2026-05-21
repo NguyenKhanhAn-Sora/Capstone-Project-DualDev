@@ -977,6 +977,28 @@ export default function ProfileLayout({
     setAvatarConfirmOpen(false);
   };
 
+  const syncAvatarToRecentAccounts = (newAvatarUrl: string) => {
+    if (typeof window === "undefined" || !profile?.username) return;
+    try {
+      const raw = window.localStorage.getItem("recentAccounts");
+      if (!raw) return;
+      const accounts = JSON.parse(raw) as Array<{
+        email: string;
+        username?: string;
+        displayName?: string;
+        avatarUrl?: string;
+        lastUsed?: number;
+      }>;
+      if (!Array.isArray(accounts)) return;
+      const updated = accounts.map((a) =>
+        a.username === profile.username ? { ...a, avatarUrl: newAvatarUrl } : a,
+      );
+      window.localStorage.setItem("recentAccounts", JSON.stringify(updated));
+    } catch (_err) {
+      // ignore
+    }
+  };
+
   const handleAvatarUploadSelect = () => {
     setAvatarMenuOpen(false);
     avatarInputRef.current?.click();
@@ -1036,6 +1058,7 @@ export default function ProfileLayout({
             }
           : prev,
       );
+      syncAvatarToRecentAccounts(res.avatarUrl);
       emitCurrentProfileUpdated();
       showToast(t("profilePage.avatarUpdated"));
       closeAvatarCrop();
@@ -1061,15 +1084,17 @@ export default function ProfileLayout({
     setAvatarError("");
     try {
       const res = await resetProfileAvatar({ token });
+      const newAvatarUrl = res.avatarUrl || DEFAULT_AVATAR_URL;
       setProfile((prev) =>
         prev
           ? {
               ...prev,
-              avatarUrl: res.avatarUrl || DEFAULT_AVATAR_URL,
+              avatarUrl: newAvatarUrl,
               avatarOriginalUrl: res.avatarOriginalUrl,
             }
           : prev,
       );
+      syncAvatarToRecentAccounts(newAvatarUrl);
       emitCurrentProfileUpdated();
       showToast(t("profilePage.avatarRemoved"));
       closeAvatarConfirm();

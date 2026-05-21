@@ -211,6 +211,28 @@ class AuthStorage {
     return limited;
   }
 
+  static Future<void> syncAvatarByUsername(
+    String username,
+    String newAvatarUrl,
+  ) async {
+    if (username.isEmpty) return;
+    final current = await loadRecentAccounts();
+    final updated = current
+        .map(
+          (e) => e.username == username
+              ? RecentAccountEntry(
+                  email: e.email,
+                  username: e.username,
+                  displayName: e.displayName,
+                  avatarUrl: newAvatarUrl,
+                  lastUsed: e.lastUsed,
+                )
+              : e,
+        )
+        .toList(growable: false);
+    await _saveRecentAccounts(updated);
+  }
+
   static Future<void> _saveRecentAccounts(
     List<RecentAccountEntry> items,
   ) async {

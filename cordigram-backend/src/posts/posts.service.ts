@@ -29,6 +29,7 @@ import { PostImpressionEvent } from '../explore/impression-event.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ActivityLogService } from '../activity/activity.service';
 import { PostSchedulerService } from './post-scheduler.service';
+import { CaptionQueueService } from '../captions/caption-queue.service';
 import { User } from '../users/user.schema';
 import {
   MediaModerationService,
@@ -149,6 +150,7 @@ export class PostsService {
     private readonly postScheduler: PostSchedulerService,
     private readonly mediaModerationService: MediaModerationService,
     private readonly usersService: UsersService,
+    private readonly captionQueue: CaptionQueueService,
   ) {}
 
   private normalizeSponsoredAuthorReputation(params: {
@@ -431,6 +433,13 @@ export class PostsService {
       );
     }
 
+    // Enqueue caption generation for each video media item (fire-and-forget)
+    doc.media.forEach((item, idx) => {
+      if (item.type === 'video' && item.url) {
+        void this.captionQueue.enqueue(doc._id.toString(), idx);
+      }
+    });
+
     await this.upsertHashtags(normalizedHashtags);
 
     await this.notifyMentionedUsers({
@@ -680,6 +689,13 @@ export class PostsService {
         scheduledAt,
       );
     }
+
+    // Enqueue caption generation for each video media item (fire-and-forget)
+    doc.media.forEach((item, idx) => {
+      if (item.type === 'video' && item.url) {
+        void this.captionQueue.enqueue(doc._id.toString(), idx);
+      }
+    });
 
     await this.upsertHashtags(normalizedHashtags);
 

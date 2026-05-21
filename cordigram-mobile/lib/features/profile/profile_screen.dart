@@ -744,6 +744,34 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     }
 
+    // Video posts (kind != 'reel') in non-reel tabs open PostDetailScreen so
+    // the user sees the post context UI, not the full-screen reel viewer.
+    if (key != 'reels') {
+      final kind =
+          (item['repostKind'] as String?) ?? (item['kind'] as String?) ?? '';
+      final media =
+          (item['media'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          [];
+      final hasVideoMedia =
+          media.isNotEmpty && media.first['type'] == 'video';
+      if (hasVideoMedia && kind != 'reel') {
+        final postId = (item['id'] as String?) ?? '';
+        if (postId.isNotEmpty) {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PostDetailScreen(
+                postId: postId,
+                viewerId: _viewerId,
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+
     // Only the dedicated Reels tab should open vertical reel-only navigation.
     if (key == 'reels') {
       final kind =
@@ -2138,6 +2166,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           avatarOriginalUrl: newOriginalUrl,
         );
       });
+      final username = _profile?.username ?? '';
+      if (username.isNotEmpty && newUrl.isNotEmpty) {
+        AuthStorage.syncAvatarByUsername(username, newUrl);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _avatarLoading = false);
@@ -2196,6 +2228,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           avatarOriginalUrl: newOriginalUrl,
         );
       });
+      final username = _profile?.username ?? '';
+      if (username.isNotEmpty) {
+        AuthStorage.syncAvatarByUsername(username, newUrl);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _avatarLoading = false);
