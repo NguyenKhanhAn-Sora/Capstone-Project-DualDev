@@ -2698,5 +2698,38 @@
         "cancel": "キャンセル"
       }
     }
+  },
+  "postEditOverlay": {
+    "title": "投稿を編集",
+    "close": "閉じる",
+    "captionLabel": "キャプション",
+    "captionPlaceholder": "何か書いてください...",
+    "addEmoji": "絵文字を追加",
+    "emojiIcon": "絵文字アイコン",
+    "searching": "検索中...",
+    "noMentionMatches": "一致なし",
+    "signInToMention": "ユーザーをメンションするにはサインインしてください",
+    "userNotFound": "ユーザーが見つかりません",
+    "removeHashtag": "{tag} を削除",
+    "hashtagsLabel": "ハッシュタグ",
+    "hashtagPlaceholder": "ハッシュタグを追加",
+    "locationLabel": "場所",
+    "locationPlaceholder": "場所を追加",
+    "noLocationSuggestions": "候補なし",
+    "noLocationFound": "候補が見つかりません。別のキーワードを試してください。",
+    "allowComments": "コメントを許可",
+    "allowCommentsDesc": "全員からのフィードバックを受け取る",
+    "allowDownloads": "ダウンロードを許可",
+    "allowDownloadsDesc": "信頼する人に元のファイルを共有",
+    "allowDownloadsInheritedLoading": "元の投稿から継承（読み込み中…）",
+    "allowDownloadsInherited": "元の投稿から継承（変更不可）",
+    "hideLike": "いいねを非表示",
+    "hideLikeDesc": "視聴者はこの投稿のいいね数を見られません",
+    "cancel": "キャンセル",
+    "saving": "保存中...",
+    "saveChanges": "変更を保存",
+    "postUpdated": "投稿が更新されました",
+    "signInRequired": "投稿を編集するにはサインインしてください",
+    "updateFailed": "投稿の更新に失敗しました"
   }
 }

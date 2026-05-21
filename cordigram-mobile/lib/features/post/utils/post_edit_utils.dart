@@ -7,6 +7,7 @@ import '../../../core/config/app_theme.dart';
 
 import '../../home/models/feed_post.dart';
 import '../../home/services/post_interaction_service.dart';
+import '../../messages/services/polls_api_service.dart';
 
 enum PostVisibilityOption { public, followers, private }
 
@@ -96,6 +97,11 @@ class _EditPostSheetState extends State<_EditPostSheet> {
   late bool _allowComments;
   late bool _allowDownload;
   late bool _hideLikeCount;
+  late bool _allowMultipleAnswers;
+
+  // Poll option label controllers (only for poll posts)
+  List<TextEditingController> _optionCtrls = [];
+
   List<_LocationSuggestion> _locationSuggestions = [];
   bool _locationLoading = false;
   bool _locationOpen = false;
@@ -103,6 +109,8 @@ class _EditPostSheetState extends State<_EditPostSheet> {
 
   bool _saving = false;
   String? _error;
+
+  bool get _isPoll => widget.post.pollId != null && widget.post.pollId!.isNotEmpty;
 
   @override
   void initState() {
@@ -115,6 +123,12 @@ class _EditPostSheetState extends State<_EditPostSheet> {
     _allowComments = widget.post.allowComments != false;
     _allowDownload = widget.post.allowDownload == true;
     _hideLikeCount = widget.post.hideLikeCount == true;
+    _allowMultipleAnswers = widget.post.poll?.allowMultipleAnswers ?? false;
+
+    if (_isPoll) {
+      final options = widget.post.poll?.options ?? [];
+      _optionCtrls = options.map((o) => TextEditingController(text: o)).toList();
+    }
   }
 
   @override
@@ -123,6 +137,9 @@ class _EditPostSheetState extends State<_EditPostSheet> {
     _captionCtrl.dispose();
     _locationCtrl.dispose();
     _hashtagsCtrl.dispose();
+    for (final c in _optionCtrls) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -136,7 +153,6 @@ class _EditPostSheetState extends State<_EditPostSheet> {
       });
       return;
     }
-
     setState(() => _locationLoading = true);
     _locationDebounce = Timer(const Duration(milliseconds: 350), () {
       _searchLocation(query);
@@ -151,33 +167,25 @@ class _EditPostSheetState extends State<_EditPostSheet> {
         '&format=jsonv2&addressdetails=1&limit=6',
       );
       final res = await http
-          .get(
-            url,
-            headers: {
-              'Accept': 'application/json',
-              'User-Agent': 'CordigramApp/1.0 (mobile; contact@cordigram.app)',
-            },
-          )
+          .get(url, headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'CordigramApp/1.0 (mobile; contact@cordigram.app)',
+          })
           .timeout(const Duration(seconds: 10));
       if (!mounted) return;
-
       if (res.statusCode != 200) {
         setState(() => _locationLoading = false);
         return;
       }
-
       final items = jsonDecode(res.body) as List;
       final suggestions = items
           .whereType<Map<String, dynamic>>()
-          .map(
-            (item) => _LocationSuggestion(
-              label: _cleanLocation(item['display_name'] as String? ?? ''),
-              lat: item['lat'] as String? ?? '',
-              lon: item['lon'] as String? ?? '',
-            ),
-          )
+          .map((item) => _LocationSuggestion(
+                label: _cleanLocation(item['display_name'] as String? ?? ''),
+                lat: item['lat'] as String? ?? '',
+                lon: item['lon'] as String? ?? '',
+              ))
           .toList();
-
       setState(() {
         _locationSuggestions = suggestions;
         _locationOpen = suggestions.isNotEmpty;
@@ -205,14 +213,12 @@ class _EditPostSheetState extends State<_EditPostSheet> {
     });
   }
 
-  List<String> _parseHashtags(String raw) {
-    return raw
-        .split(RegExp(r'[\s,]+'))
-        .map((e) => e.trim().replaceFirst('#', ''))
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList();
-  }
+  List<String> _parseHashtags(String raw) => raw
+      .split(RegExp(r'[\s,]+'))
+      .map((e) => e.trim().replaceFirst('#', ''))
+      .where((e) => e.isNotEmpty)
+      .toSet()
+      .toList();
 
   Future<void> _submit() async {
     if (_saving) return;
@@ -226,6 +232,22 @@ class _EditPostSheetState extends State<_EditPostSheet> {
     final hashtags = _parseHashtags(_hashtagsCtrl.text);
 
     try {
+      // Update poll options + allowMultipleAnswers if this is a poll post
+      if (_isPoll && widget.post.poll != null) {
+        final newOptions = _optionCtrls.map((c) => c.text.trim()).toList();
+        final optionsChanged = newOptions.join('|') !=
+            (widget.post.poll!.options.join('|'));
+        final multiChanged =
+            _allowMultipleAnswers != widget.post.poll!.allowMultipleAnswers;
+        if (optionsChanged || multiChanged) {
+          await PollsApiService.updatePoll(
+            pollId: widget.post.poll!.id,
+            options: optionsChanged ? newOptions : null,
+            allowMultipleAnswers: multiChanged ? _allowMultipleAnswers : null,
+          );
+        }
+      }
+
       final updatedJson = await PostInteractionService.updatePost(
         widget.post.id,
         UpdatePostPayload(
@@ -233,21 +255,19 @@ class _EditPostSheetState extends State<_EditPostSheet> {
           location: location,
           hashtags: hashtags,
           allowComments: _allowComments,
-          allowDownload: _allowDownload,
+          allowDownload: _isPoll ? null : _allowDownload,
           hideLikeCount: _hideLikeCount,
         ),
       );
       if (!mounted) return;
 
-      // PATCH response can be partial; keep existing identity/media metadata
-      // and only overwrite fields that were edited or explicitly returned.
       final parsed = FeedPost.fromJson(updatedJson);
       final updated = widget.post.copyWith(
         content: caption,
         location: location,
         hashtags: hashtags,
         allowComments: _allowComments,
-        allowDownload: _allowDownload,
+        allowDownload: _isPoll ? widget.post.allowDownload : _allowDownload,
         hideLikeCount: _hideLikeCount,
         visibility: parsed.visibility ?? widget.post.visibility,
       );
@@ -256,7 +276,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = 'Failed to update post. Please try again.';
+        _error = 'Failed to update. Please try again.';
       });
     }
   }
@@ -264,13 +284,11 @@ class _EditPostSheetState extends State<_EditPostSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tokens =
-        theme.extension<AppSemanticColors>() ??
+    final tokens = theme.extension<AppSemanticColors>() ??
         (theme.brightness == Brightness.dark
             ? AppSemanticColors.dark
             : AppSemanticColors.light);
-    final bottomPad =
-        MediaQuery.of(context).viewInsets.bottom +
+    final bottomPad = MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).viewPadding.bottom;
 
     return Padding(
@@ -280,6 +298,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Drag handle
             Center(
               child: Container(
                 width: 36,
@@ -299,115 +318,232 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 14),
-            _Field(
-              controller: _captionCtrl,
+            const SizedBox(height: 16),
+
+            // ── Caption section ──────────────────────────────────────────────
+            _SectionCard(
+              tokens: tokens,
               label: 'Caption',
-              minLines: 3,
-              maxLines: 7,
+              child: _Field(
+                controller: _captionCtrl,
+                label: '',
+                minLines: 3,
+                maxLines: 7,
+              ),
             ),
             const SizedBox(height: 10),
-            _Field(
-              controller: _locationCtrl,
-              label: 'Location (optional)',
-              onChanged: _onLocationChanged,
-              prefixIcon: Icon(
-                Icons.place_outlined,
-                color: tokens.textMuted,
-                size: 20,
+
+            // ── Location section ─────────────────────────────────────────────
+            _SectionCard(
+              tokens: tokens,
+              label: 'Location',
+              child: Column(
+                children: [
+                  _Field(
+                    controller: _locationCtrl,
+                    label: 'Search a place…',
+                    onChanged: _onLocationChanged,
+                    prefixIcon: Icon(
+                      Icons.place_outlined,
+                      color: tokens.textMuted,
+                      size: 20,
+                    ),
+                    suffixIcon: _locationLoading
+                        ? Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: tokens.primary,
+                              ),
+                            ),
+                          )
+                        : _locationCtrl.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.close, color: tokens.textMuted, size: 18),
+                            onPressed: () {
+                              _locationDebounce?.cancel();
+                              _locationCtrl.clear();
+                              setState(() {
+                                _locationSuggestions = [];
+                                _locationOpen = false;
+                                _locationLoading = false;
+                              });
+                            },
+                          )
+                        : null,
+                  ),
+                  if (_locationOpen)
+                    Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      decoration: BoxDecoration(
+                        color: tokens.panelMuted,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: tokens.panelBorder),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _locationSuggestions.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: tokens.panelBorder,
+                        ),
+                        itemBuilder: (_, i) {
+                          final s = _locationSuggestions[i];
+                          return InkWell(
+                            onTap: () => _selectLocation(s),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              child: Text(
+                                s.label,
+                                style: TextStyle(color: tokens.text, fontSize: 13),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
               ),
-              suffixIcon: _locationLoading
-                  ? Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: tokens.primary,
-                        ),
-                      ),
-                    )
-                  : _locationCtrl.text.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.close,
-                        color: tokens.textMuted,
-                        size: 18,
-                      ),
-                      onPressed: () {
-                        _locationDebounce?.cancel();
-                        _locationCtrl.clear();
-                        setState(() {
-                          _locationSuggestions = [];
-                          _locationOpen = false;
-                          _locationLoading = false;
-                        });
-                      },
-                    )
-                  : null,
             ),
-            if (_locationOpen)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(
-                  color: tokens.panelMuted,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: tokens.panelBorder),
-                ),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _locationSuggestions.length,
-                  itemBuilder: (_, i) {
-                    final s = _locationSuggestions[i];
-                    return InkWell(
-                      onTap: () => _selectLocation(s),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        child: Text(
-                          s.label,
-                          style: TextStyle(color: tokens.text, fontSize: 13),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+            const SizedBox(height: 10),
+
+            // ── Hashtags section ─────────────────────────────────────────────
+            _SectionCard(
+              tokens: tokens,
+              label: 'Hashtags',
+              child: _Field(
+                controller: _hashtagsCtrl,
+                label: 'e.g. #music #flutter',
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // ── Poll options section (poll posts only) ───────────────────────
+            if (_isPoll && _optionCtrls.isNotEmpty) ...[
+              _SectionCard(
+                tokens: tokens,
+                label: 'Poll options',
+                child: Column(
+                  children: List.generate(_optionCtrls.length, (i) {
+                    final imgUrl = (widget.post.poll?.hasImages == true &&
+                            i < (widget.post.poll?.optionImages.length ?? 0))
+                        ? widget.post.poll!.optionImages[i]
+                        : '';
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: i < _optionCtrls.length - 1 ? 8 : 0,
+                      ),
+                      child: Row(
+                        children: [
+                          if (imgUrl.isNotEmpty) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.network(
+                                imgUrl,
+                                width: 38,
+                                height: 38,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    Container(
+                                      width: 38,
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: tokens.panelMuted,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: _Field(
+                              controller: _optionCtrls[i],
+                              label: 'Option ${i + 1}',
+                            ),
+                          ),
+                        ],
                       ),
                     );
-                  },
+                  }),
                 ),
               ),
-            const SizedBox(height: 10),
-            _Field(
-              controller: _hashtagsCtrl,
-              label: 'Hashtags (e.g. #music #flutter)',
+              const SizedBox(height: 10),
+            ],
+
+            // ── Settings section ─────────────────────────────────────────────
+            _SectionCard(
+              tokens: tokens,
+              label: 'Settings',
+              child: Column(
+                children: [
+                  _ToggleTile(
+                    title: 'Allow comments',
+                    subtitle: 'Let others comment on this post',
+                    value: _allowComments,
+                    onChanged: (v) => setState(() => _allowComments = v),
+                    tokens: tokens,
+                  ),
+                  if (_isPoll) ...[
+                    Divider(height: 1, color: tokens.panelBorder),
+                    _ToggleTile(
+                      title: 'Allow multiple answers',
+                      subtitle: 'Voters can select more than one option',
+                      value: _allowMultipleAnswers,
+                      onChanged: (v) =>
+                          setState(() => _allowMultipleAnswers = v),
+                      tokens: tokens,
+                    ),
+                  ] else ...[
+                    Divider(height: 1, color: tokens.panelBorder),
+                    _ToggleTile(
+                      title: 'Allow download',
+                      subtitle: 'Let others save media from this post',
+                      value: _allowDownload,
+                      onChanged: (v) => setState(() => _allowDownload = v),
+                      tokens: tokens,
+                    ),
+                  ],
+                  Divider(height: 1, color: tokens.panelBorder),
+                  _ToggleTile(
+                    title: 'Hide like count',
+                    subtitle: 'Viewers won\'t see the number of likes',
+                    value: _hideLikeCount,
+                    onChanged: (v) => setState(() => _hideLikeCount = v),
+                    tokens: tokens,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            _ToggleTile(
-              title: 'Allow comments',
-              value: _allowComments,
-              onChanged: (v) => setState(() => _allowComments = v),
-            ),
-            _ToggleTile(
-              title: 'Allow download',
-              value: _allowDownload,
-              onChanged: (v) => setState(() => _allowDownload = v),
-            ),
-            _ToggleTile(
-              title: 'Hide like count',
-              value: _hideLikeCount,
-              onChanged: (v) => setState(() => _hideLikeCount = v),
-            ),
+
             if (_error != null) ...[
               const SizedBox(height: 10),
-              Text(
-                _error!,
-                style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _error!,
+                  style: TextStyle(
+                    color: theme.colorScheme.onErrorContainer,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ],
-            const SizedBox(height: 14),
+
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -415,13 +551,11 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: tokens.primary,
                   foregroundColor: theme.colorScheme.onPrimary,
-                  disabledBackgroundColor: tokens.primary.withValues(
-                    alpha: 0.45,
-                  ),
+                  disabledBackgroundColor: tokens.primary.withValues(alpha: 0.45),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
                 ),
                 child: _saving
                     ? SizedBox(
@@ -432,7 +566,13 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                           color: theme.colorScheme.onPrimary,
                         ),
                       )
-                    : const Text('Save changes'),
+                    : const Text(
+                        'Save changes',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -442,31 +582,101 @@ class _EditPostSheetState extends State<_EditPostSheet> {
   }
 }
 
-class _ToggleTile extends StatelessWidget {
-  const _ToggleTile({
-    required this.title,
-    required this.value,
-    required this.onChanged,
+/// Labeled section container — gives each group a header + card background.
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.tokens,
+    required this.label,
+    required this.child,
   });
 
-  final String title;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  final AppSemanticColors tokens;
+  final String label;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final tokens =
-        theme.extension<AppSemanticColors>() ??
-        (theme.brightness == Brightness.dark
-            ? AppSemanticColors.dark
-            : AppSemanticColors.light);
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(title, style: TextStyle(color: tokens.text, fontSize: 14)),
-      value: value,
-      activeColor: tokens.primary,
-      onChanged: onChanged,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: tokens.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: tokens.panelMuted,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: tokens.panelBorder),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: child,
+        ),
+      ],
+    );
+  }
+}
+
+class _ToggleTile extends StatelessWidget {
+  const _ToggleTile({
+    required this.title,
+    this.subtitle,
+    required this.value,
+    required this.onChanged,
+    required this.tokens,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final AppSemanticColors tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: tokens.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      color: tokens.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: tokens.primary,
+          ),
+        ],
+      ),
     );
   }
 }

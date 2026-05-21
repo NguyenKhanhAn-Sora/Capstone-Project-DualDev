@@ -2402,7 +2402,7 @@ export default function ReelPage({
     });
   };
 
-  const handleViewed = (id: string, ms?: number) => {
+  const handleViewed = useCallback((id: string, ms?: number) => {
     if (!token) return;
     if (!visibleReelsRef.current.has(id)) return;
 
@@ -2410,12 +2410,17 @@ export default function ReelPage({
     const last = viewCooldownRef.current.get(id) ?? 0;
     if (now - last < VIEW_COOLDOWN_MS) return;
 
+    // Optimistic update: block duplicate calls before API responds
+    viewCooldownRef.current.set(id, now);
     viewPost({ token, postId: id, durationMs: ms })
       .then(() => {
         viewCooldownRef.current.set(id, Date.now());
       })
-      .catch(() => undefined);
-  };
+      .catch(() => {
+        // Rollback so the view can be retried on next playback
+        viewCooldownRef.current.delete(id);
+      });
+  }, [token]);
 
   const isAuthor = useMemo(
     () => Boolean(active?.authorId && viewerId && active.authorId === viewerId),
@@ -2700,8 +2705,16 @@ export default function ReelPage({
       if (el) observer.observe(el);
     });
 
+    // When user switches tabs, clear visible set so views are not counted
+    // while the page is hidden (video pauses naturally, but guard defensively)
+    const handleVisibilityChange = () => {
+      if (document.hidden) visibleReelsRef.current.clear();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       visibleReelsRef.current.clear();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       observer.disconnect();
     };
   }, [items]);

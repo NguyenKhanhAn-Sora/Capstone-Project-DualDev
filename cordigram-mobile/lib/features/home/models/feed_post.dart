@@ -1,3 +1,5 @@
+import '../../post/models/poll_data.dart';
+
 class VideoQuality {
   const VideoQuality({
     required this.label,
@@ -208,6 +210,8 @@ class FeedPost {
     this.repostSourceMedia,
     this.repostSourceKind,
     this.primaryVideoDurationMs,
+    this.pollId,
+    this.poll,
   });
 
   final String id;
@@ -244,6 +248,8 @@ class FeedPost {
   final List<FeedMedia>? repostSourceMedia;
   final String? repostSourceKind;
   final int? primaryVideoDurationMs;
+  final String? pollId;
+  final PollData? poll;
 
   FeedPost copyWith({
     String? id,
@@ -280,6 +286,8 @@ class FeedPost {
     List<FeedMedia>? repostSourceMedia,
     String? repostSourceKind,
     int? primaryVideoDurationMs,
+    String? pollId,
+    PollData? poll,
   }) {
     return FeedPost(
       id: id ?? this.id,
@@ -321,6 +329,8 @@ class FeedPost {
       repostSourceKind: repostSourceKind ?? this.repostSourceKind,
       primaryVideoDurationMs:
           primaryVideoDurationMs ?? this.primaryVideoDurationMs,
+      pollId: pollId ?? this.pollId,
+      poll: poll ?? this.poll,
     );
   }
 
@@ -457,6 +467,10 @@ class FeedPost {
       repostSourceMedia: repostSourceMedia,
       repostSourceKind: json['repostSourceKind'] as String?,
       primaryVideoDurationMs: (json['primaryVideoDurationMs'] as num?)?.toInt(),
+      pollId: json['pollId'] as String?,
+      poll: json['poll'] is Map<String, dynamic>
+          ? PollData.fromJson(json['poll'] as Map<String, dynamic>)
+          : null,
     );
   }
 }

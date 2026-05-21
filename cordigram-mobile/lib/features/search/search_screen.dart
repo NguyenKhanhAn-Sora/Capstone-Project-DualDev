@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/config/app_theme.dart';
+import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/language_controller.dart';
 import '../hashtag/hashtag_screen.dart';
@@ -64,6 +65,8 @@ class _SearchScreenState extends State<SearchScreen> {
   static const int _kAllPreviewPostsLimit = 5;
   static const int _kAllPreviewReelsLimit = 6;
 
+  String? _viewerId;
+
   final Map<String, int> _viewCooldownMap = <String, int>{};
   static const int _kViewCooldownMs = 300000;
 
@@ -79,7 +82,20 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _loadHistory();
+    _fetchViewerId();
     _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _fetchViewerId() async {
+    try {
+      final data = await ApiService.get(
+        '/profiles/me',
+        extraHeaders: {'Authorization': 'Bearer ${AuthStorage.accessToken}'},
+      );
+      if (!mounted) return;
+      final id = (data['userId'] as String?) ?? (data['id'] as String?);
+      if (id != null) setState(() => _viewerId = id);
+    } catch (_) {}
   }
 
   @override
@@ -1255,6 +1271,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ...sliced.map(
           (state) => PostCard(
             state: state,
+            viewerId: _viewerId,
             onLike: () => _onLike(state),
             onLikeLongPress: () =>
                 showPostLikesSheet(context, postId: state.post.id),

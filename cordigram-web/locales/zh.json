@@ -2698,5 +2698,38 @@
         "cancel": "取消"
       }
     }
+  },
+  "postEditOverlay": {
+    "title": "编辑帖子",
+    "close": "关闭",
+    "captionLabel": "说明",
+    "captionPlaceholder": "写点什么...",
+    "addEmoji": "添加表情",
+    "emojiIcon": "表情图标",
+    "searching": "搜索中...",
+    "noMentionMatches": "无匹配",
+    "signInToMention": "登录以提及用户",
+    "userNotFound": "未找到用户",
+    "removeHashtag": "删除 {tag}",
+    "hashtagsLabel": "话题标签",
+    "hashtagPlaceholder": "添加话题标签",
+    "locationLabel": "位置",
+    "locationPlaceholder": "添加地点",
+    "noLocationSuggestions": "无建议",
+    "noLocationFound": "未找到建议，请尝试其他关键词。",
+    "allowComments": "允许评论",
+    "allowCommentsDesc": "开启以接收所有人的反馈",
+    "allowDownloads": "允许下载",
+    "allowDownloadsDesc": "与您信任的人共享原始文件",
+    "allowDownloadsInheritedLoading": "继承自原帖（加载中…）",
+    "allowDownloadsInherited": "继承自原帖（不可更改）",
+    "hideLike": "隐藏点赞",
+    "hideLikeDesc": "观看者将看不到此帖子的点赞数",
+    "cancel": "取消",
+    "saving": "保存中...",
+    "saveChanges": "保存更改",
+    "postUpdated": "帖子已更新",
+    "signInRequired": "请登录以编辑帖子",
+    "updateFailed": "更新帖子失败"
   }
 }

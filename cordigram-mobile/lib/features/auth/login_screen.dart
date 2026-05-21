@@ -26,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _showPassword = false;
-  bool _rememberMe = true;
   bool _loading = false;
   String _error = '';
   bool _googleLoading = false;
@@ -236,12 +235,10 @@ class _LoginScreenState extends State<LoginScreen> {
       unawaited(Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
       ));
-      if (_rememberMe) {
-        unawaited(_upsertRecentAfterLogin(
-          email: _emailController.text.trim().toLowerCase(),
-          accessToken: accessToken,
-        ));
-      }
+      unawaited(_upsertRecentAfterLogin(
+        email: _emailController.text.trim().toLowerCase(),
+        accessToken: accessToken,
+      ));
       unawaited(PushNotificationService.syncCurrentToken());
       unawaited(DmCallManager.instance.onAuthChanged());
     } on ApiException catch (e) {
@@ -402,8 +399,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final secondaryTextColor = theme.colorScheme.onSurfaceVariant;
-    final actionLinkColor = theme.colorScheme.primary;
+    const secondaryTextColor = Color(0xFF64748B);
+    const actionLinkColor = Color(0xFF3470A2);
 
     return Scaffold(
       body: Container(
@@ -463,6 +460,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
                                   autofillHints: const [AutofillHints.email],
+                                  style: const TextStyle(color: Color(0xFF0F172A)),
                                   decoration: _fieldDecoration(
                                     label: LanguageController.instance.t('auth.login.email'),
                                     hint: 'you@example.com',
@@ -485,6 +483,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   controller: _passwordController,
                                   obscureText: !_showPassword,
                                   autofillHints: const [AutofillHints.password],
+                                  style: const TextStyle(color: Color(0xFF0F172A)),
                                   decoration: _fieldDecoration(
                                     label: LanguageController.instance.t('auth.login.password'),
                                     hint: 'Enter your password',
@@ -499,6 +498,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         _showPassword
                                             ? Icons.visibility_off_outlined
                                             : Icons.visibility_outlined,
+                                        color: const Color(0xFF64748B),
                                       ),
                                     ),
                                   ),
@@ -512,39 +512,29 @@ class _LoginScreenState extends State<LoginScreen> {
                                     return null;
                                   },
                                 ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Checkbox(
-                                      value: _rememberMe,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _rememberMe = value ?? false;
-                                        });
-                                      },
-                                      visualDensity: VisualDensity.compact,
+                                const SizedBox(height: 4),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const ForgotPasswordScreen(),
+                                        ),
+                                      );
+                                    },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: actionLinkColor,
                                     ),
-                                    Text(
-                                      'Remember me',
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: secondaryTextColor,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                    child: Text(
+                                      LanguageController.instance.t('auth.login.forgotPassword'),
+                                      style: const TextStyle(
+                                        color: Color(0xFF3470A2),
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                    const Spacer(),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const ForgotPasswordScreen(),
-                                          ),
-                                        );
-                                      },
-                                      child: Text(LanguageController.instance.t('auth.login.forgotPassword')),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                                 const SizedBox(height: 6),
                                 if (_error.isNotEmpty)
@@ -664,14 +654,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                         minimumSize: Size.zero,
                                         tapTargetSize:
                                             MaterialTapTargetSize.shrinkWrap,
+                                        foregroundColor: actionLinkColor,
                                       ),
-                                      child: Text(
+                                      child: const Text(
                                         'Sign up',
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              color: actionLinkColor,
-                                              fontWeight: FontWeight.w700,
-                                            ),
+                                        style: TextStyle(
+                                          color: Color(0xFF3470A2),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -753,7 +744,9 @@ class _LoginScreenState extends State<LoginScreen> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      prefixIcon: Icon(icon),
+      labelStyle: const TextStyle(color: Color(0xFF64748B)),
+      hintStyle: const TextStyle(color: Color(0xFFADB8C7)),
+      prefixIcon: Icon(icon, color: const Color(0xFF64748B)),
       suffixIcon: suffix,
       filled: true,
       fillColor: const Color(0xFFF8FBFF),
@@ -769,6 +762,14 @@ class _LoginScreenState extends State<LoginScreen> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFF3470A2), width: 1.4),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.4),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFDC2626)),
       ),
     );
   }

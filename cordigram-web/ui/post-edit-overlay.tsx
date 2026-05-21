@@ -12,6 +12,7 @@ import {
   type FeedItem,
   type ProfileSearchItem,
 } from "@/lib/api";
+import { useLanguage } from "@/component/language-provider";
 
 const IconClose = ({ size = 18 }: { size?: number }) => (
   <svg
@@ -83,6 +84,7 @@ export default function PostEditOverlay({
   onClose,
   onUpdated,
 }: PostEditOverlayProps) {
+  const { t } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [editCaption, setEditCaption] = useState("");
   const editCaptionRef = useRef<HTMLTextAreaElement | null>(null);
@@ -311,7 +313,7 @@ export default function PostEditOverlay({
       setMentionSuggestions([]);
       setMentionOpen(false);
       setMentionHighlight(-1);
-      setMentionError("Sign in to mention users");
+      setMentionError(t("postEditOverlay.signInToMention"));
       return;
     }
 
@@ -329,13 +331,13 @@ export default function PostEditOverlay({
         setMentionSuggestions(res.items);
         setMentionOpen(res.items.length > 0);
         setMentionHighlight(res.items.length ? 0 : -1);
-        if (!res.items.length) setMentionError("User not found");
+        if (!res.items.length) setMentionError(t("postEditOverlay.userNotFound"));
       } catch {
         if (cancelled) return;
         setMentionSuggestions([]);
         setMentionOpen(false);
         setMentionHighlight(-1);
-        setMentionError("User not found");
+        setMentionError(t("postEditOverlay.userNotFound"));
       } finally {
         if (!cancelled) setMentionLoading(false);
       }
@@ -442,7 +444,7 @@ export default function PostEditOverlay({
         setLocationSuggestions([]);
         setLocationOpen(false);
         setLocationHighlight(-1);
-        setLocationError("No suggestions found, try different keywords.");
+        setLocationError(t("postEditOverlay.noLocationFound"));
       } finally {
         if (!controller.signal.aborted) setLocationLoading(false);
       }
@@ -493,7 +495,7 @@ export default function PostEditOverlay({
     setEditSuccess("");
 
     if (!token) {
-      setEditError("Please sign in to edit posts");
+      setEditError(t("postEditOverlay.signInRequired"));
       return;
     }
 
@@ -536,13 +538,13 @@ export default function PostEditOverlay({
         payload,
       });
       onUpdated(updated);
-      setEditSuccess("Post updated");
+      setEditSuccess(t("postEditOverlay.postUpdated"));
       onClose();
     } catch (err: any) {
       const message =
         (err && typeof err === "object" && "message" in err
           ? (err as { message?: string }).message
-          : null) || "Failed to update post";
+          : null) || t("postEditOverlay.updateFailed");
       setEditError(message);
     } finally {
       setEditSaving(false);
@@ -566,11 +568,11 @@ export default function PostEditOverlay({
       >
         <div className={styles.modalHeader}>
           <div>
-            <h3 className={styles.modalTitle}>Edit post</h3>
+            <h3 className={styles.modalTitle}>{t("postEditOverlay.title")}</h3>
           </div>
           <button
             className={styles.closeBtn}
-            aria-label="Close"
+            aria-label={t("postEditOverlay.close")}
             onClick={() => !editSaving && onClose()}
             type="button"
           >
@@ -581,23 +583,23 @@ export default function PostEditOverlay({
         <form className={styles.editForm} onSubmit={handleEditSubmit}>
           <label className={styles.editLabel}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Caption</span>
+              <span className={styles.editLabelText}>{t("postEditOverlay.captionLabel")}</span>
               <div className={styles.emojiWrap} ref={editEmojiRef}>
                 <button
                   type="button"
                   className={styles.emojiButton}
                   onClick={() => setEditEmojiOpen((prev) => !prev)}
-                  aria-label="Add emoji"
+                  aria-label={t("postEditOverlay.addEmoji")}
                 >
                   <svg
-                    aria-label="Emoji icon"
+                    aria-label={t("postEditOverlay.emojiIcon")}
                     fill="currentColor"
                     height="20"
                     role="img"
                     viewBox="0 0 24 24"
                     width="20"
                   >
-                    <title>Emoji icon</title>
+                    <title>{t("postEditOverlay.emojiIcon")}</title>
                     <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
                   </svg>
                 </button>
@@ -634,7 +636,7 @@ export default function PostEditOverlay({
                 }}
                 rows={4}
                 maxLength={2200}
-                placeholder="Write something..."
+                placeholder={t("postEditOverlay.captionPlaceholder")}
               />
               <span className={styles.charCount}>
                 {editCaption.length}/2200
@@ -645,11 +647,11 @@ export default function PostEditOverlay({
           {mentionOpen ? (
             <div className={styles.mentionDropdown}>
               {mentionLoading ? (
-                <div className={styles.mentionItem}>Searching...</div>
+                <div className={styles.mentionItem}>{t("postEditOverlay.searching")}</div>
               ) : null}
               {!mentionLoading && mentionSuggestions.length === 0 ? (
                 <div className={styles.mentionItem}>
-                  {mentionError || "No matches"}
+                  {mentionError || t("postEditOverlay.noMentionMatches")}
                 </div>
               ) : null}
               {mentionSuggestions.map((opt, idx) => {
@@ -697,7 +699,7 @@ export default function PostEditOverlay({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Hashtags</span>
+              <span className={styles.editLabelText}>{t("postEditOverlay.hashtagsLabel")}</span>
             </div>
             <div className={styles.chipRow}>
               {editHashtags.map((tag) => (
@@ -707,7 +709,7 @@ export default function PostEditOverlay({
                     type="button"
                     className={styles.chipRemove}
                     onClick={() => removeHashtag(tag)}
-                    aria-label={`Remove ${tag}`}
+                    aria-label={t("postEditOverlay.removeHashtag", { tag })}
                   >
                     ×
                   </button>
@@ -715,7 +717,7 @@ export default function PostEditOverlay({
               ))}
               <input
                 className={styles.editInput}
-                placeholder="Add hashtag"
+                placeholder={t("postEditOverlay.hashtagPlaceholder")}
                 value={hashtagDraft}
                 onChange={(e) => setHashtagDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -730,11 +732,11 @@ export default function PostEditOverlay({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Location</span>
+              <span className={styles.editLabelText}>{t("postEditOverlay.locationLabel")}</span>
             </div>
             <input
               className={styles.editInput}
-              placeholder="Add a place"
+              placeholder={t("postEditOverlay.locationPlaceholder")}
               value={locationQuery}
               onChange={(e) => {
                 setEditLocation(e.target.value);
@@ -748,11 +750,11 @@ export default function PostEditOverlay({
             {locationOpen ? (
               <div className={styles.locationDropdown}>
                 {locationLoading ? (
-                  <div className={styles.locationItem}>Searching...</div>
+                  <div className={styles.locationItem}>{t("postEditOverlay.searching")}</div>
                 ) : null}
                 {!locationLoading && locationSuggestions.length === 0 ? (
                   <div className={styles.locationItem}>
-                    {locationError || "No suggestions"}
+                    {locationError || t("postEditOverlay.noLocationSuggestions")}
                   </div>
                 ) : null}
                 {locationSuggestions.map((opt, idx) => {
@@ -782,9 +784,9 @@ export default function PostEditOverlay({
                 onChange={() => setEditAllowComments((prev) => !prev)}
               />
               <div>
-                <p className={styles.switchTitle}>Allow comments</p>
+                <p className={styles.switchTitle}>{t("postEditOverlay.allowComments")}</p>
                 <p className={styles.switchHint}>
-                  Enable to receive feedback from everyone
+                  {t("postEditOverlay.allowCommentsDesc")}
                 </p>
               </div>
             </label>
@@ -803,13 +805,13 @@ export default function PostEditOverlay({
                 }
               />
               <div>
-                <p className={styles.switchTitle}>Allow downloads</p>
+                <p className={styles.switchTitle}>{t("postEditOverlay.allowDownloads")}</p>
                 <p className={styles.switchHint}>
                   {isRepost
                     ? lockedAllowDownloadLoading
-                      ? "Inherited from original post (loading…)"
-                      : "Inherited from the original post (can’t be changed)"
-                    : "Share the original file with people you trust"}
+                      ? t("postEditOverlay.allowDownloadsInheritedLoading")
+                      : t("postEditOverlay.allowDownloadsInherited")
+                    : t("postEditOverlay.allowDownloadsDesc")}
                 </p>
               </div>
             </label>
@@ -821,9 +823,9 @@ export default function PostEditOverlay({
                 onChange={() => setEditHideLikeCount((prev) => !prev)}
               />
               <div>
-                <p className={styles.switchTitle}>Hide like</p>
+                <p className={styles.switchTitle}>{t("postEditOverlay.hideLike")}</p>
                 <p className={styles.switchHint}>
-                  Viewers won’t see the number of likes on this post
+                  {t("postEditOverlay.hideLikeDesc")}
                 </p>
               </div>
             </label>
@@ -843,14 +845,14 @@ export default function PostEditOverlay({
               onClick={() => !editSaving && onClose()}
               disabled={editSaving}
             >
-              Cancel
+              {t("postEditOverlay.cancel")}
             </button>
             <button
               type="submit"
               className={styles.modalPrimary}
               disabled={editSaving}
             >
-              {editSaving ? "Saving..." : "Save changes"}
+              {editSaving ? t("postEditOverlay.saving") : t("postEditOverlay.saveChanges")}
             </button>
           </div>
         </form>

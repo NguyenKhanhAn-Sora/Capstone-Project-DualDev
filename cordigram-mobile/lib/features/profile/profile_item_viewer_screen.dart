@@ -347,7 +347,8 @@ class ProfileItemViewerScreen extends StatefulWidget {
       _ProfileItemViewerScreenState();
 }
 
-class _ProfileItemViewerScreenState extends State<ProfileItemViewerScreen> {
+class _ProfileItemViewerScreenState extends State<ProfileItemViewerScreen>
+    with WidgetsBindingObserver {
   late final PageController _pageController;
   int _currentIndex = 0;
 
@@ -356,18 +357,56 @@ class _ProfileItemViewerScreenState extends State<ProfileItemViewerScreen> {
 
   static const Color _bg = Colors.black;
 
+  // ── View tracking (mirrors reels_screen.dart) ─────────────────────────────
+  final Map<String, int> _viewCooldown = {};
+  static const int _kViewCooldownMs = 300000; // 5 min
+  Timer? _viewTimer;
+
+  String _itemIdAt(int index) {
+    if (index < 0 || index >= widget.items.length) return '';
+    return (widget.items[index]['id'] as String?) ?? '';
+  }
+
+  void _trackView(int index) {
+    final id = _itemIdAt(index);
+    if (id.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final last = _viewCooldown[id] ?? 0;
+    if (now - last < _kViewCooldownMs) return;
+    _viewCooldown[id] = now;
+    PostInteractionService.view(id).catchError((_) {
+      _viewCooldown.remove(id);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
     _initController(_currentIndex);
     _initController(_currentIndex + 1);
     if (_currentIndex > 0) _initController(_currentIndex - 1);
+    // Track view for the initial item after 2-second dwell
+    _viewTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) _trackView(_currentIndex);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _viewTimer?.cancel();
+      _viewTimer = null;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _viewTimer?.cancel();
     _pageController.dispose();
     for (final c in _controllers.values) {
       c.dispose();
@@ -447,6 +486,7 @@ class _ProfileItemViewerScreenState extends State<ProfileItemViewerScreen> {
 
   void _onPageChanged(int index) {
     _controllers[_currentIndex]?.pause();
+    _viewTimer?.cancel();
     setState(() => _currentIndex = index);
     _controllers[index]?.play();
 
@@ -460,6 +500,11 @@ class _ProfileItemViewerScreenState extends State<ProfileItemViewerScreen> {
     for (final k in toRemove) {
       _controllers.remove(k)?.dispose();
     }
+
+    // Track view after 2-second dwell, same as reels_screen.dart
+    _viewTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted && _currentIndex == index) _trackView(index);
+    });
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -557,15 +602,33 @@ class ProfileReelViewerScreen extends StatefulWidget {
       _ProfileReelViewerScreenState();
 }
 
-class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen> {
+class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen>
+    with WidgetsBindingObserver {
   late final PageController _pageController;
   int _currentIndex = 0;
   final Map<int, VideoPlayerController> _controllers = {};
   final Set<String> _revealedPostIds = <String>{};
 
+  // ── View tracking (mirrors reels_screen.dart) ─────────────────────────────
+  final Map<String, int> _viewCooldown = {};
+  static const int _kViewCooldownMs = 300000; // 5 min
+  Timer? _viewTimer;
+
   String _itemIdAt(int index) {
     if (index < 0 || index >= widget.items.length) return '';
     return (widget.items[index]['id'] as String?) ?? '';
+  }
+
+  void _trackView(int index) {
+    final id = _itemIdAt(index);
+    if (id.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final last = _viewCooldown[id] ?? 0;
+    if (now - last < _kViewCooldownMs) return;
+    _viewCooldown[id] = now;
+    PostInteractionService.view(id).catchError((_) {
+      _viewCooldown.remove(id);
+    });
   }
 
   Map<String, dynamic>? _mediaAt(int index) {
@@ -601,15 +664,31 @@ class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentIndex = widget.initialIndex.clamp(0, widget.items.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
     _initController(_currentIndex);
     _initController(_currentIndex + 1);
     if (_currentIndex > 0) _initController(_currentIndex - 1);
+    // Track view for the initial reel after 2-second dwell
+    _viewTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) _trackView(_currentIndex);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _viewTimer?.cancel();
+      _viewTimer = null;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _viewTimer?.cancel();
     _pageController.dispose();
     for (final c in _controllers.values) {
       c.dispose();
@@ -710,6 +789,7 @@ class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen> {
 
   void _onPageChanged(int index) {
     _controllers[_currentIndex]?.pause();
+    _viewTimer?.cancel();
     setState(() => _currentIndex = index);
     _controllers[index]?.play();
 
@@ -722,6 +802,11 @@ class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen> {
     for (final k in toRemove) {
       _controllers.remove(k)?.dispose();
     }
+
+    // Track view after 2-second dwell, mirrors reels_screen.dart
+    _viewTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted && _currentIndex == index) _trackView(index);
+    });
   }
 
   @override

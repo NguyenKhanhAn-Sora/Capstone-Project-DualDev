@@ -727,6 +727,23 @@ class _ProfileScreenState extends State<ProfileScreen>
     final key = _visibleTabKeys[_tabController.index];
     final items = _tabItems[key]!;
 
+    // Poll posts open PostDetailScreen (has PollWidget, comments, full layout)
+    final pollId = item['pollId'] as String?;
+    if (pollId != null && pollId.isNotEmpty) {
+      final postId = (item['id'] as String?) ?? '';
+      if (postId.isNotEmpty) {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => PostDetailScreen(
+              postId: postId,
+              viewerId: _viewerId,
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     // Only the dedicated Reels tab should open vertical reel-only navigation.
     if (key == 'reels') {
       final kind =
@@ -3259,6 +3276,19 @@ class _GridTileState extends State<_GridTile> {
     if (thumbnail != null) return thumbnail;
     final coverImage = widget.item['coverImage'] as String?;
     if (coverImage != null) return coverImage;
+
+    // For poll posts: use first non-empty option image as thumbnail
+    final poll = widget.item['poll'];
+    if (poll is Map) {
+      final optionImages = poll['optionImages'];
+      if (optionImages is List) {
+        for (final img in optionImages) {
+          final url = img?.toString();
+          if (url != null && url.isNotEmpty) return url;
+        }
+      }
+    }
+
     return null;
   }
 
@@ -3312,6 +3342,7 @@ class _GridTileState extends State<_GridTile> {
     final views = (widget.item['stats'] as Map?)?['views'];
     final isVideo = _isVideo();
     final showRevealOverlay = _isBlurredByModeration() && !_revealed;
+    final isPoll = widget.item['pollId'] != null;
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -3319,7 +3350,7 @@ class _GridTileState extends State<_GridTile> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Thumbnail
+          // Thumbnail (or poll gradient placeholder)
           if (thumb != null)
             Image.network(
               thumb,
@@ -3327,11 +3358,52 @@ class _GridTileState extends State<_GridTile> {
               errorBuilder: (_, __, ___) =>
                   const ColoredBox(color: Color(0xFF1A2740)),
             )
+          else if (isPoll)
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1E3A5F), Color(0xFF0D2137)],
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.poll_rounded, color: Colors.white54, size: 28),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(
+                        (widget.item['poll'] as Map?)?['question'] as String? ?? 'Poll',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
           else
             const ColoredBox(color: Color(0xFF1A2740)),
 
+          // Poll badge (top-right)
+          if (isPoll && !widget.manageMode)
+            const Positioned(
+              top: 6,
+              right: 6,
+              child: Icon(Icons.poll_rounded, color: Colors.white70, size: 18),
+            ),
+
           // Video play indicator (top-right) — hidden in manage mode
-          if (isVideo && !widget.manageMode)
+          if (isVideo && !isPoll && !widget.manageMode)
             const Positioned(
               top: 6,
               right: 6,

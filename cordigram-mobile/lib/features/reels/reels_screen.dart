@@ -50,7 +50,7 @@ class ReelsScreen extends StatefulWidget {
   State<ReelsScreen> createState() => _ReelsScreenState();
 }
 
-class _ReelsScreenState extends State<ReelsScreen> {
+class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
   final List<FeedPostState> _reels = [];
   final Set<String> _revealedMediaPostIds = <String>{};
 
@@ -96,18 +96,31 @@ class _ReelsScreenState extends State<ReelsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchViewerId();
     _loadReels();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _viewTimer?.cancel();
     _pageController.dispose();
     for (final c in _controllers.values) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Cancel pending view timer when user switches apps or locks screen,
+  /// mirroring the web's visibilitychange + visibleReelsRef.clear() fix.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _viewTimer?.cancel();
+      _viewTimer = null;
+    }
   }
 
   // ── Viewer ID ──────────────────────────────────────────────────────────────

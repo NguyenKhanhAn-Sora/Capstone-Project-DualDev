@@ -2711,5 +2711,38 @@
         "cancel": "Cancel"
       }
     }
+  },
+  "postEditOverlay": {
+    "title": "Edit post",
+    "close": "Close",
+    "captionLabel": "Caption",
+    "captionPlaceholder": "Write something...",
+    "addEmoji": "Add emoji",
+    "emojiIcon": "Emoji icon",
+    "searching": "Searching...",
+    "noMentionMatches": "No matches",
+    "signInToMention": "Sign in to mention users",
+    "userNotFound": "User not found",
+    "removeHashtag": "Remove {tag}",
+    "hashtagsLabel": "Hashtags",
+    "hashtagPlaceholder": "Add hashtag",
+    "locationLabel": "Location",
+    "locationPlaceholder": "Add a place",
+    "noLocationSuggestions": "No suggestions",
+    "noLocationFound": "No suggestions found, try different keywords.",
+    "allowComments": "Allow comments",
+    "allowCommentsDesc": "Enable to receive feedback from everyone",
+    "allowDownloads": "Allow downloads",
+    "allowDownloadsDesc": "Share the original file with people you trust",
+    "allowDownloadsInheritedLoading": "Inherited from original post (loading…)",
+    "allowDownloadsInherited": "Inherited from the original post (can't be changed)",
+    "hideLike": "Hide like",
+    "hideLikeDesc": "Viewers won't see the number of likes on this post",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "saveChanges": "Save changes",
+    "postUpdated": "Post updated",
+    "signInRequired": "Please sign in to edit posts",
+    "updateFailed": "Failed to update post"
   }
 }

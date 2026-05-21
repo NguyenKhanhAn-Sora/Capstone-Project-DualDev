@@ -2711,5 +2711,38 @@
         "cancel": "Hủy"
       }
     }
+  },
+  "postEditOverlay": {
+    "title": "Chỉnh sửa bài viết",
+    "close": "Đóng",
+    "captionLabel": "Chú thích",
+    "captionPlaceholder": "Viết gì đó...",
+    "addEmoji": "Thêm biểu tượng cảm xúc",
+    "emojiIcon": "Biểu tượng cảm xúc",
+    "searching": "Đang tìm kiếm...",
+    "noMentionMatches": "Không có kết quả",
+    "signInToMention": "Đăng nhập để nhắc đến người dùng",
+    "userNotFound": "Không tìm thấy người dùng",
+    "removeHashtag": "Xóa {tag}",
+    "hashtagsLabel": "Thẻ hashtag",
+    "hashtagPlaceholder": "Thêm hashtag",
+    "locationLabel": "Vị trí",
+    "locationPlaceholder": "Thêm địa điểm",
+    "noLocationSuggestions": "Không có gợi ý",
+    "noLocationFound": "Không tìm thấy gợi ý, hãy thử từ khóa khác.",
+    "allowComments": "Cho phép bình luận",
+    "allowCommentsDesc": "Bật để nhận phản hồi từ mọi người",
+    "allowDownloads": "Cho phép tải xuống",
+    "allowDownloadsDesc": "Chia sẻ tệp gốc với những người bạn tin tưởng",
+    "allowDownloadsInheritedLoading": "Kế thừa từ bài gốc (đang tải…)",
+    "allowDownloadsInherited": "Kế thừa từ bài gốc (không thể thay đổi)",
+    "hideLike": "Ẩn lượt thích",
+    "hideLikeDesc": "Người xem sẽ không thấy số lượt thích của bài viết này",
+    "cancel": "Hủy",
+    "saving": "Đang lưu...",
+    "saveChanges": "Lưu thay đổi",
+    "postUpdated": "Bài viết đã được cập nhật",
+    "signInRequired": "Vui lòng đăng nhập để chỉnh sửa bài viết",
+    "updateFailed": "Cập nhật bài viết thất bại"
   }
 }

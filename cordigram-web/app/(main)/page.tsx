@@ -115,7 +115,6 @@ const getUserIdFromToken = (token: string | null): string | undefined => {
 };
 
 const PAGE_SIZE = 12;
-const VIEW_DEBOUNCE_MS = 800;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 300000;
 const REPORT_ANIMATION_MS = 200;
@@ -529,10 +528,8 @@ export default function HomePage({
   );
   const [viewerProfile, setViewerProfile] =
     useState<CurrentProfileResponse | null>(null);
-  const viewTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map(),
-  );
   const viewCooldownRef = useRef<Map<string, number>>(new Map());
+  const itemsRef = useRef<PostViewState[]>([]);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const autoLoadLockRef = useRef(false);
   const autoLoadPausedRef = useRef(false);
@@ -1678,23 +1675,28 @@ export default function HomePage({
     }
   };
 
-  const onView = (postId: string, durationMs?: number) => {
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const onView = useCallback((postId: string, durationMs?: number) => {
     if (!token) return;
-    const targetItem = items.find((p) => p.item.id === postId)?.item;
-    const targetId = targetItem?.repostOf || postId;
+    const targetItem = itemsRef.current.find((p) => p.item.id === postId)?.item;
+    const targetId = targetItem?.repostOf ?? postId;
     const now = Date.now();
     const last = viewCooldownRef.current.get(targetId) ?? 0;
     if (now - last < VIEW_COOLDOWN_MS) return;
-    const handler = () => {
-      viewPost({ token, postId: targetId, durationMs })
-        .then(() => {
-          viewCooldownRef.current.set(targetId, Date.now());
-        })
-        .catch(() => undefined);
-    };
-    const timeout = setTimeout(handler, 0);
-    viewTimers.current.set(targetId, timeout);
-  };
+    // Optimistic update: block duplicate calls before API responds
+    viewCooldownRef.current.set(targetId, now);
+    viewPost({ token, postId: targetId, durationMs })
+      .then(() => {
+        viewCooldownRef.current.set(targetId, Date.now());
+      })
+      .catch(() => {
+        // Rollback so the view can be retried on next scroll
+        viewCooldownRef.current.delete(targetId);
+      });
+  }, [token]);
   if (!canRender) return null;
 
   return (
@@ -2330,6 +2332,14 @@ function FeedCard({
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
+
+    const cancelDwell = () => {
+      if (dwellTimer.current) {
+        clearTimeout(dwellTimer.current);
+        dwellTimer.current = null;
+      }
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -2342,19 +2352,24 @@ function FeedCard({
                 sendAdsEvent("impression");
               }
             }, VIEW_DWELL_MS);
-          } else if (dwellTimer.current) {
-            clearTimeout(dwellTimer.current);
-            dwellTimer.current = null;
+          } else {
+            cancelDwell();
           }
         });
       },
       { threshold: 0.5 },
     );
+
+    // Cancel dwell timer when user switches browser tabs
+    const handleVisibilityChange = () => {
+      if (document.hidden) cancelDwell();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     observer.observe(el);
     return () => {
-      if (dwellTimer.current) {
-        clearTimeout(dwellTimer.current);
-      }
+      cancelDwell();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       observer.disconnect();
     };
   }, [id, onView, sendAdsEvent, isAdLikePost]);

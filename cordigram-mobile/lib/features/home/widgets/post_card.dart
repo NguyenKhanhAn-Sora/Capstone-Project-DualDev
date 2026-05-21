@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../models/feed_post.dart';
 import '../../profile/profile_screen.dart';
+import '../../post/models/poll_data.dart';
+import '../../post/widgets/poll_widget.dart';
 import 'media_carousel.dart';
 import '../../../core/services/language_controller.dart';
 
@@ -220,7 +222,7 @@ class PostCard extends StatefulWidget {
   State<PostCard> createState() => _PostCardState();
 }
 
-class _PostCardState extends State<PostCard> {
+class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
   Timer? _dwellTimer;
   // Per-card last-view epoch ms (resets if card is destroyed & recreated)
   int _lastViewAt = 0;
@@ -234,14 +236,38 @@ class _PostCardState extends State<PostCard> {
   /// the user follows someone.
   bool _followToggled = false;
 
+  PollData? _localPoll;
+
   @override
   void initState() {
     super.initState();
     _initiallyFollowing = widget.state.following;
+    _localPoll = widget.state.post.poll;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didUpdateWidget(PostCard old) {
+    super.didUpdateWidget(old);
+    if (old.state.post.pollId != widget.state.post.pollId) {
+      _localPoll = widget.state.post.poll;
+    }
+  }
+
+  /// Cancel dwell timer when user switches apps or locks screen,
+  /// mirroring the web’s document.visibilitychange handler.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _dwellTimer?.cancel();
+      _dwellTimer = null;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _dwellTimer?.cancel();
     super.dispose();
   }
@@ -549,6 +575,16 @@ class _PostCardState extends State<PostCard> {
                   isParentVisible: _isVisibleForAutoplay,
                 ),
               ],
+              if (_localPoll != null) ...[
+                const SizedBox(height: 12),
+                PollWidget(
+                  poll: _localPoll!,
+                  postId: post.id,
+                  viewerId: widget.viewerId,
+                  onPollUpdated: (updated) =>
+                      setState(() => _localPoll = updated),
+                ),
+              ],
               if (isAdPost &&
                   creative != null &&
                   (creative.headline.isNotEmpty ||
@@ -577,6 +613,7 @@ class _PostCardState extends State<PostCard> {
                   onSave: widget.onSave,
                   onRepost: widget.onRepost,
                   onComment: widget.onComment,
+                  hideSaveRepost: _localPoll != null,
                 ),
               ],
             ],
@@ -1426,6 +1463,7 @@ class _ActionBar extends StatelessWidget {
     required this.onSave,
     this.onRepost,
     this.onComment,
+    this.hideSaveRepost = false,
   });
   final FeedPostState state;
   final VoidCallback onLike;
@@ -1433,6 +1471,7 @@ class _ActionBar extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback? onRepost;
   final VoidCallback? onComment;
+  final bool hideSaveRepost;
 
   @override
   Widget build(BuildContext context) {
@@ -1471,35 +1510,37 @@ class _ActionBar extends StatelessWidget {
               onTap: commentsLocked ? () {} : (onComment ?? () {}),
             ),
           ),
-          Expanded(
-            child: _ActionButton(
-              icon: Icons.repeat_rounded,
-              label: lc.t('post.actions.repost'),
-              color: scheme.onSurfaceVariant,
-              onTap:
-                  onRepost ??
-                  () {
-                    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                      SnackBar(
-                        content: Text(LanguageController.instance.t('post.repostUnavailable')),
-                        backgroundColor: const Color(0xFFB91C1C),
-                      ),
-                    );
-                  },
+          if (!hideSaveRepost)
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.repeat_rounded,
+                label: lc.t('post.actions.repost'),
+                color: scheme.onSurfaceVariant,
+                onTap:
+                    onRepost ??
+                    () {
+                      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                        SnackBar(
+                          content: Text(LanguageController.instance.t('post.repostUnavailable')),
+                          backgroundColor: const Color(0xFFB91C1C),
+                        ),
+                      );
+                    },
+              ),
             ),
-          ),
-          Expanded(
-            child: _ActionButton(
-              icon: state.saved
-                  ? Icons.bookmark_rounded
-                  : Icons.bookmark_border_rounded,
-              label: lc.t('post.actions.save'),
-              color: state.saved
-                  ? const Color(0xFF4AA3E4)
-                  : scheme.onSurfaceVariant,
-              onTap: onSave,
+          if (!hideSaveRepost)
+            Expanded(
+              child: _ActionButton(
+                icon: state.saved
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                label: lc.t('post.actions.save'),
+                color: state.saved
+                    ? const Color(0xFF4AA3E4)
+                    : scheme.onSurfaceVariant,
+                onTap: onSave,
+              ),
             ),
-          ),
         ],
       ),
     );

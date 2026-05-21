@@ -73,4 +73,35 @@ class PollsApiService {
       body: {'optionIndexes': optionIndexes},
     );
   }
+
+  static Future<Map<String, dynamic>> fetchPollVoters({
+    required String pollId,
+    int? optionIndex,
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final params = <String, String>{
+      'limit': '$limit',
+      if (cursor != null) 'cursor': cursor,
+      if (optionIndex != null) 'optionIndex': '$optionIndex',
+    };
+    final query = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    final path = '/polls/$pollId/voters${query.isNotEmpty ? '?$query' : ''}';
+    return ApiService.get(path, extraHeaders: _authHeaders);
+  }
+
+  static Future<void> updatePoll({
+    required String pollId,
+    List<String>? options,
+    bool? allowMultipleAnswers,
+  }) async {
+    await ApiService.patch(
+      '/polls/$pollId',
+      extraHeaders: _authHeaders,
+      body: {
+        if (options != null) 'options': options,
+        if (allowMultipleAnswers != null) 'allowMultipleAnswers': allowMultipleAnswers,
+      },
+    );
+  }
 }

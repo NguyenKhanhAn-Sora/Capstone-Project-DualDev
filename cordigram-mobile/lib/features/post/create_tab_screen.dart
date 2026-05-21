@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'create_post_screen.dart';
 import 'create_reel_screen.dart';
+import 'create_poll_post_screen.dart';
 import '../livestream/create_livestream_screen.dart';
 import '../../core/services/language_controller.dart';
 
@@ -16,7 +17,7 @@ class CreateTabScreen extends StatefulWidget {
 
 class _CreateTabScreenState extends State<CreateTabScreen>
     with SingleTickerProviderStateMixin {
-  static const int _kTabCount = 3;
+  static const int _kTabCount = 4;
   late TabController _tabCtrl;
 
   void _handleTabChanged() {
@@ -77,9 +78,10 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                 children: [
                   CreatePostScreen(showHeader: false, onPostCreated: () {}),
                   CreateReelScreen(showHeader: false, onReelCreated: () {}),
+                  CreatePollPostScreen(showHeader: false, onPostCreated: () {}),
                   CreateLivestreamScreen(
                     showHeader: false,
-                    isActive: _tabCtrl.index == 2,
+                    isActive: _tabCtrl.index == 3,
                     onLivestreamCreated: (_) {},
                   ),
                 ],
@@ -118,6 +120,8 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                           ? LanguageController.instance.t('post.createTab.createPost')
                           : _tabCtrl.index == 1
                           ? LanguageController.instance.t('post.createTab.createReel')
+                          : _tabCtrl.index == 2
+                          ? 'Create poll post'
                           : LanguageController.instance.t('post.createTab.createLive'),
                       style: TextStyle(
                         color: scheme.onSurface,
@@ -131,6 +135,8 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                           ? LanguageController.instance.t('post.createTab.postSubtitle')
                           : _tabCtrl.index == 1
                           ? LanguageController.instance.t('post.createTab.reelSubtitle')
+                          : _tabCtrl.index == 2
+                          ? 'Ask your audience a question'
                           : LanguageController.instance.t('post.createTab.liveSubtitle'),
                       style: TextStyle(
                         color: scheme.onSurfaceVariant,
@@ -166,10 +172,16 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                   onTap: () => _safeAnimateTo(1),
                 ),
                 _PillTab(
-                  label: LanguageController.instance.t('post.createTab.live'),
-                  icon: Icons.wifi_tethering_rounded,
+                  label: 'Poll',
+                  icon: Icons.poll_outlined,
                   active: _tabCtrl.index == 2,
                   onTap: () => _safeAnimateTo(2),
+                ),
+                _PillTab(
+                  label: LanguageController.instance.t('post.createTab.live'),
+                  icon: Icons.wifi_tethering_rounded,
+                  active: _tabCtrl.index == 3,
+                  onTap: () => _safeAnimateTo(3),
                 ),
               ],
             ),
