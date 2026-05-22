@@ -16,6 +16,8 @@ export type BoostLimits = {
   serverBoostSlots: number;
   crossServerEmojis: boolean;
   crossServerStickers: boolean;
+  /** Gửi sticker máy chủ (từ máy chủ đã tham gia) trong tin nhắn trực tiếp */
+  dmServerStickers: boolean;
 };
 
 export type BoostStatusResponse = {
@@ -34,6 +36,7 @@ const BASIC_LIMITS: BoostLimits = {
   serverBoostSlots: 0,
   crossServerEmojis: true,
   crossServerStickers: false,
+  dmServerStickers: true,
 };
 
 const BOOST_LIMITS: BoostLimits = {
@@ -42,6 +45,7 @@ const BOOST_LIMITS: BoostLimits = {
   serverBoostSlots: 2,
   crossServerEmojis: true,
   crossServerStickers: true,
+  dmServerStickers: true,
 };
 
 /** Giới hạn upload mặc định (không gói Boost): 100MB — DM, máy chủ, avatar/banner, v.v. */
@@ -53,6 +57,7 @@ const FREE_LIMITS: BoostLimits = {
   serverBoostSlots: 0,
   crossServerEmojis: false,
   crossServerStickers: false,
+  dmServerStickers: false,
 };
 
 @Injectable()

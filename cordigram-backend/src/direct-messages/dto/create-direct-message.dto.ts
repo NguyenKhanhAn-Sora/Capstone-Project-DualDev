@@ -32,6 +32,18 @@ export class CreateDirectMessageDto {
 
   @IsString()
   @IsOptional()
+  customStickerUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  serverStickerId?: string;
+
+  @IsString()
+  @IsOptional()
+  serverStickerServerId?: string;
+
+  @IsString()
+  @IsOptional()
   voiceUrl?: string;
 
   @IsNumber()

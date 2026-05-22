@@ -49,6 +49,12 @@ export class DirectMessage extends Document {
   giphyId: string | null;
 
   @Prop({ type: String, default: null })
+  customStickerUrl: string | null;
+
+  @Prop({ type: Types.ObjectId, default: null })
+  serverStickerId: Types.ObjectId | null;
+
+  @Prop({ type: String, default: null })
   voiceUrl: string | null;
 
   @Prop({ type: Number, default: null })

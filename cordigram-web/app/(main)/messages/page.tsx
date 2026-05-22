@@ -5725,70 +5725,138 @@ export default function MessagesPage() {
   const handleSendServerSticker = async (
     sel: Extract<GiphyPickerSelection, { source: "server" }>,
   ) => {
-    if (!selectedChannel || selectedDirectMessageFriend) {
-      setError("Sticker máy chủ chỉ dùng trong kênh máy chủ.");
+    const label = sel.name?.trim() ? `:${sel.name}:` : "Sticker máy chủ";
+
+    if (selectedChannel && !selectedDirectMessageFriend) {
+      try {
+        shouldAutoScrollRef.current = true;
+        const newMsg = await serversApi.createMessage(
+          selectedChannel,
+          label,
+          undefined,
+          replyingTo?.id,
+          undefined,
+          "sticker",
+          undefined,
+          undefined,
+          undefined,
+          {
+            customStickerUrl: sel.imageUrl,
+            serverStickerId: sel.stickerId,
+            serverStickerServerId: sel.serverId,
+          },
+        );
+        const rawStickerId = (newMsg as serversApi.Message).serverStickerId;
+        const serverStickerIdResolved: string =
+          rawStickerId != null && String(rawStickerId).length > 0
+            ? String(rawStickerId)
+            : sel.stickerId;
+        const uiMsg: UIMessage = {
+          id: newMsg._id,
+          text: newMsg.content,
+          senderId:
+            typeof newMsg.senderId === "string"
+              ? newMsg.senderId
+              : newMsg.senderId._id,
+          senderEmail: "",
+          senderName: selfMessagingIdentity.chatUsername || "",
+          senderDisplayName:
+            servers
+              .find((s) => s._id === selectedServer)
+              ?.members?.find((m) => String(m.userId) === String(currentUserId))
+              ?.nickname?.trim() ||
+            currentUserProfile?.displayName ||
+            undefined,
+          senderAvatar: selfMessagingIdentity.avatar,
+          timestamp: new Date(newMsg.createdAt),
+          isFromCurrentUser: true,
+          type: "server",
+          messageType: "sticker",
+          customStickerUrl: (() => {
+            const fromApi = (newMsg as serversApi.Message).customStickerUrl;
+            return typeof fromApi === "string" && fromApi.length > 0
+              ? fromApi
+              : sel.imageUrl;
+          })(),
+          serverStickerId: serverStickerIdResolved,
+          replyTo: replyingTo?.id ?? undefined,
+          reactions: [],
+        };
+        setMessages((prev) => appendServerMessage(prev, uiMsg));
+        setReplyingTo(null);
+      } catch (err) {
+        console.error("Failed to send server sticker:", err);
+        setError("Không gửi được sticker máy chủ");
+      }
       return;
     }
+
+    if (!selectedDirectMessageFriend) {
+      setError("Chọn cuộc trò chuyện để gửi sticker.");
+      return;
+    }
+
+    const canDmServerStickers =
+      boostStatus?.active === true ||
+      boostStatus?.limits?.dmServerStickers === true;
+    if (!canDmServerStickers) {
+      setError(
+        "Cần gói Boost hoặc Boost cơ bản để gửi sticker máy chủ trong tin nhắn trực tiếp.",
+      );
+      return;
+    }
+
+    const friendId = selectedDirectMessageFriend._id;
     try {
       shouldAutoScrollRef.current = true;
-      const label = sel.name?.trim() ? `:${sel.name}:` : "Sticker máy chủ";
-      const newMsg = await serversApi.createMessage(
-        selectedChannel,
-        label,
-        undefined,
-        replyingTo?.id,
-        undefined,
-        "sticker",
-        undefined,
-        undefined,
-        undefined,
-        {
-          customStickerUrl: sel.imageUrl,
-          serverStickerId: sel.stickerId,
-          serverStickerServerId: sel.serverId,
-        },
-      );
-      const rawStickerId = (newMsg as serversApi.Message).serverStickerId;
-      const serverStickerIdResolved: string =
-        rawStickerId != null && String(rawStickerId).length > 0
-          ? String(rawStickerId)
-          : sel.stickerId;
-      const uiMsg: UIMessage = {
-        id: newMsg._id,
-        text: newMsg.content,
-        senderId:
-          typeof newMsg.senderId === "string"
-            ? newMsg.senderId
-            : newMsg.senderId._id,
+      const optimisticMessage: UIMessage = {
+        id: `temp-${Date.now()}-${Math.random()}`,
+        text: label,
+        senderId: currentUserId,
         senderEmail: "",
+        senderDisplayName: selfMessagingIdentity.displayName || undefined,
         senderName: selfMessagingIdentity.chatUsername || "",
-        senderDisplayName:
-          servers
-            .find((s) => s._id === selectedServer)
-            ?.members?.find((m) => String(m.userId) === String(currentUserId))
-            ?.nickname?.trim() ||
-          currentUserProfile?.displayName ||
-          undefined,
         senderAvatar: selfMessagingIdentity.avatar,
-        timestamp: new Date(newMsg.createdAt),
+        timestamp: new Date(),
         isFromCurrentUser: true,
-        type: "server",
+        type: "direct",
+        isRead: false,
         messageType: "sticker",
-        customStickerUrl: (() => {
-          const fromApi = (newMsg as serversApi.Message).customStickerUrl;
-          return typeof fromApi === "string" && fromApi.length > 0
-            ? fromApi
-            : sel.imageUrl;
-        })(),
-        serverStickerId: serverStickerIdResolved,
-        replyTo: replyingTo?.id ?? undefined,
-        reactions: [],
+        customStickerUrl: sel.imageUrl,
+        serverStickerId: sel.stickerId,
+        replyTo: replyingTo?.id,
       };
-      setMessages((prev) => appendServerMessage(prev, uiMsg));
+
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        const currentMessages = newMap.get(friendId) || [];
+        newMap.set(friendId, [...currentMessages, optimisticMessage]);
+        return newMap;
+      });
+
+      await sendDirectMessage(friendId, {
+        token,
+        content: label,
+        type: "sticker",
+        customStickerUrl: sel.imageUrl,
+        serverStickerId: sel.stickerId,
+        serverStickerServerId: sel.serverId,
+        replyTo: replyingTo?.id,
+      });
+
       setReplyingTo(null);
     } catch (err) {
-      console.error("Failed to send server sticker:", err);
+      console.error("Failed to send server sticker in DM:", err);
       setError("Không gửi được sticker máy chủ");
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        const list = newMap.get(friendId) || [];
+        newMap.set(
+          friendId,
+          list.filter((m) => !m.id.startsWith("temp-")),
+        );
+        return newMap;
+      });
     }
   };
 

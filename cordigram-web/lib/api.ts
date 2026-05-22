@@ -3658,6 +3658,9 @@ export async function sendDirectMessage(
     attachments?: string[];
     type?: "text" | "gif" | "sticker" | "voice";
     giphyId?: string;
+    customStickerUrl?: string;
+    serverStickerId?: string;
+    serverStickerServerId?: string;
     voiceUrl?: string;
     voiceDuration?: number;
     replyTo?: string;
@@ -3679,6 +3682,15 @@ export async function sendDirectMessage(
       attachments: opts.attachments || [],
       type: opts.type || "text",
       giphyId: opts.giphyId || undefined,
+      ...(opts.customStickerUrl
+        ? { customStickerUrl: opts.customStickerUrl }
+        : {}),
+      ...(opts.serverStickerId
+        ? { serverStickerId: opts.serverStickerId }
+        : {}),
+      ...(opts.serverStickerServerId
+        ? { serverStickerServerId: opts.serverStickerServerId }
+        : {}),
       voiceUrl: opts.voiceUrl || undefined,
       voiceDuration: opts.voiceDuration || undefined,
       replyTo: opts.replyTo || undefined,

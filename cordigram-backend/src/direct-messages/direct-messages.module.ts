@@ -12,11 +12,14 @@ import { MessageReport, MessageReportSchema } from './message-report.schema';
 import { UsersModule } from '../users/users.module';
 import { MessagingProfilesModule } from '../messaging-profiles/messaging-profiles.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { BoostModule } from '../boost/boost.module';
+import { Server, ServerSchema } from '../servers/server.schema';
 
 @Module({
   imports: [
     forwardRef(() => UsersModule),
     forwardRef(() => MessagingProfilesModule),
+    forwardRef(() => BoostModule),
     NotificationsModule,
     MongooseModule.forFeature([
       { name: DirectMessage.name, schema: DirectMessageSchema },
@@ -24,6 +27,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Profile.name, schema: ProfileSchema },
       { name: Follow.name, schema: FollowSchema },
       { name: MessageReport.name, schema: MessageReportSchema },
+      { name: Server.name, schema: ServerSchema },
     ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your_secret_key',

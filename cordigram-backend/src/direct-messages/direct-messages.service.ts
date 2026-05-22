@@ -23,6 +23,8 @@ import {
   type ParsedMessageSearch,
 } from '../messages/message-search-query.parser';
 import { MessagingProfilesService } from '../messaging-profiles/messaging-profiles.service';
+import { Server } from '../servers/server.schema';
+import { BoostService } from '../boost/boost.service';
 
 @Injectable()
 export class DirectMessagesService {
@@ -34,9 +36,96 @@ export class DirectMessagesService {
     @InjectModel(Follow.name) private followModel: Model<Follow>,
     @InjectModel(MessageReport.name)
     private messageReportModel: Model<MessageReport>,
+    @InjectModel(Server.name) private serverModel: Model<Server>,
     private readonly ignoredService: IgnoredService,
     private readonly messagingProfilesService: MessagingProfilesService,
+    private readonly boostService: BoostService,
   ) {}
+
+  private async resolveDmServerSticker(
+    senderId: string,
+    dto: CreateDirectMessageDto,
+  ): Promise<{
+    customStickerUrl: string;
+    serverStickerId: Types.ObjectId;
+  }> {
+    const messageType = dto.type || 'text';
+    if (messageType !== 'sticker') {
+      throw new BadRequestException(
+        'customStickerUrl/serverStickerId chỉ dùng với tin nhắn sticker',
+      );
+    }
+    if (
+      !dto.customStickerUrl?.trim() ||
+      !dto.serverStickerId?.trim()
+    ) {
+      throw new BadRequestException(
+        'Cần đủ customStickerUrl và serverStickerId cho sticker máy chủ',
+      );
+    }
+    if (dto.giphyId?.trim()) {
+      throw new BadRequestException(
+        'Không gửi đồng thời sticker Giphy và sticker máy chủ',
+      );
+    }
+
+    const boost = await this.boostService.getBoostStatus(senderId, 'messages');
+    if (!boost?.active) {
+      throw new ForbiddenException(
+        'Cần gói Boost hoặc Boost cơ bản để gửi sticker máy chủ trong tin nhắn trực tiếp',
+      );
+    }
+
+    const sourceServerIdRaw = dto.serverStickerServerId?.trim() || '';
+    if (!sourceServerIdRaw || !Types.ObjectId.isValid(sourceServerIdRaw)) {
+      throw new BadRequestException('Thiếu máy chủ nguồn của sticker');
+    }
+
+    const srvStickers = await this.serverModel
+      .findById(sourceServerIdRaw)
+      .select('customStickers members ownerId')
+      .lean()
+      .exec();
+    if (!srvStickers) {
+      throw new BadRequestException('Server sticker source not found');
+    }
+
+    const isOwner =
+      String((srvStickers as any).ownerId) === String(senderId) ||
+      String((srvStickers as any).ownerId?._id ?? '') === String(senderId);
+    const isMember =
+      isOwner ||
+      (Array.isArray((srvStickers as any).members) &&
+        (srvStickers as any).members.some(
+          (m: any) =>
+            (m?.userId?._id ?? m?.userId)?.toString?.() === String(senderId),
+        ));
+    if (!isMember) {
+      throw new ForbiddenException(
+        'Bạn phải tham gia máy chủ chứa sticker để gửi trong tin nhắn trực tiếp',
+      );
+    }
+
+    const sid = dto.serverStickerId.trim();
+    const sticker = ((srvStickers as any)?.customStickers || []).find(
+      (s: any) => s._id?.toString() === sid,
+    );
+    if (!sticker) {
+      throw new BadRequestException('Sticker không thuộc máy chủ nguồn');
+    }
+    if (
+      String(sticker.imageUrl).trim() !== dto.customStickerUrl.trim()
+    ) {
+      throw new BadRequestException(
+        'URL sticker không khớp với dữ liệu máy chủ',
+      );
+    }
+
+    return {
+      customStickerUrl: sticker.imageUrl,
+      serverStickerId: new Types.ObjectId(sid),
+    };
+  }
 
   /** Tin nhận được, chưa đọc, chưa xóa với mọi người, và chưa ẩn "for me". */
   private unreadReceiverMatch(userId: string, fromUserId?: string) {
@@ -58,12 +147,31 @@ export class DirectMessagesService {
     receiverId: string,
     createDirectMessageDto: CreateDirectMessageDto,
   ): Promise<DirectMessage> {
+    const hasCustomStickerFields = !!(
+      createDirectMessageDto.customStickerUrl?.trim() ||
+      createDirectMessageDto.serverStickerId?.trim()
+    );
+
+    let resolvedCustomStickerUrl: string | null = null;
+    let resolvedServerStickerId: Types.ObjectId | null = null;
+
+    if (hasCustomStickerFields) {
+      const resolved = await this.resolveDmServerSticker(
+        senderId,
+        createDirectMessageDto,
+      );
+      resolvedCustomStickerUrl = resolved.customStickerUrl;
+      resolvedServerStickerId = resolved.serverStickerId;
+    }
+
     const message = new this.directMessageModel({
       senderId: new Types.ObjectId(senderId),
       receiverId: new Types.ObjectId(receiverId),
       content: createDirectMessageDto.content,
       type: createDirectMessageDto.type || 'text',
       giphyId: createDirectMessageDto.giphyId || null,
+      customStickerUrl: resolvedCustomStickerUrl,
+      serverStickerId: resolvedServerStickerId,
       voiceUrl: createDirectMessageDto.voiceUrl ?? null,
       voiceDuration: createDirectMessageDto.voiceDuration ?? null,
       attachments: createDirectMessageDto.attachments || [],
