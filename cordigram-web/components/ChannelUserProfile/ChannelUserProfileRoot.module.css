@@ -341,18 +341,29 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-.dropdown.miniAside {
-  right: 0;
-  left: auto;
-  top: calc(100% + 6px);
-  margin-top: 0;
-  z-index: 10090;
+/* Menu cố định trên viewport — render qua portal, không bị banner overflow cắt */
+.dropdownFloating {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 240px;
+  max-height: min(320px, calc(100vh - 16px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 0;
+  z-index: 10120;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--color-chat-text-secondary, #949ba4) 55%, transparent)
+    transparent;
 }
 
-.dropdown.fullAside {
-  right: 0;
-  top: calc(100% + 4px);
-  margin-top: 0;
+.dropdownFloating::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdownFloating::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--color-chat-text-secondary, #949ba4) 45%, transparent);
 }
 
 .popoverFull {
@@ -492,12 +503,14 @@
   display: block;
   width: 100%;
   text-align: left;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border: none;
   background: transparent;
   color: var(--color-chat-text-strong, #f2f3f5);
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.35;
   cursor: pointer;
+  transition: background 0.12s ease;
 }
 
 .dropdownItem:hover {
@@ -682,13 +695,18 @@
   right: calc(100% + 6px);
   left: auto;
   top: 0;
-  min-width: 220px;
+  min-width: 200px;
+  max-width: 240px;
   background: var(--color-chat-modal, #111214);
   border: 1px solid var(--color-chat-modal-border, #2b2d31);
   border-radius: 8px;
-  padding: 6px 0;
-  z-index: 10095;
+  padding: 4px 0;
+  z-index: 2;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.dropdownFloating .subDropdown {
+  z-index: 10125;
 }
 
 .subDropdownItem {

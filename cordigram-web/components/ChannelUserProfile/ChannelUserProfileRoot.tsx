@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 import { useMessagesUiTone } from "@/hooks/use-messages-ui-tone";
@@ -212,6 +219,25 @@ const MUTE_DURATION_KEYS: MentionMuteDuration[] = [
   "forever",
 ];
 
+const MORE_MENU_WIDTH = 240;
+const MORE_MENU_MAX_HEIGHT = 320;
+
+function computeFloatingMenuPosition(anchor: DOMRect): { top: number; left: number } {
+  const pad = 8;
+  const menuW = MORE_MENU_WIDTH;
+  const menuH = MORE_MENU_MAX_HEIGHT;
+  let left = anchor.right - menuW;
+  let top = anchor.bottom + 6;
+  if (left < pad) left = pad;
+  if (left + menuW > window.innerWidth - pad) {
+    left = Math.max(pad, window.innerWidth - menuW - pad);
+  }
+  if (top + menuH > window.innerHeight - pad) {
+    top = Math.max(pad, anchor.top - menuH - 6);
+  }
+  return { top, left };
+}
+
 export default function ChannelUserProfileRoot({
   open,
   context,
@@ -233,9 +259,19 @@ export default function ChannelUserProfileRoot({
   const [muteSubOpen, setMuteSubOpen] = useState(false);
   const [inviteServerModalOpen, setInviteServerModalOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const fullMoreRef = useRef<HTMLDivElement>(null);
+  const fullMoreBtnRef = useRef<HTMLButtonElement>(null);
+  const fullMoreMenuRef = useRef<HTMLDivElement>(null);
   const muteSubRef = useRef<HTMLDivElement>(null);
   const popoverChromeRef = useRef<HTMLDivElement>(null);
+  const [miniMenuPos, setMiniMenuPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+  const [fullMenuPos, setFullMenuPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
   const messagesUiTone = useMessagesUiTone();
   const { t, language } = useLanguage();
   const [fullTab, setFullTab] = useState<"activity" | "follow" | "servers">(
@@ -361,6 +397,8 @@ export default function ChannelUserProfileRoot({
       if (popoverChromeRef.current) {
         syncMessagesChromeVars(popoverChromeRef.current);
       }
+      if (moreMenuRef.current) syncMessagesChromeVars(moreMenuRef.current);
+      if (fullMoreMenuRef.current) syncMessagesChromeVars(fullMoreMenuRef.current);
     };
     sync();
     window.addEventListener("cordigram-messages-chrome", sync);
@@ -371,7 +409,57 @@ export default function ChannelUserProfileRoot({
       window.removeEventListener("cordigram-messages-shell-theme", sync);
       window.removeEventListener("cordigram-chat-settings", sync);
     };
-  }, [open]);
+  }, [open, moreOpen, fullMoreOpen]);
+
+  useLayoutEffect(() => {
+    if (!moreOpen) {
+      setMiniMenuPos(null);
+      return;
+    }
+    const update = () => {
+      const btn = moreBtnRef.current;
+      if (!btn) return;
+      setMiniMenuPos(computeFloatingMenuPosition(btn.getBoundingClientRect()));
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [moreOpen]);
+
+  useLayoutEffect(() => {
+    if (!fullMoreOpen) {
+      setFullMenuPos(null);
+      return;
+    }
+    const update = () => {
+      const btn = fullMoreBtnRef.current;
+      if (!btn) return;
+      setFullMenuPos(computeFloatingMenuPosition(btn.getBoundingClientRect()));
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [fullMoreOpen]);
+
+  useLayoutEffect(() => {
+    if (moreOpen && moreMenuRef.current) {
+      syncMessagesChromeVars(moreMenuRef.current);
+    }
+  }, [moreOpen, miniMenuPos]);
+
+  useLayoutEffect(() => {
+    if (fullMoreOpen && fullMoreMenuRef.current) {
+      syncMessagesChromeVars(fullMoreMenuRef.current);
+    }
+  }, [fullMoreOpen, fullMenuPos]);
 
   useEffect(() => {
     if (!moreOpen && !fullMoreOpen && !inviteServerModalOpen) return;
@@ -379,15 +467,21 @@ export default function ChannelUserProfileRoot({
       const t = e.target as Node;
       if (
         moreOpen &&
-        moreRef.current &&
-        !moreRef.current.contains(t) &&
+        !moreRef.current?.contains(t) &&
+        !moreMenuRef.current?.contains(t) &&
         !muteSubRef.current?.contains(t)
       ) {
         setMoreOpen(false);
         setMuteSubOpen(false);
       }
-      if (fullMoreOpen && fullMoreRef.current && !fullMoreRef.current.contains(t)) {
+      if (
+        fullMoreOpen &&
+        !fullMoreRef.current?.contains(t) &&
+        !fullMoreMenuRef.current?.contains(t) &&
+        !muteSubRef.current?.contains(t)
+      ) {
         setFullMoreOpen(false);
+        setMuteSubOpen(false);
       }
     };
     document.addEventListener("click", onDoc);
@@ -578,12 +672,11 @@ export default function ChannelUserProfileRoot({
     }
   };
 
-  const renderMoreMenu = (
-    placement: "miniAside" | "fullAside",
-    opts: { onViewFull?: () => void; closeMore: () => void },
-  ) =>
-    profile && friend ? (
-      <div className={`${styles.dropdown} ${styles[placement]}`}>
+  const renderMoreMenuInner = (opts: {
+    onViewFull?: () => void;
+    closeMore: () => void;
+  }) => (
+    <>
         {opts.onViewFull ? (
           <button
             type="button"
@@ -652,8 +745,30 @@ export default function ChannelUserProfileRoot({
       >
         {t("chat.channelUserProfile.reportProfile")}
       </button>
-    </div>
-  ) : null;
+    </>
+  );
+
+  const renderMoreMenuPortal = (
+    open: boolean,
+    pos: { top: number; left: number } | null,
+    menuRef: React.RefObject<HTMLDivElement | null>,
+    opts: { onViewFull?: () => void; closeMore: () => void },
+  ) => {
+    if (!open || !pos || !profile || !friend) return null;
+    return createPortal(
+      <div
+        ref={menuRef}
+        role="menu"
+        className={`${styles.dropdown} ${styles.dropdownFloating} ${messagesUiTone === "light" ? styles.popoverLight : ""}`}
+        style={{ top: pos.top, left: pos.left, width: MORE_MENU_WIDTH }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {renderMoreMenuInner(opts)}
+      </div>,
+      document.body,
+    );
+  };
 
   const inviteServerModal =
     inviteServerModalOpen && friend ? (
@@ -792,9 +907,12 @@ export default function ChannelUserProfileRoot({
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
+                  ref={fullMoreBtnRef}
                   type="button"
                   className={styles.fullIconActionBtn}
                   aria-label={t("chat.channelUserProfile.more")}
+                  aria-haspopup="menu"
+                  aria-expanded={fullMoreOpen}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -803,16 +921,12 @@ export default function ChannelUserProfileRoot({
                     e.preventDefault();
                     e.stopPropagation();
                     setMoreOpen(false);
+                    setMuteSubOpen(false);
                     setFullMoreOpen((v) => !v);
                   }}
                 >
                   <IconMore />
                 </button>
-                {fullMoreOpen
-                  ? renderMoreMenu("fullAside", {
-                      closeMore: () => setFullMoreOpen(false),
-                    })
-                  : null}
               </div>
             </div>
             <div className={styles.fullJoinBlock}>
@@ -1035,9 +1149,12 @@ export default function ChannelUserProfileRoot({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
+                    ref={moreBtnRef}
                     type="button"
                     className={styles.bannerIconBtn}
                     aria-label={t("chat.channelUserProfile.more")}
+                    aria-haspopup="menu"
+                    aria-expanded={moreOpen}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -1046,17 +1163,12 @@ export default function ChannelUserProfileRoot({
                       e.preventDefault();
                       e.stopPropagation();
                       setFullMoreOpen(false);
+                      setMuteSubOpen(false);
                       setMoreOpen((v) => !v);
                     }}
                   >
                     <IconMore />
                   </button>
-                  {moreOpen
-                    ? renderMoreMenu("miniAside", {
-                        onViewFull: () => setView("full"),
-                        closeMore: () => setMoreOpen(false),
-                      })
-                    : null}
                 </div>
               </div>
             </div>
@@ -1161,6 +1273,18 @@ export default function ChannelUserProfileRoot({
     </div>
   );
 
-  return createPortal(card, document.body);
+  return createPortal(
+    <>
+      {card}
+      {renderMoreMenuPortal(moreOpen, miniMenuPos, moreMenuRef, {
+        onViewFull: () => setView("full"),
+        closeMore: () => setMoreOpen(false),
+      })}
+      {renderMoreMenuPortal(fullMoreOpen, fullMenuPos, fullMoreMenuRef, {
+        closeMore: () => setFullMoreOpen(false),
+      })}
+    </>,
+    document.body,
+  );
 }
 
