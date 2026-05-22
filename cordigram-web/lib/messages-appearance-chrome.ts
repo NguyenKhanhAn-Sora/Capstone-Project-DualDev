@@ -176,3 +176,31 @@ export function flushMessagesChromeToRoot(userId: string): void {
   applyMessagesRootChromeFromStorage(root, userId, getMessagesShellTheme());
   dispatchMessagesChromeChanged();
 }
+
+/** CSS variables set on `#cordigram-messages-root` — copy to portaled overlays (profile popover, etc.). */
+export const MESSAGES_CHROME_CSS_VARS = [
+  "--accent-color",
+  "--accent-hover",
+  "--accent-soft",
+  "--color-panel-context",
+  "--color-panel-border",
+  "--color-panel-hover",
+  "--color-chat-modal",
+  "--color-chat-modal-border",
+  "--color-chat-text-strong",
+  "--color-chat-text-secondary",
+  "--color-chat-hover",
+  "--color-chat-input",
+  "--color-chat-input-border",
+] as const;
+
+export function syncMessagesChromeVars(target: HTMLElement): void {
+  if (typeof window === "undefined") return;
+  const root = document.getElementById("cordigram-messages-root");
+  if (!root) return;
+  const cs = getComputedStyle(root);
+  for (const name of MESSAGES_CHROME_CSS_VARS) {
+    const val = cs.getPropertyValue(name).trim();
+    if (val) target.style.setProperty(name, val);
+  }
+}

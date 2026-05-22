@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useTheme } from "@/component/theme-provider";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
+import { useMessagesUiTone } from "@/hooks/use-messages-ui-tone";
+import { syncMessagesChromeVars } from "@/lib/messages-appearance-chrome";
 import styles from "./ChannelUserProfileRoot.module.css";
 import type { Friend } from "@/lib/servers-api";
 import { parseUserCover } from "@/lib/user-profile-cover";
@@ -234,7 +235,8 @@ export default function ChannelUserProfileRoot({
   const moreRef = useRef<HTMLDivElement>(null);
   const fullMoreRef = useRef<HTMLDivElement>(null);
   const muteSubRef = useRef<HTMLDivElement>(null);
-  const { theme } = useTheme();
+  const popoverChromeRef = useRef<HTMLDivElement>(null);
+  const messagesUiTone = useMessagesUiTone();
   const { t, language } = useLanguage();
   const [fullTab, setFullTab] = useState<"activity" | "follow" | "servers">(
     "activity",
@@ -354,6 +356,24 @@ export default function ChannelUserProfileRoot({
   }, [open, context]);
 
   useEffect(() => {
+    if (!open) return;
+    const sync = () => {
+      if (popoverChromeRef.current) {
+        syncMessagesChromeVars(popoverChromeRef.current);
+      }
+    };
+    sync();
+    window.addEventListener("cordigram-messages-chrome", sync);
+    window.addEventListener("cordigram-messages-shell-theme", sync);
+    window.addEventListener("cordigram-chat-settings", sync);
+    return () => {
+      window.removeEventListener("cordigram-messages-chrome", sync);
+      window.removeEventListener("cordigram-messages-shell-theme", sync);
+      window.removeEventListener("cordigram-chat-settings", sync);
+    };
+  }, [open]);
+
+  useEffect(() => {
     if (!moreOpen && !fullMoreOpen && !inviteServerModalOpen) return;
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
@@ -407,9 +427,10 @@ export default function ChannelUserProfileRoot({
         style: { background: parsed.bannerSolidHex } as React.CSSProperties,
       };
     }
-    const placeholder = theme === "dark" ? BANNER_WHITE_SVG : BANNER_BLACK_SVG;
+    const placeholder =
+      messagesUiTone === "dark" ? BANNER_WHITE_SVG : BANNER_BLACK_SVG;
     return { kind: "placeholder" as const, src: placeholder };
-  }, [theme, serverCoverOverride]);
+  }, [messagesUiTone, serverCoverOverride]);
 
   const avatarUrl = useMemo(
     () =>
@@ -691,7 +712,8 @@ export default function ChannelUserProfileRoot({
     >
       {inviteServerModal}
       <div
-        className={`${styles.fullModalCard} ${theme === "light" ? styles.popoverLight : ""}`}
+        ref={popoverChromeRef}
+        className={`${styles.fullModalCard} ${messagesUiTone === "light" ? styles.popoverLight : ""}`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
@@ -764,7 +786,11 @@ export default function ChannelUserProfileRoot({
               >
                 <IconMessage />
               </button>
-              <div className={styles.moreWrap} ref={fullMoreRef}>
+              <div
+                className={styles.moreWrap}
+                ref={fullMoreRef}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   type="button"
                   className={styles.fullIconActionBtn}
@@ -774,7 +800,9 @@ export default function ChannelUserProfileRoot({
                     e.stopPropagation();
                   }}
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
+                    setMoreOpen(false);
                     setFullMoreOpen((v) => !v);
                   }}
                 >
@@ -953,7 +981,8 @@ export default function ChannelUserProfileRoot({
     >
       {inviteServerModal}
       <div
-        className={`${styles.popoverWrap} ${styles.popoverMini} ${theme === "light" ? styles.popoverLight : ""}`}
+        ref={popoverChromeRef}
+        className={`${styles.popoverWrap} ${styles.popoverMini} ${messagesUiTone === "light" ? styles.popoverLight : ""}`}
         style={{ left: miniPos.left, top: miniPos.top, width: POPUP_MINI_W }}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDownCapture={(e) => {
@@ -1000,7 +1029,11 @@ export default function ChannelUserProfileRoot({
                     <IconUserAdd />
                   </button>
                 ) : null}
-                <div className={styles.moreWrap} ref={moreRef}>
+                <div
+                  className={styles.moreWrap}
+                  ref={moreRef}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     type="button"
                     className={styles.bannerIconBtn}
@@ -1010,7 +1043,9 @@ export default function ChannelUserProfileRoot({
                       e.stopPropagation();
                     }}
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
+                      setFullMoreOpen(false);
                       setMoreOpen((v) => !v);
                     }}
                   >
