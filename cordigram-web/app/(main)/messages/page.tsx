@@ -56,6 +56,7 @@ import {
   markDmConversationRead,
   fetchUserSettings,
   fetchBoostStatus,
+  fetchApiHealth,
   type BoostStatusResponse,
   fetchMessagingProfileByUserId,
   fetchMessagingProfileMe,
@@ -1679,6 +1680,10 @@ export default function MessagesPage() {
     DEFAULT_FREE_MAX_UPLOAD_BYTES,
   );
   const [boostStatus, setBoostStatus] = useState<BoostStatusResponse | null>(null);
+  /** `supported` sau GET /health hoặc gửi sticker DM thành công; `unsupported` khi API cũ từ chối field sticker. */
+  const [dmApiServerStickerSupport, setDmApiServerStickerSupport] = useState<
+    "unknown" | "supported" | "unsupported"
+  >("unknown");
 
   const submitMessagesBoostCheckout = useCallback(
     async (opts?: { skipTierChangeConfirm?: boolean }) => {
@@ -3419,6 +3424,13 @@ export default function MessagesPage() {
         setBoostStatus(null);
         setMaxUploadBytes(DEFAULT_FREE_MAX_UPLOAD_BYTES);
       });
+    void fetchApiHealth().then((h) => {
+      if (h?.features?.dmServerStickers === true) {
+        setDmApiServerStickerSupport("supported");
+      } else if (h?.features && h.features.dmServerStickers === false) {
+        setDmApiServerStickerSupport("unsupported");
+      }
+    });
     void serversApi
       .getFollowing()
       .then((list) => setFollowingIds(new Set(list.map((f) => f._id))))
@@ -5809,6 +5821,13 @@ export default function MessagesPage() {
       return;
     }
 
+    if (dmApiServerStickerSupport === "unsupported") {
+      setError(
+        "Máy chủ API chưa được cập nhật để gửi sticker trong DM. Hãy deploy lại cordigram-backend (nhánh main mới nhất) rồi thử lại.",
+      );
+      return;
+    }
+
     const friendId = selectedDirectMessageFriend._id;
     if (!sel.serverId?.trim() || !sel.stickerId?.trim() || !sel.imageUrl?.trim()) {
       setError("Sticker không hợp lệ. Hãy chọn lại từ danh sách máy chủ.");
@@ -5851,6 +5870,7 @@ export default function MessagesPage() {
         replyTo: replyingTo?.id,
       });
 
+      setDmApiServerStickerSupport("supported");
       setReplyingTo(null);
     } catch (err) {
       console.error("Failed to send server sticker in DM:", err);
@@ -5858,9 +5878,18 @@ export default function MessagesPage() {
         err && typeof err === "object" && "message" in err
           ? String((err as { message?: string }).message || "")
           : "";
+      const apiOutdated =
+        apiMsg.includes("should not exist") &&
+        (apiMsg.includes("customStickerUrl") ||
+          apiMsg.includes("serverStickerId"));
+      if (apiOutdated) {
+        setDmApiServerStickerSupport("unsupported");
+      }
       setError(
-        apiMsg.trim() ||
-          "Không gửi được sticker máy chủ. Kiểm tra gói Boost và thử lại.",
+        apiOutdated
+          ? "Máy chủ API (api.cordigram.com) chưa được cập nhật. Deploy lại cordigram-backend từ nhánh main (có hỗ trợ sticker DM) rồi thử lại."
+          : apiMsg.trim() ||
+              "Không gửi được sticker máy chủ. Kiểm tra gói Boost và thử lại.",
       );
       setConversations((prev) => {
         const newMap = new Map(prev);

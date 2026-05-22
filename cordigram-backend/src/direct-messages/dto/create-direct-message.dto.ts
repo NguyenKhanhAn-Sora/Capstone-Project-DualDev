@@ -26,20 +26,20 @@ export class CreateDirectMessageDto {
   @IsOptional()
   callDuration?: number;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   giphyId?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   customStickerUrl?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   serverStickerId?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   serverStickerServerId?: string;
 
   @IsString()

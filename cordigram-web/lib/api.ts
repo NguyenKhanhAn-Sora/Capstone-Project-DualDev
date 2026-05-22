@@ -38,6 +38,26 @@ function normalizeApiBaseUrl(raw: string | undefined | null): string {
 
 export const apiBaseUrl = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE);
 
+export type ApiHealthResponse = {
+  ok?: boolean;
+  build?: string;
+  features?: { dmServerStickers?: boolean };
+};
+
+/** Kiểm tra API đã deploy hỗ trợ sticker máy chủ trong DM chưa. */
+export async function fetchApiHealth(): Promise<ApiHealthResponse | null> {
+  try {
+    const res = await fetch(`${apiBaseUrl}/health`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as ApiHealthResponse;
+  } catch {
+    return null;
+  }
+}
+
 // Debounce: only dispatch session-expired once per 30 s regardless of how many
 // concurrent requests fail with 401 at the same time.
 let _sessionExpiredFiredAt = 0;
@@ -3681,19 +3701,19 @@ export async function sendDirectMessage(
       content: opts.content || "",
       attachments: opts.attachments || [],
       type: opts.type || "text",
-      giphyId: opts.giphyId || undefined,
-      ...(opts.customStickerUrl
+      ...(opts.giphyId ? { giphyId: opts.giphyId } : {}),
+      ...(opts.type === "sticker" && opts.customStickerUrl
         ? { customStickerUrl: opts.customStickerUrl }
         : {}),
-      ...(opts.serverStickerId
+      ...(opts.type === "sticker" && opts.serverStickerId
         ? { serverStickerId: opts.serverStickerId }
         : {}),
-      ...(opts.serverStickerServerId
+      ...(opts.type === "sticker" && opts.serverStickerServerId
         ? { serverStickerServerId: opts.serverStickerServerId }
         : {}),
-      voiceUrl: opts.voiceUrl || undefined,
-      voiceDuration: opts.voiceDuration || undefined,
-      replyTo: opts.replyTo || undefined,
+      ...(opts.voiceUrl ? { voiceUrl: opts.voiceUrl } : {}),
+      ...(opts.voiceDuration != null ? { voiceDuration: opts.voiceDuration } : {}),
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
     }),
   });
 }
