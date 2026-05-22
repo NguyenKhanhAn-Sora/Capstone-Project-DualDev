@@ -262,6 +262,9 @@ class DirectMessagesService {
             unreadCount: 0,
             avatarUrl: (map['avatar'] ?? map['avatarUrl'])?.toString(),
             isOnline: map['isOnline'] == true,
+            lastActiveAt: DateTime.tryParse(
+              map['lastActiveAt']?.toString() ?? '',
+            )?.toLocal(),
           );
         })
         .where((c) => c.userId.isNotEmpty)
@@ -343,6 +346,7 @@ class DirectMessagesService {
         unreadCount: conv.unreadCount,
         avatarUrl: conv.avatarUrl ?? existing.avatarUrl,
         isOnline: conv.isOnline || existing.isOnline,
+        lastActiveAt: conv.lastActiveAt ?? existing.lastActiveAt,
       );
     }
 

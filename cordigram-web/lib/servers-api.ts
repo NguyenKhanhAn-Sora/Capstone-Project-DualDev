@@ -284,6 +284,8 @@ export interface Friend {
   displayNameAccentHex?: string | null;
   /** Trạng thái hoạt động (DM) — từ API available-users. */
   isOnline?: boolean;
+  /** ISO — lần hoạt động gần nhất (thiết bị / presence). */
+  lastActiveAt?: string | null;
 }
 
 // Servers

@@ -27,6 +27,9 @@ class MessageThreadTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final onlineText = languageCode == 'en' ? 'Online' : 'Trực tuyến';
     final offlineText = languageCode == 'en' ? 'Offline' : 'Ngoại tuyến';
+    final presenceText = thread.presenceLabel.trim().isNotEmpty
+        ? thread.presenceLabel
+        : (thread.isOnline ? onlineText : offlineText);
     final nameLetter = thread.name.trim().isNotEmpty
         ? thread.name.trim().substring(0, 1).toUpperCase()
         : '?';
@@ -134,7 +137,7 @@ class MessageThreadTile extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      thread.isOnline ? onlineText : offlineText,
+                      presenceText,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

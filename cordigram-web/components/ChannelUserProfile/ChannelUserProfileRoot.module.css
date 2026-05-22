@@ -25,7 +25,7 @@
 .miniCard {
   width: 340px;
   border-radius: 8px;
-  overflow: visible;
+  overflow: hidden;
   background: var(--color-panel-context, #111214);
   border: 1px solid var(--color-panel-border, #1e1f22);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -38,9 +38,12 @@
 
 .miniBanner {
   position: relative;
-  height: 72px;
-  overflow: visible;
+  flex-shrink: 0;
+  height: 100px;
+  min-height: 100px;
+  overflow: hidden;
   border-radius: 8px 8px 0 0;
+  z-index: 0;
 }
 
 .miniBannerMedia {
@@ -49,6 +52,7 @@
   overflow: hidden;
   border-radius: 8px 8px 0 0;
   pointer-events: none;
+  z-index: 0;
 }
 
 .bannerFallback {
@@ -69,12 +73,13 @@
 
 .miniBannerActions {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 10px;
+  right: 10px;
   display: flex;
   align-items: center;
   gap: 6px;
-  z-index: 5;
+  z-index: 3;
+  pointer-events: auto;
 }
 
 .bannerIconBtn {
@@ -103,14 +108,39 @@
 
 .miniBody {
   padding: 0 12px 12px;
-  margin-top: -36px;
+  margin-top: -40px;
   position: relative;
+  z-index: 1;
+  background: transparent;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Nền phần thân — không phủ lên banner (tránh che vùng banner + avatar) */
+.miniBody::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 48px;
+  bottom: 0;
   background: var(--color-panel-context, #111214);
   border-radius: 0 0 8px 8px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.popoverLight .miniBody::before {
+  background: var(--color-panel-context, #ffffff);
+}
+
+.miniBody > * {
+  position: relative;
+  z-index: 1;
 }
 
 .miniAvatarWrap {
   position: relative;
+  z-index: 2;
   width: 80px;
   height: 80px;
   margin-bottom: 8px;

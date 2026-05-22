@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useLanguage } from "@/component/language-provider";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 import styles from "./CallMessageCard.module.css";
 
 export type CallMessageMedia = "audio" | "video";
@@ -38,8 +38,11 @@ function formatDuration(
   return t("chat.callMessage.durationMinutesSeconds", { m: min, s: rem });
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function formatTime(date: Date, localeTag: string): string {
+  return date.toLocaleTimeString(localeTag, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function CallIcon({
@@ -81,17 +84,31 @@ export function CallMessageCard({
   timestamp,
   onCallBack,
 }: CallMessageCardProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const localeTag = localeTagForLanguage(language);
 
-  const isMissed = callStatus === "missed" || callStatus === "declined";
+  const isMissed = callStatus === "missed";
+  const isDeclined = callStatus === "declined";
+  const isCancelled = callStatus === "cancelled";
   const isVideo = callType === "video";
-  const isIncomingMissed =
-    isMissed &&
+  const isIncoming =
     callInitiatorId &&
     currentUserId &&
     callInitiatorId !== currentUserId;
+  const isIncomingMissed = isMissed && isIncoming;
+  const showMissedIcon = isMissed || isDeclined;
 
   const title = useMemo(() => {
+    if (isDeclined) {
+      return isVideo
+        ? t("chat.callMessage.declinedVideo")
+        : t("chat.callMessage.declinedVoice");
+    }
+    if (isCancelled) {
+      return isVideo
+        ? t("chat.callMessage.cancelledVideo")
+        : t("chat.callMessage.cancelledVoice");
+    }
     if (isMissed) {
       if (isIncomingMissed) {
         return isVideo
@@ -105,14 +122,33 @@ export function CallMessageCard({
     return isVideo
       ? t("chat.callMessage.completedVideo")
       : t("chat.callMessage.completedVoice");
-  }, [isMissed, isIncomingMissed, isVideo, t]);
+  }, [
+    isCancelled,
+    isDeclined,
+    isIncomingMissed,
+    isMissed,
+    isVideo,
+    t,
+  ]);
 
   const subtitle = useMemo(() => {
     if (callStatus === "completed" && callDurationSec != null) {
       return formatDuration(callDurationSec, t);
     }
-    return formatTime(timestamp);
-  }, [callDurationSec, callStatus, t, timestamp]);
+    if ((isMissed || isDeclined) && isIncoming) {
+      return t("chat.callMessage.noAnswer");
+    }
+    return formatTime(timestamp, localeTag);
+  }, [
+    callDurationSec,
+    callStatus,
+    isDeclined,
+    isIncoming,
+    isMissed,
+    localeTag,
+    t,
+    timestamp,
+  ]);
 
   return (
     <div
@@ -129,9 +165,9 @@ export function CallMessageCard({
     >
       <div className={styles.topRow}>
         <div
-          className={`${styles.iconCircle} ${isMissed ? styles.iconMissed : styles.iconOk}`}
+          className={`${styles.iconCircle} ${showMissedIcon ? styles.iconMissed : styles.iconOk}`}
         >
-          <CallIcon isVideo={isVideo} isMissed={isMissed} />
+          <CallIcon isVideo={isVideo} isMissed={showMissedIcon} />
         </div>
         <div className={styles.textCol}>
           <span className={styles.title}>{title}</span>

@@ -8,6 +8,7 @@ class DmConversation {
     required this.unreadCount,
     this.avatarUrl,
     this.isOnline = false,
+    this.lastActiveAt,
   });
 
   final String userId;
@@ -18,6 +19,7 @@ class DmConversation {
   final int unreadCount;
   final String? avatarUrl;
   final bool isOnline;
+  final DateTime? lastActiveAt;
 
   String get title => displayName.isNotEmpty ? displayName : username;
 
@@ -44,6 +46,9 @@ class DmConversation {
               : (json['isOnline'] is bool ? json['isOnline'] as bool : null)) ??
           ((peerMap['email'] ?? json['email'])?.toString().toLowerCase().contains('đang hoạt động') ??
               false),
+      lastActiveAt: DateTime.tryParse(
+            (json['lastActiveAt'] ?? peerMap['lastActiveAt'])?.toString() ?? '',
+          )?.toLocal(),
     );
   }
 }

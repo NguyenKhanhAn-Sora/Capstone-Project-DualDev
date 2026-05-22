@@ -42,6 +42,38 @@ export class DirectMessagesService {
     private readonly boostService: BoostService,
   ) {}
 
+  /** Lần hoạt động gần nhất từ thiết bị đăng nhập (fallback khi không có socket presence). */
+  async getLastSeenAtByUserIds(
+    userIds: string[],
+  ): Promise<Record<string, string | null>> {
+    const objectIds = userIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (objectIds.length === 0) return {};
+
+    const users = await this.userModel
+      .find({ _id: { $in: objectIds } })
+      .select('loginDevices')
+      .lean()
+      .exec();
+
+    const out: Record<string, string | null> = {};
+    for (const u of users as Array<{
+      _id: Types.ObjectId;
+      loginDevices?: Array<{ lastSeenAt?: Date }>;
+    }>) {
+      let lastMs = 0;
+      for (const d of u.loginDevices ?? []) {
+        if (d?.lastSeenAt) {
+          lastMs = Math.max(lastMs, new Date(d.lastSeenAt).getTime());
+        }
+      }
+      out[u._id.toString()] =
+        lastMs > 0 ? new Date(lastMs).toISOString() : null;
+    }
+    return out;
+  }
+
   private async resolveDmServerSticker(
     senderId: string,
     dto: CreateDirectMessageDto,
@@ -81,48 +113,45 @@ export class DirectMessagesService {
       throw new BadRequestException('Thiếu máy chủ nguồn của sticker');
     }
 
+    const senderObjectId = new Types.ObjectId(senderId);
+    const canAccessServer = await this.serverModel
+      .exists({
+        _id: new Types.ObjectId(sourceServerIdRaw),
+        $or: [
+          { ownerId: senderObjectId },
+          { 'members.userId': senderObjectId },
+        ],
+      })
+      .exec();
+    if (!canAccessServer) {
+      throw new ForbiddenException(
+        'Bạn phải tham gia máy chủ chứa sticker để gửi trong tin nhắn trực tiếp',
+      );
+    }
+
     const srvStickers = await this.serverModel
       .findById(sourceServerIdRaw)
-      .select('customStickers members ownerId')
+      .select('customStickers')
       .lean()
       .exec();
     if (!srvStickers) {
       throw new BadRequestException('Server sticker source not found');
     }
 
-    const isOwner =
-      String((srvStickers as any).ownerId) === String(senderId) ||
-      String((srvStickers as any).ownerId?._id ?? '') === String(senderId);
-    const isMember =
-      isOwner ||
-      (Array.isArray((srvStickers as any).members) &&
-        (srvStickers as any).members.some(
-          (m: any) =>
-            (m?.userId?._id ?? m?.userId)?.toString?.() === String(senderId),
-        ));
-    if (!isMember) {
-      throw new ForbiddenException(
-        'Bạn phải tham gia máy chủ chứa sticker để gửi trong tin nhắn trực tiếp',
-      );
+    const sid = dto.serverStickerId.trim();
+    if (!Types.ObjectId.isValid(sid)) {
+      throw new BadRequestException('serverStickerId không hợp lệ');
     }
 
-    const sid = dto.serverStickerId.trim();
     const sticker = ((srvStickers as any)?.customStickers || []).find(
-      (s: any) => s._id?.toString() === sid,
+      (s: any) => String(s._id ?? '') === sid,
     );
-    if (!sticker) {
+    if (!sticker?.imageUrl) {
       throw new BadRequestException('Sticker không thuộc máy chủ nguồn');
-    }
-    if (
-      String(sticker.imageUrl).trim() !== dto.customStickerUrl.trim()
-    ) {
-      throw new BadRequestException(
-        'URL sticker không khớp với dữ liệu máy chủ',
-      );
     }
 
     return {
-      customStickerUrl: sticker.imageUrl,
+      customStickerUrl: String(sticker.imageUrl).trim(),
       serverStickerId: new Types.ObjectId(sid),
     };
   }
@@ -883,6 +912,7 @@ export class DirectMessagesService {
       const now = Date.now();
       const devicePresenceAgo = now - 30 * 60 * 1000;
       const onlineById = new Map<string, boolean>();
+      const lastActiveAtById = new Map<string, string | null>();
       for (const u of presenceUsers as Array<{
         _id: Types.ObjectId;
         loginDevices?: Array<{ lastSeenAt?: Date }>;
@@ -893,7 +923,12 @@ export class DirectMessagesService {
             last = Math.max(last, new Date(d.lastSeenAt).getTime());
           }
         }
-        onlineById.set(u._id.toString(), last > 0 && last >= devicePresenceAgo);
+        const uid = u._id.toString();
+        onlineById.set(uid, last > 0 && last >= devicePresenceAgo);
+        lastActiveAtById.set(
+          uid,
+          last > 0 ? new Date(last).toISOString() : null,
+        );
       }
 
       return Promise.all(
@@ -912,6 +947,7 @@ export class DirectMessagesService {
             bio: mp.bio || '',
             email: isOnline ? 'Đang hoạt động' : 'Offline',
             isOnline,
+            lastActiveAt: lastActiveAtById.get(uid) ?? null,
           };
         }),
       );

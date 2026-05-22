@@ -3,7 +3,8 @@
     "presence": {
       "online": "オンライン",
       "idle": "退席中",
-      "offline": "オフライン"
+      "offline": "オフライン",
+      "offlineAgo": "オフライン · {time}"
     },
     "common": {
       "back": "戻る",
@@ -270,6 +271,29 @@
     "messageRecalled": {
       "self": "あなたがメッセージを削除しました",
       "other": "{name} さんがメッセージを削除しました"
+    },
+    "callMessage": {
+      "missedVoice": "不在着信（音声）",
+      "missedVideo": "不在着信（ビデオ）",
+      "outgoingMissedVoice": "音声通話",
+      "outgoingMissedVideo": "ビデオ通話",
+      "declinedVoice": "音声通話 · 拒否",
+      "declinedVideo": "ビデオ通話 · 拒否",
+      "cancelledVoice": "音声通話 · キャンセル",
+      "cancelledVideo": "ビデオ通話 · キャンセル",
+      "completedVoice": "音声通話",
+      "completedVideo": "ビデオ通話",
+      "callBack": "かけ直す",
+      "durationSeconds": "{n} 秒",
+      "durationMinutes": "{n} 分",
+      "durationMinutesSeconds": "{m} 分 {s} 秒",
+      "noAnswer": "応答なし"
+    },
+    "serverInviteCard": {
+      "online": "オンライン {n}",
+      "members": "メンバー {n}",
+      "founded": "{date} から",
+      "goToServer": "サーバーへ"
     },
     "toast": {
       "deletedForMe": "メッセージを削除しました",

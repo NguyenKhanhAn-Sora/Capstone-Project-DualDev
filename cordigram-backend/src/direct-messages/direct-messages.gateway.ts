@@ -238,10 +238,17 @@ export class DirectMessagesGateway
     return rec.status;
   }
 
+  private presenceLastActiveIso(userId: string): string | null {
+    const rec = this.presence.get(userId);
+    if (!rec?.lastActiveAt) return null;
+    return new Date(rec.lastActiveAt).toISOString();
+  }
+
   private notifyPresenceToSubscribers(
     targetUserId: string,
     status: 'online' | 'idle' | 'offline',
   ) {
+    const lastActiveAt = this.presenceLastActiveIso(targetUserId);
     for (const [watcherId, targets] of this.dmPresenceSubs.entries()) {
       if (!targets?.has(targetUserId)) continue;
       const watcherSockets = this.connectedUsers.get(watcherId);
@@ -250,6 +257,7 @@ export class DirectMessagesGateway
         this.server.to(sid).emit('presence-updated', {
           userId: targetUserId,
           status,
+          lastActiveAt,
         });
       }
     }
@@ -307,7 +315,11 @@ export class DirectMessagesGateway
       // New event for online/idle/offline
       this.notifyPresenceToSubscribers(userId, next);
       // Keep legacy behavior (global broadcast) so older UI still works
-      this.server.emit('presence-updated', { userId, status: next });
+      this.server.emit('presence-updated', {
+        userId,
+        status: next,
+        lastActiveAt: this.presenceLastActiveIso(userId),
+      });
     }
   }
 
@@ -502,10 +514,33 @@ export class DirectMessagesGateway
     for (const id of ids) set.add(id);
     this.dmPresenceSubs.set(watcherId, set);
 
-    const snapshot = ids.map((targetId) => ({
-      userId: targetId,
-      status: this.effectiveStatusForViewer(targetId),
-    }));
+    const needDbLastSeen: string[] = [];
+    const snapshot = ids.map((targetId) => {
+      const rec = this.presence.get(targetId);
+      const status = this.effectiveStatusForViewer(targetId);
+      let lastActiveAt = this.presenceLastActiveIso(targetId);
+      if (!lastActiveAt && status === 'offline') {
+        needDbLastSeen.push(targetId);
+      }
+      return { userId: targetId, status, lastActiveAt };
+    });
+
+    if (needDbLastSeen.length > 0) {
+      try {
+        const fromDb =
+          await this.directMessagesService.getLastSeenAtByUserIds(
+            needDbLastSeen,
+          );
+        for (const item of snapshot) {
+          if (!item.lastActiveAt && fromDb[item.userId]) {
+            item.lastActiveAt = fromDb[item.userId];
+          }
+        }
+      } catch {
+        // ignore DB fallback errors
+      }
+    }
+
     socket.emit('presence-snapshot', { items: snapshot });
   }
 

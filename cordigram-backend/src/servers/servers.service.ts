@@ -4130,20 +4130,24 @@ export class ServersService {
       const stickersRaw = (s as any).customStickers || [];
       if (!Array.isArray(stickersRaw) || stickersRaw.length === 0) continue;
       const locked = ctx ? String(s._id) !== ctx && !hasBoost : !hasBoost;
-      const stickerOut = stickersRaw.map((st: any) => {
-        const prof = profileByUserId.get(String(st.addedByUserId));
-        return {
-          id: st._id?.toString(),
-          imageUrl: st.imageUrl,
-          name: (st.name || '').trim(),
-          animated: !!st.animated,
-          addedBy: {
-            displayName: prof?.displayName || '',
-            username: prof?.username || '',
-            avatarUrl: prof?.avatarUrl || '',
-          },
-        };
-      });
+      const stickerOut = stickersRaw
+        .map((st: any) => {
+          const id = st._id?.toString?.() ?? '';
+          if (!id) return null;
+          const prof = profileByUserId.get(String(st.addedByUserId));
+          return {
+            id,
+            imageUrl: st.imageUrl,
+            name: (st.name || '').trim(),
+            animated: !!st.animated,
+            addedBy: {
+              displayName: prof?.displayName || '',
+              username: prof?.username || '',
+              avatarUrl: prof?.avatarUrl || '',
+            },
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => row != null);
       groups.push({
         serverId: String(s._id),
         serverName: (s as any).name || '',

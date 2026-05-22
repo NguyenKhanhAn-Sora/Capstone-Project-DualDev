@@ -3,7 +3,8 @@
     "presence": {
       "online": "在线",
       "idle": "离开",
-      "offline": "离线"
+      "offline": "离线",
+      "offlineAgo": "离线 · {time}"
     },
     "common": {
       "back": "返回",
@@ -270,6 +271,29 @@
     "messageRecalled": {
       "self": "你删除了一条消息",
       "other": "{name} 删除了一条消息"
+    },
+    "callMessage": {
+      "missedVoice": "未接语音通话",
+      "missedVideo": "未接视频通话",
+      "outgoingMissedVoice": "语音通话",
+      "outgoingMissedVideo": "视频通话",
+      "declinedVoice": "语音通话 · 已拒绝",
+      "declinedVideo": "视频通话 · 已拒绝",
+      "cancelledVoice": "语音通话 · 已取消",
+      "cancelledVideo": "视频通话 · 已取消",
+      "completedVoice": "语音通话",
+      "completedVideo": "视频通话",
+      "callBack": "回拨",
+      "durationSeconds": "{n} 秒",
+      "durationMinutes": "{n} 分钟",
+      "durationMinutesSeconds": "{m} 分 {s} 秒",
+      "noAnswer": "未接听"
+    },
+    "serverInviteCard": {
+      "online": "{n} 人在线",
+      "members": "{n} 名成员",
+      "founded": "创建于 {date}",
+      "goToServer": "前往服务器"
     },
     "toast": {
       "deletedForMe": "已为你删除这条消息",

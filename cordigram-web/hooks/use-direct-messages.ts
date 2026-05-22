@@ -107,6 +107,25 @@ export interface BoostEntitlementUpdatedEvent {
 
 export type PresenceStatus = "online" | "idle" | "offline";
 
+export type UserPresence = {
+  status: PresenceStatus;
+  lastActiveAt?: string | null;
+};
+
+function mergePresenceEntry(
+  prev: UserPresence | PresenceStatus | undefined,
+  next: { status: PresenceStatus; lastActiveAt?: string | null },
+): UserPresence {
+  const status = next.status;
+  const lastActiveAt =
+    next.lastActiveAt !== undefined && next.lastActiveAt !== null
+      ? next.lastActiveAt
+      : typeof prev === "object" && prev?.lastActiveAt
+        ? prev.lastActiveAt
+        : null;
+  return { status, lastActiveAt };
+}
+
 export const useDirectMessages = ({
   userId,
   token,
@@ -132,7 +151,9 @@ export const useDirectMessages = ({
     reactions: any[];
   } | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceStatus>>({});
+  const [presenceByUserId, setPresenceByUserId] = useState<
+    Record<string, UserPresence | PresenceStatus>
+  >({});
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callBusy, setCallBusy] = useState<CallBusyEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
@@ -252,7 +273,12 @@ export const useDirectMessages = ({
 
     socket.on("user-online", (data: { userId: string; status: string }) => {
       setOnlineUsers((prev) => new Set(prev).add(data.userId));
-      setPresenceByUserId((prev) => ({ ...prev, [data.userId]: "online" }));
+      setPresenceByUserId((prev) => ({
+        ...prev,
+        [data.userId]: mergePresenceEntry(prev[data.userId], {
+          status: "online",
+        }),
+      }));
     });
 
     socket.on("user-offline", (data: { userId: string; status: string }) => {
@@ -261,16 +287,32 @@ export const useDirectMessages = ({
         newSet.delete(data.userId);
         return newSet;
       });
-      setPresenceByUserId((prev) => ({ ...prev, [data.userId]: "offline" }));
+      setPresenceByUserId((prev) => ({
+        ...prev,
+        [data.userId]: mergePresenceEntry(prev[data.userId], {
+          status: "offline",
+        }),
+      }));
     });
 
     socket.on(
       "presence-snapshot",
-      (data: { items: Array<{ userId: string; status: PresenceStatus }> }) => {
+      (data: {
+        items: Array<{
+          userId: string;
+          status: PresenceStatus;
+          lastActiveAt?: string | null;
+        }>;
+      }) => {
         const items = Array.isArray(data?.items) ? data.items : [];
         setPresenceByUserId((prev) => {
           const next = { ...prev };
-          for (const it of items) next[it.userId] = it.status;
+          for (const it of items) {
+            next[it.userId] = mergePresenceEntry(prev[it.userId], {
+              status: it.status,
+              lastActiveAt: it.lastActiveAt ?? null,
+            });
+          }
           return next;
         });
         setOnlineUsers((prev) => {
@@ -286,9 +328,19 @@ export const useDirectMessages = ({
 
     socket.on(
       "presence-updated",
-      (data: { userId: string; status: PresenceStatus }) => {
+      (data: {
+        userId: string;
+        status: PresenceStatus;
+        lastActiveAt?: string | null;
+      }) => {
         if (!data?.userId || !data?.status) return;
-        setPresenceByUserId((prev) => ({ ...prev, [data.userId]: data.status }));
+        setPresenceByUserId((prev) => ({
+          ...prev,
+          [data.userId]: mergePresenceEntry(prev[data.userId], {
+            status: data.status,
+            lastActiveAt: data.lastActiveAt ?? null,
+          }),
+        }));
         setOnlineUsers((prev) => {
           const next = new Set(prev);
           if (data.status === "offline") next.delete(data.userId);

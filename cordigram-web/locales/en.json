@@ -3,7 +3,8 @@
     "presence": {
       "online": "Online",
       "idle": "Idle",
-      "offline": "Offline"
+      "offline": "Offline",
+      "offlineAgo": "Offline · {time}"
     },
     "common": {
       "back": "Back",
@@ -276,6 +277,10 @@
       "missedVideo": "Missed video call",
       "outgoingMissedVoice": "Voice call",
       "outgoingMissedVideo": "Video call",
+      "declinedVoice": "Voice call · Declined",
+      "declinedVideo": "Video call · Declined",
+      "cancelledVoice": "Voice call · Cancelled",
+      "cancelledVideo": "Video call · Cancelled",
       "completedVoice": "Voice call",
       "completedVideo": "Video call",
       "callBack": "Call back",
@@ -283,6 +288,12 @@
       "durationMinutes": "{n} min",
       "durationMinutesSeconds": "{m} min {s} sec",
       "noAnswer": "No answer"
+    },
+    "serverInviteCard": {
+      "online": "{n} online",
+      "members": "{n} members",
+      "founded": "Founded {date}",
+      "goToServer": "Go to server"
     },
     "toast": {
       "deletedForMe": "Message deleted for you",

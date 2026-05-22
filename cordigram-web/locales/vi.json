@@ -3,7 +3,8 @@
     "presence": {
       "online": "Trực tuyến",
       "idle": "Chờ",
-      "offline": "Ngoại tuyến"
+      "offline": "Ngoại tuyến",
+      "offlineAgo": "Ngoại tuyến · {time}"
     },
     "common": {
       "back": "Trở lại",
@@ -276,6 +277,10 @@
       "missedVideo": "Đã bỏ lỡ cuộc gọi video",
       "outgoingMissedVoice": "Cuộc gọi thoại",
       "outgoingMissedVideo": "Cuộc gọi video",
+      "declinedVoice": "Cuộc gọi thoại · Từ chối",
+      "declinedVideo": "Cuộc gọi video · Từ chối",
+      "cancelledVoice": "Cuộc gọi thoại · Đã hủy",
+      "cancelledVideo": "Cuộc gọi video · Đã hủy",
       "completedVoice": "Cuộc gọi thoại",
       "completedVideo": "Cuộc gọi video",
       "callBack": "Gọi lại",
@@ -283,6 +288,12 @@
       "durationMinutes": "{n} phút",
       "durationMinutesSeconds": "{m} phút {s} giây",
       "noAnswer": "Không trả lời"
+    },
+    "serverInviteCard": {
+      "online": "{n} Trực tuyến",
+      "members": "{n} thành viên",
+      "founded": "Thành lập từ {date}",
+      "goToServer": "Đi tới Máy chủ"
     },
     "toast": {
       "deletedForMe": "Bạn đã xóa một tin nhắn",

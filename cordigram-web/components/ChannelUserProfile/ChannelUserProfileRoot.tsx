@@ -521,7 +521,7 @@ export default function ChannelUserProfileRoot({
 
   const { anchorRect } = context;
   const POPUP_MINI_W = 340;
-  const miniPos = computePopoverPosition(anchorRect, POPUP_MINI_W, 500);
+  const miniPos = computePopoverPosition(anchorRect, POPUP_MINI_W, 540);
 
   const mutualFollowCount = profile?.mutualFollowCount ?? 0;
   const mutualFollowUsers = profile?.mutualFollowUsers ?? [];

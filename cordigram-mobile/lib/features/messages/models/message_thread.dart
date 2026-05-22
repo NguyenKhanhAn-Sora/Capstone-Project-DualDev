@@ -8,6 +8,8 @@ class MessageThread {
     this.avatarUrl,
     this.isOnline = false,
     this.isPinned = false,
+    this.lastSeenAt,
+    this.presenceLabel = '',
   });
 
   final String id;
@@ -18,4 +20,6 @@ class MessageThread {
   final String? avatarUrl;
   final bool isOnline;
   final bool isPinned;
+  final DateTime? lastSeenAt;
+  final String presenceLabel;
 }

@@ -139,6 +139,7 @@ import {
 } from "@/lib/messages-shell-theme";
 import { useMessagesUiTone } from "@/hooks/use-messages-ui-tone";
 import { getDmSidebarPeersMode } from "@/lib/messages-dm-sidebar-prefs";
+import { formatDmPresenceLabel, resolvePresenceStatus } from "@/lib/dm-presence-label";
 import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
@@ -3130,7 +3131,9 @@ export default function MessagesPage() {
   const friendsForDmSidebar = useMemo(() => {
     // Apply realtime presence overrides when available
     let list = friends.map((f) => {
-      const st = (presenceByUserId as any)?.[f._id] as string | undefined;
+      const st = resolvePresenceStatus(
+        (presenceByUserId as Record<string, unknown>)?.[f._id] as any,
+      );
       if (st === "online" || st === "idle") return { ...f, isOnline: true };
       if (st === "offline") return { ...f, isOnline: false };
       return f;
@@ -5807,6 +5810,10 @@ export default function MessagesPage() {
     }
 
     const friendId = selectedDirectMessageFriend._id;
+    if (!sel.serverId?.trim() || !sel.stickerId?.trim() || !sel.imageUrl?.trim()) {
+      setError("Sticker không hợp lệ. Hãy chọn lại từ danh sách máy chủ.");
+      return;
+    }
     try {
       shouldAutoScrollRef.current = true;
       const optimisticMessage: UIMessage = {
@@ -5847,7 +5854,14 @@ export default function MessagesPage() {
       setReplyingTo(null);
     } catch (err) {
       console.error("Failed to send server sticker in DM:", err);
-      setError("Không gửi được sticker máy chủ");
+      const apiMsg =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message || "")
+          : "";
+      setError(
+        apiMsg.trim() ||
+          "Không gửi được sticker máy chủ. Kiểm tra gói Boost và thử lại.",
+      );
       setConversations((prev) => {
         const newMap = new Map(prev);
         const list = newMap.get(friendId) || [];
@@ -7076,7 +7090,16 @@ export default function MessagesPage() {
         return (
           <div>
             {textBefore && <div style={{ marginBottom: 4 }}>{textBefore}</div>}
-            <a href={fullUrl} style={{ color: "#00a8fc", fontSize: 14, wordBreak: "break-all" }}>{fullUrl}</a>
+            <a
+              href={fullUrl}
+              style={{
+                color: "var(--color-chat-accent)",
+                fontSize: 14,
+                wordBreak: "break-all",
+              }}
+            >
+              {fullUrl}
+            </a>
             <ServerInviteCard serverId={sid} inviteUrl={fullUrl} />
             {textAfter && <div style={{ marginTop: 4 }}>{textAfter}</div>}
           </div>
@@ -8271,12 +8294,14 @@ export default function MessagesPage() {
                                 {friend.displayName || friend.username}
                               </p>
                               <p className={styles.friendStatus}>
-                                {(() => {
-                                  const st = (presenceByUserId as any)?.[friend._id] as string | undefined;
-                                  if (st === "online") return t("chat.presence.online");
-                                  if (st === "idle") return t("chat.presence.idle");
-                                  return t("chat.presence.offline");
-                                })()}
+                                {formatDmPresenceLabel({
+                                  entry: (presenceByUserId as Record<string, unknown>)?.[
+                                    friend._id
+                                  ] as any,
+                                  t,
+                                  language,
+                                  fallbackLastActiveAt: friend.lastActiveAt,
+                                })}
                               </p>
                             </div>
                             {(dmUnreadCounts[String(friend._id)] ?? 0) > 0 && (

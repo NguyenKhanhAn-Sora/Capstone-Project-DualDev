@@ -168,6 +168,11 @@ class MessagesController extends ChangeNotifier {
                   : c.unreadCount,
               avatarUrl: c.avatarUrl,
               isOnline: c.isOnline,
+              lastSeenAt: c.lastActiveAt,
+              presenceLabel: _formatPresenceLabel(
+                isOnline: c.isOnline,
+                lastSeenAt: c.lastActiveAt,
+              ),
             ),
           ),
         );
@@ -229,6 +234,8 @@ class MessagesController extends ChangeNotifier {
           avatarUrl: t.avatarUrl,
           isOnline: t.isOnline,
           isPinned: t.isPinned,
+          lastSeenAt: t.lastSeenAt,
+          presenceLabel: t.presenceLabel,
         );
       }
       notifyListeners();
@@ -251,6 +258,8 @@ class MessagesController extends ChangeNotifier {
         avatarUrl: _threads[idx].avatarUrl,
         isOnline: _threads[idx].isOnline,
         isPinned: _threads[idx].isPinned,
+        lastSeenAt: _threads[idx].lastSeenAt,
+        presenceLabel: _threads[idx].presenceLabel,
       );
       _totalUnread = _threads.fold<int>(0, (sum, e) => sum + e.unreadCount);
       notifyListeners();
@@ -670,7 +679,18 @@ class MessagesController extends ChangeNotifier {
     if (idx == -1) return;
     final nextOnline = presence.status != PresenceStatus.offline;
     final current = _threads[idx];
-    if (current.isOnline == nextOnline) return;
+    final lastSeen =
+        presence.lastActiveAt ?? current.lastSeenAt;
+    final nextLabel = _formatPresenceLabel(
+      isOnline: nextOnline,
+      status: presence.status,
+      lastSeenAt: lastSeen,
+    );
+    if (current.isOnline == nextOnline &&
+        current.presenceLabel == nextLabel &&
+        current.lastSeenAt == lastSeen) {
+      return;
+    }
     _threads[idx] = MessageThread(
       id: current.id,
       name: current.name,
@@ -680,6 +700,8 @@ class MessagesController extends ChangeNotifier {
       avatarUrl: current.avatarUrl,
       isOnline: nextOnline,
       isPinned: current.isPinned,
+      lastSeenAt: lastSeen,
+      presenceLabel: nextLabel,
     );
     notifyListeners();
   }
@@ -722,6 +744,8 @@ class MessagesController extends ChangeNotifier {
           avatarUrl: t.avatarUrl,
           isOnline: t.isOnline,
           isPinned: t.isPinned,
+          lastSeenAt: t.lastSeenAt,
+          presenceLabel: t.presenceLabel,
         );
       }
     }
@@ -766,6 +790,8 @@ class MessagesController extends ChangeNotifier {
       avatarUrl: current.avatarUrl,
       isOnline: current.isOnline,
       isPinned: current.isPinned,
+      lastSeenAt: current.lastSeenAt,
+      presenceLabel: current.presenceLabel,
     );
     _sortThreads();
   }
@@ -777,5 +803,44 @@ class MessagesController extends ChangeNotifier {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m';
     if (diff.inHours < 24) return '${diff.inHours}h';
     return '${diff.inDays}d';
+  }
+
+  String _formatOfflineAgo(DateTime? time) {
+    if (time == null) return '';
+    final diff = DateTime.now().difference(time);
+    final en = _languageCode == 'en';
+    if (diff.inMinutes < 1) {
+      return en ? 'just now' : 'vừa xong';
+    }
+    if (diff.inMinutes < 60) {
+      return en
+          ? '${diff.inMinutes} min ago'
+          : '${diff.inMinutes} phút trước';
+    }
+    if (diff.inHours < 24) {
+      return en ? '${diff.inHours} hr ago' : '${diff.inHours} giờ trước';
+    }
+    if (diff.inDays < 7) {
+      return en ? '${diff.inDays} d ago' : '${diff.inDays} ngày trước';
+    }
+    return en ? '${diff.inDays} d ago' : '${diff.inDays} ngày trước';
+  }
+
+  String _formatPresenceLabel({
+    required bool isOnline,
+    PresenceStatus? status,
+    DateTime? lastSeenAt,
+  }) {
+    final en = _languageCode == 'en';
+    if (status == PresenceStatus.online ||
+        (isOnline && status != PresenceStatus.idle)) {
+      return en ? 'Online' : 'Trực tuyến';
+    }
+    if (status == PresenceStatus.idle) {
+      return en ? 'Idle' : 'Chờ';
+    }
+    final ago = _formatOfflineAgo(lastSeenAt);
+    if (ago.isEmpty) return en ? 'Offline' : 'Ngoại tuyến';
+    return en ? 'Offline · $ago' : 'Ngoại tuyến · $ago';
   }
 }
