@@ -1571,6 +1571,7 @@
     },
     "noMessages": "No messages yet. Start a conversation!",
     "loadingMessages": "Loading messages...",
+    "newMessagesBelow": "You have new messages",
     "welcome": {
       "title": "Welcome to",
       "serverOf": "{name}'s Server",

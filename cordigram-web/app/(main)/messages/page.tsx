@@ -32,6 +32,11 @@ import { DEFAULT_FREE_MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
 import { shouldPlayChannelMessageNotificationSound } from "@/lib/channel-notification-sound";
 import { playMessageNotificationSound } from "@/lib/message-notification-sound";
 import {
+  CHAT_SCROLL_BOTTOM_THRESHOLD_PX,
+  isChatNearBottom,
+  scrollChatContainerToBottom,
+} from "@/lib/chat-scroll";
+import {
   sendDirectMessage,
   getDirectMessages,
   getConversationList,
@@ -2008,6 +2013,41 @@ export default function MessagesPage() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingRef = useRef(false); // ✅ Track typing state
   const shouldAutoScrollRef = useRef(true); // Track if we should auto-scroll
+  const pendingConversationScrollRef = useRef(false);
+  const [showNewMessagesBelow, setShowNewMessagesBelow] = useState(false);
+
+  const scrollChatToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    scrollChatContainerToBottom(messagesContainerRef.current, behavior);
+  }, []);
+
+  const isChatScrolledNearBottom = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return true;
+    return isChatNearBottom(el, CHAT_SCROLL_BOTTOM_THRESHOLD_PX);
+  }, []);
+
+  const scheduleScrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => scrollChatToBottom(behavior));
+      });
+    },
+    [scrollChatToBottom],
+  );
+
+  const handleJumpToLatestMessages = useCallback(() => {
+    shouldAutoScrollRef.current = true;
+    setShowNewMessagesBelow(false);
+    pendingConversationScrollRef.current = false;
+    scheduleScrollToBottom("smooth");
+  }, [scheduleScrollToBottom]);
+
+  const prepareScrollToLatest = useCallback(() => {
+    shouldAutoScrollRef.current = true;
+    pendingConversationScrollRef.current = true;
+    setShowNewMessagesBelow(false);
+  }, []);
+
   /** Tránh xử lý lại cùng một tin socket khi effect re-run (gây badge 99+). */
   const processedIncomingDmIdsRef = useRef<Set<string>>(new Set());
   /** Hội thoại đã mở/đánh dấu đọc — giữ badge 0 khi API chưa kịp cập nhật. */
@@ -2420,7 +2460,13 @@ export default function MessagesPage() {
       deletedAt: msg.deletedAt || undefined,
     };
     setMessages((prev) => appendServerMessage(prev, uiMessage));
-    shouldAutoScrollRef.current = true;
+    if (isChatScrolledNearBottom()) {
+      shouldAutoScrollRef.current = true;
+      setShowNewMessagesBelow(false);
+    } else {
+      shouldAutoScrollRef.current = false;
+      setShowNewMessagesBelow(true);
+    }
     clearNewMessageChannel();
   }, [
     newMessageChannel,
@@ -2433,6 +2479,7 @@ export default function MessagesPage() {
     allChannels,
     notificationRoleNames,
     currentUserProfile?.username,
+    isChatScrolledNearBottom,
   ]);
 
   // Cleanup typing timeout on unmount or friend change
@@ -3386,7 +3433,7 @@ export default function MessagesPage() {
     setSelectedChannel(null);
     setDmUnreadCounts((prev) => ({ ...prev, [String(dmUserIdFromUrl)]: 0 }));
     dmReadPeersRef.current.add(String(dmUserIdFromUrl));
-    shouldAutoScrollRef.current = true;
+    prepareScrollToLatest();
 
     try {
       markAllAsRead?.(dmUserIdFromUrl);
@@ -4205,19 +4252,17 @@ export default function MessagesPage() {
 
       // Badge unread: đồng bộ qua socket dm-unread-count (không cộng local để tránh lệch / 99+).
 
-      // Auto-scroll to bottom if viewing this conversation (instant for incoming messages)
       if (
         selectedDmFriendRef.current &&
         friendId === selectedDmFriendRef.current._id
       ) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (messagesContainerRef.current) {
-              messagesContainerRef.current.scrollTop =
-                messagesContainerRef.current.scrollHeight;
-            }
-          });
-        });
+        if (shouldAutoScrollRef.current || isChatScrolledNearBottom()) {
+          shouldAutoScrollRef.current = true;
+          setShowNewMessagesBelow(false);
+          scheduleScrollToBottom();
+        } else {
+          setShowNewMessagesBelow(true);
+        }
       }
   }, [
     newMessage,
@@ -4225,6 +4270,8 @@ export default function MessagesPage() {
     loadAvailableUsers,
     bumpDmPeerToTop,
     upsertFriendToDmList,
+    isChatScrolledNearBottom,
+    scheduleScrollToBottom,
   ]);
 
   // ✅ Handle message-deleted event
@@ -4301,6 +4348,7 @@ export default function MessagesPage() {
   useEffect(() => {
     if (selectedChannel && selectedChatTextChannel) {
       setReplyingTo(null);
+      prepareScrollToLatest();
       const prev = prevChannelRef.current;
       if (prev && prev !== selectedChannel) leaveChannel(prev);
       prevChannelRef.current = selectedChannel;
@@ -4362,48 +4410,47 @@ export default function MessagesPage() {
     };
   }, [connectedVoiceChannel?._id, selectedServer, token, currentUserProfile?.username]);
 
-  // Auto scroll to latest message - optimized to prevent jitter
+  // Auto scroll to latest message - optimized to prevent jitter (server channels)
   useEffect(() => {
-    // Only auto-scroll if we should (not when user is scrolling up to read old messages)
+    if (!selectedChannel || selectedDirectMessageFriend) return;
     if (shouldAutoScrollRef.current && messages.length > 0) {
-      // Double RAF to ensure DOM fully rendered
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop =
-              messagesContainerRef.current.scrollHeight;
-          }
-        });
-      });
+      scheduleScrollToBottom();
+      setShowNewMessagesBelow(false);
     }
-  }, [messages]);
+  }, [
+    messages,
+    selectedChannel,
+    selectedDirectMessageFriend,
+    scheduleScrollToBottom,
+  ]);
 
-  // Auto scroll for DM conversations when they change - INSTANT scroll
+  // Auto scroll for DM when opening a thread or when user is already at bottom
   useEffect(() => {
-    if (selectedDirectMessageFriend) {
-      const currentMessages = conversations.get(
-        selectedDirectMessageFriend._id,
-      );
-      if (currentMessages && currentMessages.length > 0) {
-        // Scroll IMMEDIATELY after render, no animation
-        const scrollToBottom = () => {
-          if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop =
-              messagesContainerRef.current.scrollHeight;
-          }
-        };
-
-        // Execute immediately
-        scrollToBottom();
-
-        // And again after paint to ensure it sticks
-        requestAnimationFrame(() => {
-          scrollToBottom();
-          requestAnimationFrame(scrollToBottom);
-        });
-      }
+    if (!selectedDirectMessageFriend) return;
+    const currentMessages = conversations.get(selectedDirectMessageFriend._id);
+    if (!currentMessages?.length) return;
+    if (
+      !pendingConversationScrollRef.current &&
+      !shouldAutoScrollRef.current
+    ) {
+      return;
     }
-  }, [conversations, selectedDirectMessageFriend]);
+    scrollChatToBottom();
+    requestAnimationFrame(() => {
+      scrollChatToBottom();
+      requestAnimationFrame(() => {
+        scrollChatToBottom();
+        if (pendingConversationScrollRef.current) {
+          pendingConversationScrollRef.current = false;
+        }
+        setShowNewMessagesBelow(false);
+      });
+    });
+  }, [
+    conversations,
+    selectedDirectMessageFriend,
+    scrollChatToBottom,
+  ]);
 
 
   const loadServers = async () => {
@@ -4602,7 +4649,15 @@ export default function MessagesPage() {
         deletedAt: (msg as serversApi.Message).deletedAt || undefined,
       }));
 
-      setMessages(sortServerMessagesAscending(uiMessages));
+      setMessages((prev) => {
+        const apiMessages = sortServerMessagesAscending(uiMessages);
+        const apiIds = new Set(apiMessages.map((m) => m.id));
+        const recentLocal = prev.filter((m) => !apiIds.has(m.id));
+        return recentLocal.length > 0
+          ? sortServerMessagesAscending([...apiMessages, ...recentLocal])
+          : apiMessages;
+      });
+      prepareScrollToLatest();
       setError(null);
     } catch (err) {
       console.error("Failed to load messages", err);
@@ -4622,8 +4677,14 @@ export default function MessagesPage() {
 
     // Check if we already have FULLY loaded messages for this conversation
     if (fullyLoadedConversationsRef.current.has(friendId) && !forceReload) {
-      const existingMessages = conversations.get(friendId) || [];
-      return; // Already fully loaded from API
+      if (
+        selectedDmFriendRef.current &&
+        String(selectedDmFriendRef.current._id) === String(friendId)
+      ) {
+        prepareScrollToLatest();
+        scheduleScrollToBottom();
+      }
+      return;
     }
 
     // If conversation exists but wasn't fully loaded (e.g., from WebSocket only)
@@ -4693,8 +4754,9 @@ export default function MessagesPage() {
           (m) => !apiMessageIds.has(m.id),
         );
 
-        // Merge: API messages + recent WebSocket messages
-        const mergedMessages = [...uiMessages, ...recentWebSocketMessages];
+        const mergedMessages = [...uiMessages, ...recentWebSocketMessages].sort(
+          (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+        );
 
         newMap.set(friendId, mergedMessages);
         return newMap;
@@ -4702,6 +4764,13 @@ export default function MessagesPage() {
 
       // Mark as fully loaded
       fullyLoadedConversationsRef.current.add(friendId);
+
+      if (
+        selectedDmFriendRef.current &&
+        String(selectedDmFriendRef.current._id) === String(friendId)
+      ) {
+        prepareScrollToLatest();
+      }
 
       setError(null);
     } catch (err) {
@@ -4739,12 +4808,9 @@ export default function MessagesPage() {
       // Also call REST to avoid race with getConversationList refresh
       if (token) await markDmConversationRead({ token, userId: peerId });
     } catch (_err) {}
-    shouldAutoScrollRef.current = true; // ✅ Enable auto-scroll when switching conversations
-    // Pre-scroll to bottom BEFORE loading (prevents visual jump)
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = 0; // Reset first
-    }
+    prepareScrollToLatest();
     await loadDirectMessages(friend._id);
+    scheduleScrollToBottom();
   };
 
   useEffect(() => {
@@ -4846,14 +4912,16 @@ export default function MessagesPage() {
       setChannelProfileContext(null);
       setSelectedServer(null);
       setSelectedChannel(null);
+      prepareScrollToLatest();
       setSelectedDirectMessageFriend(friend);
       void loadDirectMessages(friend._id);
+      scheduleScrollToBottom();
       if (opts?.openGifPicker) {
         setMediaPickerTab("gif");
         setShowGiphyPicker(true);
       }
     },
-    [loadDirectMessages],
+    [loadDirectMessages, prepareScrollToLatest, scheduleScrollToBottom],
   );
 
   const channelProfileInviteServers = useMemo(() => {
@@ -5306,7 +5374,7 @@ export default function MessagesPage() {
       setMentionOpen(false);
       setMentionKeyword("");
       setMentionStartPos(-1);
-      shouldAutoScrollRef.current = true;
+      prepareScrollToLatest();
 
       const newMessage = await serversApi.createMessage(
         selectedChannel,
@@ -7286,14 +7354,8 @@ export default function MessagesPage() {
           }
         }
 
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (messagesContainerRef.current) {
-              messagesContainerRef.current.scrollTop =
-                messagesContainerRef.current.scrollHeight;
-            }
-          });
-        });
+        prepareScrollToLatest();
+        scheduleScrollToBottom();
 
         const uploadResults =
           files.length === 1
@@ -7475,15 +7537,8 @@ export default function MessagesPage() {
         setMessages((prev) => appendServerMessage(prev, loadingMessage));
       }
 
-      // Auto-scroll (instant for polls)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop =
-              messagesContainerRef.current.scrollHeight;
-          }
-        });
-      });
+      prepareScrollToLatest();
+      scheduleScrollToBottom();
 
       // Create poll in background
       const poll = await createPoll({
@@ -10021,10 +10076,12 @@ export default function MessagesPage() {
                       email: "",
                     };
                     if (!existing) setFriends((prev) => (prev.some((f) => f._id === userId) ? prev : [...prev, friend]));
+                    prepareScrollToLatest();
                     setSelectedDirectMessageFriend(friend);
                     setSelectedServer(null);
                     setSelectedChannel(null);
-                    loadDirectMessages(userId);
+                    void loadDirectMessages(userId);
+                    scheduleScrollToBottom();
                   }}
                   onSendMessage={(userId) => {
                     const existing = friends.find((f) => f._id === userId);
@@ -10036,10 +10093,12 @@ export default function MessagesPage() {
                       email: "",
                     };
                     if (!existing) setFriends((prev) => (prev.some((f) => f._id === userId) ? prev : [...prev, friend]));
+                    prepareScrollToLatest();
                     setSelectedDirectMessageFriend(friend);
                     setSelectedServer(null);
                     setSelectedChannel(null);
-                    loadDirectMessages(userId);
+                    void loadDirectMessages(userId);
+                    scheduleScrollToBottom();
                   }}
                 />
               </div>
@@ -10234,12 +10293,12 @@ export default function MessagesPage() {
                   style={{ position: "relative" }}
                   onScroll={(e) => {
                     const container = e.currentTarget;
-                    const isNearBottom =
-                      container.scrollHeight -
-                        container.scrollTop -
-                        container.clientHeight <
-                      100;
-                    shouldAutoScrollRef.current = isNearBottom;
+                    const near = isChatNearBottom(
+                      container,
+                      CHAT_SCROLL_BOTTOM_THRESHOLD_PX,
+                    );
+                    shouldAutoScrollRef.current = near;
+                    if (near) setShowNewMessagesBelow(false);
                   }}
                 >
                   {!selectedDirectMessageFriend &&
@@ -10704,6 +10763,16 @@ export default function MessagesPage() {
                     )}
 
                   <div ref={messagesEndRef} />
+
+                  {showNewMessagesBelow && (
+                    <button
+                      type="button"
+                      className={styles.newMessagesPill}
+                      onClick={handleJumpToLatestMessages}
+                    >
+                      {t("chat.newMessagesBelow")}
+                    </button>
+                  )}
                 </div>
 
                 {/* Reply Preview */}

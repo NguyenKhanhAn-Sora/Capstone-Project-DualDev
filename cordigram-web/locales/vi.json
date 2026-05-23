@@ -1571,6 +1571,7 @@
     },
     "noMessages": "Chưa có tin nhắn. Hãy bắt đầu trò chuyện!",
     "loadingMessages": "Đang tải tin nhắn...",
+    "newMessagesBelow": "Bạn có tin nhắn mới",
     "welcome": {
       "title": "Chào mừng đến với",
       "serverOf": "Máy chủ của {name}",

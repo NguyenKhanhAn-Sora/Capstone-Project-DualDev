@@ -1571,6 +1571,7 @@
     },
     "noMessages": "まだメッセージがありません。会話を始めましょう！",
     "loadingMessages": "メッセージを読み込み中...",
+    "newMessagesBelow": "新しいメッセージがあります",
     "welcome": {
       "title": "ようこそ",
       "serverOf": "{name}のサーバーへ",

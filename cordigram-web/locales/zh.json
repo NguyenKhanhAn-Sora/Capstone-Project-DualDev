@@ -1571,6 +1571,7 @@
     },
     "noMessages": "暂无消息。开始聊天吧！",
     "loadingMessages": "正在加载消息...",
+    "newMessagesBelow": "你有新消息",
     "welcome": {
       "title": "欢迎来到",
       "serverOf": "{name}的服务器",
