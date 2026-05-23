@@ -1,4 +1,5 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -7,8 +8,6 @@ import {
   BoostScope,
   BoostTier,
 } from './boost-entitlement.schema';
-import { DirectMessagesGateway } from '../direct-messages/direct-messages.gateway';
-import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 
 export type BoostLimits = {
   maxUploadBytes: number;
@@ -60,16 +59,44 @@ const FREE_LIMITS: BoostLimits = {
   dmServerStickers: false,
 };
 
+type BoostGatewayEmitter = {
+  emitToUser?: (userId: string, event: string, payload: unknown) => void;
+};
+
 @Injectable()
 export class BoostService {
   constructor(
     @InjectModel(BoostEntitlement.name)
     private readonly boostEntitlementModel: Model<BoostEntitlement>,
-    @Inject(forwardRef(() => DirectMessagesGateway))
-    private readonly directMessagesGateway: DirectMessagesGateway,
-    @Inject(forwardRef(() => ChannelMessagesGateway))
-    private readonly channelMessagesGateway: ChannelMessagesGateway,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  /** Lazy resolve — tránh vòng import boost ↔ direct-messages tại runtime. */
+  private emitBoostEntitlementToGateways(
+    userId: string,
+    payload: Record<string, unknown>,
+  ): void {
+    try {
+      const { DirectMessagesGateway } =
+        require('../direct-messages/direct-messages.gateway') as {
+          DirectMessagesGateway: new (...args: unknown[]) => BoostGatewayEmitter;
+        };
+      const dmGw = this.moduleRef.get(DirectMessagesGateway, { strict: false });
+      dmGw?.emitToUser?.(userId, 'boost-entitlement-updated', payload);
+    } catch {
+      // Gateway chưa sẵn sàng hoặc module chưa load
+    }
+    try {
+      const { ChannelMessagesGateway } =
+        require('../messages/channel-messages.gateway') as {
+          ChannelMessagesGateway: new (...args: unknown[]) => BoostGatewayEmitter;
+        };
+      const chGw = this.moduleRef.get(ChannelMessagesGateway, { strict: false });
+      chGw?.emitToUser?.(userId, 'boost-entitlement-updated', payload);
+    } catch {
+      // ignore
+    }
+  }
 
   computeLimits(tier: BoostTier | null): BoostLimits {
     if (tier === 'boost') return BOOST_LIMITS;
@@ -280,31 +307,13 @@ export class BoostService {
   }
 
   emitBoostEntitlementUpdated(userId: string, status: BoostStatusResponse) {
-    const payload = {
+    this.emitBoostEntitlementToGateways(userId, {
       userId,
       scope: status.scope,
       tier: status.tier,
       active: status.active,
       expiresAt: status.expiresAt,
       limits: status.limits,
-    };
-    try {
-      this.directMessagesGateway?.emitToUser?.(
-        userId,
-        'boost-entitlement-updated',
-        payload,
-      );
-    } catch {
-      // ignore
-    }
-    try {
-      this.channelMessagesGateway?.emitToUser?.(
-        userId,
-        'boost-entitlement-updated',
-        payload,
-      );
-    } catch {
-      // ignore
-    }
+    });
   }
 }

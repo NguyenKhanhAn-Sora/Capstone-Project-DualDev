@@ -1278,15 +1278,17 @@
   font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
-  color: #fff;
-  background: var(--color-brand, #5865f2);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  transition: transform 0.15s ease, filter 0.15s ease;
+  color: var(--color-on-accent, #fff);
+  background: var(--accent-color, #5865f2);
+  box-shadow:
+    0 4px 16px color-mix(in srgb, var(--accent-color, #5865f2) 40%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.28);
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
   pointer-events: auto;
 }
 
 .newMessagesPill:hover {
-  filter: brightness(1.08);
+  background: var(--accent-hover, var(--accent-color, #5865f2));
   transform: translateX(-50%) translateY(-1px);
 }
 

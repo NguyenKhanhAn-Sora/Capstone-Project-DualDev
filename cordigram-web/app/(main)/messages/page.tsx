@@ -138,6 +138,7 @@ import { applyAccentColor, ensureReadableForeground } from "@/component/theme-pr
 import {
   applyMessagesRootChromeFromStorage,
   migrateMessagesChromeStorageOnce,
+  syncMessagesChromeVars,
 } from "@/lib/messages-appearance-chrome";
 import {
   getMessagesShellTheme,
@@ -1625,6 +1626,7 @@ export default function MessagesPage() {
   }, [boostModalOpen]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const newMessagesPillRef = useRef<HTMLButtonElement>(null);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [friends, setFriends] = useState<serversApi.Friend[]>([]);
   const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] =
@@ -2047,6 +2049,22 @@ export default function MessagesPage() {
     pendingConversationScrollRef.current = true;
     setShowNewMessagesBelow(false);
   }, []);
+
+  useEffect(() => {
+    if (!showNewMessagesBelow) return;
+    const pill = newMessagesPillRef.current;
+    if (!pill) return;
+    const sync = () => syncMessagesChromeVars(pill);
+    sync();
+    window.addEventListener("cordigram-messages-chrome", sync);
+    window.addEventListener("cordigram-messages-shell-theme", sync);
+    window.addEventListener("cordigram-chat-settings", sync);
+    return () => {
+      window.removeEventListener("cordigram-messages-chrome", sync);
+      window.removeEventListener("cordigram-messages-shell-theme", sync);
+      window.removeEventListener("cordigram-chat-settings", sync);
+    };
+  }, [showNewMessagesBelow]);
 
   /** Tránh xử lý lại cùng một tin socket khi effect re-run (gây badge 99+). */
   const processedIncomingDmIdsRef = useRef<Set<string>>(new Set());
@@ -10766,8 +10784,10 @@ export default function MessagesPage() {
 
                   {showNewMessagesBelow && (
                     <button
+                      ref={newMessagesPillRef}
                       type="button"
                       className={styles.newMessagesPill}
+                      data-ui-tone={messagesUiTone}
                       onClick={handleJumpToLatestMessages}
                     >
                       {t("chat.newMessagesBelow")}
