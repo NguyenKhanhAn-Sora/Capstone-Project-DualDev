@@ -141,6 +141,7 @@ import {
 import { useMessagesUiTone } from "@/hooks/use-messages-ui-tone";
 import { getDmSidebarPeersMode } from "@/lib/messages-dm-sidebar-prefs";
 import { formatDmPresenceLabel, resolvePresenceStatus } from "@/lib/dm-presence-label";
+import { buildServerEmojiRenderMapFromPickerGroups } from "@/lib/server-emoji-render";
 import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
@@ -3789,37 +3790,39 @@ export default function MessagesPage() {
   }, [selectedServer]);
 
   const refreshServerEmojiMap = useCallback(async () => {
-    if (!selectedServer) {
-      setServerEmojiRenderMap({});
-      return;
-    }
     const authToken =
       localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
     if (!authToken) {
       setServerEmojiRenderMap({});
       return;
     }
+    const contextServerId = selectedServer || null;
     const adminViewingServer =
       isAdminView &&
       adminViewServerId &&
-      String(selectedServer) === String(adminViewServerId);
+      contextServerId &&
+      String(contextServerId) === String(adminViewServerId);
     try {
       const data = adminViewingServer
-        ? await serversApi.adminGetEmojiPickerData(selectedServer, authToken)
-        : await serversApi.getEmojiPickerData(selectedServer);
-      const m: Record<string, string> = {};
-      for (const g of data.groups || []) {
-        if (String(g.serverId) !== String(selectedServer)) continue;
-        for (const e of g.emojis || []) {
-          const k = (e.name || "").trim().toLowerCase();
-          if (k) m[k] = e.imageUrl;
-        }
-      }
-      setServerEmojiRenderMap(m);
+        ? await serversApi.adminGetEmojiPickerData(
+            contextServerId,
+            authToken,
+          )
+        : await serversApi.getEmojiPickerData(contextServerId || undefined);
+      setServerEmojiRenderMap(
+        buildServerEmojiRenderMapFromPickerGroups(data.groups),
+      );
     } catch {
       setServerEmojiRenderMap({});
     }
-  }, [selectedServer, token, isAdminView, adminViewServerId]);
+  }, [
+    selectedServer,
+    selectedChannel,
+    selectedDirectMessageFriend?._id,
+    token,
+    isAdminView,
+    adminViewServerId,
+  ]);
 
   useEffect(() => {
     void refreshServerEmojiMap();
@@ -5902,6 +5905,11 @@ export default function MessagesPage() {
       });
     }
   };
+
+  const handleEmojiCatalogLoaded = useCallback((map: Record<string, string>) => {
+    if (Object.keys(map).length === 0) return;
+    setServerEmojiRenderMap((prev) => ({ ...prev, ...map }));
+  }, []);
 
   const handleGiphyPickerSelect = (sel: GiphyPickerSelection) => {
     setShowGiphyPicker(false);
@@ -13053,6 +13061,8 @@ export default function MessagesPage() {
               selectedServer &&
               String(selectedServer) === String(adminViewServerId),
           )}
+          hasCrossServerMediaAccess={boostStatus?.active === true}
+          onEmojiCatalogLoaded={handleEmojiCatalogLoaded}
         />
       )}
 

@@ -22,6 +22,10 @@ import {
   type EmojiPickerGroup,
   type EmojiPickerEmoji,
 } from "@/lib/servers-api";
+import {
+  buildServerEmojiRenderMapFromPickerGroups,
+  isPickerServerMediaLocked,
+} from "@/lib/server-emoji-render";
 
 function EmojiPickerMartLoading() {
   const { t } = useLanguage();
@@ -220,6 +224,10 @@ interface GiphyPickerProps {
    * không dùng danh sách server theo membership.
    */
   adminMediaPicker?: boolean;
+  /** Gói Boost / Boost cơ bản — mở emoji & sticker máy chủ khác (kể cả mục Thường dùng). */
+  hasCrossServerMediaAccess?: boolean;
+  /** Gọi khi tải xong catalog emoji máy chủ (để render `:ten:` sau reload). */
+  onEmojiCatalogLoaded?: (map: Record<string, string>) => void;
 }
 
 export default function GiphyPicker({
@@ -233,6 +241,8 @@ export default function GiphyPicker({
   enableServerStickers,
   enableServerMedia,
   adminMediaPicker = false,
+  hasCrossServerMediaAccess = false,
+  onEmojiCatalogLoaded,
 }: GiphyPickerProps) {
   const { t } = useLanguage();
   const serverMediaOn =
@@ -385,6 +395,16 @@ export default function GiphyPicker({
 
   const searching = searchQuery.trim().length > 0;
 
+  const isGroupLocked = useCallback(
+    (serverId: string) =>
+      isPickerServerMediaLocked(
+        serverId,
+        contextServerId,
+        hasCrossServerMediaAccess,
+      ),
+    [contextServerId, hasCrossServerMediaAccess],
+  );
+
   const ownedIdSet = useMemo(
     () => new Set(ownedServers.map((s) => String(s.id))),
     [ownedServers],
@@ -530,7 +550,11 @@ export default function GiphyPicker({
         : getEmojiPickerData(contextServerId || undefined);
     req
       .then((d) => {
-        if (!c) setEmojiGroups(d.groups || []);
+        if (!c) {
+          const groups = d.groups || [];
+          setEmojiGroups(groups);
+          onEmojiCatalogLoaded?.(buildServerEmojiRenderMapFromPickerGroups(groups));
+        }
       })
       .catch((e) => {
         console.error(e);
@@ -542,7 +566,7 @@ export default function GiphyPicker({
     return () => {
       c = true;
     };
-  }, [activeTab, serverMediaOn, contextServerId, adminMediaPicker, t]);
+  }, [activeTab, serverMediaOn, contextServerId, adminMediaPicker, t, onEmojiCatalogLoaded]);
 
   useEffect(() => {
     if (activeTab !== "gif") return;
@@ -786,8 +810,7 @@ export default function GiphyPicker({
         serverId: e.serverId,
         serverName: e.serverName,
         serverAvatarUrl: e.serverAvatarUrl ?? null,
-        locked:
-          !!contextServerId && String(e.serverId) !== String(contextServerId),
+        locked: isGroupLocked(e.serverId),
         stickers: [],
       };
       const st: StickerPickerSticker = {
@@ -863,8 +886,7 @@ export default function GiphyPicker({
         serverId: e.serverId,
         serverName: e.serverName,
         serverAvatarUrl: e.serverAvatarUrl ?? null,
-        locked:
-          !!contextServerId && String(e.serverId) !== String(contextServerId),
+        locked: isGroupLocked(e.serverId),
         emojis: [],
       };
       const em: EmojiPickerEmoji = {
