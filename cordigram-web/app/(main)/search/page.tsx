@@ -15,11 +15,13 @@ import { useTranslations } from "next-intl";
 import styles from "./search.module.css";
 import {
   addSearchHistory,
+  fetchTrendingHashtags,
   searchProfiles,
   searchPosts,
   suggestHashtags,
   type FeedItem,
   type ProfileSearchItem,
+  type TrendingHashtagItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
@@ -92,6 +94,10 @@ export default function SearchAllPage() {
   const [reels, setReels] = useState<FeedItem[]>([]);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
 
+  // Trending hashtags shown in idle state (no query)
+  const [trending, setTrending] = useState<TrendingHashtagItem[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
+
   useEffect(() => {
     const token = getStoredAccessToken();
     if (!token) {
@@ -101,6 +107,18 @@ export default function SearchAllPage() {
     refreshBlockedUserIds(token)
       .then((ids) => setBlockedIds(ids))
       .catch(() => undefined);
+  }, []);
+
+  // Load trending hashtags once on mount (idle state)
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    let cancelled = false;
+    setTrendingLoading(true);
+    fetchTrendingHashtags({ token, limit: 10 })
+      .then((items) => { if (!cancelled) setTrending(items); })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setTrendingLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -242,8 +260,43 @@ export default function SearchAllPage() {
       </div>
 
       <div className={styles.body}>
+        {/* ── Idle state: Trending Hashtags ── */}
         {!normalized ? (
-          <div className={styles.muted}>{t("status.typeToSearch")}</div>
+          <div className={styles.trendingSection}>
+            <div className={styles.trendingHeader}>
+              <span className={styles.trendingFire}>🔥</span>
+              <span className={styles.trendingTitle}>Trending Hashtags</span>
+            </div>
+            {trendingLoading ? (
+              <div className={styles.trendingSkeletonWrap}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className={styles.trendingSkeleton} />
+                ))}
+              </div>
+            ) : trending.length === 0 ? (
+              <div className={styles.muted}>{t("status.typeToSearch")}</div>
+            ) : (
+              <div className={styles.trendingGrid}>
+                {trending.map((tag, i) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    className={styles.trendingCard}
+                    onClick={async () => {
+                      await addToHistory({ kind: "hashtag", tag: tag.name });
+                      router.push(`/hashtag/${encodeURIComponent(tag.name)}`);
+                    }}
+                  >
+                    <span className={styles.trendingRank}>#{i + 1}</span>
+                    <span className={styles.trendingName}>#{tag.name}</span>
+                    <span className={styles.trendingCount}>
+                      {tag.recentPosts.toLocaleString("vi-VN")} bài / 48h
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : null}
         {loading ? <div className={styles.muted}>{t("status.searching")}</div> : null}
         {error ? <div className={styles.error}>{error}</div> : null}

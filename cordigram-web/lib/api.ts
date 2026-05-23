@@ -3051,6 +3051,31 @@ export type HashtagSuggestItem = {
   lastUsedAt?: string | null;
 };
 
+export type TrendingHashtagItem = {
+  id: string;
+  name: string;
+  recentPosts: number;
+  score: number;
+};
+
+export async function fetchTrendingHashtags(opts: {
+  token?: string | null;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<TrendingHashtagItem[]> {
+  const { token, limit = 10, signal } = opts;
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+
+  const res = await apiFetch<{ items: TrendingHashtagItem[]; count: number }>({
+    path: `/hashtags/trending?${params.toString()}`,
+    method: "GET",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    signal,
+  });
+  return res.items ?? [];
+}
+
 export async function suggestHashtags(opts: {
   token?: string | null;
   query: string;
