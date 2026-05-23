@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -52,6 +54,7 @@ export class MessagingProfilesService {
     private readonly messagingProfileModel: Model<MessagingProfile>,
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @Inject(forwardRef(() => ProfilesService))
     private readonly profilesService: ProfilesService,
   ) {}
 

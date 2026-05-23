@@ -1,5 +1,7 @@
 import {
   Injectable,
+  Inject,
+  forwardRef,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
@@ -39,6 +41,7 @@ export class DirectMessagesService {
     @InjectModel(Server.name) private serverModel: Model<Server>,
     private readonly ignoredService: IgnoredService,
     private readonly messagingProfilesService: MessagingProfilesService,
+    @Inject(forwardRef(() => BoostService))
     private readonly boostService: BoostService,
   ) {}
 
