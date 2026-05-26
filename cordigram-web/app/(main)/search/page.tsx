@@ -180,7 +180,11 @@ export default function SearchAllPage() {
   const handleReelLeave = (e: MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
     el.pause();
-    el.currentTime = 0;
+    el.currentTime = 0.1;
+  };
+  // Seek to first frame so thumbnail is visible before hover
+  const handleReelMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    e.currentTarget.currentTime = 0.1;
   };
 
   const handleEnterToSearch = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -406,6 +410,7 @@ export default function SearchAllPage() {
                           muted
                           playsInline
                           preload="metadata"
+                          onLoadedMetadata={handleReelMetadata}
                           onMouseEnter={handleReelEnter}
                           onMouseLeave={handleReelLeave}
                         />
