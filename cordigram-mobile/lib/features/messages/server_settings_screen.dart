@@ -423,7 +423,6 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              'Trực tuyến: ${_stats!['onlineCount'] ?? 0} | '
                               'Thành viên: ${_stats!['memberCount'] ?? 0} | '
                               'Ngày thành lập: ${_formatStatDate(_stats!['createdAt'])}',
                               style: const TextStyle(

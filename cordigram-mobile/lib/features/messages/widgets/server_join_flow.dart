@@ -778,7 +778,6 @@ class ServerJoinFlow {
     required String presentationName,
     String? presentationAvatarUrl,
     int? memberCount,
-    int? onlineCount,
   }) async {
     final defaultLabel = await ServersService.getMyDefaultDisplayLabel();
     final nickCtrl = TextEditingController();
@@ -805,12 +804,9 @@ class ServerJoinFlow {
                     ? defaultLabel
                     : nickCtrl.text.trim();
                 final statsLine = () {
-                  final on = onlineCount;
                   final mem = memberCount;
-                  if (on == null && mem == null) return '';
-                  final a = on ?? 0;
-                  final b = mem ?? 0;
-                  return '$a đang trực tuyến   $b thành viên';
+                  if (mem == null) return '';
+                  return '$mem thành viên';
                 }();
 
                 return DraggableScrollableSheet(
@@ -1110,7 +1106,6 @@ class ServerJoinFlow {
     String? presentationServerName,
     String? presentationAvatarUrl,
     int? presentationMemberCount,
-    int? presentationOnlineCount,
     VoidCallback? onNavigateToMessagesHome,
   }) async {
     if (!context.mounted) return false;
@@ -1226,7 +1221,6 @@ class ServerJoinFlow {
         presentationName: presentationName,
         presentationAvatarUrl: presentationAvatarUrl,
         memberCount: presentationMemberCount,
-        onlineCount: presentationOnlineCount,
       );
       if (!context.mounted) return false;
 

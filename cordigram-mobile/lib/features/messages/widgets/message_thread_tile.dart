@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../models/message_thread.dart';
 
 class MessageThreadTile extends StatelessWidget {
@@ -8,13 +9,11 @@ class MessageThreadTile extends StatelessWidget {
     required this.thread,
     required this.onTap,
     this.showActivityLabel = true,
-    this.languageCode = 'vi',
   });
 
   final MessageThread thread;
   final VoidCallback onTap;
   final bool showActivityLabel;
-  final String languageCode;
 
   String get _unreadLabel {
     final n = thread.unreadCount;
@@ -25,8 +24,10 @@ class MessageThreadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onlineText = languageCode == 'en' ? 'Online' : 'Trực tuyến';
-    final offlineText = languageCode == 'en' ? 'Offline' : 'Ngoại tuyến';
+    final scheme = Theme.of(context).colorScheme;
+    final t = LanguageController.instance.t;
+    final onlineText = t('chat.presence.online');
+    final offlineText = t('chat.presence.offline');
     final presenceText = thread.presenceLabel.trim().isNotEmpty
         ? thread.presenceLabel
         : (thread.isOnline ? onlineText : offlineText);
@@ -44,15 +45,15 @@ class MessageThreadTile extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 17,
-            backgroundColor: const Color(0xFFDDDDDD),
+            backgroundColor: scheme.surfaceContainerHighest,
             backgroundImage: thread.avatarUrl != null
                 ? NetworkImage(thread.avatarUrl!)
                 : null,
             child: thread.avatarUrl == null
                 ? Text(
                     nameLetter,
-                    style: const TextStyle(
-                      color: Color(0xFF1B2A4A),
+                    style: TextStyle(
+                      color: scheme.onSurface,
                       fontWeight: FontWeight.w700,
                     ),
                   )
@@ -65,15 +66,15 @@ class MessageThreadTile extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF2A45),
+                  color: scheme.error,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 constraints: const BoxConstraints(minWidth: 16),
                 alignment: Alignment.center,
                 child: Text(
                   _unreadLabel,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: scheme.onError,
                     fontSize: 8,
                     fontWeight: FontWeight.w700,
                     height: 1.1,
@@ -90,21 +91,19 @@ class MessageThreadTile extends StatelessWidget {
               thread.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: scheme.onSurface,
+                    fontSize: 15,
+                  ),
             ),
           ),
           if (showActivityLabel && thread.lastActiveLabel.isNotEmpty)
             Text(
               thread.lastActiveLabel,
-              style: const TextStyle(
-                color: Color(0xFF7E8CA8),
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
             ),
         ],
       ),
@@ -117,37 +116,21 @@ class MessageThreadTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: thread.unreadCount > 0
-                      ? Colors.white.withValues(alpha: 0.85)
-                      : const Color(0xFF7E8CA8),
-                  fontWeight: thread.unreadCount > 0
-                      ? FontWeight.w600
-                      : FontWeight.w400,
+                      ? scheme.onSurface
+                      : scheme.onSurfaceVariant,
                   fontSize: 12,
+                  fontWeight:
+                      thread.unreadCount > 0 ? FontWeight.w600 : FontWeight.w400,
                 ),
               )
-            : Row(
-                children: [
-                  Icon(
-                    Icons.circle,
-                    size: 8,
-                    color: thread.isOnline
-                        ? const Color(0xFF31C56F)
-                        : const Color(0xFF7E8CA8),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      presenceText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF7E8CA8),
-                        fontWeight: FontWeight.w400,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                ],
+            : Text(
+                presenceText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
               ),
       ),
     );

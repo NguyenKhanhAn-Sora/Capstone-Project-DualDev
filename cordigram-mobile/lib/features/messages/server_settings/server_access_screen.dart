@@ -214,6 +214,74 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
     });
   }
 
+  Future<void> _editExistingRule(Map<String, dynamic> rule) async {
+    if (!widget.canManage) return;
+    final id = (rule['_id'] ?? rule['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final ctrl = TextEditingController(
+      text: (rule['content'] ?? '').toString(),
+    );
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: const Color(0xFF152A52),
+        title: const Text('Sửa quy định', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: ctrl,
+          style: const TextStyle(color: Colors.white),
+          maxLines: 4,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+    final content = ctrl.text.trim();
+    ctrl.dispose();
+    if (ok != true || content.isEmpty) return;
+    try {
+      await ServersService.patchAccessRule(widget.serverId, id, content);
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _deleteExistingRule(Map<String, dynamic> rule) async {
+    if (!widget.canManage) return;
+    final id = (rule['_id'] ?? rule['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: const Color(0xFF152A52),
+        title: const Text('Xóa quy định?', style: TextStyle(color: Colors.white)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Xóa', style: TextStyle(color: Color(0xFFFF6B7A))),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ServersService.deleteAccessRule(widget.serverId, id);
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
   Future<void> _openAddQuestionDialog({Map<String, dynamic>? existing}) async {
     if (!widget.canManage) return;
     final type = await showModalBottomSheet<String>(
@@ -375,12 +443,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
   Widget build(BuildContext context) {
     final pad = MediaQuery.paddingOf(context);
     final hPad = MediaQuery.sizeOf(context).width > 520 ? 24.0 : 14.0;
-    final allRules = [
-      ..._rules
-          .map((e) => (e['content'] ?? '').toString())
-          .where((e) => e.isNotEmpty),
-      ..._pendingRuleAdds,
-    ];
+    final pendingRules = _pendingRuleAdds;
 
     return Scaffold(
       backgroundColor: _bg,
@@ -453,17 +516,50 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (allRules.isEmpty)
+                        if (_rules.isEmpty && pendingRules.isEmpty)
                           const Text(
                             'Chưa có quy định.',
                             style: TextStyle(color: Color(0xFF8EA3CC)),
                           ),
-                        for (var i = 0; i < allRules.length; i++)
+                        for (var i = 0; i < _rules.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${i + 1}. ${(_rules[i]['content'] ?? '').toString()}',
+                                    style: const TextStyle(color: Colors.white70),
+                                  ),
+                                ),
+                                if (widget.canManage) ...[
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit_outlined,
+                                      color: Color(0xFF8EA3CC),
+                                      size: 20,
+                                    ),
+                                    onPressed: () => _editExistingRule(_rules[i]),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Color(0xFFFF8A8A),
+                                      size: 20,
+                                    ),
+                                    onPressed: () => _deleteExistingRule(_rules[i]),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        for (var i = 0; i < pendingRules.length; i++)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Text(
-                              '${i + 1}. ${allRules[i]}',
-                              style: const TextStyle(color: Colors.white70),
+                              '${_rules.length + i + 1}. ${pendingRules[i]} (chưa lưu)',
+                              style: const TextStyle(color: Color(0xFFFFD54F)),
                             ),
                           ),
                         if (widget.canManage) ...[

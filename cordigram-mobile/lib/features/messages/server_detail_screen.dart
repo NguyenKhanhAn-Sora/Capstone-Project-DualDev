@@ -15,6 +15,8 @@ import 'voice_channel_room_screen.dart';
 import 'server_join_applications_screen.dart';
 import 'widgets/channel_context_sheet.dart';
 import 'widgets/invite_to_server_sheet.dart';
+import 'utils/messages_navigator.dart';
+import 'widgets/messages_chrome_builder.dart';
 import 'widgets/server_context_sheet.dart';
 
 class ServerDetailScreen extends StatefulWidget {
@@ -37,8 +39,6 @@ class ServerDetailScreen extends StatefulWidget {
 }
 
 class _ServerDetailScreenState extends State<ServerDetailScreen> {
-  static const Color _pageColor = Color(0xFF08183A);
-  static const Color _lineColor = Color(0xFF21345D);
   bool _loading = true;
   String? _error;
   List<ServerCategory> _categories = const [];
@@ -308,10 +308,8 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
 
   Future<void> _openJoinApplications() async {
     if (!_permissions.canManageJoinApplications) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => ServerJoinApplicationsScreen(server: _effectiveServer),
-      ),
+    await context.pushMessages<void>(
+      ServerJoinApplicationsScreen(server: _effectiveServer),
     );
     if (mounted) await _refreshJoinApplicationsBadge();
   }
@@ -338,15 +336,13 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
             uid != null &&
             uid.isNotEmpty &&
             oid == uid;
-        Navigator.of(context).push<dynamic>(
-          MaterialPageRoute(
-            builder: (_) => ServerSettingsHubScreen(
-              server: _effectiveServer,
-              permissions: _permissions,
-              currentUserId: widget.currentUserId,
-              isOwner: isOwner,
-              communityEnabled: _effectiveServer.communityEnabled,
-            ),
+        context.pushMessages<dynamic>(
+          ServerSettingsHubScreen(
+            server: _effectiveServer,
+            permissions: _permissions,
+            currentUserId: widget.currentUserId,
+            isOwner: isOwner,
+            communityEnabled: _effectiveServer.communityEnabled,
           ),
         ).then((result) {
           if (!mounted) return;
@@ -362,14 +358,12 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
       },
       onOpenCreateEvent: () {
         if (!mounted) return;
-        Navigator.of(context)
-            .push<void>(
-          MaterialPageRoute(
-            builder: (_) => CreateServerEventScreen(
-              serverId: widget.server.id,
-              textChannels: _allTextChannels,
-              voiceChannels: _allVoiceChannels,
-            ),
+        context
+            .pushMessages<void>(
+          CreateServerEventScreen(
+            serverId: widget.server.id,
+            textChannels: _allTextChannels,
+            voiceChannels: _allVoiceChannels,
           ),
         )
             .then((_) {
@@ -425,30 +419,25 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
 
   void _openTextChannel(ServerChannel channel) {
     _lastOpenedTextChannelId = channel.id;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ChannelChatScreen(
-          server: _effectiveServer,
-          channel: channel,
-          currentUserId: widget.currentUserId,
-          participantName: widget.participantName,
-        ),
+    context.pushMessages(
+      ChannelChatScreen(
+        server: _effectiveServer,
+        channel: channel,
+        currentUserId: widget.currentUserId,
+        participantName: widget.participantName,
       ),
     );
   }
 
   Future<void> _openVoiceChannel(ServerChannel channel) async {
     VoiceChannelSessionController.instance.clearVoiceMinimized();
-    final minimizedToChat =
-        await Navigator.of(context, rootNavigator: true).push<bool>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => VoiceChannelRoomScreen(
-          server: _effectiveServer,
-          channel: channel,
-          participantName: widget.participantName,
-        ),
+    final minimizedToChat = await context.pushMessages<bool>(
+      VoiceChannelRoomScreen(
+        server: _effectiveServer,
+        channel: channel,
+        participantName: widget.participantName,
       ),
+      fullscreenDialog: true,
     );
     if (!mounted || minimizedToChat != true) return;
     final chatTarget = _pickChatChannelForQuickReturn();
@@ -542,13 +531,16 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        backgroundColor: _pageColor,
+    return MessagesChromeBuilder(
+      builder: (context, chrome) => Scaffold(
+        backgroundColor: chrome.bg,
         appBar: AppBar(
-          backgroundColor: _pageColor,
+          backgroundColor: chrome.bg,
+          foregroundColor: chrome.text,
+          iconTheme: IconThemeData(color: chrome.text),
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: Icon(Icons.arrow_back_rounded, color: chrome.text),
             onPressed: () async {
               await _leaveVoiceIfInCurrentServer();
               if (!mounted) return;
@@ -559,7 +551,11 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
             onLongPress: _openServerSheet,
             child: Text(
               _effectiveServer.name,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: chrome.text,
+              ),
             ),
           ),
           actions: [
@@ -603,7 +599,7 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
           ],
         ),
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(child: CircularProgressIndicator(color: chrome.accent))
             : _error != null
             ? Center(
                 child: Padding(
@@ -611,7 +607,7 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                   child: Text(
                     _error!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Color(0xFFAFC0E2)),
+                    style: TextStyle(color: chrome.textMuted),
                   ),
                 ),
               )
@@ -664,7 +660,7 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                                     _openChannelSheet(channel, cat.id),
                               ),
                             ),
-                            const Divider(height: 22, color: _lineColor),
+                            Divider(height: 22, color: chrome.border),
                           ],
                         );
                       }),
@@ -693,7 +689,7 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                     if (_displayVoiceChannels
                         .where((c) => c.categoryId == null)
                         .isNotEmpty) ...[
-                      const Divider(height: 22, color: _lineColor),
+                      Divider(height: 22, color: chrome.border),
                       const _SectionHeader(
                         icon: Icons.volume_up_rounded,
                         title: 'Kênh đàm thoại',
@@ -714,13 +710,13 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                           ),
                     ],
                     if (_allTextChannels.isEmpty && _allVoiceChannels.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 56),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 56),
                         child: Center(
                           child: Text(
                             'Server chưa có kênh nào.',
                             style: TextStyle(
-                              color: Color(0xFFAFC0E2),
+                              color: chrome.textMuted,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -730,7 +726,8 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                   ],
                 ),
               ),
-      );
+      ),
+    );
   }
 }
 
@@ -742,16 +739,17 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFFAFC0E2), size: 16),
+          Icon(icon, color: muted, size: 16),
           const SizedBox(width: 6),
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFFAFC0E2),
+            style: TextStyle(
+              color: muted,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -783,24 +781,24 @@ class _ChannelTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       leading: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: const Color(0xFFC4D4F4)),
+          Icon(icon, color: scheme.onSurfaceVariant),
           if (isPrivate) ...[
             const SizedBox(width: 4),
-            const Icon(Icons.lock_rounded, color: Color(0xFF8EA3CC), size: 14),
+            Icon(Icons.lock_rounded, color: scheme.onSurfaceVariant, size: 14),
           ],
         ],
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-        ),
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: scheme.onSurface,
+              fontSize: 15,
+            ),
       ),
       subtitle: (subtitle ?? '').trim().isEmpty
           ? null
@@ -808,25 +806,25 @@ class _ChannelTile extends StatelessWidget {
               subtitle!.trim(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
             ),
       trailing: unreadCount > 0
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF2A45),
+                color: scheme.error,
                 borderRadius: BorderRadius.circular(99),
               ),
               child: Text(
                 '$unreadCount',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: scheme.onError,
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
                 ),
               ),
             )
-          : const Icon(Icons.chevron_right_rounded, color: Color(0xFF7E8CA8)),
+          : Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
       onTap: onTap,
       onLongPress: onLongPress,
     );

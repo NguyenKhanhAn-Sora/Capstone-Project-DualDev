@@ -7,6 +7,7 @@ import '../models/server_permissions.dart';
 import '../services/channel_messages_service.dart';
 import '../services/server_sidebar_prefs_store.dart';
 import '../services/servers_service.dart';
+import '../utils/messages_ui.dart';
 
 /// Mobile-optimized server menu (parity with web `ServerContextMenu`).
 class ServerContextSheet {
@@ -23,14 +24,10 @@ class ServerContextSheet {
     VoidCallback? onOpenServerSettings,
     VoidCallback? onOpenCreateEvent,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
+    return MessagesUi.showBottomSheet<void>(
+      context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0E1F45),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => _ServerContextBody(
+      child: _ServerContextBody(
         server: server,
         userId: userId,
         permissions: permissions,
@@ -43,6 +40,7 @@ class ServerContextSheet {
     );
   }
 }
+
 
 class _ServerContextBody extends StatefulWidget {
   const _ServerContextBody({
@@ -264,9 +262,16 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
   }
 
   Widget _tile(String title, VoidCallback? onTap, {Color? color}) {
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
-      title: Text(title, style: TextStyle(color: color ?? Colors.white, fontWeight: FontWeight.w600)),
-      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF7E8CA8)),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: color ?? scheme.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
       onTap: _busy ? null : onTap,
     );
   }

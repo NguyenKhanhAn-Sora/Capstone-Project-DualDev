@@ -21,6 +21,11 @@ import 'services/voice_channel_session_controller.dart';
 import 'widgets/message_folder_dropdown.dart';
 import 'widgets/messages_inbox_sheet.dart';
 import 'widgets/message_thread_tile.dart';
+import 'messages_settings_screen.dart';
+import '../../core/services/accent_color_controller.dart';
+import '../../core/services/language_controller.dart';
+import 'utils/messages_navigator.dart';
+import 'widgets/messages_chrome_builder.dart';
 
 class MessageHomeScreen extends StatefulWidget {
   const MessageHomeScreen({super.key});
@@ -30,10 +35,9 @@ class MessageHomeScreen extends StatefulWidget {
 }
 
 class _MessageHomeScreenState extends State<MessageHomeScreen> {
-  static const String _dmTitle = 'Tin nhắn trực tiếp';
-  static const String _serverTitle = 'Server';
-  static const Color _pageColor = Color(0xFF08183A);
-  static const Color _lineColor = Color(0xFF21345D);
+  static const String _quickBoost = 'boost';
+  static const String _quickSettings = 'settings';
+  static const String _quickSwitch = 'switch';
 
   final TextEditingController _searchController = TextEditingController();
   final MessagesController _messagesController = MessagesController();
@@ -49,7 +53,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     _messagesController.addListener(_onControllerChanged);
     _serverListController.addListener(_onControllerChanged);
     _messagesController.init();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await AccentColorController.instance.bindUser(_messagesController.myUserId);
       if (mounted) _serverListController.loadServers();
     });
     _serverRealtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
@@ -101,13 +106,23 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     }).toList();
   }
 
-  String get _headerTitle => _isServerMode ? _serverTitle : _dmTitle;
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
 
-  List<String> get _quickMenuItems => [
-    'Nâng cấp Boost',
-    'Cài đặt',
-    _isServerMode ? _dmTitle : _serverTitle,
-  ];
+  String get _headerTitle => _isServerMode
+      ? _t('chat.messagesPage.contextServer')
+      : _t('chat.messagesPage.directMessages');
+
+  List<({String id, String label})> get _quickMenuEntries => [
+        (id: _quickBoost, label: _t('chat.messagesPage.boostUpgrade')),
+        (id: _quickSettings, label: _t('chat.messagesPage.settingsTitle')),
+        (
+          id: _quickSwitch,
+          label: _isServerMode
+              ? _t('chat.messagesPage.contextDm')
+              : _t('chat.messagesPage.contextServer'),
+        ),
+      ];
 
   String get _voiceContextKey => _isServerMode ? 'server:lobby' : 'dm:lobby';
 
@@ -164,9 +179,43 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     });
   }
 
-  void _onQuickMenuTap(String action) {
-    final shouldSwitchToServer = action == _serverTitle;
-    final shouldSwitchToDm = action == _dmTitle;
+  void _onQuickMenuTap(String actionLabel) {
+    String? action;
+    for (final e in _quickMenuEntries) {
+      if (e.label == actionLabel) {
+        action = e.id;
+        break;
+      }
+    }
+    if (action == null) return;
+    if (action == _quickSettings) {
+      setState(() => _isFolderExpanded = false);
+      unawaited(
+        MessagesSettingsScreen.show(
+          context,
+          onSaved: () async {
+            if (mounted) setState(() {});
+            await _messagesController.refreshChatSettings();
+            await _messagesController.refreshMyIdentity();
+            await _messagesController.refreshThreads();
+          },
+        ),
+      );
+      return;
+    }
+    if (action == _quickBoost) {
+      setState(() => _isFolderExpanded = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${_t('chat.messagesPage.boostUpgrade')} — ${_t('chat.common.server')}',
+          ),
+        ),
+      );
+      return;
+    }
+    final shouldSwitchToServer = action == _quickSwitch && !_isServerMode;
+    final shouldSwitchToDm = action == _quickSwitch && _isServerMode;
     setState(() {
       if (shouldSwitchToServer) {
         _isServerMode = true;
@@ -242,14 +291,12 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     final participantName = displayName.isNotEmpty
         ? displayName
         : (username.isNotEmpty ? username : 'Người dùng');
-    final hubResult = await Navigator.of(context).push<dynamic>(
-      MaterialPageRoute(
-        builder: (_) => ServerDetailScreen(
-          server: server,
-          currentUserId: _messagesController.myUserId,
-          participantName: participantName,
-          initialTextChannelId: initialTextChannelId,
-        ),
+    final hubResult = await context.pushMessages<dynamic>(
+      ServerDetailScreen(
+        server: server,
+        currentUserId: _messagesController.myUserId,
+        participantName: participantName,
+        initialTextChannelId: initialTextChannelId,
       ),
     );
     if (!mounted) return;
@@ -532,26 +579,24 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
   }
 
   void _openThread(MessageThread thread) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => MessageChatScreen(
-          thread: thread,
-          controller: _messagesController,
-          onOpenJoinedServer: (serverId, {channelId}) async {
-            await _serverListController.loadServers();
-            if (!mounted) return;
-            for (final s in _serverListController.servers) {
-              if (s.id == serverId) {
-                final ch = (channelId ?? '').trim();
-                await _openServer(
-                  s,
-                  initialTextChannelId: ch.isEmpty ? null : ch,
-                );
-                return;
-              }
+    context.pushMessages(
+      MessageChatScreen(
+        thread: thread,
+        controller: _messagesController,
+        onOpenJoinedServer: (serverId, {channelId}) async {
+          await _serverListController.loadServers();
+          if (!mounted) return;
+          for (final s in _serverListController.servers) {
+            if (s.id == serverId) {
+              final ch = (channelId ?? '').trim();
+              await _openServer(
+                s,
+                initialTextChannelId: ch.isEmpty ? null : ch,
+              );
+              return;
             }
-          },
-        ),
+          }
+        },
       ),
     );
   }
@@ -569,7 +614,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       await _serverListController.loadServers();
     }
     if (!mounted) return;
-    final threads = _messagesController.threads;
+    final threads = _messagesController.filteredThreads;
     final servers = _serverListController.servers;
     Future<QuickSwitchServerData?> loadQuick(ServerSummary s) async {
       try {
@@ -632,24 +677,20 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
             final chosenChannel = ch;
             final name = _participantNameForVoice();
             if (chosenChannel.isVoice) {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => VoiceChannelRoomScreen(
-                    server: chosenServer,
-                    channel: chosenChannel,
-                    participantName: name,
-                  ),
+              await context.pushMessages(
+                VoiceChannelRoomScreen(
+                  server: chosenServer,
+                  channel: chosenChannel,
+                  participantName: name,
                 ),
               );
             } else {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ChannelChatScreen(
-                    server: chosenServer,
-                    channel: chosenChannel,
-                    currentUserId: _messagesController.myUserId,
-                    participantName: name,
-                  ),
+              await context.pushMessages(
+                ChannelChatScreen(
+                  server: chosenServer,
+                  channel: chosenChannel,
+                  currentUserId: _messagesController.myUserId,
+                  participantName: name,
                 ),
               );
             }
@@ -755,18 +796,22 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
             ],
           ),
         ),
-        const Divider(height: 1, color: _lineColor),
+        Divider(
+          height: 1,
+          color: AccentColorController.instance.palette.border,
+        ),
         Expanded(
           child: ListView.separated(
             itemCount: servers.length,
-            separatorBuilder: (_, __) =>
-                const Divider(height: 1, color: _lineColor),
+            separatorBuilder: (_, __) => Divider(
+              height: 1,
+              color: AccentColorController.instance.palette.border,
+            ),
             itemBuilder: (context, index) {
               final server = servers[index];
               return MessageThreadTile(
                 thread: _toServerThread(server),
                 showActivityLabel: false,
-                languageCode: _messagesController.languageCode,
                 onTap: () => _openServer(server),
               );
             },
@@ -778,10 +823,14 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final threads = _messagesController.threads;
+    final threads = _messagesController.filteredThreads;
     final servers = _filteredServers;
 
-    return AnimatedBuilder(
+    return MessagesChromeBuilder(
+      builder: (context, chrome) {
+        final muted = chrome.textMuted;
+        final onSurface = chrome.text;
+        return AnimatedBuilder(
       animation: Listenable.merge([
         VoiceChannelSessionController.instance,
         DmCallManager.instance,
@@ -794,9 +843,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
           FocusScope.of(context).unfocus();
         },
         child: Scaffold(
-          backgroundColor: _pageColor,
+          backgroundColor: chrome.bg,
           appBar: AppBar(
-            backgroundColor: _pageColor,
+            backgroundColor: chrome.bg,
             elevation: 0,
             scrolledUnderElevation: 0,
             surfaceTintColor: Colors.transparent,
@@ -829,7 +878,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                   clipBehavior: Clip.none,
                   children: [
                     IconButton(
-                      tooltip: 'Hộp thư',
+                      tooltip: _t('chat.messagesPage.inboxTitle'),
                       onPressed: _openInboxSheet,
                       constraints: const BoxConstraints.tightFor(
                         width: 30,
@@ -837,10 +886,10 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                       ),
                       padding: EdgeInsets.zero,
                       splashRadius: 18,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.mail_outline_rounded,
                         size: 21,
-                        color: Colors.white,
+                        color: onSurface,
                       ),
                     ),
                     if (_messagesController.inboxUnreadCount > 0)
@@ -867,7 +916,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
                   child: MessageQuickMenuDropdown(
-                    items: _quickMenuItems,
+                    items: _quickMenuEntries.map((e) => e.label).toList(),
                     onSelected: _onQuickMenuTap,
                   ),
                 ),
@@ -878,9 +927,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                         controller: _searchController,
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          hintText: 'Tìm server...',
-                          hintStyle: const TextStyle(
-                            color: Color(0xFFAFC0E2),
+                          hintText: _t('chat.popups.messageSearch.quickSwitchServers'),
+                          hintStyle: TextStyle(
+                            color: muted,
                             fontSize: 13,
                           ),
                           isDense: true,
@@ -890,22 +939,22 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFAFC0E2),
+                            borderSide: BorderSide(
+                              color: chrome.border,
                               width: 1,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFAFC0E2),
+                            borderSide: BorderSide(
+                              color: chrome.border,
                               width: 1,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
-                            borderSide: const BorderSide(
-                              color: Colors.white,
+                            borderSide: BorderSide(
+                              color: chrome.accent,
                               width: 1.2,
                             ),
                           ),
@@ -915,14 +964,14 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                         readOnly: true,
                         onTap: _openGlobalMessageSearch,
                         decoration: InputDecoration(
-                          hintText: 'Tìm hoặc bắt đầu cuộc trò chuyện',
-                          hintStyle: const TextStyle(
-                            color: Color(0xFFAFC0E2),
+                          hintText: _t('chat.messagesPage.searchPlaceholder'),
+                          hintStyle: TextStyle(
+                            color: muted,
                             fontSize: 13,
                           ),
-                          prefixIcon: const Icon(
+                          prefixIcon: Icon(
                             Icons.search_rounded,
-                            color: Color(0xFFAFC0E2),
+                            color: muted,
                             size: 22,
                           ),
                           isDense: true,
@@ -932,29 +981,29 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFAFC0E2),
+                            borderSide: BorderSide(
+                              color: chrome.border,
                               width: 1,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFAFC0E2),
+                            borderSide: BorderSide(
+                              color: chrome.border,
                               width: 1,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFAFC0E2),
+                            borderSide: BorderSide(
+                              color: chrome.border,
                               width: 1,
                             ),
                           ),
                         ),
                       ),
               ),
-              const Divider(height: 1, thickness: 1, color: _lineColor),
+              Divider(height: 1, thickness: 1, color: chrome.border),
               Expanded(
                 child: _isServerMode
                     ? _buildServerModeBody(servers)
@@ -967,16 +1016,16 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                           child: Text(
                             _messagesController.threadsError!,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: Color(0xFFAFC0E2)),
+                            style: TextStyle(color: muted),
                           ),
                         ),
                       )
                     : threads.isEmpty
                     ? Center(
-                        child: const Text(
+                        child: Text(
                           'No conversations found',
                           style: TextStyle(
-                            color: Color(0xFFAFC0E2),
+                            color: muted,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -984,13 +1033,12 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                     : ListView.separated(
                         itemCount: threads.length,
                         separatorBuilder: (_, __) =>
-                            const Divider(height: 1, color: _lineColor),
+                            Divider(height: 1, color: chrome.border),
                         itemBuilder: (context, index) {
                           final thread = threads[index];
                           return MessageThreadTile(
                             thread: thread,
                             showActivityLabel: !_isServerMode,
-                            languageCode: _messagesController.languageCode,
                             onTap: () => _openThread(thread),
                           );
                         },
@@ -1001,15 +1049,15 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
           bottomNavigationBar: Container(
             height: 42,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: const BoxDecoration(
-              color: _pageColor,
-              border: Border(top: BorderSide(color: _lineColor)),
+            decoration: BoxDecoration(
+              color: chrome.panelSidebar,
+              border: Border(top: BorderSide(color: chrome.border)),
             ),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 10,
-                  backgroundColor: const Color(0xFFDDDDDD),
+                  backgroundColor: chrome.surfaceMuted,
                   backgroundImage:
                       (_messagesController.myAvatarUrl ?? '').isNotEmpty
                       ? NetworkImage(_messagesController.myAvatarUrl!)
@@ -1029,8 +1077,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                                     .substring(0, 1)
                                     .toUpperCase()
                               : 'U'),
-                          style: const TextStyle(
-                            color: Color(0xFF1B2A4A),
+                          style: TextStyle(
+                            color: onSurface,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1044,9 +1092,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                     Text(
                       (_messagesController.myUsername ?? '').isNotEmpty
                           ? _messagesController.myUsername!
-                          : 'Username',
-                      style: const TextStyle(
-                        color: Colors.white,
+                          : _t('chat.messagesPage.userFallback'),
+                      style: TextStyle(
+                        color: onSurface,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         height: 1.1,
@@ -1059,15 +1107,15 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                           size: 7,
                           color: _messagesController.myOnline
                               ? const Color(0xFF31C56F)
-                              : const Color(0xFF7E8CA8),
+                              : muted,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           (_messagesController.myDisplayName ?? '').isNotEmpty
                               ? _messagesController.myDisplayName!
-                              : 'DisplayName',
-                          style: const TextStyle(
-                            color: Color(0xFF9AAFD5),
+                              : _t('chat.messagesPage.userFallback'),
+                          style: TextStyle(
+                            color: muted,
                             fontSize: 9,
                           ),
                         ),
@@ -1089,8 +1137,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                         ? Icons.mic_off_rounded
                         : Icons.mic_none_rounded,
                     color: _globalMicMuted
-                        ? const Color(0xFFFF5770)
-                        : const Color(0xFFB4C2DE),
+                        ? Theme.of(context).colorScheme.error
+                        : muted,
                   ),
                 ),
                 IconButton(
@@ -1106,8 +1154,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                         ? Icons.headset_off_rounded
                         : Icons.headset_rounded,
                     color: _globalSoundMuted
-                        ? const Color(0xFFFF5770)
-                        : const Color(0xFFB4C2DE),
+                        ? Theme.of(context).colorScheme.error
+                        : muted,
                   ),
                 ),
               ],
@@ -1115,6 +1163,8 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }
@@ -1140,10 +1190,12 @@ class _ServerCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final hasImage = (imageUrl ?? '').isNotEmpty;
     final letter = (label ?? '').trim().isNotEmpty
         ? (label!.trim().substring(0, 1).toUpperCase())
         : '?';
+    final onCircle = selected ? scheme.onPrimary : scheme.onSurface;
     return Tooltip(
       message: tooltip ?? label ?? '',
       child: Stack(
@@ -1157,12 +1209,10 @@ class _ServerCircleButton extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: selected
-                    ? const Color(0xFF2D7EFF)
-                    : const Color(0xFF122A55),
+                color: selected ? scheme.primary : scheme.surfaceContainerHighest,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected ? Colors.white : const Color(0xFF2A3F69),
+                  color: selected ? scheme.onPrimary : scheme.outline,
                 ),
               ),
               child: hasImage
@@ -1173,8 +1223,8 @@ class _ServerCircleButton extends StatelessWidget {
                         errorBuilder: (_, __, ___) => Center(
                           child: Text(
                             letter,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: onCircle,
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
                             ),
@@ -1184,11 +1234,11 @@ class _ServerCircleButton extends StatelessWidget {
                     )
                   : Center(
                       child: icon != null
-                          ? Icon(icon, color: Colors.white, size: 24)
+                          ? Icon(icon, color: onCircle, size: 24)
                           : Text(
                               letter,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: onCircle,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 16,
                               ),
@@ -1203,14 +1253,14 @@ class _ServerCircleButton extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF2A45),
+                  color: scheme.error,
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: const Color(0xFF071531)),
+                  border: Border.all(color: scheme.surface),
                 ),
                 child: Text(
                   unreadCount > 99 ? '99+' : '$unreadCount',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: scheme.onError,
                     fontWeight: FontWeight.w700,
                     fontSize: 8,
                   ),

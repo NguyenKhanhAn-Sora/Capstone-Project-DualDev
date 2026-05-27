@@ -21,6 +21,7 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
   static const Color _card = Color(0xFF0E1F45);
 
   List<Map<String, dynamic>> _rows = [];
+  List<Map<String, dynamic>> _restricted = [];
   bool _loading = true;
   String? _error;
   final _search = TextEditingController();
@@ -43,9 +44,18 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
       _error = null;
     });
     try {
-      final list = await ServersService.getBannedUsers(widget.serverId);
+      final banned = await ServersService.getBannedUsers(widget.serverId);
+      List<Map<String, dynamic>> restricted = [];
+      if (widget.canUnban) {
+        restricted = await ServersService.getMentionRestrictedMembers(
+          widget.serverId,
+        );
+      }
       if (!mounted) return;
-      setState(() => _rows = list);
+      setState(() {
+        _rows = banned;
+        _restricted = restricted;
+      });
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -99,6 +109,78 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
     }
   }
 
+  Future<void> _unrestrict(String userId) async {
+    try {
+      await ServersService.unrestrictMember(widget.serverId, userId);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã gỡ hạn chế đề cập')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Widget _userTile({
+    required Map<String, dynamic> r,
+    required String uid,
+    required String name,
+    required String subtitle,
+    required VoidCallback? onAction,
+    required String actionLabel,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: _card,
+        borderRadius: BorderRadius.circular(12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: const Color(0xFF21345D),
+            backgroundImage: (r['avatarUrl']?.toString().isNotEmpty == true)
+                ? NetworkImage(r['avatarUrl'].toString())
+                : null,
+            child: r['avatarUrl'] == null
+                ? Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                : null,
+          ),
+          title: Text(
+            name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          ),
+          trailing: onAction == null
+              ? null
+              : TextButton(
+                  onPressed: onAction,
+                  child: Text(
+                    actionLabel,
+                    style: const TextStyle(color: Color(0xFF7FB6FF)),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pad = MediaQuery.paddingOf(context);
@@ -113,116 +195,91 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
           IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 8),
-            child: TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Tìm theo tên hoặc user ID',
-                hintStyle: const TextStyle(color: Color(0xFF6B7A99)),
-                filled: true,
-                fillColor: _card,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(child: Text(_error!))
+          : ListView(
+              padding: EdgeInsets.fromLTRB(hPad, 10, hPad, pad.bottom + 16),
+              children: [
+                TextField(
+                  controller: _search,
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Tìm theo tên hoặc user ID',
+                    hintStyle: const TextStyle(color: Color(0xFF6B7A99)),
+                    filled: true,
+                    fillColor: _card,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF8EA3CC)),
+                  ),
                 ),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF8EA3CC)),
-              ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Đã cấm',
+                  style: TextStyle(
+                    color: Color(0xFF8EA3CC),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (_filtered.isEmpty)
+                  const Text(
+                    'Không có lệnh cấm',
+                    style: TextStyle(color: Color(0xFF8EA3CC)),
+                  )
+                else
+                  ..._filtered.map((r) {
+                    final uid = (r['userId'] ?? '').toString();
+                    final name = (r['displayName'] ?? r['username'] ?? uid).toString();
+                    final reason = (r['reason'] ?? '').toString();
+                    return _userTile(
+                      r: r,
+                      uid: uid,
+                      name: name,
+                      subtitle: reason.isEmpty ? '@${r['username']}' : reason,
+                      onAction: widget.canUnban ? () => _unban(uid) : null,
+                      actionLabel: 'Gỡ cấm',
+                    );
+                  }),
+                if (widget.canUnban && _restricted.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Hạn chế đề cập',
+                    style: TextStyle(
+                      color: Color(0xFF8EA3CC),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Thành viên bị AutoMod hạn chế @ — có thể gỡ tại đây.',
+                    style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._restricted.map((r) {
+                    final uid = (r['userId'] ?? '').toString();
+                    final name = (r['displayName'] ?? r['username'] ?? uid).toString();
+                    return _userTile(
+                      r: r,
+                      uid: uid,
+                      name: name,
+                      subtitle: 'Hạn chế đề cập',
+                      onAction: () => _unrestrict(uid),
+                      actionLabel: 'Gỡ hạn chế',
+                    );
+                  }),
+                ],
+              ],
             ),
-          ),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? Center(child: Text(_error!))
-                    : _filtered.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'Không có lệnh cấm',
-                              style: TextStyle(color: Color(0xFF8EA3CC)),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: EdgeInsets.fromLTRB(
-                              hPad,
-                              0,
-                              hPad,
-                              pad.bottom + 16,
-                            ),
-                            itemCount: _filtered.length,
-                            itemBuilder: (context, i) {
-                              final r = _filtered[i];
-                              final uid = (r['userId'] ?? '').toString();
-                              final name =
-                                  (r['displayName'] ?? r['username'] ?? uid)
-                                      .toString();
-                              final reason = (r['reason'] ?? '').toString();
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: Material(
-                                  color: _card,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: const Color(0xFF21345D),
-                                      backgroundImage:
-                                          (r['avatarUrl']?.toString().isNotEmpty ==
-                                                  true)
-                                              ? NetworkImage(
-                                                  r['avatarUrl'].toString(),
-                                                )
-                                              : null,
-                                      child: r['avatarUrl'] == null
-                                          ? Text(
-                                              name.isNotEmpty
-                                                  ? name[0].toUpperCase()
-                                                  : '?',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                    title: Text(
-                                      name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      reason.isEmpty ? '@${r['username']}' : reason,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Color(0xFF8EA3CC),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    trailing: widget.canUnban
-                                        ? TextButton(
-                                            onPressed: () => _unban(uid),
-                                            child: const Text(
-                                              'Gỡ cấm',
-                                              style: TextStyle(
-                                                color: Color(0xFF7FB6FF),
-                                              ),
-                                            ),
-                                          )
-                                        : null,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-          ),
-        ],
-      ),
     );
   }
 }

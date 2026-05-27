@@ -7,6 +7,32 @@ import '../../../core/services/auth_storage.dart';
 import '../models/dm_message.dart';
 import '../models/presence_state.dart';
 
+class DmUserTypingEvent {
+  const DmUserTypingEvent({
+    required this.fromUserId,
+    required this.username,
+    required this.isTyping,
+  });
+
+  final String fromUserId;
+  final String username;
+  final bool isTyping;
+}
+
+class DmProfileStyleUpdatedEvent {
+  const DmProfileStyleUpdatedEvent({
+    required this.userId,
+    this.displayName,
+    this.username,
+    this.avatarUrl,
+  });
+
+  final String userId;
+  final String? displayName;
+  final String? username;
+  final String? avatarUrl;
+}
+
 class DmUnreadCountEvent {
   const DmUnreadCountEvent({
     required this.totalUnread,
@@ -71,6 +97,13 @@ class DirectMessagesRealtimeService {
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messagesReadController =
       StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<DmUserTypingEvent> _typingController =
+      StreamController<DmUserTypingEvent>.broadcast();
+  static final StreamController<DmProfileStyleUpdatedEvent>
+  _profileStyleController =
+      StreamController<DmProfileStyleUpdatedEvent>.broadcast();
+
+  static Timer? _presencePingTimer;
 
   static Stream<DmMessage> get newMessages => _newMessageController.stream;
   static Stream<DmUnreadCountEvent> get unreadCounts =>
@@ -85,6 +118,9 @@ class DirectMessagesRealtimeService {
       _messageDeletedController.stream;
   static Stream<Map<String, dynamic>> get messagesRead =>
       _messagesReadController.stream;
+  static Stream<DmUserTypingEvent> get userTyping => _typingController.stream;
+  static Stream<DmProfileStyleUpdatedEvent> get profileStyleUpdated =>
+      _profileStyleController.stream;
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -229,8 +265,68 @@ class DirectMessagesRealtimeService {
       _messagesReadController.add(Map<String, dynamic>.from(payload));
     });
 
+    socket.on('user-typing', (payload) {
+      if (payload is! Map) return;
+      final fromUserId = (payload['fromUserId'] ?? '').toString();
+      if (fromUserId.isEmpty) return;
+      _typingController.add(
+        DmUserTypingEvent(
+          fromUserId: fromUserId,
+          username: (payload['username'] ?? '').toString(),
+          isTyping: payload['isTyping'] == true,
+        ),
+      );
+    });
+
+    socket.on('user-profile-style-updated', (payload) {
+      if (payload is! Map) return;
+      final userId = (payload['userId'] ?? payload['_id'] ?? '').toString();
+      if (userId.isEmpty) return;
+      _profileStyleController.add(
+        DmProfileStyleUpdatedEvent(
+          userId: userId,
+          displayName: payload['displayName']?.toString(),
+          username: payload['username']?.toString(),
+          avatarUrl: (payload['avatarUrl'] ?? payload['avatar'])?.toString(),
+        ),
+      );
+    });
+
+    socket.on('connect', (_) => _startPresenceHeartbeat());
+    socket.on('disconnect', (_) => _stopPresenceHeartbeat());
+
     socket.connect();
     _socket = socket;
+    if (socket.connected) _startPresenceHeartbeat();
+  }
+
+  static void _startPresenceHeartbeat() {
+    _stopPresenceHeartbeat();
+    _emitPresencePing();
+    _emitPresenceActivity();
+    _presencePingTimer = Timer.periodic(
+      const Duration(seconds: 25),
+      (_) => _emitPresencePing(),
+    );
+  }
+
+  static void _stopPresenceHeartbeat() {
+    _presencePingTimer?.cancel();
+    _presencePingTimer = null;
+  }
+
+  static void _emitPresencePing() {
+    _socket?.emit('presence-ping');
+  }
+
+  static void _emitPresenceActivity() {
+    _socket?.emit('presence-activity');
+  }
+
+  /// Call on user interaction while app is foregrounded (mirrors web mouse/click).
+  static void notifyUserActivity() {
+    if (_socket?.connected != true) return;
+    _emitPresenceActivity();
   }
 
   static void _onReaction(dynamic payload) {
@@ -249,6 +345,29 @@ class DirectMessagesRealtimeService {
 
   static void markAsRead({required String userId}) {
     _socket?.emit('mark-all-as-read', {'senderId': userId});
+  }
+
+  static void markMessageIdsAsRead({
+    required List<String> messageIds,
+    required String senderId,
+  }) {
+    if (messageIds.isEmpty) return;
+    _socket?.emit('mark-as-read', {
+      'messageIds': messageIds,
+      'senderId': senderId,
+    });
+  }
+
+  static void emitDeleteMessage({
+    required String messageId,
+    required String receiverId,
+    String deleteType = 'for-everyone',
+  }) {
+    _socket?.emit('delete-message', {
+      'messageId': messageId,
+      'deleteType': deleteType,
+      'receiverId': receiverId,
+    });
   }
 
   static void initiateCall({
@@ -278,6 +397,7 @@ class DirectMessagesRealtimeService {
   }
 
   static Future<void> disconnect() async {
+    _stopPresenceHeartbeat();
     final socket = _socket;
     if (socket != null) {
       socket.off('new-message');

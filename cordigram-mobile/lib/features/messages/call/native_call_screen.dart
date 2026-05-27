@@ -7,7 +7,8 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../message_home_screen.dart';
+import '../messages_shell.dart';
+import '../utils/messages_navigator.dart';
 import 'calls_api_service.dart';
 import 'dm_call_manager.dart';
 
@@ -614,7 +615,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     _isMinimizeNavigating = true;
     try {
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const MessageHomeScreen()),
+        messagesEntryRoute<void>(const MessagesShell()),
       );
     } finally {
       _isMinimizeNavigating = false;

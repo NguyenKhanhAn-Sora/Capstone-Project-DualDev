@@ -78,6 +78,34 @@ class _ServerRolesScreenState extends State<ServerRolesScreen> {
     }
   }
 
+  Future<void> _reorderCustomRoles(int oldIndex, int newIndex) async {
+    if (!widget.canManageRoles) return;
+    if (newIndex > oldIndex) newIndex -= 1;
+    final custom = _roles.where((r) => !r.isDefault).toList();
+    if (oldIndex < 0 ||
+        oldIndex >= custom.length ||
+        newIndex < 0 ||
+        newIndex >= custom.length) {
+      return;
+    }
+    final moved = custom.removeAt(oldIndex);
+    custom.insert(newIndex, moved);
+    final def = _roles.where((r) => r.isDefault).toList();
+    try {
+      await ServersService.reorderRoles(
+        widget.serverId,
+        custom.map((r) => r.id).toList(),
+      );
+      if (!mounted) return;
+      setState(() => _roles = [...custom, ...def]);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+      await _load();
+    }
+  }
+
   Future<void> _openRole(ServerRole role) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -180,13 +208,30 @@ class _ServerRolesScreenState extends State<ServerRolesScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      ...custom.map(
-                        (r) => _RoleRow(
-                          name: r.name,
-                          color: r.color,
-                          onTap: () => _openRole(r),
+                      if (widget.canManageRoles && custom.length > 1)
+                        ReorderableListView(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          onReorder: _reorderCustomRoles,
+                          children: [
+                            for (final r in custom)
+                              _RoleRow(
+                                key: ValueKey(r.id),
+                                name: r.name,
+                                color: r.color,
+                                onTap: () => _openRole(r),
+                                showDrag: true,
+                              ),
+                          ],
+                        )
+                      else
+                        ...custom.map(
+                          (r) => _RoleRow(
+                            name: r.name,
+                            color: r.color,
+                            onTap: () => _openRole(r),
+                          ),
                         ),
-                      ),
                       if (def case final everyone?)
                         _RoleRow(
                           name: '@everyone',
@@ -202,14 +247,17 @@ class _ServerRolesScreenState extends State<ServerRolesScreen> {
 
 class _RoleRow extends StatelessWidget {
   const _RoleRow({
+    super.key,
     required this.name,
     required this.color,
     required this.onTap,
+    this.showDrag = false,
   });
 
   final String name;
   final String color;
   final VoidCallback onTap;
+  final bool showDrag;
 
   Color _parse(String hex) {
     var h = hex.trim();
@@ -253,6 +301,11 @@ class _RoleRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (showDrag)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 4),
+                    child: Icon(Icons.drag_handle_rounded, color: Color(0xFF7E8CA8)),
+                  ),
                 const Icon(Icons.chevron_right_rounded, color: Color(0xFF7E8CA8)),
               ],
             ),

@@ -72,8 +72,8 @@ class MessagesMediaService {
 
   static bool get isBoostMediaOptimizationEnabled => _boostActive;
 
-  static Future<void> refreshBoostStatus() async {
-    if (_boostStatusLoaded) return;
+  static Future<void> refreshBoostStatus({bool force = false}) async {
+    if (_boostStatusLoaded && !force) return;
     _boostStatusLoaded = true;
     try {
       final json = await ApiService.get(

@@ -14,6 +14,7 @@ class MessageFolderDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -21,8 +22,8 @@ class MessageFolderDropdown extends StatelessWidget {
           child: Text(
             title,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: scheme.onSurface,
               fontSize: 15,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.1,
@@ -38,9 +39,9 @@ class MessageFolderDropdown extends StatelessWidget {
           icon: AnimatedRotation(
             turns: isExpanded ? 0.25 : 0,
             duration: const Duration(milliseconds: 180),
-            child: const Icon(
+            child: Icon(
               Icons.arrow_forward,
-              color: Colors.white,
+              color: scheme.onSurface,
               size: 16,
             ),
           ),
@@ -62,11 +63,12 @@ class MessageQuickMenuDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1737),
-        border: Border.all(color: const Color(0xFF4D5A78)),
+        color: scheme.surface,
+        border: Border.all(color: scheme.outline),
       ),
       child: Column(
         children: [
@@ -76,8 +78,8 @@ class MessageQuickMenuDropdown extends StatelessWidget {
               title: Center(
                 child: Text(
                   items[i],
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: scheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -86,7 +88,7 @@ class MessageQuickMenuDropdown extends StatelessWidget {
               onTap: () => onSelected(items[i]),
             ),
             if (i < items.length - 1)
-              const Divider(height: 1, thickness: 1, color: Color(0xFF4D5A78)),
+              Divider(height: 1, thickness: 1, color: scheme.outline),
           ],
         ],
       ),
