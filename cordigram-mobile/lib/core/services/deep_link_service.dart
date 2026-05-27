@@ -9,6 +9,9 @@ class DeepLinkService {
 
   static StreamSubscription<Uri>? _sub;
 
+  /// Set before launching Google OAuth; completed when cordigram:// callback arrives.
+  static Completer<Uri>? pendingOAuthCompleter;
+
   static Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
     final appLinks = AppLinks();
 
@@ -21,7 +24,6 @@ class DeepLinkService {
     // Link that launched the app from terminated state
     final initial = await appLinks.getInitialLink();
     if (initial != null) {
-      // Delay so the widget tree is fully built before pushing
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _handle(initial, navigatorKey),
       );
@@ -34,6 +36,14 @@ class DeepLinkService {
   }
 
   static void _handle(Uri uri, GlobalKey<NavigatorState> navigatorKey) {
+    // cordigram:// scheme — OAuth callback or future custom deep links
+    if (uri.scheme == 'cordigram') {
+      if (pendingOAuthCompleter != null && !pendingOAuthCompleter!.isCompleted) {
+        pendingOAuthCompleter!.complete(uri);
+      }
+      return;
+    }
+
     final nav = navigatorKey.currentState;
     if (nav == null) return;
 
