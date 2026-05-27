@@ -30,6 +30,7 @@ type PostItem = {
   moderationState: string;
   autoHiddenPendingReview: boolean;
   createdAt: string | null;
+  isPoll?: boolean;
 };
 
 type CommentItem = {
@@ -1320,6 +1321,16 @@ function ContentModerationPageClient() {
                       </td>
                       <td>
                         <p className={styles.subText}>{item.visibility}</p>
+                        {item.isPoll ? (
+                          <span className={styles.pollMetaBadge}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true" width="11" height="11">
+                              <rect x="3" y="13" width="4" height="8" rx="1" fill="currentColor" />
+                              <rect x="10" y="8" width="4" height="13" rx="1" fill="currentColor" />
+                              <rect x="17" y="3" width="4" height="18" rx="1" fill="currentColor" />
+                            </svg>
+                            Poll
+                          </span>
+                        ) : null}
                         {item.media?.length ? (
                           <button
                             type="button"
@@ -1652,6 +1663,69 @@ function ContentModerationPageClient() {
                           ) : null}
                         </div>
                       </article>
+                    ) : reviewPost?.poll ? (
+                      <div className={styles.pollCard}>
+                        <div className={styles.pollHeader}>
+                          <svg className={styles.pollIcon} viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="3" y="13" width="4" height="8" rx="1" fill="currentColor" />
+                            <rect x="10" y="8" width="4" height="13" rx="1" fill="currentColor" />
+                            <rect x="17" y="3" width="4" height="18" rx="1" fill="currentColor" />
+                          </svg>
+                          <span className={styles.pollHeaderLabel}>Poll</span>
+                          <span className={`${styles.pollStatusBadge} ${reviewPost.poll.isExpired ? styles.pollStatusExpired : styles.pollStatusActive}`}>
+                            {reviewPost.poll.isExpired ? "Expired" : "Active"}
+                          </span>
+                          {reviewPost.poll.allowMultipleAnswers ? (
+                            <span className={styles.pollMultiBadge}>Multiple answers</span>
+                          ) : null}
+                        </div>
+
+                        {reviewPost.caption ? (
+                          <p className={styles.pollCaption}>{reviewPost.caption}</p>
+                        ) : null}
+
+                        <p className={styles.pollQuestion}>{reviewPost.poll.question}</p>
+
+                        <div className={styles.pollOptions}>
+                          {(reviewPost.poll.options as string[]).map((option: string, idx: number) => {
+                            const pct: number = (reviewPost.poll.percentages as number[])[idx] ?? 0;
+                            const votes: number = (reviewPost.poll.voteCounts as number[])[idx] ?? 0;
+                            const imgUrl: string | null = Array.isArray(reviewPost.poll.optionImages) ? (reviewPost.poll.optionImages[idx] ?? null) : null;
+                            return (
+                              <div key={idx} className={styles.pollOptionRow}>
+                                {imgUrl ? (
+                                  <img src={imgUrl} alt={option} className={styles.pollOptionImg} />
+                                ) : null}
+                                <div className={styles.pollOptionBody}>
+                                  <div className={styles.pollOptionMeta}>
+                                    <span className={styles.pollOptionText}>{option}</span>
+                                    <span className={styles.pollOptionStat}>{votes} vote{votes !== 1 ? "s" : ""} · {pct}%</span>
+                                  </div>
+                                  <div className={styles.pollBarTrack}>
+                                    <div className={styles.pollBarFill} style={{ width: `${pct}%` }} />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className={styles.pollFooter}>
+                          <span className={styles.pollFooterStat}>{reviewPost.poll.totalVotes} total vote{reviewPost.poll.totalVotes !== 1 ? "s" : ""}</span>
+                          <span className={styles.pollFooterDot}>·</span>
+                          <span className={styles.pollFooterStat}>
+                            {reviewPost.poll.durationHours}h duration
+                          </span>
+                          {reviewPost.poll.expiresAt ? (
+                            <>
+                              <span className={styles.pollFooterDot}>·</span>
+                              <span className={styles.pollFooterStat}>
+                                Ends {new Date(reviewPost.poll.expiresAt as string).toLocaleString()}
+                              </span>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
                     ) : (
                       <div className={styles.reviewInfoBlock}>
                         <p className={styles.reviewInfoLabel}>Caption</p>

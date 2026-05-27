@@ -1245,6 +1245,8 @@
     "unableToLoad": "探索を読み込めません",
     "blurredViolation": "この画像は当社の基準に違反しているためぼかされています。",
     "noPostsYet": "探索投稿はまだありません",
+    "notInterested": "興味なし",
+    "viewPost": "投稿を見る",
     "seenAll": "探索の投稿をすべて見ました"
   },
   "hashtag": {

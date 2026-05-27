@@ -3251,7 +3251,7 @@ class _GridTileState extends State<_GridTile> {
     final after = url.substring(idx + marker.length);
     final dotIdx = after.lastIndexOf('.');
     final pathNoExt = dotIdx >= 0 ? after.substring(0, dotIdx) : after;
-    return '${before}so_0/$pathNoExt.jpg';
+    return '${before}so_auto/$pathNoExt.jpg';
   }
 
   static String? _pickString(List<dynamic> values) {

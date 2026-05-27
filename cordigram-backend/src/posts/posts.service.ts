@@ -54,11 +54,15 @@ const ADS_FREQUENCY_COOLDOWN_MINUTES = 30
 const ADS_FREQUENCY_MAX_IMPRESSIONS_24H = 3
 const REACH_RESTRICT_SCORE_MULTIPLIER = 0.15
 // Feed ranking tunables
-const FRESHNESS_HALF_LIFE_HOURS = 36       // decay half-life for post freshness
-const FOLLOW_RELATIONSHIP_BOOST = 2.0      // score multiplier for followed users
-const VERIFIED_CREATOR_BOOST = 1.8         // score multiplier for blue-tick creators
-const MAX_POSTS_PER_AUTHOR_PER_FEED = 2    // author diversity cap across the ranked pool
-const MIN_CANDIDATE_POOL_SIZE = 300        // minimum candidates to rank before slicing
+const FRESHNESS_HALF_LIFE_HOURS = 72          // 72 h half-life — quality content stays visible longer
+const FOLLOW_RELATIONSHIP_BOOST = 2.0         // score multiplier for followed users (home feed)
+const VERIFIED_CREATOR_BOOST = 1.25           // reduced from 1.8 — prevents explore being dominated by influencers
+const NEW_CREATOR_BOOST = 1.15                // mild discovery boost for accounts < 90 days old
+const MAX_POSTS_PER_AUTHOR_PER_FEED = 2       // author diversity cap across the ranked pool
+const MIN_CANDIDATE_POOL_SIZE = 300           // minimum candidates to rank before slicing
+const EXPLORE_INTEREST_BOOST_CAP = 2.5        // max personalisation multiplier (final = base × up to 3.5×)
+const EXPLORE_INTEREST_DIVISOR = 10           // normaliser: interest/this → raw boost before cap
+const TASTE_CACHE_TTL_MS = 60 * 60 * 1000    // rebuild taste profile after 1 hour (was 6 h)
 
 @Injectable()
 export class PostsService {
@@ -2821,7 +2825,12 @@ export class PostsService {
   async recordImpression(
     userId: string,
     postId: string,
-    opts: { sessionId: string; position?: number | null; source?: string },
+    opts: {
+      sessionId: string;
+      position?: number | null;
+      source?: string;
+      durationMs?: number | null;
+    },
   ) {
     const { userObjectId, postObjectId } = await this.resolveIds(
       userId,
@@ -2852,6 +2861,33 @@ export class PostsService {
 
     if (created) {
       await this.bumpCounters(postObjectId, { 'stats.impressions': 1 });
+    }
+
+    // If the user dwelled on this post for ≥ 2 s, persist a view interaction so the
+    // taste-profile rebuild can use watch-time as a learning signal (same as video completion).
+    const durationMs =
+      typeof opts.durationMs === 'number' && opts.durationMs > 0
+        ? Math.round(opts.durationMs)
+        : null;
+    if (durationMs !== null && durationMs >= 2000) {
+      try {
+        await this.postInteractionModel
+          .findOneAndUpdate(
+            { userId: userObjectId, postId: postObjectId, type: 'view' },
+            {
+              $setOnInsert: {
+                userId: userObjectId,
+                postId: postObjectId,
+                type: 'view',
+              },
+              $max: { durationMs },
+            },
+            { upsert: true },
+          )
+          .lean();
+      } catch {
+        // Ignore upsert race conditions
+      }
     }
 
     return { impressed: true, created };
@@ -2926,45 +2962,123 @@ export class PostsService {
     );
 
     const now = new Date();
+    const hiddenObjectIds = Array.from(
+      hiddenIds,
+      (id) => new Types.ObjectId(id),
+    );
+    const authorExclusion = {
+      $nin: [userObjectId, ...followeeObjectIds, ...excludedAuthorIds],
+    };
 
-    // Fixed candidate pool size (stable across pages).
-    const candidateLimit = 1000;
+    // ── Step 1: load taste profile FIRST — needed to build the interest-matched pool ──
+    const taste = await this.getOrRebuildTasteProfile(userObjectId);
 
-    const candidateDocs = await this.postModel
-      .find({
-        authorId: {
-          $nin: [userObjectId, ...followeeObjectIds, ...excludedAuthorIds],
-        },
-        kind: { $in: allowedKinds },
-        status: 'published',
-        visibility: 'public',
-        moderationState: 'normal',
-        deletedAt: null,
-        publishedAt: { $ne: null },
-        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
-      })
-      .sort({
-        'stats.views': -1,
-        'stats.hearts': -1,
-        'stats.comments': -1,
-        createdAt: -1,
-      })
-      .limit(candidateLimit)
-      .lean();
+    const topHashtags: string[] = taste
+      ? Array.from(
+          (taste.hashtagWeights ?? new Map<string, number>()).entries(),
+        )
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 20)
+          .map(([k]) => k)
+      : [];
+    const topTopics: string[] = taste
+      ? Array.from((taste.topicWeights ?? new Map<string, number>()).entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([k]) => k)
+      : [];
+
+    // ── Step 2: adaptive 3-pool candidate strategy (all queries run in parallel) ──
+    //   Pool A (500): globally trending — highest total engagement
+    //   Pool B (300): interest-matched — filtered by user's top hashtags/topics
+    //   Pool C (200): fresh injection — last 7 days, purely chronological
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [trendingDocs, interestDocs, freshDocs] = await Promise.all([
+      this.postModel
+        .find({
+          authorId: authorExclusion,
+          kind: { $in: allowedKinds },
+          status: 'published',
+          visibility: 'public',
+          moderationState: 'normal',
+          deletedAt: null,
+          publishedAt: { $ne: null },
+          _id: { $nin: hiddenObjectIds },
+        })
+        .sort({
+          'stats.views': -1,
+          'stats.hearts': -1,
+          'stats.comments': -1,
+          createdAt: -1,
+        })
+        .limit(500)
+        .lean(),
+
+      topHashtags.length || topTopics.length
+        ? this.postModel
+            .find({
+              authorId: authorExclusion,
+              kind: { $in: allowedKinds },
+              status: 'published',
+              visibility: 'public',
+              moderationState: 'normal',
+              deletedAt: null,
+              publishedAt: { $ne: null },
+              _id: { $nin: hiddenObjectIds },
+              $or: [
+                ...(topHashtags.length
+                  ? [{ hashtags: { $in: topHashtags } }]
+                  : []),
+                ...(topTopics.length
+                  ? [{ topics: { $in: topTopics } }]
+                  : []),
+              ],
+            })
+            .sort({ createdAt: -1 })
+            .limit(300)
+            .lean()
+        : Promise.resolve([] as typeof trendingDocs),
+
+      this.postModel
+        .find({
+          authorId: authorExclusion,
+          kind: { $in: allowedKinds },
+          status: 'published',
+          visibility: 'public',
+          moderationState: 'normal',
+          deletedAt: null,
+          publishedAt: { $ne: null },
+          _id: { $nin: hiddenObjectIds },
+          createdAt: { $gte: sevenDaysAgo },
+        })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean(),
+    ]);
+
+    // Merge pools — trending first (anchor), then interest, then fresh; deduplicate by _id
+    const seenDocIds = new Set<string>();
+    const mergedDocs: typeof trendingDocs = [];
+    for (const doc of [...trendingDocs, ...interestDocs, ...freshDocs]) {
+      const id = doc._id?.toString?.();
+      if (id && !seenDocIds.has(id)) {
+        seenDocIds.add(id);
+        mergedDocs.push(doc);
+      }
+    }
 
     const bannedExploreAuthors = await this.getBannedAuthorIdSet(
-      candidateDocs.map((item) => item.authorId),
+      mergedDocs.map((item) => item.authorId),
     );
 
-    const visibleCandidateDocs = candidateDocs.filter((item) => {
+    const visibleCandidateDocs = mergedDocs.filter((item) => {
       const authorId = item.authorId?.toString?.();
       return !authorId || !bannedExploreAuthors.has(authorId);
     });
 
     if (!visibleCandidateDocs.length)
       return [] as ReturnType<typeof this.toResponse>[];
-
-    const taste = await this.getOrRebuildTasteProfile(userObjectId);
 
     const candidates = visibleCandidateDocs.map(
       (raw) => this.postModel.hydrate(raw) as Post,
@@ -2990,19 +3104,69 @@ export class PostsService {
       viewed.map((v) => v.postId?.toString?.()).filter(Boolean),
     );
 
+    // Pre-fetch which candidate authors are creator-verified (single lightweight query)
+    const candidateAuthorObjectIds = Array.from(
+      new Set(
+        candidates
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      ),
+    ).map((id: string) => new Types.ObjectId(id));
+
+    const verifiedCreatorProfiles = await this.profileModel
+      .find({ userId: { $in: candidateAuthorObjectIds }, isCreatorVerified: true })
+      .select('userId')
+      .lean();
+    const verifiedCreatorSet = new Set<string>(
+      verifiedCreatorProfiles
+        .map((p: any) => p.userId?.toString?.())
+        .filter(Boolean),
+    );
+
     const scored = candidates
       .map((post) => {
         const authorId = post.authorId?.toString?.() ?? '';
+
+        // Base engagement + freshness score — now correctly passes isCreatorVerified
         const base = this.scorePost(
           post,
           new Set<string>(),
           now,
           0,
           reachRestrictedAuthorIds.has(authorId),
+          verifiedCreatorSet.has(authorId),
         );
+
+        // Personalisation boost — up to 2.5× (was 0.6×)
         const interest = this.scoreInterest(post, taste);
-        const interestBoost = Math.min(0.6, Math.max(0, interest / 20));
-        const score = base * (1 + interestBoost);
+        const interestBoost = Math.min(
+          EXPLORE_INTEREST_BOOST_CAP,
+          Math.max(0, interest / EXPLORE_INTEREST_DIVISOR),
+        );
+
+        // Velocity signal — reward posts that earned engagement faster (trending now)
+        const ageHours = Math.max(
+          0.1,
+          (now.getTime() -
+            (post.createdAt
+              ? new Date(post.createdAt).getTime()
+              : now.getTime())) /
+            3_600_000,
+        );
+        const stats = post.stats ?? ({} as any);
+        const totalEngagement =
+          (stats.hearts ?? 0) * 2 +
+          (stats.comments ?? 0) * 3 +
+          (stats.saves ?? 0) * 4 +
+          (stats.shares ?? 0) * 3 +
+          (stats.reposts ?? 0) * 3;
+        // Posts that accumulated the same engagement in less time get up to +50%
+        const velocityBoost = Math.min(
+          0.5,
+          totalEngagement / Math.max(1, Math.pow(ageHours, 0.8)) / 50,
+        );
+
+        const score = base * (1 + interestBoost) * (1 + velocityBoost);
         const viewed = post._id ? viewedIds.has(post._id.toString()) : false;
         return { post, score, viewed };
       })
@@ -3098,7 +3262,7 @@ export class PostsService {
     const updatedAt = existing?.updatedAt
       ? new Date(existing.updatedAt).getTime()
       : 0;
-    const stale = !updatedAt || now - updatedAt > 6 * 60 * 60 * 1000;
+    const stale = !updatedAt || now - updatedAt > TASTE_CACHE_TTL_MS;
 
     if (existing && !stale) {
       return this.tasteProfileModel.hydrate(existing) as UserTasteProfile;

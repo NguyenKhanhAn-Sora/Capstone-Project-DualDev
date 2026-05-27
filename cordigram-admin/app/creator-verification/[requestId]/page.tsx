@@ -668,12 +668,10 @@ export default function CreatorVerificationDetailPage() {
                             <div className={styles.postContentPanel}>
                               <h3 className={styles.postTitle}>Post performance</h3>
                               <div className={styles.postStatsGrid}>
-                                <div className={styles.postStatItem}><span>Hearts</span><strong>{post.stats.hearts}</strong></div>
+                                <div className={styles.postStatItem}><span>Likes</span><strong>{post.stats.hearts}</strong></div>
                                 <div className={styles.postStatItem}><span>Comments</span><strong>{post.stats.comments}</strong></div>
                                 <div className={styles.postStatItem}><span>Saves</span><strong>{post.stats.saves}</strong></div>
                                 <div className={styles.postStatItem}><span>Reposts</span><strong>{post.stats.reposts}</strong></div>
-                                <div className={styles.postStatItem}><span>Shares</span><strong>{post.stats.shares}</strong></div>
-                                <div className={styles.postStatItem}><span>Reports</span><strong>{post.stats.reports}</strong></div>
                               </div>
                             </div>
                           </div>

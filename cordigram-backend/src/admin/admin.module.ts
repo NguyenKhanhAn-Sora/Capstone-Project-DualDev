@@ -54,6 +54,7 @@ import {
   CommunityDiscoveryHistory,
   CommunityDiscoveryHistorySchema,
 } from './community-discovery-history.schema';
+import { Poll, PollSchema } from '../polls/poll.schema';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
@@ -88,6 +89,7 @@ import {
         name: CommunityDiscoveryHistory.name,
         schema: CommunityDiscoveryHistorySchema,
       },
+      { name: Poll.name, schema: PollSchema },
     ]),
     LivekitModule,
     NotificationsModule,
