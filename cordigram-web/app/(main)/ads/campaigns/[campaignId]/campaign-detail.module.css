@@ -108,31 +108,29 @@
   color: #1d4ed8;
 }
 
-@media (prefers-color-scheme: dark) {
-  .status_active {
-    background: rgba(16, 185, 129, 0.25);
-    color: #86efac;
-  }
+:global([data-theme="dark"]) .status_active {
+  background: rgba(16, 185, 129, 0.25);
+  color: #86efac;
+}
 
-  .status_paused {
-    background: rgba(148, 163, 184, 0.32);
-    color: #e2e8f0;
-  }
+:global([data-theme="dark"]) .status_paused {
+  background: rgba(148, 163, 184, 0.32);
+  color: #e2e8f0;
+}
 
-  .status_hidden {
-    background: rgba(100, 116, 139, 0.38);
-    color: #f1f5f9;
-  }
+:global([data-theme="dark"]) .status_hidden {
+  background: rgba(100, 116, 139, 0.38);
+  color: #f1f5f9;
+}
 
-  .status_canceled {
-    background: rgba(220, 38, 38, 0.26);
-    color: #fecaca;
-  }
+:global([data-theme="dark"]) .status_canceled {
+  background: rgba(220, 38, 38, 0.26);
+  color: #fecaca;
+}
 
-  .status_completed {
-    background: rgba(59, 130, 246, 0.24);
-    color: #bfdbfe;
-  }
+:global([data-theme="dark"]) .status_completed {
+  background: rgba(59, 130, 246, 0.22);
+  color: #93c5fd;
 }
 
 .metricGrid {

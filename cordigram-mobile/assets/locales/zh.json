@@ -1287,6 +1287,8 @@
     "unableToLoad": "无法加载探索内容",
     "blurredViolation": "此图片因违反我们的标准已被模糊处理。",
     "noPostsYet": "暂无探索内容",
+    "notInterested": "不感兴趣",
+    "viewPost": "查看帖子",
     "seenAll": "您已查看所有探索帖子"
   },
   "hashtag": {

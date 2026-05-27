@@ -62,6 +62,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="www.cordigram.com" />
             </intent-filter>
+            <!-- cordigram:// deep links: OAuth callbacks and in-app navigation -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cordigram" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -102,19 +109,6 @@
             android:screenOrientation="portrait"
             android:theme="@style/Ucrop.CropTheme" />
 
-        <!-- Intercepts cordigram:// OAuth callback, forwards to MainActivity via onNewIntent
-             so flutter_web_auth_2 resolves the authenticate() Future and Chrome closes. -->
-        <activity
-            android:name=".OAuthCallbackActivity"
-            android:exported="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter android:label="cordigram_oauth">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="cordigram" />
-            </intent-filter>
-        </activity>
 
     </application>
     <!-- Required to query activities that can process text, see:

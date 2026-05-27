@@ -58,6 +58,7 @@ class ExploreService {
     required String postId,
     required String sessionId,
     int? position,
+    int? dwellMs,
     String source = 'explore-grid-mobile',
   }) async {
     final token = AuthStorage.accessToken;
@@ -71,6 +72,7 @@ class ExploreService {
           'sessionId': sessionId,
           'position': position,
           'source': source,
+          if (dwellMs != null) 'durationMs': dwellMs,
         },
         extraHeaders: {'Authorization': 'Bearer $token'},
       );

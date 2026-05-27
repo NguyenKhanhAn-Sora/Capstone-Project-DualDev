@@ -1004,7 +1004,10 @@ export default function HashtagPage() {
             const handleLeave = (e: React.MouseEvent<HTMLVideoElement>) => {
               const el = e.currentTarget;
               el.pause();
-              el.currentTime = 0;
+              el.currentTime = 0.1;
+            };
+            const handleMeta = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+              e.currentTarget.currentTime = 0.1;
             };
             return (
               <button
@@ -1019,6 +1022,7 @@ export default function HashtagPage() {
                   muted
                   playsInline
                   preload="metadata"
+                  onLoadedMetadata={handleMeta}
                   onMouseEnter={handleEnter}
                   onMouseLeave={handleLeave}
                 />

@@ -46,6 +46,7 @@ import {
   CommunityDiscoveryHistory,
   CommunityDiscoveryHistoryAction,
 } from './community-discovery-history.schema';
+import { Poll } from '../polls/poll.schema';
 
 @Injectable()
 export class AdminService implements OnModuleInit {
@@ -98,6 +99,8 @@ export class AdminService implements OnModuleInit {
     private readonly userServerModel: Model<UserServer>,
     @InjectModel(CommunityDiscoveryHistory.name)
     private readonly communityDiscoveryHistoryModel: Model<CommunityDiscoveryHistory>,
+    @InjectModel(Poll.name)
+    private readonly pollModel: Model<Poll>,
   ) {}
 
   async onModuleInit() {
@@ -5444,7 +5447,7 @@ export class AdminService implements OnModuleInit {
       .skip(safeOffset)
       .limit(safeLimit + 1)
       .select(
-        '_id authorId content media visibility moderationState autoHiddenPendingReview createdAt',
+        '_id authorId content media visibility moderationState autoHiddenPendingReview createdAt pollId',
       )
       .lean();
 
@@ -5509,6 +5512,7 @@ export class AdminService implements OnModuleInit {
         moderationState: doc.moderationState ?? 'normal',
         autoHiddenPendingReview: Boolean(doc.autoHiddenPendingReview),
         createdAt: doc.createdAt ?? null,
+        isPoll: Boolean((doc as any).pollId),
       };
     });
 
@@ -5823,17 +5827,64 @@ export class AdminService implements OnModuleInit {
       const post = await this.postModel
         .findById(objectId)
         .select(
-          'authorId content media visibility moderationState autoHiddenPendingReview createdAt',
+          'authorId content media visibility moderationState autoHiddenPendingReview createdAt pollId',
         )
         .lean();
       if (!post) {
         throw new NotFoundException('Post not found');
       }
 
-      const profile = await this.profileModel
-        .findOne({ userId: post.authorId })
-        .select('displayName username avatarUrl')
-        .lean();
+      const [profile, pollData] = await Promise.all([
+        this.profileModel
+          .findOne({ userId: post.authorId })
+          .select('displayName username avatarUrl')
+          .lean(),
+        (post as any).pollId
+          ? this.pollModel
+              .findById((post as any).pollId)
+              .select(
+                'question options optionImages allowMultipleAnswers expiresAt votes durationHours createdAt',
+              )
+              .lean()
+          : null,
+      ]);
+
+      let poll: object | null = null;
+      if (pollData) {
+        const now = new Date();
+        const isExpired = pollData.expiresAt
+          ? new Date(pollData.expiresAt) < now
+          : false;
+        const totalVotes = Array.isArray(pollData.votes)
+          ? pollData.votes.length
+          : 0;
+        const voteCounts = Array.isArray(pollData.options)
+          ? pollData.options.map((_: string, idx: number) =>
+              Array.isArray(pollData.votes)
+                ? pollData.votes.filter(
+                    (v: { optionIndex: number }) => v.optionIndex === idx,
+                  ).length
+                : 0,
+            )
+          : [];
+        const percentages = voteCounts.map((count: number) =>
+          totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0,
+        );
+
+        poll = {
+          question: pollData.question ?? '',
+          options: pollData.options ?? [],
+          optionImages: pollData.optionImages ?? null,
+          allowMultipleAnswers: Boolean(pollData.allowMultipleAnswers),
+          expiresAt: pollData.expiresAt ?? null,
+          durationHours: pollData.durationHours ?? 24,
+          createdAt: pollData.createdAt ?? null,
+          isExpired,
+          totalVotes,
+          voteCounts,
+          percentages,
+        };
+      }
 
       return {
         type: 'post',
@@ -5866,6 +5917,7 @@ export class AdminService implements OnModuleInit {
                 }))
                 .filter((item: { url: string }) => Boolean(item.url))
             : [],
+          poll,
         },
       };
     }

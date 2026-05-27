@@ -1677,7 +1677,7 @@ export default function SettingsPage() {
         >
           <span>{getVisibilityLabel(selectedValue)}</span>
           <span className={styles.visibilityCaret} aria-hidden>
-            â–¾
+            ▾
           </span>
         </button>
         {isOpen ? (
@@ -1701,7 +1701,7 @@ export default function SettingsPage() {
                   <span>{option.label}</span>
                   {active ? (
                     <span className={styles.visibilityCheck} aria-hidden>
-                      âœ"
+                      ✓
                     </span>
                   ) : null}
                 </button>
@@ -3894,7 +3894,7 @@ export default function SettingsPage() {
                       }`}
                       aria-hidden="true"
                     >
-                      â–¾
+                      ▾
                     </span>
                   </button>
 
@@ -4075,7 +4075,7 @@ export default function SettingsPage() {
                       }`}
                       aria-hidden="true"
                     >
-                      â–¾
+                      ▾
                     </span>
                   </button>
 
@@ -4223,7 +4223,7 @@ export default function SettingsPage() {
                       }`}
                       aria-hidden="true"
                     >
-                      â–¾
+                      ▾
                     </span>
                   </button>
 
@@ -4455,7 +4455,7 @@ export default function SettingsPage() {
                             className={styles.languageCaret}
                             aria-hidden="true"
                           >
-                            â–¾
+                            ▾
                           </span>
                         </button>
                         {languageOpen ? (
@@ -4479,7 +4479,7 @@ export default function SettingsPage() {
                                 <span>{getLanguageLabel(value)}</span>
                                 {language === value ? (
                                   <span className={styles.languageCheck}>
-                                    âœ"
+                                    ✓
                                   </span>
                                 ) : null}
                               </button>

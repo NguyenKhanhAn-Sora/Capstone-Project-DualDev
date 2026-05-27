@@ -1287,6 +1287,8 @@
     "unableToLoad": "Unable to load explore",
     "blurredViolation": "This image has been blurred due to violation of our standards.",
     "noPostsYet": "No explore posts yet",
+    "notInterested": "Not interested",
+    "viewPost": "View post",
     "seenAll": "You've seen all explore posts"
   },
   "hashtag": {

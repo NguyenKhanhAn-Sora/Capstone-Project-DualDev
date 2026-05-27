@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cordigram_mobile/core/services/api_service.dart';
 import 'package:flutter/material.dart';
+import '../home/services/post_interaction_service.dart';
 
 import '../../core/services/language_controller.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -32,6 +33,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
       '${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
   final Set<String> _sentImpressions = <String>{};
   final Set<String> _revealedMediaKeys = <String>{};
+
+  // Dwell-time tracking: records when each post entered the viewport
+  final Map<String, DateTime> _dwellStartTimes = {};
+  // Accumulated dwell per post (ms) across multiple visibility events
+  final Map<String, int> _dwellAccumMs = {};
+  // Posts for which we already sent the dwell-enriched impression report
+  final Set<String> _sentDwellReports = <String>{};
 
   @override
   void initState() {
@@ -67,6 +75,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _items.clear();
         _sentImpressions.clear();
         _revealedMediaKeys.clear();
+        _dwellStartTimes.clear();
+        _dwellAccumMs.clear();
+        _sentDwellReports.clear();
         _initialLoading = true;
       }
     });
@@ -110,17 +121,135 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  void _trackImpression(FeedPost item, int position) {
-    if (_sentImpressions.contains(item.id)) return;
-    _sentImpressions.add(item.id);
-    ExploreService.recordImpression(
-      postId: item.id,
-      sessionId: _sessionId,
-      position: position,
+  void _onTileVisibilityChanged(
+    FeedPost item,
+    int position,
+    double visibleFraction,
+  ) {
+    final id = item.id;
+
+    if (visibleFraction >= 0.2) {
+      // Post entered viewport — start dwell timer if not already running
+      _dwellStartTimes.putIfAbsent(id, () => DateTime.now());
+
+      // Record first impression (no dwell data yet)
+      if (!_sentImpressions.contains(id)) {
+        _sentImpressions.add(id);
+        ExploreService.recordImpression(
+          postId: id,
+          sessionId: _sessionId,
+          position: position,
+        );
+      }
+    } else {
+      // Post left viewport — accumulate dwell time
+      final start = _dwellStartTimes.remove(id);
+      if (start != null) {
+        final elapsed = DateTime.now().difference(start).inMilliseconds;
+        _dwellAccumMs[id] = (_dwellAccumMs[id] ?? 0) + elapsed;
+      }
+
+      // Once total dwell >= 2 s, send enriched impression so backend can update
+      // the taste profile's view-interaction weight for this post.
+      final totalDwell = _dwellAccumMs[id] ?? 0;
+      if (totalDwell >= 2000 && !_sentDwellReports.contains(id)) {
+        _sentDwellReports.add(id);
+        ExploreService.recordImpression(
+          postId: id,
+          sessionId: _sessionId,
+          position: position,
+          dwellMs: totalDwell,
+        );
+      }
+    }
+  }
+
+  Future<void> _hidePost(FeedPost item) async {
+    setState(() => _items.removeWhere((p) => p.id == item.id));
+    try {
+      await PostInteractionService.hide(item.id);
+    } catch (_) {
+      // Silently ignore — post is already removed from local list
+    }
+  }
+
+  void _showNotInterestedSheet(FeedPost item) {
+    final lc = LanguageController.instance;
+    final scheme = Theme.of(context).colorScheme;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 12),
+              decoration: BoxDecoration(
+                color: scheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.not_interested_outlined,
+                  color: scheme.onSurface),
+              title: Text(
+                lc.t('explore.notInterested'),
+                style: TextStyle(color: scheme.onSurface, fontSize: 15),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                _hidePost(item);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.open_in_new_outlined,
+                  color: scheme.onSurface),
+              title: Text(
+                lc.t('explore.viewPost'),
+                style: TextStyle(color: scheme.onSurface, fontSize: 15),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                _openItem(item);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 
   bool _isReel(FeedPost item) => item.kind.toLowerCase() == 'reel';
+
+  static String? _cloudinaryVideoThumb(String url) {
+    const marker = '/video/upload/';
+    final idx = url.indexOf(marker);
+    if (idx == -1) return null;
+    final before = url.substring(0, idx + marker.length);
+    final after = url.substring(idx + marker.length);
+    final dotIdx = after.lastIndexOf('.');
+    final pathNoExt = dotIdx >= 0 ? after.substring(0, dotIdx) : after;
+    // so_auto: Cloudinary picks the most representative frame via scene detection
+    return '${before}so_auto/$pathNoExt.jpg';
+  }
+
+  String _getThumbnailUrl(FeedMedia media, {bool revealed = false}) {
+    if (media.isBlurredByModeration && revealed) {
+      final original = media.originalBestUrl;
+      if (media.type == 'video') return _cloudinaryVideoThumb(original) ?? original;
+      return original;
+    }
+    if (media.type == 'video') return _cloudinaryVideoThumb(media.url) ?? media.url;
+    return media.url;
+  }
 
   Map<String, dynamic> _toViewerItem(FeedPost post) {
     final author = post.author;
@@ -248,20 +377,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
       height: tileHeight,
       child: VisibilityDetector(
         key: ValueKey('explore-tile-${item.id}'),
-        onVisibilityChanged: (info) {
-          if (info.visibleFraction >= 0.2) {
-            _trackImpression(item, position);
-          }
-        },
+        onVisibilityChanged: (info) =>
+            _onTileVisibilityChanged(item, position, info.visibleFraction),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: () => _openItem(item),
+            onLongPress: () => _showNotInterestedSheet(item),
             child: Stack(
               fit: StackFit.expand,
               children: [
                 Image.network(
-                  media.displayUrl(revealed: revealed),
+                  _getThumbnailUrl(media, revealed: revealed),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => const ColoredBox(
                     color: Color(0xFF1C2740),

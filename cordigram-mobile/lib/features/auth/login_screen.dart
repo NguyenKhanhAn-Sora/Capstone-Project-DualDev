@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/deep_link_service.dart';
 import '../../core/services/language_controller.dart';
 import '../../core/services/push_notification_service.dart';
 import '../home/home_screen.dart';
@@ -266,12 +266,22 @@ class _LoginScreenState extends State<LoginScreen> {
             queryParameters: deviceId != null ? {'deviceId': deviceId} : {},
           );
 
-      final result = await FlutterWebAuth2.authenticate(
-        url: uri.toString(),
-        callbackUrlScheme: 'cordigram',
-      );
+      DeepLinkService.pendingOAuthCompleter = Completer<Uri>();
 
-      final callbackUri = Uri.parse(result);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        DeepLinkService.pendingOAuthCompleter = null;
+        setState(() {
+          _error = 'Could not open Google sign-in. Please try again.';
+          _googleLoading = false;
+        });
+        return;
+      }
+
+      final callbackUri = await DeepLinkService.pendingOAuthCompleter!.future
+          .timeout(const Duration(minutes: 5));
+      DeepLinkService.pendingOAuthCompleter = null;
+
       final accessToken = callbackUri.queryParameters['accessToken'];
       final signupToken = callbackUri.queryParameters['signupToken'];
       final refreshToken = callbackUri.queryParameters['refreshToken'];
@@ -304,14 +314,14 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         setState(() => _googleLoading = false);
       }
-    } on PlatformException catch (e) {
-      if (e.code != 'CANCELED') {
-        setState(() {
-          _error = 'Google sign-in failed. Please try again.';
-        });
-      }
-      setState(() => _googleLoading = false);
+    } on TimeoutException {
+      DeepLinkService.pendingOAuthCompleter = null;
+      setState(() {
+        _error = 'Google sign-in timed out. Please try again.';
+        _googleLoading = false;
+      });
     } catch (e) {
+      DeepLinkService.pendingOAuthCompleter = null;
       setState(() {
         _error = 'Google sign-in failed. Please try again.';
         _googleLoading = false;
@@ -570,6 +580,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     style: FilledButton.styleFrom(
                                       backgroundColor: const Color(0xFF3470A2),
                                       foregroundColor: Colors.white,
+                                      disabledBackgroundColor: const Color(0xFF3470A2).withValues(alpha: 0.72),
+                                      disabledForegroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),
                                       ),
@@ -622,6 +634,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         color: Color(0xFFD7E5F2),
                                       ),
                                       foregroundColor: const Color(0xFF1F2937),
+                                      disabledForegroundColor: const Color(0xFF6B7280),
+                                      disabledBackgroundColor: const Color(0xFFF1F5F9),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),
                                       ),
