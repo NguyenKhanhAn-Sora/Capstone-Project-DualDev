@@ -2053,6 +2053,14 @@
       "errorCameraDenied": "カメラがブロックされているか使用できません。再試行してください。",
       "micDeviceLabel": "マイク {index}",
       "cameraDeviceLabel": "カメラ {index}"
+    },
+    "player": {
+      "captionOff": "オフ",
+      "captionGenerating": "字幕を生成中...",
+      "captionLangVi": "ベトナム語",
+      "captionLangEn": "英語",
+      "captionLangZh": "中国語",
+      "captionLangJa": "日本語"
     }
   }
 }

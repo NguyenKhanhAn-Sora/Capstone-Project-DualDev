@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -92,6 +92,13 @@ const formatTimeAgo = (value: string | null | undefined, language: string) => {
 
 const REEL_STATS_POLL_INTERVAL = 5000;
 const VIEW_THRESHOLD = 0.5;
+
+const CAPTION_LANG_T_KEYS: Record<string, string> = {
+  vi: "player.captionLangVi",
+  en: "player.captionLangEn",
+  zh: "player.captionLangZh",
+  ja: "player.captionLangJa",
+};
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 5 * 60 * 1000;
 const COMMENT_PANEL_WIDTH = "clamp(320px, 28vw, 420px)";
@@ -451,10 +458,17 @@ function ReelVideo({
   const [duration, setDuration] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
-  const [showSubtitles, setShowSubtitles] = useState(false);
   const captionRef = useRef<HTMLDivElement | null>(null);
-  const reelCaptionUrl = item.media?.[0]?.captionUrl ?? null;
-  const reelCaptionLang = item.media?.[0]?.captionLanguage ?? null;
+  const reelCaptionTracks = useMemo(() => {
+    const tracks = item.media?.[0]?.captionTracks;
+    if (tracks && tracks.length > 0) return tracks;
+    const url = item.media?.[0]?.captionUrl;
+    const lang = item.media?.[0]?.captionLanguage;
+    if (url) return [{ lang: lang ?? "und", url }];
+    return [];
+  }, [item.media]);
+  const [selectedReelLang, setSelectedReelLang] = useState<string | null>(null);
+  const [showCaptionMenu, setShowCaptionMenu] = useState(false);
   const authorOwnerId = item.authorId || item.author?.id;
   const isSelf = Boolean(viewerId && authorOwnerId === viewerId);
   const isFollowing = Boolean(
@@ -483,21 +497,27 @@ function ReelVideo({
   useEffect(() => {
     setExpanded(false);
     setCanExpand(false);
-    setShowSubtitles(false);
+    setSelectedReelLang(null);
+    setShowCaptionMenu(false);
   }, [item.id]);
 
-  // Sync subtitle track mode with showSubtitles state
+  // Sync all subtitle tracks with selectedReelLang
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !reelCaptionUrl) return;
+    if (!video || !reelCaptionTracks.length) return;
     const sync = () => {
-      const track = video.textTracks?.[0];
-      if (track) track.mode = showSubtitles ? "showing" : "hidden";
+      const tl = video.textTracks;
+      for (let i = 0; i < tl.length; i++) {
+        const track = tl[i];
+        const lang = track.language || reelCaptionTracks[i]?.lang || "";
+        track.mode =
+          selectedReelLang && lang === selectedReelLang ? "showing" : "hidden";
+      }
     };
     sync();
     const t = setTimeout(sync, 100);
     return () => clearTimeout(t);
-  }, [showSubtitles, reelCaptionUrl, item.id]);
+  }, [selectedReelLang, reelCaptionTracks, item.id]);
 
   useEffect(() => {
     const el = captionRef.current;
@@ -770,25 +790,50 @@ function ReelVideo({
         controls={false}
         crossOrigin="anonymous"
       >
-        {reelCaptionUrl && (
+        {reelCaptionTracks.map((track) => (
           <track
+            key={track.lang}
             kind="subtitles"
-            src={reelCaptionUrl}
-            srcLang={reelCaptionLang ?? "und"}
-            label="Auto"
+            src={track.url}
+            srcLang={track.lang}
+            label={t(CAPTION_LANG_T_KEYS[track.lang] ?? "") || track.lang.toUpperCase()}
           />
-        )}
+        ))}
       </video>
-      {reelCaptionUrl && (
-        <button
-          className={`${styles.volumeBtn} ${showSubtitles ? styles.ccActive : ""}`}
+      {reelCaptionTracks.length > 0 && (
+        <div
+          className={`${styles.captionGroup} ${(selectedReelLang !== null || showCaptionMenu) ? styles.captionGroupActive : ""}`}
           style={{ bottom: "calc(var(--reel-vol-bottom, 56px) + 52px)" }}
-          onClick={(e) => { e.stopPropagation(); setShowSubtitles((p) => !p); }}
-          aria-label={showSubtitles ? "Hide subtitles" : "Show subtitles"}
-          aria-pressed={showSubtitles}
+          onClick={(e) => e.stopPropagation()}
         >
-          <IconCc active={showSubtitles} />
-        </button>
+          {showCaptionMenu && (
+            <div className={styles.captionMenu}>
+              <button
+                className={`${styles.captionItem} ${selectedReelLang === null ? styles.captionItemActive : ""}`}
+                onClick={() => { setSelectedReelLang(null); setShowCaptionMenu(false); }}
+              >
+                {t("player.captionOff")}
+              </button>
+              {reelCaptionTracks.map((track) => (
+                <button
+                  key={track.lang}
+                  className={`${styles.captionItem} ${selectedReelLang === track.lang ? styles.captionItemActive : ""}`}
+                  onClick={() => { setSelectedReelLang(track.lang); setShowCaptionMenu(false); }}
+                >
+                  {t(CAPTION_LANG_T_KEYS[track.lang] ?? "") || track.lang.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            className={`${styles.volumeBtn} ${styles.captionBtn} ${selectedReelLang !== null ? styles.ccActive : ""}`}
+            onClick={() => setShowCaptionMenu((p) => !p)}
+            aria-label="Caption language"
+            aria-pressed={selectedReelLang !== null}
+          >
+            <IconCc active={selectedReelLang !== null} />
+          </button>
+        </div>
       )}
       <button
         className={styles.volumeBtn}

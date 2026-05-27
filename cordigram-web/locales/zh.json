@@ -2756,5 +2756,13 @@
     "postUpdated": "帖子已更新",
     "signInRequired": "请登录以编辑帖子",
     "updateFailed": "更新帖子失败"
+  },
+  "player": {
+    "captionOff": "关闭",
+    "captionGenerating": "正在生成字幕...",
+    "captionLangVi": "越南语",
+    "captionLangEn": "英语",
+    "captionLangZh": "中文",
+    "captionLangJa": "日语"
   }
 }

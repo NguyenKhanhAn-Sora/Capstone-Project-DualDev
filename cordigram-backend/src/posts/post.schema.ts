@@ -7,6 +7,16 @@ export type PostKind = 'post' | 'reel';
 export type ModerationState = 'normal' | 'restricted' | 'hidden' | 'removed';
 
 @Schema({ _id: false })
+export class CaptionTrack {
+  @Prop({ type: String, required: true })
+  lang: string;
+
+  @Prop({ type: String, required: true })
+  url: string;
+}
+const CaptionTrackSchema = SchemaFactory.createForClass(CaptionTrack);
+
+@Schema({ _id: false })
 export class Media {
   @Prop({ type: String, enum: ['image', 'video'], required: true })
   type: 'image' | 'video';
@@ -28,6 +38,10 @@ export class Media {
   /** Caption generation pipeline state */
   @Prop({ type: String, enum: ['pending', 'done', 'failed', null], default: null })
   captionStatus?: 'pending' | 'done' | 'failed' | null;
+
+  /** All translated caption tracks (original + vi/en/zh/ja) */
+  @Prop({ type: [CaptionTrackSchema], default: [] })
+  captionTracks?: CaptionTrack[];
 }
 
 const MediaSchema = SchemaFactory.createForClass(Media);

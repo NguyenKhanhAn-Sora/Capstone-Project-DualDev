@@ -1260,6 +1260,14 @@
       "errorCameraDenied": "Camera đã bị chặn hoặc không khả dụng. Vui lòng thử lại.",
       "micDeviceLabel": "Microphone {index}",
       "cameraDeviceLabel": "Camera {index}"
+    },
+    "player": {
+      "captionOff": "Tắt",
+      "captionGenerating": "Đang tạo phụ đề...",
+      "captionLangVi": "Tiếng Việt",
+      "captionLangEn": "Tiếng Anh",
+      "captionLangZh": "Tiếng Trung",
+      "captionLangJa": "Tiếng Nhật"
     }
   }
 }

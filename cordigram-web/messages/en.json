@@ -1260,6 +1260,14 @@
       "errorCameraDenied": "Camera was blocked or unavailable. Please try again.",
       "micDeviceLabel": "Microphone {index}",
       "cameraDeviceLabel": "Camera {index}"
+    },
+    "player": {
+      "captionOff": "Off",
+      "captionGenerating": "Generating captions...",
+      "captionLangVi": "Vietnamese",
+      "captionLangEn": "English",
+      "captionLangZh": "Chinese",
+      "captionLangJa": "Japanese"
     }
   }
 }
