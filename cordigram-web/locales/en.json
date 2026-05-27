@@ -2744,5 +2744,13 @@
     "postUpdated": "Post updated",
     "signInRequired": "Please sign in to edit posts",
     "updateFailed": "Failed to update post"
+  },
+  "player": {
+    "captionOff": "Off",
+    "captionGenerating": "Generating captions...",
+    "captionLangVi": "Vietnamese",
+    "captionLangEn": "English",
+    "captionLangZh": "Chinese",
+    "captionLangJa": "Japanese"
   }
 }

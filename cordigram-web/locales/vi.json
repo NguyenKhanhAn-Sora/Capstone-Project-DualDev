@@ -2744,5 +2744,13 @@
     "postUpdated": "Bài viết đã được cập nhật",
     "signInRequired": "Vui lòng đăng nhập để chỉnh sửa bài viết",
     "updateFailed": "Cập nhật bài viết thất bại"
+  },
+  "player": {
+    "captionOff": "Tắt",
+    "captionGenerating": "Đang tạo phụ đề...",
+    "captionLangVi": "Tiếng Việt",
+    "captionLangEn": "Tiếng Anh",
+    "captionLangZh": "Tiếng Trung",
+    "captionLangJa": "Tiếng Nhật"
   }
 }

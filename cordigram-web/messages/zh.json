@@ -2053,6 +2053,14 @@
       "errorCameraDenied": "摄像头被阻止或不可用，请重试。",
       "micDeviceLabel": "麦克风 {index}",
       "cameraDeviceLabel": "摄像头 {index}"
+    },
+    "player": {
+      "captionOff": "关闭",
+      "captionGenerating": "正在生成字幕...",
+      "captionLangVi": "越南语",
+      "captionLangEn": "英语",
+      "captionLangZh": "中文",
+      "captionLangJa": "日语"
     }
   }
 }

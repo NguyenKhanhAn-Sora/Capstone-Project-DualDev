@@ -258,7 +258,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-width: 72px;
+  min-width: 120px;
   backdrop-filter: blur(8px);
   z-index: 10;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -272,6 +272,7 @@
   font-size: 13px;
   cursor: pointer;
   text-align: center;
+  white-space: nowrap;
   transition: background 0.12s ease, color 0.12s ease;
 }
 

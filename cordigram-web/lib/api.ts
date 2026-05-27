@@ -352,6 +352,7 @@ export type CreatePostResponse = {
     captionUrl?: string | null;
     captionLanguage?: string | null;
     captionStatus?: "pending" | "done" | "failed" | null;
+    captionTracks?: Array<{ lang: string; url: string }> | null;
   }>;
   hashtags: string[];
   mentions: string[];
@@ -451,6 +452,7 @@ export type FeedItem = CreatePostResponse & {
     captionUrl?: string | null;
     captionLanguage?: string | null;
     captionStatus?: "pending" | "done" | "failed" | null;
+    captionTracks?: Array<{ lang: string; url: string }> | null;
   }> | null;
   spamScore?: number;
   qualityScore?: number;

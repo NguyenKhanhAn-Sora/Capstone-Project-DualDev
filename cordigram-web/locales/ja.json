@@ -2731,5 +2731,13 @@
     "postUpdated": "投稿が更新されました",
     "signInRequired": "投稿を編集するにはサインインしてください",
     "updateFailed": "投稿の更新に失敗しました"
+  },
+  "player": {
+    "captionOff": "オフ",
+    "captionGenerating": "字幕を生成中...",
+    "captionLangVi": "ベトナム語",
+    "captionLangEn": "英語",
+    "captionLangZh": "中国語",
+    "captionLangJa": "日本語"
   }
 }

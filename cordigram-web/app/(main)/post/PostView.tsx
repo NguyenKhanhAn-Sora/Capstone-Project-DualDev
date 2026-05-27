@@ -2012,6 +2012,26 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       .finally(() => setLoadingPost(false));
   }, [blockedIds, leaveBlockedContent, postId, token]);
 
+  // Poll for caption completion when any video media has captionStatus === 'pending'
+  useEffect(() => {
+    if (!post) return;
+    const hasPending = post.media?.some((m) => m.type === "video" && m.captionStatus === "pending");
+    if (!hasPending) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const latest = await fetchPostDetail({ token, postId });
+        const stillPending = latest.media?.some((m) => m.type === "video" && m.captionStatus === "pending");
+        setPost((prev) => prev ? { ...prev, media: latest.media } : prev);
+        if (!stillPending) clearInterval(interval);
+      } catch {
+        // ignore polling errors
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [post?.media?.map((m) => m.captionStatus).join(","), postId, token]);
+
   const openCommentReportModal = (commentId: string) => {
     if (!token) {
       showToast("Please sign in to report");
@@ -3604,6 +3624,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           playsInline
           captionUrl={currentMedia.captionUrl ?? null}
           captionLang={currentMedia.captionLanguage ?? null}
+          captionTracks={currentMedia.captionTracks ?? null}
+          captionStatus={currentMedia.captionStatus ?? null}
         />
       );
     }
