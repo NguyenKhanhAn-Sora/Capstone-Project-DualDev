@@ -23,6 +23,9 @@ import 'search/message_search_sheet.dart';
 import 'widgets/channel_chat_gate_sheet.dart';
 import 'widgets/gif_toolbar_icon.dart';
 import 'widgets/sticker_toolbar_icon.dart';
+import 'widgets/messages_chrome_builder.dart';
+import '../../core/services/accent_color_controller.dart';
+import '../../core/theme/messages_chrome_palette.dart';
 
 class ChannelChatScreen extends StatefulWidget {
   const ChannelChatScreen({
@@ -43,8 +46,8 @@ class ChannelChatScreen extends StatefulWidget {
 }
 
 class _ChannelChatScreenState extends State<ChannelChatScreen> {
-  static const Color _pageColor = Color(0xFF08183A);
-  static const Color _lineColor = Color(0xFF21345D);
+  MessagesChromePalette get _chrome => AccentColorController.instance.palette;
+
   static final RegExp _pollRegExp = RegExp(r'📊 \[Poll\]:\s*([a-fA-F0-9]{24})');
   static final RegExp _serverEmojiTokenRegExp = RegExp(
     r':([a-zA-Z0-9_]{1,80}):',
@@ -584,7 +587,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   void _showPlusSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
       ),
@@ -761,7 +764,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   void _showUnicodeEmojiPicker() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) {
         return SafeArea(
           child: SizedBox(
@@ -769,9 +772,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             child: EmojiPicker(
               textEditingController: _inputController,
               onEmojiSelected: (_, __) {},
-              config: const Config(
+              config: Config(
                 emojiViewConfig: EmojiViewConfig(
-                  backgroundColor: Color(0xFF0B1424),
+                  backgroundColor: _chrome.surface,
                 ),
               ),
             ),
@@ -789,7 +792,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
@@ -856,7 +859,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   Future<void> _showEmojiPicker() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) {
         return SafeArea(
           child: Column(
@@ -919,7 +922,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
@@ -1022,7 +1025,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
@@ -1092,7 +1095,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   Future<void> _showStickerPickerMenu() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1129,7 +1132,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     final isMine = _isMine(message);
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1193,7 +1196,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                 Navigator.of(ctx).pop();
                 final deleteType = await showModalBottomSheet<String>(
                   context: context,
-                  backgroundColor: const Color(0xFF0B1424),
+                  backgroundColor: _chrome.surface,
                   builder: (dCtx) {
                     return SafeArea(
                       child: Column(
@@ -1246,7 +1249,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) {
         return SizedBox(
           height: 360,
@@ -1259,9 +1262,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                 emoji: emoji.emoji,
               );
             },
-            config: const Config(
+            config: Config(
               emojiViewConfig: EmojiViewConfig(
-                backgroundColor: Color(0xFF0B1424),
+                backgroundColor: _chrome.surface,
               ),
               categoryViewConfig: CategoryViewConfig(
                 backgroundColor: Color(0xFF121e36),
@@ -1344,7 +1347,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0B1424),
+      backgroundColor: _chrome.surface,
       builder: (ctx) => _VoiceRecordPanel(onSend: _sendVoiceMessage),
     );
   }
@@ -1555,10 +1558,11 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _pageColor,
+    return MessagesChromeBuilder(
+      builder: (context, chrome) => Scaffold(
+      backgroundColor: chrome.bg,
       appBar: AppBar(
-        backgroundColor: _pageColor,
+        backgroundColor: chrome.bg,
         elevation: 0,
         titleSpacing: 0,
         actions: [
@@ -1592,7 +1596,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       ),
       body: Column(
         children: [
-          const Divider(height: 1, color: _lineColor),
+          Divider(height: 1, color: chrome.border),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -2015,6 +2019,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

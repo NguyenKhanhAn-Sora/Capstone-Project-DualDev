@@ -987,6 +987,163 @@ class ServersService {
     );
   }
 
+  static Future<void> transferServerOwnership(
+    String serverId,
+    String newOwnerId,
+  ) async {
+    await ApiService.patch(
+      '/servers/$serverId/transfer-ownership',
+      extraHeaders: _authHeaders,
+      body: {'newOwnerId': newOwnerId},
+    );
+  }
+
+  static Future<int> getPruneCount(
+    String serverId, {
+    required int days,
+    String role = 'all',
+  }) async {
+    final res = await ApiService.get(
+      '/servers/$serverId/prune/count?days=$days&role=${Uri.encodeQueryComponent(role)}',
+      extraHeaders: _authHeaders,
+    );
+    final c = res['count'];
+    return c is num ? c.toInt() : 0;
+  }
+
+  static Future<int> pruneMembers(
+    String serverId, {
+    required int days,
+    String role = 'all',
+  }) async {
+    final res = await ApiService.post(
+      '/servers/$serverId/prune',
+      extraHeaders: _authHeaders,
+      body: {'days': days, 'role': role},
+    );
+    final r = res['removed'];
+    return r is num ? r.toInt() : 0;
+  }
+
+  static Future<void> removeTimeout(String serverId, String memberId) async {
+    await ApiService.post(
+      '/servers/$serverId/remove-timeout/$memberId',
+      extraHeaders: _authHeaders,
+      body: const <String, dynamic>{},
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getMentionRestrictedMembers(
+    String serverId,
+  ) async {
+    try {
+      final list = await _getListResponse(
+        '/servers/$serverId/mention-restricted',
+        preferredKeys: const ['items', 'data', 'members'],
+      );
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {
+      try {
+        final list = await ApiService.getList(
+          '/servers/$serverId/mention-restricted',
+          extraHeaders: _authHeaders,
+        );
+        return list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      } catch (_) {
+        return const <Map<String, dynamic>>[];
+      }
+    }
+  }
+
+  static Future<void> unrestrictMember(String serverId, String memberId) async {
+    await ApiService.post(
+      '/servers/$serverId/unrestrict/$memberId',
+      extraHeaders: _authHeaders,
+      body: const <String, dynamic>{},
+    );
+  }
+
+  static Future<void> patchAccessRule(
+    String serverId,
+    String ruleId,
+    String content,
+  ) async {
+    await ApiService.patch(
+      '/servers/$serverId/access/rules/${Uri.encodeComponent(ruleId)}',
+      extraHeaders: _authHeaders,
+      body: {'content': content},
+    );
+  }
+
+  static Future<void> deleteAccessRule(String serverId, String ruleId) async {
+    await ApiService.delete(
+      '/servers/$serverId/access/rules/${Uri.encodeComponent(ruleId)}',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getServerAuditLogs(
+    String serverId, {
+    String? action,
+    String? actorUserId,
+    int limit = 80,
+  }) async {
+    final q = <String>[];
+    if (action != null && action.isNotEmpty) {
+      q.add('action=${Uri.encodeQueryComponent(action)}');
+    }
+    if (actorUserId != null && actorUserId.isNotEmpty) {
+      q.add('actorUserId=${Uri.encodeQueryComponent(actorUserId)}');
+    }
+    q.add('limit=$limit');
+    final qs = q.isEmpty ? '' : '?${q.join('&')}';
+    try {
+      final list = await _getListResponse(
+        '/servers/$serverId/audit-logs$qs',
+        preferredKeys: const ['items', 'data', 'logs'],
+      );
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } on TypeError {
+      return ApiService.getList(
+        '/servers/$serverId/audit-logs$qs',
+        extraHeaders: _authHeaders,
+      ).then(
+        (list) => list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
+      );
+    }
+  }
+
+  static Future<List<ServerRole>> reorderRoles(
+    String serverId,
+    List<String> roleIds,
+  ) async {
+    final res = await ApiService.patch(
+      '/servers/$serverId/roles/reorder',
+      extraHeaders: _authHeaders,
+      body: {'roleIds': roleIds},
+    );
+    final list = (res['roles'] ?? res['items'] ?? res['data']) as List? ?? const [];
+    if (list.isEmpty && res is Map && res.containsKey('_id')) {
+      return getRoles(serverId);
+    }
+    return list
+        .whereType<Map>()
+        .map((e) => ServerRole.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
   static Future<List<dynamic>> _getListResponse(
     String path, {
     required List<String> preferredKeys,

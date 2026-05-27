@@ -52,6 +52,35 @@ class GiphySearchService {
   }
 
   /// Giống cordigram-web `getRandomWaveSticker`: sticker chào / vẫy tay.
+  static Future<GiphySearchItem?> getById(String id) async {
+    if (AppConfig.giphyApiKey.isEmpty || id.trim().isEmpty) return null;
+    final res = await http.get(
+      Uri.parse(
+        '$_base/gifs/${Uri.encodeComponent(id)}?api_key=${AppConfig.giphyApiKey}',
+      ),
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) return null;
+    final map = jsonDecode(res.body);
+    if (map is! Map<String, dynamic>) return null;
+    final data = map['data'];
+    if (data is! Map<String, dynamic>) return null;
+    final gid = data['id']?.toString() ?? '';
+    if (gid.isEmpty) return null;
+    final title = data['title']?.toString() ?? '';
+    String preview = '';
+    final images = data['images'];
+    if (images is Map) {
+      for (final key in ['fixed_height', 'fixed_height_small', 'downsized', 'original']) {
+        final block = images[key];
+        if (block is Map && block['url'] != null) {
+          preview = block['url'].toString();
+          break;
+        }
+      }
+    }
+    return GiphySearchItem(id: gid, title: title, previewUrl: preview);
+  }
+
   static Future<GiphySearchItem?> getRandomWaveSticker() async {
     if (AppConfig.giphyApiKey.isEmpty) return null;
     const queries = ['wave hello', 'hi wave', 'waving hand'];

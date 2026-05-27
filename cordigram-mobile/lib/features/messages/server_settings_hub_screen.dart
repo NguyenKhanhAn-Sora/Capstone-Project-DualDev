@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/services/language_controller.dart';
 import 'models/server_models.dart';
 import 'models/server_permissions.dart';
 import 'server_members_screen.dart';
@@ -9,12 +10,14 @@ import 'server_roles_screen.dart';
 import 'server_settings/server_access_screen.dart';
 import 'server_settings/server_automod_screen.dart';
 import 'server_settings/server_bans_screen.dart';
+import 'server_settings/server_audit_log_screen.dart';
 import 'server_settings/server_community_screen.dart';
 import 'server_settings/server_emoji_screen.dart';
 import 'server_settings/server_interaction_screen.dart';
 import 'server_settings/server_safety_screen.dart';
 import 'server_settings/server_sticker_screen.dart';
 import 'server_settings_screen.dart';
+import 'utils/messages_navigator.dart';
 import 'services/servers_service.dart';
 
 /// Trung tâm cài đặt máy chủ — cấu trúc nhóm giống web [ServerSettingsPanel].
@@ -40,11 +43,10 @@ class ServerSettingsHubScreen extends StatefulWidget {
 }
 
 class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-  static const Color _line = Color(0xFF21345D);
-
   late ServerSummary _server;
+
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
 
   @override
   void initState() {
@@ -134,34 +136,35 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
 
   Future<void> _openProfile() async {
     final canManage = widget.isOwner || widget.permissions.canManageServer;
-    final updated = await Navigator.of(context).push<ServerSummary?>(
-      MaterialPageRoute(
-        builder: (_) => ServerSettingsScreen(
-          serverId: _server.id,
-          initialSummary: _server,
-          canManageSettings: canManage,
-        ),
+    final updated = await context.pushMessages<ServerSummary?>(
+      ServerSettingsScreen(
+        serverId: _server.id,
+        initialSummary: _server,
+        canManageSettings: canManage,
       ),
     );
     _setServer(updated);
   }
 
   void _push(Widget page) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    context.pushMessages(page);
   }
 
-  Widget _sectionTitle(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
-        child: Text(
-          t,
-          style: const TextStyle(
-            color: Color(0xFF8EA3CC),
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.6,
-          ),
+  Widget _sectionTitle(String label) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: scheme.onSurfaceVariant,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.6,
         ),
-      );
+      ),
+    );
+  }
 
   Widget _tile(
     String title,
@@ -169,8 +172,9 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
     bool danger = false,
     IconData icon = Icons.chevron_right_rounded,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: _card,
+      color: scheme.surface,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -183,13 +187,13 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    color: danger ? const Color(0xFFFF8A8A) : Colors.white,
+                    color: danger ? scheme.error : scheme.onSurface,
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
                   ),
                 ),
               ),
-              Icon(icon, color: const Color(0xFF7E8CA8), size: 22),
+              Icon(icon, color: scheme.onSurfaceVariant, size: 22),
             ],
           ),
         ),
@@ -220,9 +224,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
         Navigator.of(context).pop(_server);
       },
       child: Scaffold(
-      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: _bg,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
@@ -231,17 +233,17 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Cài đặt máy chủ',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            Text(
+              _t('chat.serverSettings.ariaLabel'),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
             Text(
               _server.name.toUpperCase(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: Color(0xFF8EA3CC),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -256,11 +258,11 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
           pad.bottom + 24,
         ),
         children: [
-          _sectionTitle('HỒ SƠ'),
-          _tile('Hồ sơ máy chủ', _openProfile),
+          _sectionTitle(_t('chat.serverSettings.sections.profile').toUpperCase()),
+          _tile(_t('chat.serverSettings.sections.profile'), _openProfile),
           const SizedBox(height: 8),
           _tile(
-            'Tương tác',
+            _t('chat.serverSettings.sections.interactions'),
             () => _push(
               ServerInteractionScreen(
                 serverId: _server.id,
@@ -268,10 +270,10 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
               ),
             ),
           ),
-          const Divider(height: 28, color: _line),
-          _sectionTitle('BIỂU CẢM'),
+          Divider(height: 28, color: Theme.of(context).dividerColor),
+          _sectionTitle(_t('chat.serverSettings.groups.expressions')),
           _tile(
-            'Emoji máy chủ',
+            _t('chat.serverSettings.sections.emoji'),
             () {
               if (!canExpr) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -286,7 +288,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
           ),
           const SizedBox(height: 8),
           _tile(
-            'Sticker máy chủ',
+            _t('chat.serverSettings.sections.sticker'),
             () {
               if (!canExpr) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -304,20 +306,21 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
               );
             },
           ),
-          const Divider(height: 28, color: _line),
-          _sectionTitle('MỌI NGƯỜI'),
+          Divider(height: 28, color: Theme.of(context).dividerColor),
+          _sectionTitle(_t('chat.serverSettings.groups.people')),
           _tile(
-            'Thành viên',
+            _t('chat.serverSettings.sections.members'),
             () => _push(
               ServerMembersScreen(
                 serverId: _server.id,
                 currentUserId: widget.currentUserId,
+                isOwner: widget.isOwner,
               ),
             ),
           ),
           const SizedBox(height: 8),
           _tile(
-            'Vai trò',
+            _t('chat.serverSettings.sections.roles'),
             () => _push(
               ServerRolesScreen(
                 serverId: _server.id,
@@ -327,7 +330,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
           ),
           const SizedBox(height: 8),
           _tile(
-            'Truy cập',
+            _t('chat.serverSettings.sections.access'),
             () => _push(
               ServerAccessScreen(
                 serverId: _server.id,
@@ -335,10 +338,10 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
               ),
             ),
           ),
-          const Divider(height: 28, color: _line),
-          _sectionTitle('KIỂM DUYỆT'),
+          Divider(height: 28, color: Theme.of(context).dividerColor),
+          _sectionTitle(_t('chat.serverSettings.groups.moderation')),
           _tile(
-            'Thiết lập an toàn',
+            _t('chat.serverSettings.sections.safety'),
             () => _push(
               ServerSafetyScreen(
                 serverId: _server.id,
@@ -348,7 +351,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
           ),
           const SizedBox(height: 8),
           _tile(
-            'Danh sách ban',
+            _t('chat.serverSettings.sections.bans'),
             () => _push(
               ServerBansScreen(
                 serverId: _server.id,
@@ -358,7 +361,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
           ),
           const SizedBox(height: 8),
           _tile(
-            'AutoMod',
+            _t('chat.serverSettings.sections.automod'),
             () => _push(
               ServerAutomodScreen(
                 serverId: _server.id,
@@ -366,10 +369,17 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
               ),
             ),
           ),
-          const Divider(height: 28, color: _line),
+          if (canManageSettings) ...[
+            const SizedBox(height: 8),
+            _tile(
+              'Nhật ký chỉnh sửa',
+              () => _push(ServerAuditLogScreen(serverId: _server.id)),
+            ),
+          ],
+          Divider(height: 28, color: Theme.of(context).dividerColor),
           _sectionTitle('CỘNG ĐỒNG'),
           _tile(
-            'Cộng đồng',
+            _server.communityEnabled ? 'Tổng quan Community' : 'Cộng đồng',
             () => _push(
               ServerCommunityScreen(
                 serverId: _server.id,
@@ -378,7 +388,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
             ),
           ),
           if (widget.isOwner) ...[
-            const Divider(height: 28, color: _line),
+            Divider(height: 28, color: Theme.of(context).dividerColor),
             _sectionTitle('NGUY HIỂM'),
             _tile('Xóa máy chủ', _confirmDelete, danger: true),
           ],

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -8,7 +9,9 @@ import 'core/services/auth_storage.dart';
 import 'core/services/deep_link_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/session_bootstrap.dart';
+import 'core/services/accent_color_controller.dart';
 import 'core/services/language_controller.dart';
+import 'core/services/messages_shell_theme_controller.dart';
 import 'core/services/theme_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
@@ -52,9 +55,11 @@ void main() async {
   // the app — not only while the user is inside the matching chat screen.
   await DmCallManager.instance.attach(appNavigatorKey);
   await DeepLinkService.initialize(appNavigatorKey);
-  // Load theme and language BEFORE runApp so the first frame never shows raw keys.
+  // Social theme + language; Messages chrome tải riêng (không đổi MaterialApp social).
   await ThemeController.instance.load();
   await LanguageController.instance.load();
+  await MessagesShellThemeController.instance.load();
+  await AccentColorController.instance.load();
   runApp(const MyApp());
 }
 
@@ -106,13 +111,14 @@ class _MyAppState extends State<MyApp> {
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: ThemeController.instance.themeMode,
+          locale: Locale(LanguageController.instance.language),
           // Wrap every route with the global call overlay so ring-ins show up
           // on top of home, feed, profile, settings — everywhere.
           builder: (ctx, child) =>
               GlobalCallOverlay(child: child ?? const SizedBox.shrink()),
           home: AuthStorage.accessToken != null
-              ? const HomeScreen()
-              : const LoginScreen(),
+              ? HomeScreen()
+              : LoginScreen(),
         ),
       ),
     );

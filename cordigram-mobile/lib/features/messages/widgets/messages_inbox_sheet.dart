@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../models/inbox_models.dart';
 import '../models/dm_message.dart';
 import '../services/channel_messages_realtime_service.dart';
@@ -69,10 +70,10 @@ class MessagesInboxSheet extends StatefulWidget {
 enum _InboxTab { forYou, unread, mentions }
 
 class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
-  static const Color _bg = Color(0xFF0C1B3A);
-  static const Color _accent = Color(0xFF00C48C);
-
   _InboxTab _tab = _InboxTab.forYou;
+
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
   List<InboxForYouItem> _forYou = [];
   List<InboxUnreadItem> _unread = [];
   List<InboxMentionItem> _mentions = [];
@@ -354,79 +355,61 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final screenH = MediaQuery.sizeOf(context).height;
     final h = (screenH > 0 ? screenH * 0.88 : 560.0).clamp(320.0, 920.0);
-    final dark = ThemeData(
-      brightness: Brightness.dark,
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _accent,
-        brightness: Brightness.dark,
-      ),
-      scaffoldBackgroundColor: _bg,
-      listTileTheme: const ListTileThemeData(
-        textColor: Color(0xFFE8F5E0),
-        iconColor: Color(0xFFE8F5E0),
-        titleTextStyle: TextStyle(
-          color: Color(0xFFE8F5E0),
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
-        subtitleTextStyle: TextStyle(
-          color: Color(0xFF8EA3CC),
-          fontSize: 13,
-        ),
-      ),
-    );
-    return Theme(
-      data: dark,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Material(
-          color: _bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          child: SizedBox(
-            height: h,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.mail_outline_rounded, color: Colors.white, size: 22),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Hộp thư',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _markAllBusy ? null : _markAllRead,
-                        child: Text(
-                          _markAllBusy ? '…' : 'Đọc hết',
-                          style: const TextStyle(color: _accent, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: widget.onClose ?? () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Material(
+        color: scheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        child: SizedBox(
+          height: h,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                child: Row(
                   children: [
-                    _tabBtn('Dành cho bạn', _InboxTab.forYou),
-                    _tabBtn('Chưa đọc', _InboxTab.unread),
-                    _tabBtn('Đề cập', _InboxTab.mentions),
+                    Icon(Icons.mail_outline_rounded, color: scheme.onSurface, size: 22),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _t('chat.popups.inbox.title'),
+                        style: TextStyle(
+                          color: scheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _markAllBusy ? null : _markAllRead,
+                      child: Text(
+                        _markAllBusy
+                            ? '…'
+                            : _t('chat.popups.inbox.markAll'),
+                        style: TextStyle(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: widget.onClose ?? () => Navigator.of(context).pop(),
+                      icon: Icon(Icons.close_rounded, color: scheme.onSurfaceVariant),
+                    ),
                   ],
                 ),
-                const Divider(height: 1, color: Color(0xFF21345D)),
+              ),
+              Row(
+                children: [
+                  _tabBtn(_t('chat.popups.inbox.tabForYou'), _InboxTab.forYou),
+                  _tabBtn(_t('chat.popups.inbox.tabUnread'), _InboxTab.unread),
+                  _tabBtn(_t('chat.popups.inbox.tabMentions'), _InboxTab.mentions),
+                ],
+              ),
+              Divider(height: 1, color: scheme.outline),
                 if (_loadError != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -449,11 +432,11 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _tabBtn(String label, _InboxTab t) {
+    final scheme = Theme.of(context).colorScheme;
     final on = _tab == t;
     return Expanded(
       child: InkWell(
@@ -468,7 +451,7 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: on ? _accent : Colors.transparent,
+                color: on ? scheme.primary : Colors.transparent,
                 width: 2,
               ),
             ),
@@ -477,7 +460,7 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: on ? Colors.white : const Color(0xFF8EA3CC),
+              color: on ? scheme.onSurface : scheme.onSurfaceVariant,
               fontWeight: on ? FontWeight.w700 : FontWeight.w500,
               fontSize: 13,
             ),
@@ -584,7 +567,7 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
           children: [
             IconButton(
               onPressed: () => _acceptInvite(item),
-              icon: const Icon(Icons.check_circle_outline, color: _accent),
+              icon: Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.primary),
             ),
             IconButton(
               onPressed: () => _declineInvite(item),

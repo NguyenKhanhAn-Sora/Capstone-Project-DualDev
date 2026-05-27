@@ -14,6 +14,9 @@ import 'services/inbox_service.dart';
 import 'services/message_notification_sound.dart';
 import 'services/messages_media_service.dart';
 import 'utils/dm_call_message_utils.dart';
+import 'utils/dm_sidebar_prefs.dart';
+import 'utils/messages_i18n.dart';
+import '../../core/services/language_controller.dart';
 
 class MessagesController extends ChangeNotifier {
   final List<MessageThread> _threads = [];
@@ -34,8 +37,15 @@ class MessagesController extends ChangeNotifier {
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
   StreamSubscription<Map<String, dynamic>>? _messagesReadSub;
+  StreamSubscription<DmProfileStyleUpdatedEvent>? _profileStyleSub;
   StreamSubscription<Map<String, dynamic>>? _channelInboxSub;
   Timer? _inboxPollTimer;
+
+  final Set<String> _followingUserIds = {};
+  final Set<String> _conversationPeerIds = {};
+  String _dmListFrom = 'everyone';
+  String _dmCallFrom = 'everyone';
+  DmSidebarPeersMode _dmSidebarPeersMode = DmSidebarPeersMode.all;
 
   bool _loadingThreads = false;
   int _totalUnread = 0;
@@ -49,6 +59,32 @@ class MessagesController extends ChangeNotifier {
   String _languageCode = 'vi';
 
   List<MessageThread> get threads => List.unmodifiable(_threads);
+
+  /// Sidebar list with web-equivalent filters (`dmListFrom`, online-only).
+  List<MessageThread> get filteredThreads {
+    var list = List<MessageThread>.from(_threads);
+    if (_dmSidebarPeersMode == DmSidebarPeersMode.online) {
+      list = list.where((t) => t.isOnline).toList();
+    }
+    if (_dmListFrom == 'followers_only') {
+      list = list
+          .where(
+            (t) =>
+                _followingUserIds.contains(t.id) ||
+                _conversationPeerIds.contains(t.id),
+          )
+          .toList();
+    }
+    return list;
+  }
+
+  String get dmCallFrom => _dmCallFrom;
+
+  bool canCallPeer(String peerUserId) {
+    if (_dmCallFrom != 'followers_only') return true;
+    return _followingUserIds.contains(peerUserId) ||
+        _conversationPeerIds.contains(peerUserId);
+  }
   bool get loadingThreads => _loadingThreads;
   int get totalUnread => _totalUnread;
   String? get threadsError => _threadsError;
@@ -85,11 +121,85 @@ class MessagesController extends ChangeNotifier {
     _messagesReadSub = DirectMessagesRealtimeService.messagesRead.listen(
       _onMessagesReadEvent,
     );
+    _profileStyleSub =
+        DirectMessagesRealtimeService.profileStyleUpdated.listen(
+      _onProfileStyleUpdated,
+    );
     _startInboxPolling();
+    _languageCode = LanguageController.instance.language;
+    LanguageController.instance.addListener(_onLanguageChanged);
     await refreshInboxCount();
     await refreshMyIdentity();
     await refreshBlockedUsers();
+    await refreshChatSettings();
     await refreshThreads();
+  }
+
+  void _onLanguageChanged() {
+    final next = LanguageController.instance.language;
+    if (_languageCode == next) return;
+    _languageCode = next;
+    _relocalizeThreads();
+    notifyListeners();
+  }
+
+  void _relocalizeThreads() {
+    if (_threads.isEmpty) return;
+    for (var i = 0; i < _threads.length; i++) {
+      final t = _threads[i];
+      final msgs = _messagesByUser[t.id];
+      final lastMsg = msgs != null && msgs.isNotEmpty ? msgs.last : null;
+      final preview = lastMsg != null
+          ? DmCallMessageUtils.threadPreviewForMessage(
+              lastMsg,
+              viewerId: _myUserId,
+            )
+          : t.lastMessage;
+      final activityMs = _peerLastActivityMs[t.id];
+      final activityAt = activityMs != null
+          ? DateTime.fromMillisecondsSinceEpoch(activityMs)
+          : (lastMsg?.createdAt ?? t.lastSeenAt);
+      _threads[i] = MessageThread(
+        id: t.id,
+        name: t.name,
+        lastMessage: preview,
+        lastActiveLabel: MessagesI18n.formatThreadTimeShort(activityAt),
+        unreadCount: t.unreadCount,
+        avatarUrl: t.avatarUrl,
+        isOnline: t.isOnline,
+        isPinned: t.isPinned,
+        lastSeenAt: t.lastSeenAt,
+        presenceLabel: MessagesI18n.presenceLabel(
+          isOnline: t.isOnline,
+          lastSeenAt: t.lastSeenAt,
+        ),
+      );
+    }
+  }
+
+  Future<void> refreshChatSettings() async {
+    try {
+      final settings = await DirectMessagesService.getUserSettings();
+      _dmListFrom = (settings['dmListFrom'] ?? 'everyone').toString();
+      _dmCallFrom = (settings['dmCallFrom'] ?? 'everyone').toString();
+      _dmSidebarPeersMode = await DmSidebarPrefs.getPeersMode();
+      final following = await DirectMessagesService.getFollowingAsConversations();
+      _followingUserIds
+        ..clear()
+        ..addAll(following.map((c) => c.userId));
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void markIncomingMessagesRead({
+    required String peerUserId,
+    required List<String> messageIds,
+  }) {
+    if (messageIds.isEmpty) return;
+    DirectMessagesRealtimeService.markMessageIdsAsRead(
+      messageIds: messageIds,
+      senderId: peerUserId,
+    );
   }
 
   Future<void> refreshMyIdentity() async {
@@ -107,12 +217,14 @@ class MessagesController extends ChangeNotifier {
   }
 
   Future<void> disposeController() async {
+    LanguageController.instance.removeListener(_onLanguageChanged);
     await _newMessageSub?.cancel();
     await _unreadSub?.cancel();
     await _presenceSub?.cancel();
     await _reactionSub?.cancel();
     await _deletedSub?.cancel();
     await _messagesReadSub?.cancel();
+    await _profileStyleSub?.cancel();
     await _channelInboxSub?.cancel();
     _inboxPollTimer?.cancel();
     // Do not disconnect the shared DM socket here. [DmCallManager] needs it
@@ -141,10 +253,19 @@ class MessagesController extends ChangeNotifier {
     notifyListeners();
     try {
       var conversations = await DirectMessagesService.getDmSidebarThreads();
+      _conversationPeerIds
+        ..clear()
+        ..addAll(
+          (await DirectMessagesService.getConversations()).map((c) => c.userId),
+        );
       if (conversations.isEmpty) {
         conversations =
             await DirectMessagesService.getFollowingAsConversations();
       }
+      final following = await DirectMessagesService.getFollowingAsConversations();
+      _followingUserIds
+        ..clear()
+        ..addAll(following.map((c) => c.userId));
       for (final c in conversations) {
         final peerId = c.userId;
         if (c.lastMessageAt != null) {
@@ -161,7 +282,7 @@ class MessagesController extends ChangeNotifier {
               id: c.userId,
               name: c.title,
               lastMessage: c.lastMessage,
-              lastActiveLabel: _formatRelative(c.lastMessageAt),
+              lastActiveLabel: MessagesI18n.formatThreadTimeShort(c.lastMessageAt),
               unreadCount: _readPeers.contains(c.userId) ||
                       _activeConversationPeerId == c.userId
                   ? 0
@@ -169,7 +290,7 @@ class MessagesController extends ChangeNotifier {
               avatarUrl: c.avatarUrl,
               isOnline: c.isOnline,
               lastSeenAt: c.lastActiveAt,
-              presenceLabel: _formatPresenceLabel(
+              presenceLabel: MessagesI18n.presenceLabel(
                 isOnline: c.isOnline,
                 lastSeenAt: c.lastActiveAt,
               ),
@@ -393,6 +514,13 @@ class MessagesController extends ChangeNotifier {
     String deleteType = 'for-me',
   }) async {
     await DirectMessagesService.deleteMessage(messageId, deleteType: deleteType);
+    if (deleteType == 'for-everyone') {
+      DirectMessagesRealtimeService.emitDeleteMessage(
+        messageId: messageId,
+        receiverId: peerUserId,
+        deleteType: deleteType,
+      );
+    }
     final list = _messagesByUser[peerUserId];
     if (list == null || list.isEmpty) return;
     if (deleteType == 'for-everyone') {
@@ -508,6 +636,71 @@ class MessagesController extends ChangeNotifier {
       changed = true;
     }
     if (changed) notifyListeners();
+  }
+
+  void _onProfileStyleUpdated(DmProfileStyleUpdatedEvent event) {
+    final idx = _threads.indexWhere((t) => t.id == event.userId);
+    if (idx != -1) {
+      final t = _threads[idx];
+      final name = (event.displayName ?? '').trim();
+      _threads[idx] = MessageThread(
+        id: t.id,
+        name: name.isNotEmpty ? name : t.name,
+        lastMessage: t.lastMessage,
+        lastActiveLabel: t.lastActiveLabel,
+        unreadCount: t.unreadCount,
+        avatarUrl: event.avatarUrl ?? t.avatarUrl,
+        isOnline: t.isOnline,
+        isPinned: t.isPinned,
+        lastSeenAt: t.lastSeenAt,
+        presenceLabel: t.presenceLabel,
+      );
+    }
+    for (final entry in _messagesByUser.entries) {
+      final list = entry.value;
+      for (var i = 0; i < list.length; i++) {
+        final old = list[i];
+        if (old.senderId != event.userId && old.receiverId != event.userId) {
+          continue;
+        }
+        list[i] = DmMessage(
+          id: old.id,
+          senderId: old.senderId,
+          receiverId: old.receiverId,
+          content: old.content,
+          createdAt: old.createdAt,
+          type: old.type,
+          read: old.read,
+          voiceUrl: old.voiceUrl,
+          voiceDurationSec: old.voiceDurationSec,
+          giphyId: old.giphyId,
+          replyTo: old.replyTo,
+          attachments: old.attachments,
+          reactions: old.reactions,
+          isPinned: old.isPinned,
+          pinnedAt: old.pinnedAt,
+          senderDisplayName: old.senderId == event.userId
+              ? (event.displayName ?? old.senderDisplayName)
+              : old.senderDisplayName,
+          senderUsername: old.senderId == event.userId
+              ? (event.username ?? old.senderUsername)
+              : old.senderUsername,
+          senderAvatarUrl: old.senderId == event.userId
+              ? (event.avatarUrl ?? old.senderAvatarUrl)
+              : old.senderAvatarUrl,
+          receiverDisplayName: old.receiverId == event.userId
+              ? (event.displayName ?? old.receiverDisplayName)
+              : old.receiverDisplayName,
+          receiverUsername: old.receiverId == event.userId
+              ? (event.username ?? old.receiverUsername)
+              : old.receiverUsername,
+          receiverAvatarUrl: old.receiverId == event.userId
+              ? (event.avatarUrl ?? old.receiverAvatarUrl)
+              : old.receiverAvatarUrl,
+        );
+      }
+    }
+    notifyListeners();
   }
 
   void _onMessagesReadEvent(Map<String, dynamic> payload) {
@@ -681,7 +874,7 @@ class MessagesController extends ChangeNotifier {
     final current = _threads[idx];
     final lastSeen =
         presence.lastActiveAt ?? current.lastSeenAt;
-    final nextLabel = _formatPresenceLabel(
+    final nextLabel = MessagesI18n.presenceLabel(
       isOnline: nextOnline,
       status: presence.status,
       lastSeenAt: lastSeen,
@@ -785,7 +978,7 @@ class MessagesController extends ChangeNotifier {
       id: current.id,
       name: current.name,
       lastMessage: lastMessage,
-      lastActiveLabel: 'now',
+      lastActiveLabel: MessagesI18n.formatThreadTimeShort(at),
       unreadCount: current.unreadCount,
       avatarUrl: current.avatarUrl,
       isOnline: current.isOnline,
@@ -796,51 +989,4 @@ class MessagesController extends ChangeNotifier {
     _sortThreads();
   }
 
-  String _formatRelative(DateTime? time) {
-    if (time == null) return '';
-    final diff = DateTime.now().difference(time);
-    if (diff.inMinutes < 1) return 'now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    return '${diff.inDays}d';
-  }
-
-  String _formatOfflineAgo(DateTime? time) {
-    if (time == null) return '';
-    final diff = DateTime.now().difference(time);
-    final en = _languageCode == 'en';
-    if (diff.inMinutes < 1) {
-      return en ? 'just now' : 'vừa xong';
-    }
-    if (diff.inMinutes < 60) {
-      return en
-          ? '${diff.inMinutes} min ago'
-          : '${diff.inMinutes} phút trước';
-    }
-    if (diff.inHours < 24) {
-      return en ? '${diff.inHours} hr ago' : '${diff.inHours} giờ trước';
-    }
-    if (diff.inDays < 7) {
-      return en ? '${diff.inDays} d ago' : '${diff.inDays} ngày trước';
-    }
-    return en ? '${diff.inDays} d ago' : '${diff.inDays} ngày trước';
-  }
-
-  String _formatPresenceLabel({
-    required bool isOnline,
-    PresenceStatus? status,
-    DateTime? lastSeenAt,
-  }) {
-    final en = _languageCode == 'en';
-    if (status == PresenceStatus.online ||
-        (isOnline && status != PresenceStatus.idle)) {
-      return en ? 'Online' : 'Trực tuyến';
-    }
-    if (status == PresenceStatus.idle) {
-      return en ? 'Idle' : 'Chờ';
-    }
-    final ago = _formatOfflineAgo(lastSeenAt);
-    if (ago.isEmpty) return en ? 'Offline' : 'Ngoại tuyến';
-    return en ? 'Offline · $ago' : 'Ngoại tuyến · $ago';
-  }
 }

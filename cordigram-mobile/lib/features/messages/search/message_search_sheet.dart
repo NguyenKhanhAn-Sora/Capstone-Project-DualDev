@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../models/message_thread.dart';
 import '../models/server_models.dart';
 import '../services/direct_messages_service.dart';
@@ -568,22 +569,28 @@ class _MessageSearchSheetState extends State<MessageSearchSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LanguageController.instance.t;
+    final scheme = Theme.of(context).colorScheme;
     final title = switch (widget.mode) {
-      _SheetMode.globalDm => 'Tìm hoặc bắt đầu cuộc trò chuyện',
-      _SheetMode.dmConversation =>
-        'Tìm trong ${widget.dmPartnerName ?? 'trò chuyện'}',
+      _SheetMode.globalDm => t('chat.messagesPage.searchPlaceholder'),
+      _SheetMode.dmConversation => t(
+          'chat.popups.messageSearch.placeholderDm',
+          {'name': widget.dmPartnerName ?? t('chat.common.user')},
+        ),
       _SheetMode.serverChannel =>
-        'Tìm tin nhắn${widget.channelName != null ? ' · #${widget.channelName}' : ''}',
+        '${t('chat.popups.messageSearch.title')}${widget.channelName != null ? ' · #${widget.channelName}' : ''}',
     };
 
     final hint = switch (widget.mode) {
-      _SheetMode.globalDm => 'from: @ # ! * · Gợi ý: bắt đầu bằng @ # ! *',
-      _SheetMode.dmConversation => 'Chỉ nội dung tin nhắn trong cuộc trò chuyện này',
-      _SheetMode.serverChannel => 'from: in: has: · Nội dung…',
+      _SheetMode.globalDm =>
+        '${t('chat.popups.messageSearch.proTipBody')} · ${t('chat.popups.messageSearch.proTipLabel')}',
+      _SheetMode.dmConversation =>
+        t('chat.popups.messageSearch.proTipDmConversationOnly'),
+      _SheetMode.serverChannel => t('chat.popups.messageSearch.proTipBodyServer'),
     };
 
     return Material(
-      color: const Color(0xFF0F1B37),
+      color: scheme.surface,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       child: SafeArea(
         top: false,
@@ -603,8 +610,8 @@ class _MessageSearchSheetState extends State<MessageSearchSheet> {
                       Expanded(
                         child: Text(
                           title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: scheme.onSurface,
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
                           ),
@@ -612,7 +619,7 @@ class _MessageSearchSheetState extends State<MessageSearchSheet> {
                       ),
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded, color: Colors.white),
+                        icon: Icon(Icons.close_rounded, color: scheme.onSurface),
                       ),
                     ],
                   ),
@@ -622,22 +629,22 @@ class _MessageSearchSheetState extends State<MessageSearchSheet> {
                   child: TextField(
                     controller: _q,
                     autofocus: true,
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: scheme.onSurface),
                     decoration: InputDecoration(
                       hintText: hint,
-                      hintStyle: const TextStyle(
-                        color: Color(0xFF8EA3CC),
+                      hintStyle: TextStyle(
+                        color: scheme.onSurfaceVariant,
                         fontSize: 13,
                       ),
                       filled: true,
-                      fillColor: const Color(0xFF152447),
+                      fillColor: scheme.surfaceContainerHighest,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF2C3A5A)),
+                        borderSide: BorderSide(color: scheme.outline),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF2C3A5A)),
+                        borderSide: BorderSide(color: scheme.outline),
                       ),
                     ),
                     onChanged: (_) => _scheduleSearch(),

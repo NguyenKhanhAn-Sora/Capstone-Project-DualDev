@@ -226,6 +226,71 @@ class DirectMessagesService {
     );
   }
 
+  static Future<void> reportMessage(
+    String messageId, {
+    required String reason,
+    String? description,
+  }) async {
+    await ApiService.post(
+      '/direct-messages/$messageId/report',
+      extraHeaders: _authHeaders,
+      body: {
+        'reason': reason,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+      },
+    );
+  }
+
+  static Future<Map<String, dynamic>> getUserSettings() async {
+    return ApiService.get('/users/settings', extraHeaders: _authHeaders);
+  }
+
+  static Future<Map<String, dynamic>> updateUserSettings({
+    String? dmListFrom,
+    String? dmCallFrom,
+    bool? sharePresence,
+    bool? chatSoundEnabled,
+    bool? showCordigramMemberSince,
+    String? appearancePreset,
+    String? appearanceBackground,
+  }) async {
+    return ApiService.patch(
+      '/users/settings',
+      extraHeaders: _authHeaders,
+      body: {
+        if (dmListFrom != null) 'dmListFrom': dmListFrom,
+        if (dmCallFrom != null) 'dmCallFrom': dmCallFrom,
+        if (sharePresence != null) 'sharePresence': sharePresence,
+        if (chatSoundEnabled != null) 'chatSoundEnabled': chatSoundEnabled,
+        if (showCordigramMemberSince != null)
+          'showCordigramMemberSince': showCordigramMemberSince,
+        if (appearancePreset != null) 'appearancePreset': appearancePreset,
+        if (appearanceBackground != null)
+          'appearanceBackground': appearanceBackground,
+      },
+    );
+  }
+
+  static Future<Map<String, dynamic>> getMessagingProfileByUserId(
+    String userId,
+  ) async {
+    return ApiService.get(
+      '/messaging-profiles/${Uri.encodeComponent(userId)}',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static Future<Map<String, dynamic>> updateMyMessagingProfile(
+    Map<String, dynamic> payload,
+  ) async {
+    return ApiService.patch(
+      '/messaging-profiles/me',
+      extraHeaders: _authHeaders,
+      body: payload,
+    );
+  }
+
   static Future<List<DmConversation>> searchConversations(String query) async {
     final encoded = Uri.encodeQueryComponent(query);
     final res = await ApiService.get(

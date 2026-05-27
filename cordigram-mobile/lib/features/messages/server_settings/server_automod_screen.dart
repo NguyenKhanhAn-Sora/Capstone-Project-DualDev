@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../models/server_models.dart';
+import '../models/server_role_models.dart';
 import '../services/servers_service.dart';
 
 /// Chặn spam đề cập — lưu vào `automod.mentionSpamFilter` trong `/safety-settings`.
@@ -28,10 +30,21 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
   bool _loading = true;
   String? _error;
   final _limitCtrl = TextEditingController();
+  final _durationCtrl = TextEditingController();
+  final _notifCtrl = TextEditingController();
+  List<ServerChannel> _channels = [];
+  List<ServerRole> _roles = [];
+
+  List<String> get _exemptRoleIds =>
+      List<String>.from(_msf['exemptRoleIds'] ?? []);
+  List<String> get _exemptChannelIds =>
+      List<String>.from(_msf['exemptChannelIds'] ?? []);
 
   @override
   void dispose() {
     _limitCtrl.dispose();
+    _durationCtrl.dispose();
+    _notifCtrl.dispose();
     super.dispose();
   }
 
@@ -78,9 +91,16 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
         'exemptChannelIds': List<String>.from(msf['exemptChannelIds'] ?? []),
       };
       _limitCtrl.text = '${msf['mentionLimit']}';
+      _durationCtrl.text = '${msf['blockDurationHours']}';
+      _notifCtrl.text = msf['customNotification']?.toString() ?? '';
+      final ch = await ServersService.getServerChannels(widget.serverId);
+      final roles = await ServersService.getRoles(widget.serverId);
+      if (!mounted) return;
       setState(() {
         _full = doc;
         _msf = msf;
+        _channels = ch;
+        _roles = roles;
       });
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -92,9 +112,15 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
   Future<void> _save() async {
     if (!widget.canManage) return;
     final lim = int.tryParse(_limitCtrl.text.trim()) ?? 20;
+    final dur = int.tryParse(_durationCtrl.text.trim()) ?? 8;
     final merged = Map<String, dynamic>.from(_full);
     final am = Map<String, dynamic>.from((merged['automod'] as Map?) ?? {});
-    am['mentionSpamFilter'] = {..._msf, 'mentionLimit': lim};
+    am['mentionSpamFilter'] = {
+      ..._msf,
+      'mentionLimit': lim,
+      'blockDurationHours': dur,
+      'customNotification': _notifCtrl.text.trim(),
+    };
     merged['automod'] = am;
     try {
       final saved =
@@ -253,6 +279,172 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                               })
                           : null,
                       activeColor: const Color(0xFF5865F2),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _durationCtrl,
+                      enabled: widget.canManage,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Thời gian hạn chế (giờ)',
+                        labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
+                        filled: true,
+                        fillColor: _card,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _notifCtrl,
+                      enabled: widget.canManage,
+                      maxLines: 2,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Thông báo tùy chỉnh (tuỳ chọn)',
+                        labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
+                        filled: true,
+                        fillColor: _card,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Miễn trừ',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ..._exemptRoleIds.map((id) {
+                          final name = _roles
+                              .where((r) => r.id == id)
+                              .map((r) => r.name)
+                              .firstOrNull;
+                          return Chip(
+                            label: Text('@${name ?? id}'),
+                            deleteIcon: widget.canManage
+                                ? const Icon(Icons.close, size: 16)
+                                : null,
+                            onDeleted: widget.canManage
+                                ? () => setState(() {
+                                      _msf['exemptRoleIds'] = _exemptRoleIds
+                                          .where((x) => x != id)
+                                          .toList();
+                                    })
+                                : null,
+                          );
+                        }),
+                        if (widget.canManage)
+                          ActionChip(
+                            label: const Text('+ Vai trò'),
+                            onPressed: () async {
+                              final picked = await showModalBottomSheet<String>(
+                                context: context,
+                                backgroundColor: _card,
+                                builder: (ctx) => SafeArea(
+                                  child: ListView(
+                                    shrinkWrap: true,
+                                    children: _roles
+                                        .where((r) => !r.isDefault)
+                                        .where((r) => !_exemptRoleIds.contains(r.id))
+                                        .map(
+                                          (r) => ListTile(
+                                            title: Text(
+                                              r.name,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            onTap: () => Navigator.pop(ctx, r.id),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ),
+                              );
+                              if (picked == null) return;
+                              setState(() {
+                                _msf['exemptRoleIds'] = [
+                                  ..._exemptRoleIds,
+                                  picked,
+                                ];
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ..._exemptChannelIds.map((id) {
+                          final name = _channels
+                              .where((c) => c.id == id)
+                              .map((c) => c.name)
+                              .firstOrNull;
+                          return Chip(
+                            label: Text('#${name ?? id}'),
+                            deleteIcon: widget.canManage
+                                ? const Icon(Icons.close, size: 16)
+                                : null,
+                            onDeleted: widget.canManage
+                                ? () => setState(() {
+                                      _msf['exemptChannelIds'] =
+                                          _exemptChannelIds
+                                              .where((x) => x != id)
+                                              .toList();
+                                    })
+                                : null,
+                          );
+                        }),
+                        if (widget.canManage)
+                          ActionChip(
+                            label: const Text('+ Kênh'),
+                            onPressed: () async {
+                              final picked = await showModalBottomSheet<String>(
+                                context: context,
+                                backgroundColor: _card,
+                                builder: (ctx) => SafeArea(
+                                  child: ListView(
+                                    shrinkWrap: true,
+                                    children: _channels
+                                        .where((c) => !_exemptChannelIds.contains(c.id))
+                                        .map(
+                                          (c) => ListTile(
+                                            title: Text(
+                                              '#${c.name}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            onTap: () => Navigator.pop(ctx, c.id),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ),
+                              );
+                              if (picked == null) return;
+                              setState(() {
+                                _msf['exemptChannelIds'] = [
+                                  ..._exemptChannelIds,
+                                  picked,
+                                ];
+                              });
+                            },
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 20),
                     FilledButton(

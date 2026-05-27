@@ -9,10 +9,12 @@ class ServerMembersScreen extends StatefulWidget {
     super.key,
     required this.serverId,
     this.currentUserId,
+    this.isOwner = false,
   });
 
   final String serverId;
   final String? currentUserId;
+  final bool isOwner;
 
   @override
   State<ServerMembersScreen> createState() => _ServerMembersScreenState();
@@ -244,6 +246,196 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
     }
   }
 
+  Future<void> _removeTimeout(MemberWithRolesRow m) async {
+    try {
+      await ServersService.removeTimeout(widget.serverId, m.userId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã gỡ timeout.')),
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _transferOwnership(MemberWithRolesRow m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: const Color(0xFF152A52),
+        title: const Text(
+          'Chuyển quyền sở hữu?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          '${m.displayName} sẽ trở thành chủ máy chủ. Bạn sẽ trở thành thành viên.',
+          style: const TextStyle(color: Color(0xFFB8C8E8)),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text(
+              'Chuyển quyền',
+              style: TextStyle(color: Color(0xFFFF6B7A)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await ServersService.transferServerOwnership(widget.serverId, m.userId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã chuyển quyền sở hữu.')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _openPruneDialog() async {
+    int days = 30;
+    String role = 'all';
+    int? previewCount;
+    bool loadingPreview = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModal) {
+            Future<void> refreshPreview() async {
+              setModal(() => loadingPreview = true);
+              try {
+                final c = await ServersService.getPruneCount(
+                  widget.serverId,
+                  days: days,
+                  role: role,
+                );
+                setModal(() {
+                  previewCount = c;
+                  loadingPreview = false;
+                });
+              } catch (_) {
+                setModal(() => loadingPreview = false);
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF152A52),
+              title: const Text(
+                'Lược bỏ thành viên',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Đuổi thành viên không hoạt động trong N ngày (không gồm chủ máy chủ).',
+                      style: TextStyle(color: Color(0xFFB8C8E8)),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      value: days,
+                      dropdownColor: const Color(0xFF0E1F45),
+                      style: const TextStyle(color: Colors.white),
+                      items: const [
+                        DropdownMenuItem(value: 7, child: Text('7 ngày')),
+                        DropdownMenuItem(value: 30, child: Text('30 ngày')),
+                        DropdownMenuItem(value: 90, child: Text('90 ngày')),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        days = v;
+                        previewCount = null;
+                        setModal(() {});
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: role,
+                      dropdownColor: const Color(0xFF0E1F45),
+                      style: const TextStyle(color: Colors.white),
+                      items: const [
+                        DropdownMenuItem(value: 'all', child: Text('Mọi vai trò')),
+                        DropdownMenuItem(value: 'none', child: Text('Không có vai trò')),
+                        DropdownMenuItem(value: 'member', child: Text('Thành viên')),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        role = v;
+                        previewCount = null;
+                        setModal(() {});
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: loadingPreview ? null : refreshPreview,
+                      child: loadingPreview
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              previewCount == null
+                                  ? 'Xem trước số lượng'
+                                  : 'Sẽ lược bỏ: $previewCount thành viên',
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Huỷ'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    try {
+                      final removed = await ServersService.pruneMembers(
+                        widget.serverId,
+                        days: days,
+                        role: role,
+                      );
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Đã lược bỏ $removed thành viên.')),
+                      );
+                      await _load();
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('$e')),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text(
+                    'Lược bỏ',
+                    style: TextStyle(color: Color(0xFFFF6B7A)),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _openActions(MemberWithRolesRow m, MembersWithRolesResult ctx) {
     showModalBottomSheet<void>(
       context: context,
@@ -284,13 +476,34 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
                   _ban(m);
                 },
               ),
-            if (ctx.canTimeout)
+            if (ctx.canTimeout && !m.isTimedOut)
               ListTile(
                 leading: const Icon(Icons.timer_outlined, color: Color(0xFFFFD54F)),
                 title: const Text('Timeout', style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(c);
                   _timeout(m);
+                },
+              ),
+            if (ctx.canTimeout && m.isTimedOut)
+              ListTile(
+                leading: const Icon(Icons.timer_off_outlined, color: Color(0xFF7FB6FF)),
+                title: const Text('Gỡ timeout', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(c);
+                  _removeTimeout(m);
+                },
+              ),
+            if (widget.isOwner && !m.isOwner)
+              ListTile(
+                leading: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF7FB6FF)),
+                title: const Text(
+                  'Chuyển quyền sở hữu',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.pop(c);
+                  _transferOwnership(m);
                 },
               ),
             ListTile(
@@ -315,6 +528,12 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
         backgroundColor: _bg,
         title: const Text('Thành viên', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          if (widget.isOwner)
+            IconButton(
+              tooltip: 'Lược bỏ thành viên',
+              onPressed: _loading ? null : _openPruneDialog,
+              icon: const Icon(Icons.cleaning_services_outlined),
+            ),
           IconButton(
             tooltip: 'Làm mới',
             onPressed: _loading ? null : _load,

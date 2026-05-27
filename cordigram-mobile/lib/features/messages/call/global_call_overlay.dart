@@ -25,12 +25,52 @@ class GlobalCallOverlay extends StatelessWidget {
     return Stack(
       children: [
         child,
-        AnimatedBuilder(
-          animation: Listenable.merge([
-            DmCallManager.instance,
-            VoiceChannelSessionController.instance,
-          ]),
-          builder: (context, __) {
+        // Own [Overlay] so PiP controls / platform video views are not built
+        // under [MaterialApp.builder] where [Overlay.of] is unavailable.
+        const Positioned.fill(child: _GlobalCallFloatingOverlay()),
+      ],
+    );
+  }
+}
+
+/// Hosts call / voice PiP layers in a dedicated [Overlay] above routes.
+class _GlobalCallFloatingOverlay extends StatefulWidget {
+  const _GlobalCallFloatingOverlay();
+
+  @override
+  State<_GlobalCallFloatingOverlay> createState() =>
+      _GlobalCallFloatingOverlayState();
+}
+
+class _GlobalCallFloatingOverlayState extends State<_GlobalCallFloatingOverlay> {
+  late final OverlayEntry _entry;
+
+  void _markEntryDirty() {
+    _entry.markNeedsBuild();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _entry = OverlayEntry(builder: _buildLayers);
+    DmCallManager.instance.addListener(_markEntryDirty);
+    VoiceChannelSessionController.instance.addListener(_markEntryDirty);
+  }
+
+  @override
+  void dispose() {
+    DmCallManager.instance.removeListener(_markEntryDirty);
+    VoiceChannelSessionController.instance.removeListener(_markEntryDirty);
+    _entry.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Overlay(initialEntries: [_entry]);
+  }
+
+  Widget _buildLayers(BuildContext context) {
             final mgr = DmCallManager.instance;
             final voice = VoiceChannelSessionController.instance;
             final dmFullCallUi =
@@ -120,7 +160,7 @@ class GlobalCallOverlay extends StatelessWidget {
                         avatarUrl: incoming.callerAvatarUrl,
                         acceptLabel: 'Chấp nhận',
                         rejectLabel: 'Từ chối',
-                        onAccept: () => _acceptIncoming(context, mgr),
+                        onAccept: () => _acceptIncomingDmCall(mgr),
                         onReject: mgr.rejectIncoming,
                       ),
                     ),
@@ -179,56 +219,55 @@ class GlobalCallOverlay extends StatelessWidget {
               );
             }
 
-            if (layers.isEmpty) return const SizedBox.shrink();
-            return Stack(fit: StackFit.expand, children: layers);
-          },
+    if (layers.isEmpty) return const SizedBox.shrink();
+    return Stack(fit: StackFit.expand, children: layers);
+  }
+}
+
+Future<void> _acceptIncomingDmCall(DmCallManager mgr) async {
+  final voiceSession = VoiceChannelSessionController.instance;
+  if (!voiceSession.active) {
+    await mgr.acceptIncoming();
+    return;
+  }
+
+  final dialogContext = DmCallManager.instance.rootNavigatorState?.context;
+  if (dialogContext == null) return;
+
+  final leaveVoiceFirst = await showDialog<bool>(
+    context: dialogContext,
+    builder: (dialogContext) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF0E2247),
+        title: const Text(
+          'Đang ở kênh thoại server',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
-      ],
-    );
-  }
-
-  Future<void> _acceptIncoming(BuildContext context, DmCallManager mgr) async {
-    final voiceSession = VoiceChannelSessionController.instance;
-    if (!voiceSession.active) {
-      await mgr.acceptIncoming();
-      return;
-    }
-
-    final leaveVoiceFirst = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF0E2247),
-          title: const Text(
-            'Đang ở kênh thoại server',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        content: Text(
+          'Bạn đang trong kênh ${voiceSession.channelName ?? 'thoại'}. '
+          'Bạn cần rời kênh thoại trước khi nhận cuộc gọi DM.',
+          style: const TextStyle(color: Color(0xFFAFC0E2)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Từ chối'),
           ),
-          content: Text(
-            'Bạn đang trong kênh ${voiceSession.channelName ?? 'thoại'}. '
-            'Bạn cần rời kênh thoại trước khi nhận cuộc gọi DM.',
-            style: const TextStyle(color: Color(0xFFAFC0E2)),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Rời kênh và nhận'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Từ chối'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Rời kênh và nhận'),
-            ),
-          ],
-        );
-      },
-    );
+        ],
+      );
+    },
+  );
 
-    if (leaveVoiceFirst == true) {
-      await voiceSession.leave();
-      await mgr.acceptIncoming();
-      return;
-    }
-    mgr.rejectIncoming();
+  if (leaveVoiceFirst == true) {
+    await voiceSession.leave();
+    await mgr.acceptIncoming();
+    return;
   }
+  mgr.rejectIncoming();
 }
 
 Future<void> _openVoiceRoomFromGlobalPip() async {
@@ -417,19 +456,13 @@ class _VoiceDockedChipState extends State<_VoiceDockedChip> {
   @override
   void initState() {
     super.initState();
-    widget.session.addListener(_onSession);
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
   }
 
-  void _onSession() {
-    if (mounted) setState(() {});
-  }
-
   @override
   void dispose() {
-    widget.session.removeListener(_onSession);
     _clock?.cancel();
     super.dispose();
   }
@@ -557,19 +590,13 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
   @override
   void initState() {
     super.initState();
-    widget.session.addListener(_onSession);
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
   }
 
-  void _onSession() {
-    if (mounted) setState(() {});
-  }
-
   @override
   void dispose() {
-    widget.session.removeListener(_onSession);
     _clock?.cancel();
     super.dispose();
   }
@@ -680,8 +707,9 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
                                 ),
                               ),
                             ),
-                            Tooltip(
-                              message: 'Rời phòng',
+                            Semantics(
+                              label: 'Rời phòng',
+                              button: true,
                               child: Material(
                                 color: Colors.transparent,
                                 child: InkWell(
@@ -699,8 +727,9 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
                                 ),
                               ),
                             ),
-                            Tooltip(
-                              message: 'Thu nhỏ góc',
+                            Semantics(
+                              label: 'Thu nhỏ góc',
+                              button: true,
                               child: Material(
                                 color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(999),
@@ -855,19 +884,13 @@ class _DockedMiniCallChipState extends State<_DockedMiniCallChip> {
   @override
   void initState() {
     super.initState();
-    widget.mgr.addListener(_onMgr);
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
   }
 
-  void _onMgr() {
-    if (mounted) setState(() {});
-  }
-
   @override
   void dispose() {
-    widget.mgr.removeListener(_onMgr);
     _clock?.cancel();
     super.dispose();
   }
@@ -1000,19 +1023,13 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
   @override
   void initState() {
     super.initState();
-    widget.mgr.addListener(_onMgr);
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
   }
 
-  void _onMgr() {
-    if (mounted) setState(() {});
-  }
-
   @override
   void dispose() {
-    widget.mgr.removeListener(_onMgr);
     _clock?.cancel();
     super.dispose();
   }

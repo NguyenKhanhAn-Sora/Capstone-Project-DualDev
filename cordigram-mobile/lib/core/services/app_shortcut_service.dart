@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:quick_actions/quick_actions.dart';
 
 import '../services/auth_storage.dart';
-import '../../features/messages/message_home_screen.dart';
+import '../../features/messages/messages_shell.dart';
+import '../../features/messages/utils/messages_navigator.dart';
 import '../../features/notifications/notification_screen.dart';
 
 class AppShortcutService {
@@ -83,9 +84,7 @@ class AppShortcutService {
         MaterialPageRoute<void>(builder: (_) => const NotificationScreen()),
       );
     } else if (type == _messageType) {
-      navigator.push(
-        MaterialPageRoute<void>(builder: (_) => const MessageHomeScreen()),
-      );
+      navigator.push(messagesEntryRoute<void>(const MessagesShell()));
     }
   }
 

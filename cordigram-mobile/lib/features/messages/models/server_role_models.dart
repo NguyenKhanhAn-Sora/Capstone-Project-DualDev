@@ -129,6 +129,7 @@ class MemberWithRolesRow {
     required this.serverMemberRole,
     this.isOwner = false,
     this.nickname,
+    this.timeoutUntil,
   });
 
   final String userId;
@@ -139,8 +140,20 @@ class MemberWithRolesRow {
   final String serverMemberRole;
   final bool isOwner;
   final String? nickname;
+  final DateTime? timeoutUntil;
+
+  bool get isTimedOut {
+    final until = timeoutUntil;
+    if (until == null) return false;
+    return until.isAfter(DateTime.now());
+  }
 
   factory MemberWithRolesRow.fromJson(Map<String, dynamic> json) {
+    DateTime? timeout;
+    final raw = json['timeoutUntil'];
+    if (raw != null) {
+      timeout = DateTime.tryParse(raw.toString())?.toLocal();
+    }
     return MemberWithRolesRow(
       userId: (json['userId'] ?? '').toString(),
       displayName: (json['displayName'] ?? '').toString(),
@@ -150,6 +163,7 @@ class MemberWithRolesRow {
       serverMemberRole: (json['serverMemberRole'] ?? 'member').toString(),
       isOwner: json['isOwner'] == true,
       nickname: json['nickname']?.toString(),
+      timeoutUntil: timeout,
     );
   }
 }

@@ -1332,7 +1332,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _showMoreMenu() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF141D30),
+      backgroundColor: _surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1401,11 +1401,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
+        backgroundColor: _surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
           _t('profile.block.dialogTitle', {'username': p.username}),
-          style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+          style: TextStyle(color: _textPrimary, fontSize: 16),
         ),
         content: Text(
           _t('profile.block.dialogBody'),
@@ -1491,7 +1491,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final vis = p.visibility;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF141D30),
+      backgroundColor: _surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/dm_message.dart';
-import '../utils/dm_call_message_utils.dart';
+import '../utils/messages_i18n.dart';
 
 /// Call log card in DM thread (missed / completed voice or video).
 class DmCallMessageCard extends StatelessWidget {
@@ -10,30 +10,22 @@ class DmCallMessageCard extends StatelessWidget {
     required this.message,
     required this.viewerId,
     required this.onCallBack,
-    this.languageCode = 'vi',
   });
 
   final DmMessage message;
   final String? viewerId;
   final VoidCallback onCallBack;
-  final String languageCode;
 
   bool get _isVideo => message.callType == 'video';
 
-  bool get _isMissed => DmCallMessageUtils.isMissedStatus(message.callStatus);
+  bool get _isMissed => MessagesI18n.isMissedCallStatus(message.callStatus);
 
   @override
   Widget build(BuildContext context) {
-    final title = DmCallMessageUtils.callCardTitle(
-      message,
-      viewerId,
-      languageCode: languageCode,
-    );
-    final subtitle = DmCallMessageUtils.callCardSubtitle(
-      message,
-      languageCode: languageCode,
-    );
-    final callBack = DmCallMessageUtils.callBackLabel(languageCode: languageCode);
+    final scheme = Theme.of(context).colorScheme;
+    final title = MessagesI18n.callCardTitle(message, viewerId);
+    final subtitle = MessagesI18n.callCardSubtitle(message, viewerId);
+    final callBack = MessagesI18n.callBackLabel();
 
     return Material(
       color: Colors.transparent,
@@ -45,8 +37,8 @@ class DmCallMessageCard extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: const Color(0x995B2D6E),
-            border: Border.all(color: const Color(0x40C084FC)),
+            color: scheme.primaryContainer.withValues(alpha: 0.55),
+            border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -58,11 +50,9 @@ class DmCallMessageCard extends StatelessWidget {
                     height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _isMissed
-                          ? const Color(0xFFE53935)
-                          : const Color(0xFF7C4DFF),
+                      color: _isMissed ? scheme.error : scheme.primary,
                     ),
-                    child: Icon(_icon(), color: Colors.white, size: 20),
+                    child: Icon(_icon(), color: scheme.onPrimary, size: 20),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -71,8 +61,8 @@ class DmCallMessageCard extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: scheme.onSurface,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
@@ -81,7 +71,7 @@ class DmCallMessageCard extends StatelessWidget {
                         Text(
                           subtitle,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.65),
+                            color: scheme.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
@@ -94,8 +84,8 @@ class DmCallMessageCard extends StatelessWidget {
               TextButton(
                 onPressed: onCallBack,
                 style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF6D3FA8),
-                  foregroundColor: Colors.white,
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),

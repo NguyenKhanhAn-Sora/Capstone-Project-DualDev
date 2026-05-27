@@ -17,7 +17,8 @@ import '../livestream/livestream_create_service.dart';
 import '../livestream/livestream_hub_screen.dart';
 import '../messages/call/dm_call_manager.dart';
 import '../messages/call/pending_dm_call_storage.dart';
-import '../messages/message_home_screen.dart';
+import '../messages/messages_shell.dart';
+import '../messages/utils/messages_navigator.dart';
 import '../messages/services/direct_messages_realtime_service.dart';
 import '../notifications/services/notification_realtime_service.dart';
 import '../notifications/notification_screen.dart';
@@ -136,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
     _tabController.addListener(_onTabChanged);
     PostUploadController.instance.addListener(_onUploadStateChanged);
+    LanguageController.instance.addListener(_onLanguageChanged);
     _loadFeed();
     _loadLiveStreams();
     _fetchProfile();
@@ -238,6 +240,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     PostUploadController.instance.removeListener(_onUploadStateChanged);
+    LanguageController.instance.removeListener(_onLanguageChanged);
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _topNavAnimController.dispose();
@@ -259,6 +262,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _showTopNav();
     _scrollTriggerAccumulated = 0;
     _scrollTriggerDirection = 0;
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _goHomeOrScrollTop() async {
@@ -1490,13 +1497,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               height: 110,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: const Color(0xFF131929),
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                ),
               ),
-              child: const CircularProgressIndicator(
+              child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Color(0xFF4AA3E4),
+                color: Theme.of(context).colorScheme.primary,
               ),
             )
           else
@@ -1961,7 +1970,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           tooltip: LanguageController.instance.t('home.tooltip.messages'),
           onTap: () => Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => const MessageHomeScreen())),
+          ).push(messagesEntryRoute(const MessagesShell())),
         ),
         // Profile avatar
         GestureDetector(
@@ -2045,9 +2054,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFeedTab() {
+    final scheme = Theme.of(context).colorScheme;
     if (_initialLoad && _loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
+      return Center(
+        child: CircularProgressIndicator(color: scheme.primary),
       );
     }
 
@@ -2061,8 +2071,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!_initialLoad && _states.isEmpty && !_loading) {
       if (_liveStreams.isNotEmpty || _loadingLiveStreams) {
         return RefreshIndicator(
-          color: const Color(0xFF4AA3E4),
-          backgroundColor: const Color(0xFF131929),
+          color: scheme.primary,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           onRefresh: _refreshHome,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -2086,8 +2096,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final sliverItemCount = _states.length + (hasLiveSection ? 1 : 0);
 
     return RefreshIndicator(
-      color: const Color(0xFF4AA3E4),
-      backgroundColor: const Color(0xFF131929),
+      color: scheme.primary,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       onRefresh: _refreshHome,
       child: CustomScrollView(
         controller: _scrollController,
@@ -3290,35 +3300,37 @@ class _InlineError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme.bodyMedium?.color ?? scheme.onSurface;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF131929),
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+          color: scheme.error.withValues(alpha: 0.35),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.error_outline_rounded,
-            color: Color(0xFFEF4444),
+            color: scheme.error,
             size: 18,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 13),
+              style: TextStyle(color: text, fontSize: 13),
             ),
           ),
           TextButton(
             onPressed: onRetry,
             child: Text(
               LanguageController.instance.t('common.retry'),
-              style: const TextStyle(
-                color: Color(0xFF4AA3E4),
+              style: TextStyle(
+                color: scheme.primary,
                 fontWeight: FontWeight.w700,
               ),
             ),
