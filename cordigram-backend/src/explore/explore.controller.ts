@@ -57,6 +57,7 @@ export class ExploreController {
       sessionId?: string;
       position?: number | null;
       source?: string;
+      durationMs?: number | null;
     },
   ) {
     const user = req.user as AuthenticatedUser | undefined;
@@ -80,6 +81,8 @@ export class ExploreController {
             ? body.position
             : (body.position ?? null),
         source: body?.source?.toString?.() || 'explore',
+        durationMs:
+          typeof body.durationMs === 'number' ? body.durationMs : null,
       },
     );
   }

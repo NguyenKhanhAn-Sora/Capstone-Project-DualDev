@@ -531,6 +531,7 @@ export class CreatorVerificationService {
           status: 'published',
           visibility: 'public',
           kind: { $in: ['post', 'reel'] },
+          pollId: { $in: [null, undefined] },
           moderationState: { $ne: 'removed' },
           deletedAt: null,
         })

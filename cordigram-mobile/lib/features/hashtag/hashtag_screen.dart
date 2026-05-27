@@ -988,7 +988,7 @@ class _HashtagReelCard extends StatelessWidget {
     final after = url.substring(idx + marker.length);
     final dotIdx = after.lastIndexOf('.');
     final pathNoExt = dotIdx >= 0 ? after.substring(0, dotIdx) : after;
-    return '${before}so_0/$pathNoExt.jpg';
+    return '${before}so_auto/$pathNoExt.jpg';
   }
 }
 
