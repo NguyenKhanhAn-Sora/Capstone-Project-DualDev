@@ -394,19 +394,10 @@ export default function LoginPage() {
     if (clearingAll || removingEmail === account.email) return;
     setPassword("");
     setError(null);
-    setCheckingSession(true);
     setSelectedAccount(account);
     setModalPassword("");
     setModalError(null);
-
-    try {
-      await refreshSession();
-      await syncThemeFromServer(getStoredAccessToken() || "");
-      routeAfterAuth(getStoredAccessToken() || "");
-    } catch (_err) {
-      setCheckingSession(false);
-      setModalError(null);
-    }
+    setCheckingSession(false);
   };
 
   const handleModalSubmit = async (event: FormEvent<HTMLFormElement>) => {

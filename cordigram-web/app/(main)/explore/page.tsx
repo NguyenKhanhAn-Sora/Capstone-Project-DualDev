@@ -110,7 +110,8 @@ export default function ExplorePage() {
             limit: PAGE_SIZE,
             page: nextPage,
           })) || [];
-        const filtered = filterFeedItemsByBlockedAuthors(data, blockedIds);
+        const nonAd = data.filter((item) => !(item as any).sponsored);
+        const filtered = filterFeedItemsByBlockedAuthors(nonAd, blockedIds);
 
         setHasMore(filtered.length >= PAGE_SIZE);
 

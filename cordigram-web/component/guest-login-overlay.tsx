@@ -52,7 +52,7 @@ export default function GuestLoginOverlay({ open, onClose }: Props) {
 
         <div className={styles.actions}>
           <Link
-            href="/login?skipRestore=1"
+            href="/login"
             className={styles.btnPrimary}
             onClick={onClose}
           >

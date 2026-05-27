@@ -2925,12 +2925,28 @@ export class PostsService {
         .lean();
       const guestSlice = guestDocs.slice(sliceStart, sliceEnd);
       if (!guestSlice.length) return [] as ReturnType<typeof this.toResponse>[];
+
+      const guestAllIds = guestSlice.map((d) => d._id?.toString?.() ?? '').filter(Boolean);
+      let guestAdIdSet = new Set<string>();
+      if (guestAllIds.length) {
+        const guestAdTxns = await this.paymentTransactionModel
+          .find({ promotedPostId: { $in: guestAllIds } })
+          .select('promotedPostId')
+          .lean();
+        guestAdIdSet = new Set(
+          guestAdTxns.map((t) => t.promotedPostId?.toString?.() ?? '').filter(Boolean),
+        );
+      }
+      const filteredGuestSlice = guestSlice.filter(
+        (d) => !guestAdIdSet.has(d._id?.toString?.() ?? ''),
+      );
+
       const authorIds = Array.from(
-        new Set(guestSlice.map((p) => p.authorId?.toString()).filter(Boolean)),
+        new Set(filteredGuestSlice.map((p) => p.authorId?.toString()).filter(Boolean)),
       ).map((id) => new Types.ObjectId(id as string));
       const profiles = await this.getProfilesWithCreatorVerification(authorIds);
       const profileMap = this.mapProfilesByUserId(profiles);
-      return guestSlice.map((raw) => {
+      return filteredGuestSlice.map((raw) => {
         const profile = profileMap.get(raw.authorId?.toString() ?? '') ?? null;
         return this.toResponse(this.postModel.hydrate(raw) as Post, profile, {});
       });
@@ -3204,7 +3220,23 @@ export class PostsService {
       if (picked.length >= sliceEnd) break;
     }
 
-    const pagePosts = picked.slice(sliceStart, sliceEnd);
+    const pagePostsRaw = picked.slice(sliceStart, sliceEnd);
+    if (!pagePostsRaw.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const pageAllIds = pagePostsRaw.map((p) => p._id?.toString?.() ?? '').filter(Boolean);
+    let pageAdIdSet = new Set<string>();
+    if (pageAllIds.length) {
+      const pageAdTxns = await this.paymentTransactionModel
+        .find({ promotedPostId: { $in: pageAllIds } })
+        .select('promotedPostId')
+        .lean();
+      pageAdIdSet = new Set(
+        pageAdTxns.map((t) => t.promotedPostId?.toString?.() ?? '').filter(Boolean),
+      );
+    }
+    const pagePosts = pagePostsRaw.filter(
+      (p) => !pageAdIdSet.has(p._id?.toString?.() ?? ''),
+    );
     if (!pagePosts.length) return [] as ReturnType<typeof this.toResponse>[];
 
     const authorIds = Array.from(
@@ -3852,9 +3884,25 @@ export class PostsService {
       .limit(limit)
       .lean();
 
-    const pollMap = await this.batchFetchPolls(docs);
+    // Filter out posts that have ever been used as an ad (any status)
+    const allPostIds = docs.map((d) => d._id?.toString?.() ?? '').filter(Boolean);
+    let adPostIdSet = new Set<string>();
+    if (allPostIds.length) {
+      const adPostIds = await this.paymentTransactionModel
+        .find({ promotedPostId: { $in: allPostIds } })
+        .select('promotedPostId')
+        .lean();
+      adPostIdSet = new Set(
+        adPostIds.map((t) => t.promotedPostId?.toString?.() ?? '').filter(Boolean),
+      );
+    }
+    const filteredDocs = docs.filter(
+      (d) => !adPostIdSet.has(d._id?.toString?.() ?? ''),
+    );
 
-    return docs.map((doc) => {
+    const pollMap = await this.batchFetchPolls(filteredDocs);
+
+    return filteredDocs.map((doc) => {
       const poll = doc.pollId ? pollMap.get(doc.pollId.toString()) || null : null;
       return this.toResponse(this.postModel.hydrate(doc) as Post, null, {}, null, null, poll);
     });

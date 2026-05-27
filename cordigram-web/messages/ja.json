@@ -659,6 +659,7 @@
     },
     "detail": {
       "backToCampaigns": "キャンペーン一覧に戻る",
+      "goToAds": "広告投稿を見る",
       "loading": "キャンペーン詳細を読み込み中...",
       "loadFailed": "キャンペーン詳細の読み込みに失敗しました。",
       "sections": {

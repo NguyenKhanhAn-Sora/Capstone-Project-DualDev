@@ -578,6 +578,7 @@
     },
     "detail": {
       "backToCampaigns": "Back to campaigns",
+      "goToAds": "Go to ads",
       "loading": "Loading campaign details...",
       "loadFailed": "Failed to load campaign details.",
       "sections": {

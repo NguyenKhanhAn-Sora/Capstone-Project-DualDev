@@ -1946,6 +1946,7 @@
     "accountUnavailable": "This account is currently unavailable.",
     "blockedTitle": "Profile is not available",
     "blockedDefault": "The link may be broken or the profile may have been removed.",
+    "blockedProfileMessage": "This profile is currently not available.",
     "blockedBackHome": "Go back home",
     "privateTitle": "This profile is private",
     "privateText": "The owner has limited access to their profile. Follow requests may be required to view their content.",
@@ -2642,6 +2643,8 @@
         "unhide": "Unhide",
         "unhiding": "Unhiding...",
         "refreshBtn": "Refresh",
+        "noCaption": "No caption",
+        "sponsoredPost": "Sponsored content",
         "errors": {
           "unhideFailed": "Unable to unhide this post.",
           "loadFailed": "Unable to load hidden posts."

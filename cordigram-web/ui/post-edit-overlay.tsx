@@ -114,6 +114,7 @@ export default function PostEditOverlay({
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [locationHighlight, setLocationHighlight] = useState(-1);
+  const locationUserTyped = useRef(false);
   const [editAllowComments, setEditAllowComments] = useState(true);
   const [editAllowDownload, setEditAllowDownload] = useState(false);
   const [lockedAllowDownload, setLockedAllowDownload] = useState<
@@ -145,6 +146,7 @@ export default function PostEditOverlay({
     setActiveMentionRange(null);
     setEditLocation(post.location || "");
     setLocationQuery(post.location || "");
+    locationUserTyped.current = false;
     setLocationSuggestions([]);
     setLocationOpen(false);
     setLocationLoading(false);
@@ -161,7 +163,8 @@ export default function PostEditOverlay({
 
   useEffect(() => {
     if (open) resetEditState();
-  }, [open, resetEditState, post?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, post?.id]);
 
   useEffect(() => {
     if (!open || !post || !token) return;
@@ -401,6 +404,7 @@ export default function PostEditOverlay({
 
   useEffect(() => {
     if (!open) return;
+    if (!locationUserTyped.current) return;
     if (!locationQuery.trim()) {
       setLocationSuggestions([]);
       setLocationOpen(false);
@@ -739,6 +743,7 @@ export default function PostEditOverlay({
               placeholder={t("postEditOverlay.locationPlaceholder")}
               value={locationQuery}
               onChange={(e) => {
+                locationUserTyped.current = true;
                 setEditLocation(e.target.value);
                 setLocationQuery(e.target.value);
               }}

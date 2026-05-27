@@ -51,6 +51,148 @@
   color: #cbd5e1;
 }
 
+/* ── Reel loading skeleton ── */
+@keyframes reelShimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.reelLoadingSkeleton {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+  padding: 16px;
+  gap: 12px;
+}
+
+.reelSkeletonCard {
+  position: relative;
+  width: min(360px, calc(100vh * 9 / 16));
+  height: min(640px, calc(100vh - 80px));
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.reelSkeletonGradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.10) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 400px 100%;
+  animation: reelShimmer 1.5s infinite linear;
+}
+
+.reelSkeletonBottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 16px;
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.reelSkeletonAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.12) 25%,
+    rgba(255,255,255,0.22) 50%,
+    rgba(255,255,255,0.12) 75%
+  );
+  background-size: 400px 100%;
+  animation: reelShimmer 1.5s infinite linear;
+}
+
+.reelSkeletonText {
+  flex: 1;
+}
+
+.reelSkeletonLine {
+  display: block;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.12) 25%,
+    rgba(255,255,255,0.22) 50%,
+    rgba(255,255,255,0.12) 75%
+  );
+  background-size: 400px 100%;
+  animation: reelShimmer 1.5s infinite linear;
+}
+
+.reelSkeletonSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 20px;
+  align-self: flex-end;
+}
+
+.reelSkeletonAction {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.08) 25%,
+    rgba(255,255,255,0.16) 50%,
+    rgba(255,255,255,0.08) 75%
+  );
+  background-size: 400px 100%;
+  animation: reelShimmer 1.5s infinite linear;
+}
+
+/* ── Reel error / private state ── */
+.reelStateError {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  text-align: center;
+  padding: 32px;
+}
+
+.reelStateIcon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  display: grid;
+  place-items: center;
+  color: #94a3b8;
+}
+
+.reelStateTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: -0.01em;
+}
+
+.reelStateDesc {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  max-width: 280px;
+  line-height: 1.6;
+}
+
 .stageShell {
   display: flex;
   justify-content: center;

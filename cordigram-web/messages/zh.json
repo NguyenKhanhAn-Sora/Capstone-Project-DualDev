@@ -659,6 +659,7 @@
     },
     "detail": {
       "backToCampaigns": "返回广告系列",
+      "goToAds": "查看广告帖子",
       "loading": "正在加载广告系列详情...",
       "loadFailed": "加载广告系列详情失败。",
       "sections": {

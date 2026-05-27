@@ -1606,6 +1606,141 @@
   color: #9a3412;
 }
 
+/* ── Post loading skeleton ── */
+@keyframes shimmer {
+  0% { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeletonBase {
+  background: linear-gradient(
+    90deg,
+    var(--color-border, rgba(255,255,255,0.08)) 25%,
+    color-mix(in srgb, var(--color-border, rgba(255,255,255,0.08)) 60%, var(--color-surface-muted, rgba(255,255,255,0.12))) 50%,
+    var(--color-border, rgba(255,255,255,0.08)) 75%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+
+.postLoadingSkeleton {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 520px;
+}
+
+@media (max-width: 700px) {
+  .postLoadingSkeleton {
+    grid-template-columns: 1fr;
+  }
+  .skeletonMedia {
+    display: none;
+  }
+}
+
+.skeletonMedia {
+  background: linear-gradient(
+    90deg,
+    var(--color-border, rgba(255,255,255,0.08)) 25%,
+    color-mix(in srgb, var(--color-border, rgba(255,255,255,0.08)) 60%, var(--color-surface-muted, rgba(255,255,255,0.12))) 50%,
+    var(--color-border, rgba(255,255,255,0.08)) 75%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 12px 0 0 12px;
+  min-height: 420px;
+}
+
+.skeletonContent {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.skeletonHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeletonAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(
+    90deg,
+    var(--color-border, rgba(255,255,255,0.08)) 25%,
+    color-mix(in srgb, var(--color-border, rgba(255,255,255,0.08)) 60%, var(--color-surface-muted, rgba(255,255,255,0.12))) 50%,
+    var(--color-border, rgba(255,255,255,0.08)) 75%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+.skeletonHeaderText {
+  flex: 1;
+}
+
+.skeletonLine {
+  background: linear-gradient(
+    90deg,
+    var(--color-border, rgba(255,255,255,0.08)) 25%,
+    color-mix(in srgb, var(--color-border, rgba(255,255,255,0.08)) 60%, var(--color-surface-muted, rgba(255,255,255,0.12))) 50%,
+    var(--color-border, rgba(255,255,255,0.08)) 75%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 5px;
+  height: 13px;
+  display: block;
+}
+
+.skeletonActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+/* ── Post error / private state ── */
+.postStateError {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 32px;
+  gap: 14px;
+  text-align: center;
+  min-height: 340px;
+}
+
+.postStateIcon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-text-muted, #94a3b8) 12%, transparent);
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.postStateTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #e5e7eb);
+  letter-spacing: -0.01em;
+}
+
+.postStateDesc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted, #94a3b8);
+  max-width: 300px;
+  line-height: 1.55;
+}
+
 .toast {
   position: fixed;
   left: 50%;

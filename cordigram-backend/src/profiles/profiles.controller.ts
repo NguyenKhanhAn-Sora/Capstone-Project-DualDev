@@ -388,6 +388,7 @@ export class ProfilesController {
       query: q,
       limit: limit ? Number(limit) : 8,
       excludeUserId: user?.userId,
+      viewerId: user?.userId,
     });
 
     return {

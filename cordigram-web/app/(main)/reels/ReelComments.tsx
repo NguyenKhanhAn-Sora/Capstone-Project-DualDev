@@ -2100,7 +2100,8 @@ export default function ReelComments({
   };
 
   const handleSubmit = async () => {
-    if (!token || !postId || submitting || commentsLocked) return;
+    if (!token) { showLoginOverlay(); return; }
+    if (!postId || submitting || commentsLocked) return;
     if (commentMediaUploading) return;
     const content = text.trim();
     const hasMedia = Boolean(commentMediaFile || commentMediaExternal);

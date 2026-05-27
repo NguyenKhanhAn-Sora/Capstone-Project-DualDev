@@ -45,7 +45,9 @@ class ExploreService {
 
     final visibleItems = allItems.where((post) {
       if (post.media.isEmpty) return false;
-      return !post.media.any((m) => m.isBlurredByModeration);
+      if (post.media.any((m) => m.isBlurredByModeration)) return false;
+      if (isAdLikeFeedPost(post)) return false;
+      return true;
     }).toList();
 
     return ExploreFeedResult(

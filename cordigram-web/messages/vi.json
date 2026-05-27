@@ -578,6 +578,7 @@
     },
     "detail": {
       "backToCampaigns": "Về danh sách chiến dịch",
+      "goToAds": "Xem bài quảng cáo",
       "loading": "Đang tải chi tiết chiến dịch...",
       "loadFailed": "Tải chi tiết chiến dịch thất bại.",
       "sections": {

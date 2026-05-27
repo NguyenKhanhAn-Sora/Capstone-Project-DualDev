@@ -1397,7 +1397,7 @@ export default function HomePage({
   );
 
   const onHide = async (postId: string) => {
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     setItems((prev) => prev.filter((p) => p.item.id !== postId));
     try {
       await hidePost({ token, postId });
@@ -1563,7 +1563,7 @@ export default function HomePage({
   };
 
   const onReportIntent = (postId: string, label: string) => {
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
     setReportClosing(false);
     setReportTarget({ postId, label });

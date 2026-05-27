@@ -1946,6 +1946,7 @@
     "accountUnavailable": "此账号目前不可用。",
     "blockedTitle": "资料不可用",
     "blockedDefault": "链接可能已失效或资料已被删除。",
+    "blockedProfileMessage": "此资料目前不可用。",
     "blockedBackHome": "返回首页",
     "privateTitle": "此资料是私密的",
     "privateText": "该用户已限制对其资料的访问。可能需要发送关注请求才能查看内容。",
@@ -2642,6 +2643,8 @@
         "unhide": "取消隐藏",
         "unhiding": "取消隐藏中...",
         "refreshBtn": "刷新",
+        "noCaption": "无说明文字",
+        "sponsoredPost": "广告内容",
         "errors": {
           "unhideFailed": "无法取消隐藏此帖子。",
           "loadFailed": "无法加载隐藏帖子。"

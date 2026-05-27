@@ -463,6 +463,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const fromProfile = searchParams?.get("fromProfile") === "1";
   const profileNavProfileId = (searchParams?.get("profileId") || "").trim();
   const [token, setToken] = useState<string | null>(null);
+  const [tokenLoaded, setTokenLoaded] = useState(false);
   const [post, setPost] = useState<FeedItem | null>(null);
   const [adsCampaignIdForPost, setAdsCampaignIdForPost] = useState<string | null>(null);
   const [profilePostIds, setProfilePostIds] = useState<string[]>([]);
@@ -557,6 +558,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [locationError, setLocationError] = useState("");
   const [locationOpen, setLocationOpen] = useState(false);
   const [locationHighlight, setLocationHighlight] = useState(-1);
+  const locationUserTyped = useRef(false);
   const [editAllowComments, setEditAllowComments] = useState(true);
   const [editAllowDownload, setEditAllowDownload] = useState(false);
   const [lockedEditAllowDownload, setLockedEditAllowDownload] = useState<
@@ -644,6 +646,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     setActiveMentionRange(null);
     setEditLocation(current?.location || "");
     setLocationQuery(current?.location || "");
+    locationUserTyped.current = false;
     setLocationSuggestions([]);
     setLocationOpen(false);
     setLocationLoading(false);
@@ -666,7 +669,15 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   useEffect(() => {
     resetEditState();
-  }, [resetEditState, postId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId]);
+
+  useEffect(() => {
+    if (editOpen) {
+      resetEditState();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -737,6 +748,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   useEffect(() => {
     if (!editOpen) return;
+    if (!locationUserTyped.current) return;
     if (!locationQuery.trim()) {
       setLocationSuggestions([]);
       setLocationOpen(false);
@@ -1880,6 +1892,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     if (typeof window === "undefined") return;
     const accessToken = localStorage.getItem("accessToken");
     setToken(accessToken);
+    setTokenLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -1986,6 +1999,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   );
 
   useEffect(() => {
+    if (!tokenLoaded) return;
     setLoadingPost(true);
     setPostError("");
     fetchPostDetail({ token, postId })
@@ -2010,7 +2024,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         setPostError(err?.message || "Failed to load post");
       })
       .finally(() => setLoadingPost(false));
-  }, [blockedIds, leaveBlockedContent, postId, token]);
+  }, [blockedIds, leaveBlockedContent, postId, token, tokenLoaded]);
 
   // Poll for caption completion when any video media has captionStatus === 'pending'
   useEffect(() => {
@@ -2401,14 +2415,14 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         .map(([parentId, state]) => ({ parentId, state }))
         .filter(({ parentId, state }) => {
           if (!state.expanded) return false;
+          // Always refresh expanded threads that already have items loaded (syncs like counts)
+          if (state.items.length > 0) return true;
           const parent = index.get(parentId);
           const replyCount = parent?.repliesCount;
-          const loaded = state.items.length;
           const hasCount = typeof replyCount === "number";
           return (
-            (hasCount ? replyCount !== loaded : true) ||
-            state.hasMore ||
-            (hasCount ? replyCount > 0 && !loaded : loaded === 0)
+            (hasCount ? replyCount > 0 : true) ||
+            state.hasMore
           );
         });
 
@@ -4783,6 +4797,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   };
 
   const openLikesOverlay = () => {
+    if (!token) { showLoginOverlay(); return; }
     setLikesOverlayOpen(true);
     setLikesOverlayClosing(false);
   };
@@ -4796,6 +4811,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   };
 
   const openCommentLikesOverlay = (commentId: string) => {
+    if (!token) { showLoginOverlay(); return; }
     setCommentLikesOverlayId(commentId);
     setCommentLikesOverlayOpen(true);
     setCommentLikesOverlayClosing(false);
@@ -4993,6 +5009,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               placeholder="Add a place"
               value={locationQuery}
               onChange={(e) => {
+                locationUserTyped.current = true;
                 setEditLocation(e.target.value);
                 setLocationQuery(e.target.value);
               }}
@@ -5724,9 +5741,57 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         onClick={(e) => asModal && e.stopPropagation()}
       >
         {loadingPost ? (
-          <div className={styles.stateBox}>Loading post...</div>
+          <div className={styles.postLoadingSkeleton}>
+            <div className={styles.skeletonMedia} />
+            <div className={styles.skeletonContent}>
+              <div className={styles.skeletonHeader}>
+                <div className={styles.skeletonAvatar} />
+                <div className={styles.skeletonHeaderText}>
+                  <div className={styles.skeletonLine} style={{ width: "140px", height: "14px" }} />
+                  <div className={styles.skeletonLine} style={{ width: "90px", height: "12px", marginTop: "6px" }} />
+                </div>
+              </div>
+              <div className={styles.skeletonLine} style={{ width: "100%", height: "13px", marginTop: "20px" }} />
+              <div className={styles.skeletonLine} style={{ width: "80%", height: "13px", marginTop: "10px" }} />
+              <div className={styles.skeletonLine} style={{ width: "60%", height: "13px", marginTop: "10px" }} />
+              <div className={styles.skeletonActions}>
+                {[1,2,3].map((i) => (
+                  <div key={i} className={styles.skeletonLine} style={{ width: "52px", height: "28px", borderRadius: "8px" }} />
+                ))}
+              </div>
+            </div>
+          </div>
         ) : postError ? (
-          <div className={styles.stateBox}>{postError}</div>
+          <div className={styles.postStateError}>
+            <div className={styles.postStateIcon}>
+              {(postError.toLowerCase().includes("private") || postError.toLowerCase().includes("followers") || postError.toLowerCase().includes("available")) ? (
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              ) : postError.toLowerCase().includes("not found") ? (
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <line x1="8" y1="11" x2="14" y2="11"/>
+                </svg>
+              ) : (
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              )}
+            </div>
+            <p className={styles.postStateTitle}>
+              {postError.toLowerCase().includes("private") ? "This post is private" :
+               (postError.toLowerCase().includes("followers") || postError.toLowerCase().includes("available")) ? "You don't have permission to view this post" :
+               postError.toLowerCase().includes("not found") ? "Post not found" :
+               "Something went wrong"}
+            </p>
+            <p className={styles.postStateDesc}>
+              {(postError.toLowerCase().includes("private") || postError.toLowerCase().includes("followers") || postError.toLowerCase().includes("available"))
+                ? "You don't have permission to view this content."
+                : postError}
+            </p>
+          </div>
         ) : post ? (() => {
           const isPoll = Boolean(post.poll);
           const pollImages: string[] = (post.poll?.optionImages ?? []).filter((u): u is string => Boolean(u));

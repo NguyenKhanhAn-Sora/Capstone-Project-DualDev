@@ -591,6 +591,7 @@ export class ProfilesService {
     query: string;
     limit?: number;
     excludeUserId?: string;
+    viewerId?: string;
   }): Promise<
     Array<{
       id: string;
@@ -616,10 +617,20 @@ export class ProfilesService {
         ? new Types.ObjectId(excludeUserId)
         : null;
 
+    // Fetch bidirectional block list for the viewer
+    const viewerObjectId =
+      params.viewerId && Types.ObjectId.isValid(params.viewerId)
+        ? new Types.ObjectId(params.viewerId)
+        : null;
+    const blockExcludedIds = viewerObjectId
+      ? await this.getViewerBlockExcludedIds(viewerObjectId)
+      : [];
+
     const pipeline: PipelineStage[] = [
       {
         $match: {
           ...(exclude ? { userId: { $ne: exclude } } : {}),
+          ...(blockExcludedIds.length ? { userId: { $nin: blockExcludedIds } } : {}),
           $or: [
             { username: { $regex: anywhereRegex } },
             { displayName: { $regex: anywhereRegex } },
@@ -805,6 +816,15 @@ export class ProfilesService {
     const viewerId = params.viewerId ? this.asObjectId(params.viewerId) : null;
 
     const isOwner = Boolean(viewerId && ownerId && viewerId.equals(ownerId));
+
+    // Block check: if either side has blocked the other, return profile unavailable
+    if (viewerId && !isOwner) {
+      const blockExcluded = await this.getViewerBlockExcludedIds(viewerId);
+      const ownerIdStr = ownerId.toString();
+      if (blockExcluded.some((id) => id.toString() === ownerIdStr)) {
+        throw new ForbiddenException('This profile is not available');
+      }
+    }
 
     const [
       followersCount,

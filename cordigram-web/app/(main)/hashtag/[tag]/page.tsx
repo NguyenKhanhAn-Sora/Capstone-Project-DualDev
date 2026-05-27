@@ -32,6 +32,7 @@ import {
   refreshBlockedUserIds,
 } from "@/lib/blocked-users";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useGuestAuth } from "@/context/guest-auth-context";
 import styles from "./hashtag.module.css";
 import feedStyles from "../../home-feed.module.css";
 import PostEditOverlay from "@/ui/post-edit-overlay";
@@ -287,6 +288,7 @@ const buildLocalDateTimeIso = (date: string, time: string) => {
 
 export default function HashtagPage() {
   const canRender = useRequireAuth({ guestAllowed: true });
+  const { showLoginOverlay } = useGuestAuth();
   const t = useTranslations("home");
   const tHashtag = useTranslations("hashtag");
   const params = useParams<{ tag?: string }>();
@@ -495,7 +497,7 @@ export default function HashtagPage() {
 
   const handleQuickRepost = async (target: RepostTarget) => {
     const token = getStoredAccessToken();
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     try {
       const originalId = resolveOriginalPostId(target.postId);
       const targetId = target.postId;
@@ -522,7 +524,7 @@ export default function HashtagPage() {
 
   const handleShareQuote = async (target: RepostTarget, input: QuoteInput) => {
     const token = getStoredAccessToken();
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     try {
       const originalId = resolveOriginalPostId(target.postId);
       const targetId = target.postId;
@@ -574,7 +576,7 @@ export default function HashtagPage() {
     kindOverride?: "post" | "reel",
   ) => {
     const token = getStoredAccessToken();
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     const kind = kindOverride ?? (tab === "reels" ? "reel" : "post");
     const source = posts.find((item) => item.id === postId);
     setRepostTarget({
@@ -681,7 +683,7 @@ export default function HashtagPage() {
 
   const onFollow = async (authorId: string, nextFollow: boolean) => {
     const token = getStoredAccessToken();
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     setPosts((prev) =>
       prev.map((item) =>
         item.authorId === authorId ? { ...item, following: nextFollow } : item,
@@ -771,7 +773,7 @@ export default function HashtagPage() {
 
   const onLike = async (postId: string, liked: boolean) => {
     const token = getStoredAccessToken();
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     const targetItem = posts.find((item) => item.id === postId);
     const targetId = targetItem?.repostOf || postId;
     try {
@@ -810,7 +812,7 @@ export default function HashtagPage() {
 
   const onSave = async (postId: string, saved: boolean) => {
     const token = getStoredAccessToken();
-    if (!token) return;
+    if (!token) { showLoginOverlay(); return; }
     updatePost(postId, (item) => ({
       ...item,
       saved,

@@ -1260,6 +1260,7 @@ export default function ReelPage({
     [searchParams],
   );
   const [token, setToken] = useState<string | null>(null);
+  const [tokenLoaded, setTokenLoaded] = useState(false);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -1617,6 +1618,7 @@ export default function ReelPage({
     const stored = localStorage.getItem("accessToken");
     setToken(stored);
     setViewerId(getUserIdFromToken(stored));
+    setTokenLoaded(true);
   }, [canRender]);
 
   useEffect(() => {
@@ -1803,7 +1805,7 @@ export default function ReelPage({
   }, [hasMore, items, loadMore, loading, loadingMore, singleMode]);
 
   useEffect(() => {
-    if (!singleMode || !token || !requestedReelId) return;
+    if (!singleMode || !requestedReelId || !tokenLoaded) return;
     let cancelled = false;
     setLoading(true);
     const load = async () => {
@@ -1864,7 +1866,7 @@ export default function ReelPage({
     return () => {
       cancelled = true;
     };
-  }, [blockedIds, leaveBlockedContent, originReelId, requestedReelId, singleMode, token]);
+  }, [blockedIds, leaveBlockedContent, originReelId, requestedReelId, singleMode, token, tokenLoaded]);
 
   useEffect(() => {
     if (!token || !viewerId) return;
@@ -3394,9 +3396,55 @@ export default function ReelPage({
       <div className={styles.page}>
         <div className={styles.rail}>
           {loading ? (
-            <div className={styles.stateCard}>{t("reelsPage.loading")}</div>
+            <div className={styles.reelLoadingSkeleton}>
+              <div className={styles.reelSkeletonCard}>
+                <div className={styles.reelSkeletonGradient} />
+                <div className={styles.reelSkeletonBottom}>
+                  <div className={styles.reelSkeletonAvatar} />
+                  <div className={styles.reelSkeletonText}>
+                    <div className={styles.reelSkeletonLine} style={{ width: "120px", height: "14px" }} />
+                    <div className={styles.reelSkeletonLine} style={{ width: "200px", height: "12px", marginTop: "8px" }} />
+                    <div className={styles.reelSkeletonLine} style={{ width: "160px", height: "12px", marginTop: "6px" }} />
+                  </div>
+                </div>
+              </div>
+              <div className={styles.reelSkeletonSidebar}>
+                {[1,2,3,4].map((i) => (
+                  <div key={i} className={styles.reelSkeletonAction} />
+                ))}
+              </div>
+            </div>
           ) : error ? (
-            <div className={styles.stateCard}>{error}</div>
+            <div className={styles.reelStateError}>
+              <div className={styles.reelStateIcon}>
+                {(error.toLowerCase().includes("private") || error.toLowerCase().includes("followers") || error.toLowerCase().includes("available")) ? (
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                ) : error.toLowerCase().includes("not found") ? (
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    <line x1="8" y1="11" x2="14" y2="11"/>
+                  </svg>
+                ) : (
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                )}
+              </div>
+              <p className={styles.reelStateTitle}>
+                {error.toLowerCase().includes("private") ? "This reel is private" :
+                 (error.toLowerCase().includes("followers") || error.toLowerCase().includes("available")) ? "You don't have permission to view this reel" :
+                 error.toLowerCase().includes("not found") ? "Reel not found" :
+                 "Something went wrong"}
+              </p>
+              <p className={styles.reelStateDesc}>
+                {(error.toLowerCase().includes("private") || error.toLowerCase().includes("followers") || error.toLowerCase().includes("available"))
+                  ? "You don't have permission to view this content."
+                  : error}
+              </p>
+            </div>
           ) : !items.length ? (
             <div className={styles.stateCard}>
               {!token ? (

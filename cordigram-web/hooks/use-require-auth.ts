@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAccessTokenStatus, isAccessTokenValid } from "@/lib/auth";
+import { getAccessTokenStatus, isAccessTokenValid, refreshSession } from "@/lib/auth";
 
 export function useRequireAuth(opts?: {
   skip?: boolean;
@@ -23,31 +23,46 @@ export function useRequireAuth(opts?: {
       return;
     }
 
-    const check = () => {
+    let refreshingRef = false;
+
+    const check = async () => {
       const token =
         typeof window !== "undefined"
           ? localStorage.getItem("accessToken")
           : null;
-      const previous = lastTokenRef.current;
       lastTokenRef.current = token;
       const valid = isAccessTokenValid(token);
+
       if (!valid) {
-        if (previous && !token && typeof window !== "undefined") {
-          window.sessionStorage.setItem(skipRestoreKey, "1");
+        // Try silent refresh before redirecting to login
+        if (!refreshingRef) {
+          refreshingRef = true;
+          try {
+            const newToken = await refreshSession();
+            lastTokenRef.current = newToken;
+            if (getAccessTokenStatus(newToken) === "banned") {
+              router.replace("/banned");
+              setCanRender(false);
+            } else {
+              setCanRender(true);
+            }
+          } catch {
+            router.replace("/login");
+            setCanRender(false);
+          } finally {
+            refreshingRef = false;
+          }
         }
-        router.replace("/login");
-        setCanRender(false);
-        return false;
+        return;
       }
 
       if (getAccessTokenStatus(token) === "banned") {
         router.replace("/banned");
         setCanRender(false);
-        return false;
+        return;
       }
 
       setCanRender(true);
-      return true;
     };
 
     check();
@@ -69,11 +84,11 @@ export function useRequireAuth(opts?: {
     }, 500);
 
     window.addEventListener("storage", onStorage);
-    window.addEventListener("focus", check);
+    window.addEventListener("focus", () => { check(); });
 
     return () => {
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener("focus", check);
+      window.removeEventListener("focus", () => { check(); });
       clearInterval(interval);
     };
   }, [router, skip, guestAllowed]);

@@ -856,7 +856,6 @@ export default function SignupPage() {
       }),
     });
 
-    setStoredAccessToken(res.accessToken);
     if (typeof window !== "undefined") {
       localStorage.setItem("ui-theme", "light");
     }
@@ -864,8 +863,8 @@ export default function SignupPage() {
       document.documentElement.dataset.theme = "light";
       document.body.dataset.theme = "light";
     }
-    showInfo("Sign-up successful. Redirecting...");
-    router.push("/");
+    showInfo("Sign-up successful. Please log in to continue.");
+    router.push("/login");
   };
 
   const genderOptions = useMemo(

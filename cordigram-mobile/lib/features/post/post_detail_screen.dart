@@ -403,10 +403,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _pollTimer = Timer.periodic(_kPollInterval, (_) => _syncComments());
   }
 
-  /// Silently refresh page-1 comments and merge liked/likesCount
-  /// without disrupting the user's scroll position.
+  /// Silently refresh page-1 comments: merge metadata and append new
+  /// comments from other devices without disrupting scroll position.
   Future<void> _syncComments() async {
-    if (_comments.isEmpty) return;
+    if (_commentsLoading) return;
     try {
       final data = await ApiService.get(
         '/posts/${widget.postId}/comments?page=1&limit=$_commentPageSize',
@@ -421,7 +421,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 .toList()
           : [];
       if (!mounted) return;
+
+      final existingIds = _comments.map((c) => c.id).toSet();
+      final newFromOtherDevices = fresh
+          .where((c) => c.parentId == null && !existingIds.contains(c.id))
+          .toList();
+
       setState(() {
+        // Update metadata (likes etc.) for existing comments
         for (final c in _comments) {
           final updated = fresh.firstWhere(
             (f) => f.id == c.id,
@@ -429,11 +436,26 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           );
           if (updated.id == c.id) {
             c.likesCount = updated.likesCount;
-            // Only sync liked from server if the comment has not been
-            // optimistically toggled (i.e. server and local agree).
           }
         }
+        // Append comments posted from other devices
+        if (newFromOtherDevices.isNotEmpty) {
+          _comments.addAll(newFromOtherDevices);
+        }
       });
+
+      // Push like counts directly into tile states (bypasses initState local copy)
+      for (final c in _comments) {
+        final updated = fresh.firstWhere((f) => f.id == c.id, orElse: () => c);
+        if (updated.id == c.id) {
+          _allTileKeys[c.id]?.currentState?.updateLikes(
+            updated.likesCount ?? c.likesCount ?? 0,
+            updated.liked,
+          );
+          // Sync reply likes for expanded threads
+          _allTileKeys[c.id]?.currentState?.syncRepliesLikes();
+        }
+      }
     } catch (_) {
       // Silently ignore polling errors
     }
@@ -1711,6 +1733,49 @@ class _CommentTileState extends State<_CommentTile> {
       _replies = [..._replies, reply];
       _expanded = true;
     });
+  }
+
+  /// Update like state from polling without disrupting optimistic interactions.
+  void updateLikes(int newCount, bool newLiked) {
+    if (!mounted) return;
+    setState(() {
+      _likesCount = newCount;
+      _liked = newLiked;
+    });
+  }
+
+  /// Sync reply likes for expanded threads; called by parent during polling.
+  Future<void> syncRepliesLikes() async {
+    if (!_expanded || _replies.isEmpty) return;
+    try {
+      final data = await ApiService.get(
+        '/posts/${widget.postId}/comments'
+        '?page=1&limit=10&parentId=${widget.comment.id}',
+        extraHeaders: widget.authHeader,
+      );
+      if (!mounted) return;
+      final rawItems = data['items'];
+      final List<CommentItem> fresh = (rawItems is List)
+          ? rawItems
+                .whereType<Map<String, dynamic>>()
+                .map(CommentItem.fromJson)
+                .toList()
+          : [];
+      setState(() {
+        for (final r in _replies) {
+          final updated = fresh.firstWhere((f) => f.id == r.id, orElse: () => r);
+          if (updated.id == r.id) {
+            r.likesCount = updated.likesCount;
+          }
+        }
+      });
+      for (final r in fresh) {
+        widget.allTileKeys[r.id]?.currentState?.updateLikes(
+          r.likesCount ?? 0,
+          r.liked,
+        );
+      }
+    } catch (_) {}
   }
 
   // ── Toggle expand / collapse (mirrors web toggleRepliesVisibility) ────────

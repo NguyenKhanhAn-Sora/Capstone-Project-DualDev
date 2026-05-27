@@ -2275,6 +2275,12 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                 .toList()
           : [];
       if (!mounted) return;
+
+      final existingIds = _comments.map((c) => c.id).toSet();
+      final newFromOtherDevices = fresh
+          .where((c) => c.parentId == null && !existingIds.contains(c.id))
+          .toList();
+
       setState(() {
         for (final c in _comments) {
           final updated = fresh.firstWhere(
@@ -2283,7 +2289,22 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
           );
           if (updated.id == c.id) c.likesCount = updated.likesCount;
         }
+        if (newFromOtherDevices.isNotEmpty) {
+          _comments.addAll(newFromOtherDevices);
+        }
       });
+
+      // Push like counts directly into tile states (bypasses initState local copy)
+      for (final c in _comments) {
+        final updated = fresh.firstWhere((f) => f.id == c.id, orElse: () => c);
+        if (updated.id == c.id) {
+          _allTileKeys[c.id]?.currentState?.updateLikes(
+            updated.likesCount ?? c.likesCount ?? 0,
+            updated.liked,
+          );
+          _allTileKeys[c.id]?.currentState?.syncRepliesLikes();
+        }
+      }
     } catch (_) {}
   }
 
@@ -3008,6 +3029,45 @@ class _RCommentTileState extends State<_RCommentTile> {
       _replies = [..._replies, reply];
       _expanded = true;
     });
+  }
+
+  void updateLikes(int newCount, bool newLiked) {
+    if (!mounted) return;
+    setState(() {
+      _likesCount = newCount;
+      _liked = newLiked;
+    });
+  }
+
+  Future<void> syncRepliesLikes() async {
+    if (!_expanded || _replies.isEmpty) return;
+    try {
+      final data = await ApiService.get(
+        '/posts/${widget.postId}/comments'
+        '?page=1&limit=10&parentId=${widget.comment.id}',
+        extraHeaders: widget.authHeader,
+      );
+      if (!mounted) return;
+      final rawItems = data['items'];
+      final List<CommentItem> fresh = (rawItems is List)
+          ? rawItems
+                .whereType<Map<String, dynamic>>()
+                .map(CommentItem.fromJson)
+                .toList()
+          : [];
+      setState(() {
+        for (final r in _replies) {
+          final updated = fresh.firstWhere((f) => f.id == r.id, orElse: () => r);
+          if (updated.id == r.id) r.likesCount = updated.likesCount;
+        }
+      });
+      for (final r in fresh) {
+        widget.allTileKeys[r.id]?.currentState?.updateLikes(
+          r.likesCount ?? 0,
+          r.liked,
+        );
+      }
+    } catch (_) {}
   }
 
   void _toggleReplies() {

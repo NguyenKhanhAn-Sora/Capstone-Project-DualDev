@@ -1946,6 +1946,7 @@
     "accountUnavailable": "このアカウントは現在利用できません。",
     "blockedTitle": "プロフィールは利用できません",
     "blockedDefault": "リンクが壊れているか、プロフィールが削除された可能性があります。",
+    "blockedProfileMessage": "このプロフィールは現在ご利用いただけません。",
     "blockedBackHome": "ホームに戻る",
     "privateTitle": "このプロフィールは非公開です",
     "privateText": "オーナーがプロフィールへのアクセスを制限しています。コンテンツを見るにはフォローリクエストが必要な場合があります。",
@@ -2642,6 +2643,8 @@
         "unhide": "表示に戻す",
         "unhiding": "表示に戻しています...",
         "refreshBtn": "更新",
+        "noCaption": "キャプションなし",
+        "sponsoredPost": "広告コンテンツ",
         "errors": {
           "unhideFailed": "この投稿を表示に戻せませんでした。",
           "loadFailed": "非表示の投稿を読み込めませんでした。"

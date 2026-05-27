@@ -1946,6 +1946,7 @@
     "accountUnavailable": "Tài khoản này hiện không khả dụng.",
     "blockedTitle": "Hồ sơ không khả dụng",
     "blockedDefault": "Liên kết có thể bị hỏng hoặc hồ sơ đã bị xoá.",
+    "blockedProfileMessage": "Hồ sơ này hiện không khả dụng.",
     "blockedBackHome": "Quay về trang chủ",
     "privateTitle": "Hồ sơ này là riêng tư",
     "privateText": "Chủ sở hữu đã giới hạn quyền truy cập vào hồ sơ của họ. Có thể cần gửi yêu cầu theo dõi để xem nội dung.",
@@ -2642,6 +2643,8 @@
         "unhide": "Bỏ ẩn",
         "unhiding": "Đang bỏ ẩn...",
         "refreshBtn": "Làm mới",
+        "noCaption": "Không có chú thích",
+        "sponsoredPost": "Nội dung quảng cáo",
         "errors": {
           "unhideFailed": "Không thể bỏ ẩn bài viết này.",
           "loadFailed": "Không thể tải bài viết đã ẩn."

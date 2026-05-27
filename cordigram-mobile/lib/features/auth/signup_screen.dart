@@ -14,6 +14,7 @@ import '../../core/services/auth_storage.dart';
 import '../../core/services/language_controller.dart';
 import '../home/home_screen.dart';
 import '../messages/call/dm_call_manager.dart';
+import 'login_screen.dart';
 
 // ---------------------------------------------------------------------------
 // SignupScreen – 4-step flow mirroring cordigram-web:
@@ -364,23 +365,15 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_gender.isNotEmpty) body['gender'] = _gender;
     if (avatarData != null) body.addAll(avatarData);
 
-    final result = await ApiService.postAuth(
+    await ApiService.postAuth(
       '/auth/complete-profile',
       body: body,
       extraHeaders: {'Authorization': 'Bearer $_signupToken'},
     );
-    final token = result.body['accessToken'] as String?;
-    if (token != null) {
-      await AuthStorage.saveTokens(
-        accessToken: token,
-        refreshToken: result.refreshToken,
-      );
-      await DmCallManager.instance.onAuthChanged();
-    }
     if (!mounted) return;
     Navigator.of(
       context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   // ── Step 3: upload original + cropped, then complete profile ──

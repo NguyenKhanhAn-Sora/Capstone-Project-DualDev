@@ -1730,18 +1730,31 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 CircleAvatar(
                                   radius: 22,
                                   backgroundColor:
-                                      scheme.surfaceContainerHighest,
+                                      _systemTypes.contains(item.type)
+                                      ? scheme.primaryContainer
+                                      : scheme.surfaceContainerHighest,
                                   backgroundImage:
-                                      item.actor.avatarUrl.isNotEmpty
-                                      ? NetworkImage(item.actor.avatarUrl)
-                                      : null,
-                                  child: item.actor.avatarUrl.isEmpty
-                                      ? Icon(
-                                          _iconFor(item.type),
-                                          color: scheme.onSurfaceVariant,
-                                          size: 20,
+                                      _systemTypes.contains(item.type)
+                                      ? null
+                                      : item.actor.avatarUrl.isNotEmpty
+                                          ? NetworkImage(item.actor.avatarUrl)
+                                          : null,
+                                  child: _systemTypes.contains(item.type)
+                                      ? ClipOval(
+                                          child: Image.asset(
+                                            'assets/images/cordigram-logo.png',
+                                            width: 44,
+                                            height: 44,
+                                            fit: BoxFit.cover,
+                                          ),
                                         )
-                                      : null,
+                                      : item.actor.avatarUrl.isEmpty
+                                          ? Icon(
+                                              _iconFor(item.type),
+                                              color: scheme.onSurfaceVariant,
+                                              size: 20,
+                                            )
+                                          : null,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(

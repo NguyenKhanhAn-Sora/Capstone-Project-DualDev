@@ -389,6 +389,8 @@ export default function ProfileLayoutClient({
           setBlockedView(true);
           if (isUnavailable) {
             setBlockedMessage(t("profilePage.accountUnavailable"));
+          } else if (maybeStatus === 403) {
+            setBlockedMessage(t("profilePage.blockedProfileMessage"));
           }
           setError("");
         } else {
@@ -500,7 +502,12 @@ export default function ProfileLayoutClient({
             limit: 30,
           });
           setSuccess(
-            (items || []).filter((item) => item && !(item as any)?.repostOf),
+            (items || []).filter(
+              (item) =>
+                item &&
+                !(item as any)?.repostOf &&
+                !(item as any)?.sponsored,
+            ),
           );
           return;
         }
@@ -644,7 +651,7 @@ export default function ProfileLayoutClient({
     ])
       .then(([posts, reels]) => {
         const originals = [...(posts || []), ...(reels || [])].filter(
-          (item) => !item?.repostOf,
+          (item) => !item?.repostOf && !(item as any)?.sponsored,
         );
         setAuthoredCount(originals.length);
       })

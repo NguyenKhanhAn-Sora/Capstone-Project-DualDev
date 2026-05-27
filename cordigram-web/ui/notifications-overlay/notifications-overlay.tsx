@@ -1570,8 +1570,8 @@ export default function NotificationsOverlay(props: {
                     placeholder="yyyy-mm-dd"
                   />
                 </div>
-                <div className={styles.mutePicker}>
-                  <label className={styles.muteLabel}>{t("mute.timeLabel")}</label>
+                <div className={styles.muteTimeRow}>
+                  <label className={styles.muteLabel} style={{ whiteSpace: "nowrap" }}>{t("mute.timeLabel")}</label>
                   <TimeSelect
                     value={muteCustomTime}
                     onChange={setMuteCustomTime}

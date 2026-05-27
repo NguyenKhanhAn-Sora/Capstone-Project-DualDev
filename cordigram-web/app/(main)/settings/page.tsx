@@ -4114,9 +4114,14 @@ export default function SettingsPage() {
                           const authorHandle = post.authorUsername
                             ? `@${post.authorUsername}`
                             : "Unknown";
-                          const caption = post.content?.trim()
-                            ? post.content.trim()
-                            : "No caption";
+                          const isAdPost = Boolean((post as any).sponsored) || post.kind === "ad";
+                          const cleanContent = post.content
+                            ?.replace(/\[\[\/?\w[\w_]*\]\]/g, "")
+                            .replace(/\s+/g, " ")
+                            .trim();
+                          const caption = isAdPost && !cleanContent
+                            ? t("settingsPage.content.hidden.sponsoredPost")
+                            : (cleanContent || t("settingsPage.content.hidden.noCaption"));
                           const media = post.media?.[0];
                           const thumbUrl = media?.url;
                           const postId = post.id;

@@ -710,6 +710,16 @@ export default function CampaignDetailPage() {
           <button type="button" className={styles.backBtn} onClick={() => router.push("/ads/campaigns")}>
             {t("detail.backToCampaigns")}
           </button>
+          {detail?.promotedPostId ? (
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              style={{ marginLeft: "auto" }}
+              onClick={() => router.push(`/post/${detail.promotedPostId}`)}
+            >
+              {t("detail.goToAds")}
+            </button>
+          ) : null}
         </div>
 
         {loading ? <p className={styles.helper}>{t("detail.loading")}</p> : null}

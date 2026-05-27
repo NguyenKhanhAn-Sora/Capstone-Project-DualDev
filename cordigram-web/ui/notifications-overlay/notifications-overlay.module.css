@@ -654,7 +654,7 @@
 }
 
 .muteCard {
-  width: min(420px, 92vw);
+  width: min(480px, 92vw);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -726,8 +726,14 @@
 
 .muteCustomRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
+}
+
+.muteTimeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .mutePicker {
@@ -774,8 +780,9 @@
 }
 
 @media (max-width: 480px) {
-  .muteCustomRow {
-    grid-template-columns: 1fr;
+  .muteTimeRow {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
