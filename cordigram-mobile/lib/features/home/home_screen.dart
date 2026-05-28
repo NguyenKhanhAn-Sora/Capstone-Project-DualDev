@@ -87,11 +87,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String? _displayName;
   String? _username;
 
-  // ── New-posts banner ──────────────────────────────────────────────────────
-  bool _newPostsAvailable = false;
-  String? _topPostId;
-  Timer? _newPostsCheckTimer;
-
   // ── Polling ────────────────────────────────────────────────────────────────
   Timer? _pollTimer;
   static const Duration _pollInterval = Duration(seconds: 15);
@@ -145,7 +140,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _scrollController.addListener(_onScroll);
     _startPolling();
     _startLivePolling();
-    _startNewPostsCheck();
     _startNotificationRealtime();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_consumePendingDmCallFromPush());
@@ -246,7 +240,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _topNavAnimController.dispose();
     _pollTimer?.cancel();
     _livePollTimer?.cancel();
-    _newPostsCheckTimer?.cancel();
     _notificationRtSub?.cancel();
     _notificationSeenSub?.cancel();
     _notificationStateSub?.cancel();
@@ -633,27 +626,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  /// Checks every 60 s whether new posts appeared at the top of the feed.
-  void _startNewPostsCheck() {
-    _newPostsCheckTimer?.cancel();
-    _newPostsCheckTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
-      if (!mounted) return;
-      if (_newPostsAvailable) return; // already showing banner
-      try {
-        final peeked = await FeedService.fetchFeed(page: 1);
-        if (!mounted) return;
-        final latestId = peeked.isNotEmpty ? peeked.first.id : null;
-        if (latestId == null) return;
-        if (_topPostId == null) {
-          _topPostId = latestId;
-          return;
-        }
-        if (_topPostId != latestId) {
-          setState(() => _newPostsAvailable = true);
-        }
-      } catch (_) {}
-    });
-  }
 
   Future<void> _loadLiveStreams({bool silent = false}) async {
     if (_loadingLiveStreams) return;
@@ -666,7 +638,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     try {
       final response = await LivestreamCreateService.listLiveLivestreams();
-      final items = response.items.where((item) => item.isLive).toList()
+      final items = response.items
+          .where((item) => item.isLive && (_viewerId == null || item.hostUserId != _viewerId))
+          .toList()
         ..sort((a, b) {
           final aTime = a.startedAt?.millisecondsSinceEpoch ?? 0;
           final bTime = b.startedAt?.millisecondsSinceEpoch ?? 0;
@@ -779,8 +753,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _page = 1;
         _hasMore = true;
         _initialLoad = true;
-        _newPostsAvailable = false;
-        _topPostId = null;
       }
     });
     try {
@@ -805,10 +777,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // hasMore: a full page means there are likely more items
         _hasMore = allPosts.length >= FeedService.pageSize;
         _initialLoad = false;
-        // Record the leading post id for new-posts detection
-        if (_states.isNotEmpty && _topPostId == null) {
-          _topPostId = _states.first.post.id;
-        }
       });
     } on ApiException catch (e) {
       setState(() {
@@ -2103,24 +2071,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          // "New posts available" banner
-          if (_newPostsAvailable)
-            SliverToBoxAdapter(
-              child: _NewPostsBanner(
-                onTap: () {
-                  setState(() {
-                    _newPostsAvailable = false;
-                    _topPostId = null;
-                  });
-                  _scrollController.animateTo(
-                    0,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOut,
-                  );
-                  _loadFeed(refresh: true);
-                },
-              ),
-            ),
           // People you may know strip
           SliverToBoxAdapter(
             child: PeopleYouMayKnow(onOpenProfile: _openUserProfile),
@@ -3207,91 +3157,6 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _NewPostsBanner extends StatefulWidget {
-  const _NewPostsBanner({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  State<_NewPostsBanner> createState() => _NewPostsBannerState();
-}
-
-class _NewPostsBannerState extends State<_NewPostsBanner>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<Offset> _slide;
-  late final Animation<double> _fade;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 280),
-    )..forward();
-    _slide = Tween<Offset>(
-      begin: const Offset(0, -0.6),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
-    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fade,
-      child: SlideTransition(
-        position: _slide,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: GestureDetector(
-            onTap: widget.onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF22D3EE)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(999),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6366F1).withValues(alpha: 0.4),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.arrow_upward_rounded,
-                      size: 16, color: Colors.white),
-                  const SizedBox(width: 6),
-                  Text(
-                    LanguageController.instance.t('home.feed.newPosts'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _InlineError extends StatelessWidget {
   const _InlineError({required this.message, required this.onRetry});

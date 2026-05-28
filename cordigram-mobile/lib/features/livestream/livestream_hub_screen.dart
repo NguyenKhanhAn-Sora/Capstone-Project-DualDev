@@ -2001,7 +2001,10 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     // stream is horizontally mirrored at the hardware level. Apply scaleX(-1)
     // to restore natural orientation. The host's own local view is handled
     // automatically by VideoTrackRenderer's mirrorMode.auto.
-    if (!_isHostSession && _hostIsFrontCamera) {
+    // Screen share tracks (e.g. web host sharing their screen) are never
+    // mirrored at the hardware level, so the correction must not be applied.
+    final isScreenShare = track.source == TrackSource.screenShareVideo;
+    if (!_isHostSession && _hostIsFrontCamera && !isScreenShare) {
       return Transform(
         alignment: Alignment.center,
         transform: Matrix4.diagonal3Values(-1, 1, 1),

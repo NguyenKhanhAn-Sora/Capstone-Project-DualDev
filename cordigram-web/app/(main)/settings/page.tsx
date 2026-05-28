@@ -4114,7 +4114,7 @@ export default function SettingsPage() {
                           const authorHandle = post.authorUsername
                             ? `@${post.authorUsername}`
                             : "Unknown";
-                          const isAdPost = Boolean((post as any).sponsored) || post.kind === "ad";
+                          const isAdPost = Boolean((post as any).sponsored) || Boolean((post as any).kind === "ad");
                           const cleanContent = post.content
                             ?.replace(/\[\[\/?\w[\w_]*\]\]/g, "")
                             .replace(/\s+/g, " ")

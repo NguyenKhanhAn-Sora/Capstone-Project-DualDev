@@ -406,17 +406,20 @@ export default function ProfileLayoutClient({
   useEffect(() => {
     setActiveStream(null);
     if (!profileId || !canRender) return;
+    // profile.userId is the actual MongoDB ObjectId; profileId from the URL may be a
+    // username slug which would never match hostUserId in the livestream response.
+    const resolvedUserId = profile?.userId ?? profileId;
     const currentViewerId = getUserIdFromToken(getStoredAccessToken());
-    if (currentViewerId === profileId) return;
+    if (currentViewerId === resolvedUserId) return;
     listLiveLivestreams()
       .then((res) => {
         const found = res.items.find(
-          (s) => s.hostUserId === profileId && s.status === "live",
+          (s) => s.hostUserId === resolvedUserId && s.status === "live",
         );
         setActiveStream(found ?? null);
       })
       .catch(() => {});
-  }, [canRender, profileId]);
+  }, [canRender, profileId, profile?.userId]);
 
   useEffect(() => {
     const el = bioRef.current;

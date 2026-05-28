@@ -2952,13 +2952,13 @@ export default function LivestreamHub({
       setLoading(true);
       setError("");
       const data = await listLiveLivestreams();
-      setStreams(data.items || []);
+      setStreams((data.items || []).filter((s) => !viewerId || s.hostUserId !== viewerId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load livestream list.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewerId]);
 
   useEffect(() => {
     if (isViewerPage) return;

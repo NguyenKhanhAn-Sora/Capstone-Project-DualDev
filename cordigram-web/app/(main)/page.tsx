@@ -533,9 +533,7 @@ export default function HomePage({
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const autoLoadLockRef = useRef(false);
   const autoLoadPausedRef = useRef(false);
-  const [newPostsAvailable, setNewPostsAvailable] = useState(false);
-  const topPostIdRef = useRef<string | null>(null);
-  const newPostsCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
 
   const feedCacheKey = useMemo(() => {
     const searchKey = (searchQueryOverride ?? "").trim();
@@ -985,49 +983,6 @@ export default function HomePage({
     searchQueryOverride,
   ]);
 
-  // Periodically check for new posts at the top of the feed (every 60 s)
-  useEffect(() => {
-    if (!initialized || isSearchMode || embedded) return;
-    if (typeof window === "undefined") return;
-
-    const check = async () => {
-      if (document.visibilityState !== "visible") return;
-      try {
-        const peeked = await fetchFeed({
-          token,
-          limit: 1,
-          page: 1,
-          scope: scopeOverride,
-          kinds: kindsOverride,
-        });
-        const latestId = Array.isArray(peeked) && peeked[0]?.id;
-        if (!latestId) return;
-        if (topPostIdRef.current === null) {
-          // first snapshot — just record
-          topPostIdRef.current = latestId;
-          return;
-        }
-        if (topPostIdRef.current !== latestId) {
-          setNewPostsAvailable(true);
-        }
-      } catch {}
-    };
-
-    newPostsCheckIntervalRef.current = setInterval(check, 60_000);
-    return () => {
-      if (newPostsCheckIntervalRef.current) {
-        clearInterval(newPostsCheckIntervalRef.current);
-        newPostsCheckIntervalRef.current = null;
-      }
-    };
-  }, [initialized, isSearchMode, embedded, token, scopeOverride, kindsOverride]);
-
-  // Track the leading post id so the banner knows when feed truly changed
-  useEffect(() => {
-    if (items.length > 0 && !newPostsAvailable) {
-      topPostIdRef.current = items[0].item.id;
-    }
-  }, [items, newPostsAvailable]);
 
   const load = useCallback(
     async (nextPage: number) => {
@@ -1705,22 +1660,6 @@ export default function HomePage({
         <PostUploadBanner />
         {headerSlot}
 
-        {newPostsAvailable && !isSearchMode && (
-          <button
-            className={styles.newPostsBanner}
-            onClick={() => {
-              setNewPostsAvailable(false);
-              topPostIdRef.current = null;
-              void load(1);
-              if (typeof window !== "undefined") {
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }
-            }}
-          >
-            <span className={styles.newPostsIcon}>↑</span>
-            {t("feed.newPostsAvailable")}
-          </button>
-        )}
 
         {visibleItems.map(({ item, flags }, index) => (
           <Fragment key={item.id}>
