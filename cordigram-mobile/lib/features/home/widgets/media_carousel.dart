@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -605,8 +604,8 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                                   onDownload: widget.allowDownload
                                       ? () => widget.onDownloadRequested(item)
                                       : null,
-                                  captionUrl: item.captionUrl,
-                                  captionLanguage: item.captionLanguage,
+                                  captionTracks: item.effectiveCaptionTracks,
+                                  captionStatus: item.captionStatus,
                                 )
                               : _ZoomableImage(
                                   url: mediaUrl,
@@ -913,8 +912,8 @@ class _MediaItem extends StatelessWidget {
         expectedDuration: expectedDuration,
         onDownload: onDownload,
         onFullscreen: onFullscreen,
-        captionUrl: media.captionUrl,
-        captionLanguage: media.captionLanguage,
+        captionTracks: media.effectiveCaptionTracks,
+        captionStatus: media.captionStatus,
       );
     }
 
@@ -974,8 +973,8 @@ class _InlineVideoPreview extends StatefulWidget {
     this.expectedDuration,
     this.onDownload,
     this.onFullscreen,
-    this.captionUrl,
-    this.captionLanguage,
+    this.captionTracks = const [],
+    this.captionStatus,
   });
 
   final String url;
@@ -986,8 +985,8 @@ class _InlineVideoPreview extends StatefulWidget {
   final double? expectedDuration;
   final VoidCallback? onDownload;
   final VoidCallback? onFullscreen;
-  final String? captionUrl;
-  final String? captionLanguage;
+  final List<CaptionTrack> captionTracks;
+  final String? captionStatus;
 
   @override
   State<_InlineVideoPreview> createState() => _InlineVideoPreviewState();
@@ -1016,26 +1015,118 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   // Speed
   double _speed = 1.0;
 
-  // Captions (CC)
-  List<VttCue> _cues = [];
-  bool _captionsLoaded = false;
-  bool _showCaptions = false;
+  // Captions (CC) — multi-language
+  String? _selectedLang; // null = off
+  final Map<String, List<VttCue>> _cuesByLang = {};
+  final Set<String> _loadingLangs = {};
+
+  bool get _captionPending =>
+      widget.captionStatus == 'pending' && widget.captionTracks.isEmpty;
 
   VttCue? get _activeCue {
+    final lang = _selectedLang;
+    if (lang == null) return null;
     final pos = _controller?.value.position;
-    if (pos == null || !_showCaptions) return null;
-    return activeCue(_cues, pos);
+    if (pos == null) return null;
+    final cues = _cuesByLang[lang];
+    if (cues == null || cues.isEmpty) return null;
+    return activeCue(cues, pos);
   }
 
-  Future<void> _loadCaptions() async {
-    final url = widget.captionUrl;
-    if (url == null || url.isEmpty) return;
-    final cues = await fetchAndParseVtt(url);
+  Future<void> _loadLangIfNeeded(String lang) async {
+    if (_cuesByLang.containsKey(lang) || _loadingLangs.contains(lang)) return;
+    final track = widget.captionTracks.firstWhere(
+      (t) => t.lang == lang,
+      orElse: () => const CaptionTrack(lang: '', url: ''),
+    );
+    if (track.url.isEmpty) return;
+    _loadingLangs.add(lang);
+    final cues = await fetchAndParseVtt(track.url);
     if (!mounted) return;
     setState(() {
-      _cues = cues;
-      _captionsLoaded = true;
+      _cuesByLang[lang] = cues;
+      _loadingLangs.remove(lang);
     });
+  }
+
+  void _showCaptionSheet() {
+    final t = LanguageController.instance.t;
+    final langLabels = <String, String>{
+      'vi': t('player.captionLangVi'),
+      'en': t('player.captionLangEn'),
+      'zh': t('player.captionLangZh'),
+      'ja': t('player.captionLangJa'),
+    };
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1A2235),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Off option
+            ListTile(
+              title: Text(
+                t('player.captionOff'),
+                style: TextStyle(
+                  color: _selectedLang == null
+                      ? const Color(0xFF4AA3E4)
+                      : Colors.white,
+                  fontWeight: _selectedLang == null
+                      ? FontWeight.w700
+                      : FontWeight.normal,
+                ),
+              ),
+              trailing: _selectedLang == null
+                  ? const Icon(Icons.check_rounded, color: Color(0xFF4AA3E4))
+                  : null,
+              onTap: () {
+                setState(() => _selectedLang = null);
+                Navigator.pop(context);
+              },
+            ),
+            // Language options
+            ...widget.captionTracks.map((track) {
+              final isActive = _selectedLang == track.lang;
+              final label =
+                  langLabels[track.lang] ?? track.lang.toUpperCase();
+              return ListTile(
+                title: Text(
+                  label,
+                  style: TextStyle(
+                    color: isActive ? const Color(0xFF4AA3E4) : Colors.white,
+                    fontWeight:
+                        isActive ? FontWeight.w700 : FontWeight.normal,
+                  ),
+                ),
+                trailing: isActive
+                    ? const Icon(Icons.check_rounded,
+                        color: Color(0xFF4AA3E4))
+                    : null,
+                onTap: () {
+                  setState(() => _selectedLang = track.lang);
+                  _loadLangIfNeeded(track.lang);
+                  Navigator.pop(context);
+                },
+              );
+            }),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1043,7 +1134,6 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
     super.initState();
     _volumeUnsub = VideoVolumeStore.instance.subscribe(_onVolumeChanged);
     _initController(widget.url);
-    _loadCaptions();
   }
 
   void _onVolumeChanged() {
@@ -1483,7 +1573,7 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
           ),
 
           // Caption overlay (above controls)
-          if (_showCaptions)
+          if (_selectedLang != null)
             Positioned(
               left: 8, right: 8, bottom: 52,
               child: IgnorePointer(
@@ -1575,21 +1665,33 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
                               onTap: _showSpeedSheet,
                             ),
 
-                            // CC button (only when caption is available)
-                            if (_captionsLoaded && _cues.isNotEmpty)
+                            // CC button
+                            if (widget.captionTracks.isNotEmpty)
                               GestureDetector(
-                                onTap: () => setState(() => _showCaptions = !_showCaptions),
+                                onTap: _showCaptionSheet,
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                                   child: Text(
                                     'CC',
                                     style: TextStyle(
-                                      color: _showCaptions
+                                      color: _selectedLang != null
                                           ? const Color(0xFF4F8EF7)
                                           : Colors.white,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
+                                  ),
+                                ),
+                              )
+                            else if (_captionPending)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    color: Colors.white.withValues(alpha: 0.6),
                                   ),
                                 ),
                               ),
@@ -1659,8 +1761,8 @@ class _OverlayVideoPlayer extends StatefulWidget {
     this.qualities,
     this.expectedDuration,
     this.onDownload,
-    this.captionUrl,
-    this.captionLanguage,
+    this.captionTracks = const [],
+    this.captionStatus,
   });
   final String url;
   final String playbackKey;
@@ -1668,8 +1770,8 @@ class _OverlayVideoPlayer extends StatefulWidget {
   final List<VideoQuality>? qualities;
   final double? expectedDuration;
   final VoidCallback? onDownload;
-  final String? captionUrl;
-  final String? captionLanguage;
+  final List<CaptionTrack> captionTracks;
+  final String? captionStatus;
 
   @override
   State<_OverlayVideoPlayer> createState() => _OverlayVideoPlayerState();
@@ -1692,23 +1794,114 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
   void Function()? _volumeUnsub;
   double _speed = 1.0;
 
-  // Captions (CC)
-  List<VttCue> _cues = [];
-  bool _captionsLoaded = false;
-  bool _showCaptions = false;
+  // Captions (CC) — multi-language
+  String? _selectedLang;
+  final Map<String, List<VttCue>> _cuesByLang = {};
+  final Set<String> _loadingLangs = {};
+
+  bool get _captionPending =>
+      widget.captionStatus == 'pending' && widget.captionTracks.isEmpty;
 
   VttCue? get _activeCue {
+    final lang = _selectedLang;
+    if (lang == null) return null;
     final pos = _controller?.value.position;
-    if (pos == null || !_showCaptions) return null;
-    return activeCue(_cues, pos);
+    if (pos == null) return null;
+    final cues = _cuesByLang[lang];
+    if (cues == null || cues.isEmpty) return null;
+    return activeCue(cues, pos);
   }
 
-  Future<void> _loadCaptions() async {
-    final url = widget.captionUrl;
-    if (url == null || url.isEmpty) return;
-    final cues = await fetchAndParseVtt(url);
+  Future<void> _loadLangIfNeeded(String lang) async {
+    if (_cuesByLang.containsKey(lang) || _loadingLangs.contains(lang)) return;
+    final track = widget.captionTracks.firstWhere(
+      (t) => t.lang == lang,
+      orElse: () => const CaptionTrack(lang: '', url: ''),
+    );
+    if (track.url.isEmpty) return;
+    _loadingLangs.add(lang);
+    final cues = await fetchAndParseVtt(track.url);
     if (!mounted) return;
-    setState(() { _cues = cues; _captionsLoaded = true; });
+    setState(() {
+      _cuesByLang[lang] = cues;
+      _loadingLangs.remove(lang);
+    });
+  }
+
+  void _showCaptionSheet() {
+    final t = LanguageController.instance.t;
+    final langLabels = <String, String>{
+      'vi': t('player.captionLangVi'),
+      'en': t('player.captionLangEn'),
+      'zh': t('player.captionLangZh'),
+      'ja': t('player.captionLangJa'),
+    };
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1A2235),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              title: Text(
+                t('player.captionOff'),
+                style: TextStyle(
+                  color: _selectedLang == null
+                      ? const Color(0xFF4AA3E4)
+                      : Colors.white,
+                  fontWeight: _selectedLang == null
+                      ? FontWeight.w700
+                      : FontWeight.normal,
+                ),
+              ),
+              trailing: _selectedLang == null
+                  ? const Icon(Icons.check_rounded, color: Color(0xFF4AA3E4))
+                  : null,
+              onTap: () {
+                setState(() => _selectedLang = null);
+                Navigator.pop(context);
+              },
+            ),
+            ...widget.captionTracks.map((track) {
+              final isActive = _selectedLang == track.lang;
+              final label = langLabels[track.lang] ?? track.lang.toUpperCase();
+              return ListTile(
+                title: Text(
+                  label,
+                  style: TextStyle(
+                    color: isActive ? const Color(0xFF4AA3E4) : Colors.white,
+                    fontWeight:
+                        isActive ? FontWeight.w700 : FontWeight.normal,
+                  ),
+                ),
+                trailing: isActive
+                    ? const Icon(Icons.check_rounded, color: Color(0xFF4AA3E4))
+                    : null,
+                onTap: () {
+                  setState(() => _selectedLang = track.lang);
+                  _loadLangIfNeeded(track.lang);
+                  Navigator.pop(context);
+                },
+              );
+            }),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1716,7 +1909,6 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
     super.initState();
     _volumeUnsub = VideoVolumeStore.instance.subscribe(_onVolumeChanged);
     _initController(widget.url);
-    _loadCaptions();
   }
 
   void _onVolumeChanged() {
@@ -2082,7 +2274,7 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
             ),
 
           // Caption overlay
-          if (_showCaptions)
+          if (_selectedLang != null)
             Positioned(
               left: 16,
               right: 16,
@@ -2214,18 +2406,32 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
                                     onTap: _showSpeedSheet,
                                   ),
                                   // CC button
-                                  if (_captionsLoaded && _cues.isNotEmpty)
+                                  if (widget.captionTracks.isNotEmpty)
                                     GestureDetector(
-                                      onTap: () => setState(() => _showCaptions = !_showCaptions),
+                                      onTap: _showCaptionSheet,
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                                         child: Text(
                                           'CC',
                                           style: TextStyle(
-                                            color: _showCaptions ? const Color(0xFF4F8EF7) : Colors.white,
+                                            color: _selectedLang != null
+                                                ? const Color(0xFF4F8EF7)
+                                                : Colors.white,
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
                                           ),
+                                        ),
+                                      ),
+                                    )
+                                  else if (_captionPending)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                      child: SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                          color: Colors.white.withValues(alpha: 0.6),
                                         ),
                                       ),
                                     ),

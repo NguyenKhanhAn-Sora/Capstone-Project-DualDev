@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class VttCue {
@@ -59,7 +60,7 @@ List<VttCue> parseVtt(String content) {
 Future<List<VttCue>> fetchAndParseVtt(String url) async {
   try {
     final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) return parseVtt(response.body);
+    if (response.statusCode == 200) return parseVtt(utf8.decode(response.bodyBytes));
   } catch (_) {}
   return [];
 }

@@ -1,5 +1,16 @@
 import '../../post/models/poll_data.dart';
 
+class CaptionTrack {
+  const CaptionTrack({required this.lang, required this.url});
+  final String lang;
+  final String url;
+
+  factory CaptionTrack.fromJson(Map<String, dynamic> json) => CaptionTrack(
+    lang: (json['lang'] as String?) ?? '',
+    url: (json['url'] as String?) ?? '',
+  );
+}
+
 class VideoQuality {
   const VideoQuality({
     required this.label,
@@ -28,6 +39,8 @@ class FeedMedia {
     this.metadata,
     this.captionUrl,
     this.captionLanguage,
+    this.captionTracks,
+    this.captionStatus,
   });
 
   final String type; // "image" | "video"
@@ -38,6 +51,17 @@ class FeedMedia {
   final Map<String, dynamic>? metadata;
   final String? captionUrl;
   final String? captionLanguage;
+  final List<CaptionTrack>? captionTracks;
+  final String? captionStatus; // "pending" | "done" | "failed" | null
+
+  /// Effective tracks: merge captionTracks with legacy single-track fallback
+  List<CaptionTrack> get effectiveCaptionTracks {
+    if (captionTracks != null && captionTracks!.isNotEmpty) return captionTracks!;
+    if (captionUrl != null && captionUrl!.isNotEmpty) {
+      return [CaptionTrack(lang: captionLanguage ?? 'vi', url: captionUrl!)];
+    }
+    return [];
+  }
 
   List<VideoQuality>? get qualities {
     final raw = metadata?['qualities'];
@@ -114,6 +138,17 @@ class FeedMedia {
 
     final captionUrlRaw = (json['captionUrl'] as String?)?.trim();
     final captionLangRaw = (json['captionLanguage'] as String?)?.trim();
+    final captionStatusRaw = (json['captionStatus'] as String?)?.trim();
+
+    final captionTracksRaw = json['captionTracks'];
+    List<CaptionTrack>? captionTracks;
+    if (captionTracksRaw is List) {
+      captionTracks = captionTracksRaw
+          .whereType<Map<String, dynamic>>()
+          .map(CaptionTrack.fromJson)
+          .where((t) => t.lang.isNotEmpty && t.url.isNotEmpty)
+          .toList();
+    }
 
     return FeedMedia(
       type: (json['type'] as String?) ?? 'image',
@@ -126,6 +161,8 @@ class FeedMedia {
       metadata: metadata,
       captionUrl: (captionUrlRaw != null && captionUrlRaw.isNotEmpty) ? captionUrlRaw : null,
       captionLanguage: (captionLangRaw != null && captionLangRaw.isNotEmpty) ? captionLangRaw : null,
+      captionTracks: (captionTracks != null && captionTracks.isNotEmpty) ? captionTracks : null,
+      captionStatus: (captionStatusRaw != null && captionStatusRaw.isNotEmpty) ? captionStatusRaw : null,
     );
   }
 }

@@ -3599,5 +3599,13 @@
       "blockUpdateError": "Không thể cập nhật chặn",
       "now": "vừa xong"
     }
+  },
+  "player": {
+    "captionOff": "Tắt",
+    "captionGenerating": "Đang tạo phụ đề...",
+    "captionLangVi": "Tiếng Việt",
+    "captionLangEn": "Tiếng Anh",
+    "captionLangZh": "Tiếng Trung",
+    "captionLangJa": "Tiếng Nhật"
   }
 }

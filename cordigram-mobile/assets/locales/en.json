@@ -3598,5 +3598,13 @@
       "blockUpdateError": "Could not update block status",
       "now": "now"
     }
+  },
+  "player": {
+    "captionOff": "Off",
+    "captionGenerating": "Generating captions...",
+    "captionLangVi": "Vietnamese",
+    "captionLangEn": "English",
+    "captionLangZh": "Chinese",
+    "captionLangJa": "Japanese"
   }
 }

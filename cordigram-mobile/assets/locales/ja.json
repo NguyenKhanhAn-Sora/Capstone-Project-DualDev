@@ -3598,5 +3598,13 @@
       "blockUpdateError": "ブロック状態を更新できませんでした",
       "now": "たった今"
     }
+  },
+  "player": {
+    "captionOff": "オフ",
+    "captionGenerating": "字幕を生成中...",
+    "captionLangVi": "ベトナム語",
+    "captionLangEn": "英語",
+    "captionLangZh": "中国語",
+    "captionLangJa": "日本語"
   }
 }
