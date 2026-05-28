@@ -80,6 +80,18 @@
   --color-voice-received-text: #1a2035;
 }
 
+/* Force light-mode tokens on any subtree (e.g. DateSelect popover when forceLight=true) */
+[data-theme="light"] {
+  --color-bg: #f6f8fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f7fb;
+  --color-border: #e3eaf5;
+  --color-text: #0f1629;
+  --color-text-muted: #5b6378;
+  --color-primary: #4aa3e4;
+  --color-primary-strong: #3470a2;
+}
+
 [data-theme="dark"] {
   --color-bg: #0c1220;
   --color-surface: #0f172a;

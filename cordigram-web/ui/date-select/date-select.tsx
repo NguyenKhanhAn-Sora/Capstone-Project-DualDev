@@ -261,6 +261,7 @@ export function DateSelect({
     <div
       ref={rootRef}
       className={`${styles.root} ${open ? styles.rootOpen : ""}`}
+      {...(forceLight ? { "data-theme": "light" } : {})}
     >
       <button
         ref={buttonRef}
