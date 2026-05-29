@@ -18,12 +18,17 @@ async function bootstrap() {
     }),
   );
 
+  const corsOrigins = [
+    config.frontendUrl,
+    config.adminUrl,
+    ...config.corsExtraOrigins,
+  ].filter((origin, index, list) => {
+    const value = origin?.trim();
+    return Boolean(value) && list.indexOf(origin) === index;
+  });
+
   app.enableCors({
-    origin: [
-      config.frontendUrl,
-      config.adminUrl,
-      ...config.corsExtraOrigins,
-    ],
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [

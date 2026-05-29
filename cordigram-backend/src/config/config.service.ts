@@ -27,8 +27,18 @@ export class ConfigService {
     return this.require('FRONTEND_URL');
   }
 
+  /**
+   * Admin dashboard origin for CORS. Falls back to FRONTEND_URL when unset so
+   * deploy/local boot does not fail if only the main web URL is configured.
+   */
   get adminUrl(): string {
-    return this.require('ADMIN_URL');
+    const explicit = process.env.ADMIN_URL?.trim();
+    if (explicit) return explicit;
+    try {
+      return this.frontendUrl;
+    } catch {
+      return '';
+    }
   }
 
   get corsExtraOrigins(): string[] {
