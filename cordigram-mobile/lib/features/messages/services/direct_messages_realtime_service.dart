@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../core/config/app_config.dart';
+import '../call/dm_call_session_sync.dart';
 import '../../../core/services/auth_storage.dart';
 import '../models/dm_message.dart';
 import '../models/presence_state.dart';
@@ -68,7 +69,7 @@ class DmCallBusyEvent {
     this.peerId,
   });
 
-  final String code; // already_in_call | peer_busy
+  final String code; // already_in_call | peer_busy | user_busy
   final String? receiverId;
   final String? peerId;
 }
@@ -93,6 +94,11 @@ class DirectMessagesRealtimeService {
       StreamController<String>.broadcast();
   static final StreamController<DmCallBusyEvent> _callBusyController =
       StreamController<DmCallBusyEvent>.broadcast();
+  static final StreamController<DmCallSessionsSyncPayload>
+  _callSessionsSyncController =
+      StreamController<DmCallSessionsSyncPayload>.broadcast();
+  static DmCallSessionsSyncPayload _lastCallSessionsSync =
+      const DmCallSessionsSyncPayload(sessions: [], at: 0);
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messagesReadController =
@@ -114,6 +120,10 @@ class DirectMessagesRealtimeService {
   static Stream<DmCallEvent> get callEvents => _callController.stream;
   static Stream<String> get callEnded => _callEndedController.stream;
   static Stream<DmCallBusyEvent> get callBusy => _callBusyController.stream;
+  static Stream<DmCallSessionsSyncPayload> get callSessionsSync =>
+      _callSessionsSyncController.stream;
+  static DmCallSessionsSyncPayload get lastCallSessionsSync =>
+      _lastCallSessionsSync;
   static Stream<Map<String, dynamic>> get messageDeleted =>
       _messageDeletedController.stream;
   static Stream<Map<String, dynamic>> get messagesRead =>
@@ -239,6 +249,12 @@ class DirectMessagesRealtimeService {
           peerId: data['peerId']?.toString(),
         ),
       );
+    });
+    socket.on('call-sessions-sync', (payload) {
+      final parsed = parseCallSessionsSyncPayload(payload);
+      if (parsed == null) return;
+      _lastCallSessionsSync = parsed;
+      _callSessionsSyncController.add(parsed);
     });
     socket.on('ice-candidate', (payload) {
       if (payload is! Map) return;
@@ -377,7 +393,14 @@ class DirectMessagesRealtimeService {
     _socket?.emit('call-initiate', {
       'receiverId': receiverId,
       'type': isVideo ? 'video' : 'audio',
+      'clientPlatform': 'mobile',
     });
+  }
+
+  static void emitCallHeartbeat(String peerId) {
+    final id = peerId.trim();
+    if (id.isEmpty) return;
+    _socket?.emit('call-heartbeat', {'peerId': id});
   }
 
   static void answerCall(String callerId, Map<String, dynamic> sdpOffer) {
@@ -411,6 +434,7 @@ class DirectMessagesRealtimeService {
       socket.off('call-answer');
       socket.off('call-rejected');
       socket.off('call-busy');
+      socket.off('call-sessions-sync');
       socket.off('ice-candidate');
       socket.off('call-ended');
       socket.off('message-deleted');

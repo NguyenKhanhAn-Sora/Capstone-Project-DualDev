@@ -9,6 +9,7 @@ import '../services/channel_messages_realtime_service.dart';
 import '../services/direct_messages_realtime_service.dart';
 import '../services/direct_messages_service.dart';
 import 'calls_api_service.dart';
+import 'dm_call_session_sync.dart';
 import 'native_call_screen.dart';
 
 /// App-wide call lifecycle manager for 1:1 direct-message calls.
@@ -39,6 +40,9 @@ class DmCallManager extends ChangeNotifier {
   StreamSubscription<DmCallEvent>? _callSub;
   StreamSubscription<String>? _endedSub;
   StreamSubscription<DmCallBusyEvent>? _busySub;
+  StreamSubscription<DmCallSessionsSyncPayload>? _sessionsSyncSub;
+  Timer? _callHeartbeatTimer;
+  List<DmCallSessionSyncItem> _serverSessions = const [];
   bool _initialized = false;
   bool _callRouteOnStack = false;
 
@@ -83,6 +87,10 @@ class DmCallManager extends ChangeNotifier {
       List<OutgoingCallState>.unmodifiable(_outgoings.values);
   ActiveCallState? get active => _active;
   bool get hasActiveCall => _active != null;
+  List<DmCallSessionSyncItem> get serverCallSessions =>
+      List<DmCallSessionSyncItem>.unmodifiable(_serverSessions);
+  bool isPeerBusyOnServer(String peerUserId) =>
+      isBusyWithPeer(_serverSessions, peerUserId);
   bool get isCallMinimized => _isCallMinimized;
   bool get isMiniCallTuckedToCorner => _miniCallTuckedToCorner;
   Offset get miniCallOffset => _miniCallOffset;
@@ -129,6 +137,9 @@ class DmCallManager extends ChangeNotifier {
     _endedSub =
         DirectMessagesRealtimeService.callEnded.listen(_onCallEnded);
     _busySub = DirectMessagesRealtimeService.callBusy.listen(_onCallBusy);
+    _serverSessions = DirectMessagesRealtimeService.lastCallSessionsSync.sessions;
+    _sessionsSyncSub =
+        DirectMessagesRealtimeService.callSessionsSync.listen(_onSessionsSync);
     unawaited(_refreshMyName());
   }
 
@@ -188,6 +199,8 @@ class DmCallManager extends ChangeNotifier {
     _setMicEnabledDelegate = null;
     _setSoundEnabledDelegate = null;
     _myName = null;
+    _serverSessions = const [];
+    _stopCallHeartbeat();
     notifyListeners();
     final token = AuthStorage.accessToken;
     if (token != null && token.isNotEmpty) {
@@ -219,6 +232,8 @@ class DmCallManager extends ChangeNotifier {
     _callSub?.cancel();
     _endedSub?.cancel();
     _busySub?.cancel();
+    _sessionsSyncSub?.cancel();
+    _stopCallHeartbeat();
     super.dispose();
   }
 
@@ -236,7 +251,27 @@ class DmCallManager extends ChangeNotifier {
     String? myName,
   }) async {
     if (_incoming != null) return;
+    if (_active != null) {
+      _showSnack('Bạn đang trong cuộc gọi. Hãy kết thúc trước khi gọi tiếp.');
+      return;
+    }
     if (_outgoings.containsKey(peerUserId)) return;
+    if (_outgoings.isNotEmpty) {
+      _showSnack('Bạn đang gọi người khác. Hãy hủy cuộc gọi đó trước.');
+      return;
+    }
+    if (!canMobileInitiateCall(_serverSessions)) {
+      if (isBusyWithPeer(_serverSessions, peerUserId)) {
+        _showSnack(
+          'Bạn đang gọi người này từ thiết bị hoặc tab khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
+        );
+      } else {
+        _showSnack(
+          'Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp.',
+        );
+      }
+      return;
+    }
     if ((AuthStorage.accessToken ?? '').isEmpty) {
       await AuthStorage.loadAll();
     }
@@ -279,6 +314,7 @@ class DmCallManager extends ChangeNotifier {
         _scheduleOutgoingDismiss(peerUserId);
       }
     });
+    _restartCallHeartbeat();
     notifyListeners();
   }
 
@@ -367,6 +403,7 @@ class DmCallManager extends ChangeNotifier {
     _activeSoundEnabled = true;
     _setMicEnabledDelegate = null;
     _setSoundEnabledDelegate = null;
+    _stopCallHeartbeat();
     notifyListeners();
   }
 
@@ -532,12 +569,57 @@ class DmCallManager extends ChangeNotifier {
 
   void _onCallBusy(DmCallBusyEvent event) {
     final peerId = event.receiverId ?? event.peerId;
-    if (peerId == null || peerId.isEmpty) return;
-    if (!_outgoings.containsKey(peerId)) return;
-    _cancelOutgoingFor(peerId);
-    _showSnack(
-      'Bạn đang gọi người này từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
+    if (peerId != null && peerId.isNotEmpty && _outgoings.containsKey(peerId)) {
+      _cancelOutgoingFor(peerId);
+    }
+    final msg = event.code == 'peer_busy'
+        ? 'Người nhận đang bận cuộc gọi khác.'
+        : event.code == 'user_busy'
+        ? 'Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp.'
+        : 'Bạn đang gọi người này từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.';
+    _showSnack(msg);
+  }
+
+  void _onSessionsSync(DmCallSessionsSyncPayload payload) {
+    _serverSessions = payload.sessions;
+    if (!canMobileInitiateCall(_serverSessions)) {
+      for (final peerId in _outgoings.keys.toList()) {
+        if (!isBusyWithPeer(_serverSessions, peerId)) {
+          _cancelOutgoingFor(peerId, notify: false);
+        }
+      }
+    }
+    _restartCallHeartbeat();
+    notifyListeners();
+  }
+
+  void _restartCallHeartbeat() {
+    _stopCallHeartbeat();
+    final peers = <String>{};
+    if (_active != null) peers.add(_active!.peerUserId);
+    for (final p in _outgoings.keys) {
+      peers.add(p);
+    }
+    for (final s in _serverSessions) {
+      peers.add(s.peerId);
+    }
+    if (peers.isEmpty) return;
+    void tick() {
+      for (final peerId in peers) {
+        DirectMessagesRealtimeService.emitCallHeartbeat(peerId);
+      }
+    }
+
+    tick();
+    _callHeartbeatTimer = Timer.periodic(
+      const Duration(seconds: 25),
+      (_) => tick(),
     );
+  }
+
+  void _stopCallHeartbeat() {
+    _callHeartbeatTimer?.cancel();
+    _callHeartbeatTimer = null;
   }
 
   Future<void> _handleAnswer(DmCallEvent event) async {
@@ -609,7 +691,10 @@ class DmCallManager extends ChangeNotifier {
       _setSoundEnabledDelegate = null;
       changed = true;
     }
-    if (changed) notifyListeners();
+    if (changed) {
+      _restartCallHeartbeat();
+      notifyListeners();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -631,6 +716,7 @@ class DmCallManager extends ChangeNotifier {
       video: video,
     );
     _activeCallStartedAt = DateTime.now();
+    _restartCallHeartbeat();
     clearMinimizedPipVideoTracks();
     _isCallMinimized = false;
     _miniCallTuckedToCorner = false;

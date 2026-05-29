@@ -1,6 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import io, { Socket } from "socket.io-client";
 import { apiBaseUrl } from "@/lib/api";
+import {
+  type CallSessionsSyncPayload,
+  type CallSessionSyncItem,
+  parseCallSessionsSyncPayload,
+} from "@/lib/call-session-sync";
 
 interface UseDirectMessagesOptions {
   userId: string;
@@ -72,10 +77,12 @@ export interface CallEvent {
 }
 
 export interface CallBusyEvent {
-  code: "already_in_call" | "peer_busy";
+  code: "already_in_call" | "peer_busy" | "user_busy";
   receiverId?: string;
   peerId?: string;
 }
+
+export type { CallSessionsSyncPayload, CallSessionSyncItem };
 
 export interface UserProfileStyleUpdatedEvent {
   userId: string;
@@ -157,6 +164,8 @@ export const useDirectMessages = ({
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callBusy, setCallBusy] = useState<CallBusyEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
+  const [callSessionsSync, setCallSessionsSync] =
+    useState<CallSessionsSyncPayload>({ sessions: [], at: 0 });
   const [messageDeleted, setMessageDeleted] = useState<{
     messageId: string;
     deleteType?: "for-everyone" | "for-me";
@@ -433,6 +442,11 @@ export const useDirectMessages = ({
       setTimeout(() => setCallBusy(null), 2000);
     });
 
+    socket.on("call-sessions-sync", (data: unknown) => {
+      const parsed = parseCallSessionsSyncPayload(data);
+      if (parsed) setCallSessionsSync(parsed);
+    });
+
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
       const evt: CallEvent = {
         from: data.from,
@@ -593,11 +607,18 @@ export const useDirectMessages = ({
         socketRef.current.emit("call-initiate", {
           receiverId,
           type,
+          clientPlatform: "web",
         });
       }
     },
     [],
   );
+
+  const emitCallHeartbeat = useCallback((peerId: string) => {
+    const id = peerId?.trim();
+    if (!id || !socketRef.current?.connected) return;
+    socketRef.current.emit("call-heartbeat", { peerId: id });
+  }, []);
 
   const answerCall = useCallback((callerId: string, sdpOffer: any) => {
     if (socketRef.current && socketRef.current.connected) {
@@ -655,6 +676,7 @@ export const useDirectMessages = ({
     subscribePresence,
     callEvent,
     callBusy,
+    callSessionsSync,
     callEnded,
     messageDeleted,
     userProfileStyleUpdated,
@@ -668,6 +690,7 @@ export const useDirectMessages = ({
     rejectCall,
     sendIceCandidate,
     endCall,
+    emitCallHeartbeat,
     emitDeleteMessage,
   };
 };
