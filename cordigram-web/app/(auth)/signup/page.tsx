@@ -17,6 +17,7 @@ import { apiFetch, ApiError, getApiBaseUrl } from "@/lib/api";
 import { setStoredAccessToken } from "@/lib/auth";
 import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
 import { DateSelect } from "@/ui/date-select/date-select";
+import { MobileDatePicker } from "@/ui/mobile-date-picker/mobile-date-picker";
 
 type Step = "email" | "otp" | "profile" | "avatar";
 
@@ -75,6 +76,62 @@ const ArrowLeftIcon = () => (
     strokeLinejoin="round"
   >
     <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+
+const MailIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" />
+  </svg>
+);
+const LockIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+const BadgeIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /><circle cx="12" cy="14" r="2" />
+  </svg>
+);
+const AtIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="4" /><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94" />
+  </svg>
+);
+const CakeIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" /><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" /><path d="M2 21h20M7 8v3M12 8v3M17 8v3M7 5h.01M12 5h.01M17 5h.01" />
+  </svg>
+);
+const CalendarIcon = () => (
+  <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+  </svg>
+);
+const PersonOutlineIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+  </svg>
+);
+const ChevronDownIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+const EditNoteIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+const PhotoIcon = () => (
+  <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+  </svg>
+);
+const PersonPlaceholderIcon = () => (
+  <svg aria-hidden width={60} height={60} viewBox="0 0 24 24" fill="none" stroke="#B0C4D8" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
   </svg>
 );
 
@@ -211,6 +268,69 @@ async function getCroppedDataUrl(
   return canvas.toDataURL("image/jpeg", 0.9);
 }
 
+// Scale output xuống maxSize để tránh iOS Safari canvas limit — dùng cho preview
+async function getCroppedDataUrlScaled(
+  imageSrc: string,
+  croppedAreaPixels: Area,
+  maxSize = 512,
+): Promise<string> {
+  const image = await loadImage(imageSrc);
+  const size = Math.min(maxSize, croppedAreaPixels.width, croppedAreaPixels.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    size,
+    size,
+  );
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
+
+// Scale output xuống maxSize — dùng cho upload (chất lượng cao hơn preview)
+async function getCroppedBlobScaled(
+  imageSrc: string,
+  croppedAreaPixels: Area,
+  maxSize = 1024,
+): Promise<Blob> {
+  const image = await loadImage(imageSrc);
+  const size = Math.min(maxSize, croppedAreaPixels.width, croppedAreaPixels.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    size,
+    size,
+  );
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error("Could not create blob"));
+        resolve(blob);
+      },
+      "image/jpeg",
+      0.92,
+    );
+  });
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -236,6 +356,9 @@ export default function SignupPage() {
     "male" | "female" | "other" | "prefer_not_to_say" | ""
   >("");
   const [genderOpen, setGenderOpen] = useState(false);
+  const [mobileGenderOpen, setMobileGenderOpen] = useState(false);
+  const [mobileDateOpen, setMobileDateOpen] = useState(false);
+  const [mobileCropOpen, setMobileCropOpen] = useState(false);
   const [genderHighlight, setGenderHighlight] = useState(0);
   const genderRef = useRef<HTMLDivElement | null>(null);
   const [locationInput, setLocationInput] = useState("");
@@ -913,13 +1036,36 @@ export default function SignupPage() {
     setError("");
     try {
       let avatarPayload: AvatarUploadResponse | undefined;
+
       if (avatarFile && avatarPreview && croppedAreaPixels) {
-        const croppedBlob = await getCroppedBlob(
-          avatarPreview,
-          croppedAreaPixels,
-        );
+        // Tạo blob ảnh đã crop — fallback chain để đảm bảo luôn có "cropped" blob:
+        // 1. Full resolution (tốt nhất, desktop)
+        // 2. 1024px scaled (an toàn trên iOS mobile)
+        // 3. 512px scaled (avatarThumb đã có sẵn, đảm bảo lưu được)
+        let croppedBlob: Blob | null = null;
+
+        try {
+          croppedBlob = await getCroppedBlob(avatarPreview, croppedAreaPixels);
+        } catch {
+          try {
+            croppedBlob = await getCroppedBlobScaled(avatarPreview, croppedAreaPixels, 1024);
+          } catch {
+            // Fallback cuối: dùng avatarThumb (512px) đã được compute khi crop
+            if (avatarThumb) {
+              const res = await fetch(avatarThumb);
+              croppedBlob = await res.blob();
+            }
+          }
+        }
+
+        if (!croppedBlob) {
+          throw new Error("Could not process avatar image. Please try again.");
+        }
+
         const form = new FormData();
+        // Bản gốc: file thật từ thiết bị, không qua canvas
         form.append("original", avatarFile, avatarFile.name);
+        // Bản đã chỉnh sửa: crop + (optional) zoom theo ý người dùng
         form.append(
           "cropped",
           new File([croppedBlob], `avatar-cropped-${Date.now()}.jpg`, {
@@ -929,9 +1075,7 @@ export default function SignupPage() {
 
         const uploadRes = await fetch(`${getApiBaseUrl()}/auth/upload-avatar`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${signupToken}`,
-          },
+          headers: { Authorization: `Bearer ${signupToken}` },
           body: form,
         });
 
@@ -968,6 +1112,21 @@ export default function SignupPage() {
       showError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMobileCropConfirm = async () => {
+    try {
+      if (avatarPreview && croppedAreaPixels) {
+        // Scale xuống 512px để tránh iOS Safari canvas limit
+        const url = await getCroppedDataUrlScaled(avatarPreview, croppedAreaPixels, 512);
+        setAvatarThumb(url);
+      }
+    } catch {
+      // Nếu canvas fail, dùng ảnh gốc làm preview (upload vẫn crop đúng)
+      if (avatarPreview) setAvatarThumb(avatarPreview);
+    } finally {
+      setMobileCropOpen(false);
     }
   };
 
@@ -1500,9 +1659,491 @@ export default function SignupPage() {
 
   if (!canRender) return null;
 
+  const stepToIdx: Record<Step, number> = { email: 0, otp: 1, profile: 2, avatar: 3 };
+  const mobileStepIdx = stepToIdx[step];
+  const mobileTitles = ["Create account", "Verify email", "Profile info", "Choose avatar"];
+  const mobileSubtitles = [
+    "Enter your email to get started",
+    `Enter the OTP sent to ${email}`,
+    "Complete your account details",
+    "Add a profile photo (optional)",
+  ];
+  const mobileShowBack =
+    (step === "otp" && !isGoogleFlow) ||
+    (step === "profile" && !isGoogleFlow) ||
+    step === "avatar";
+
   return (
     <div className={`${styles.page} ${styles["page-transition"]}`}>
-      <div className="min-h-screen">
+
+      {/* ====== MOBILE LAYOUT — giống 100% Flutter app ====== */}
+      <div
+        className="md:hidden min-h-screen overflow-y-auto"
+        style={{ background: "linear-gradient(to bottom, #1F4F7A 0%, #3470A2 35%, #F4F7FB 75%)" }}
+      >
+        <div className="px-5 pt-3 pb-6 max-w-[430px] mx-auto">
+
+          {/* Brand */}
+          <div className="flex flex-col items-center pt-3 pb-4">
+            <img src="/logo.png" alt="Cordigram" width={100} height={100} className="rounded-2xl" />
+            <span className="mt-2.5 text-white font-bold text-[14px] tracking-[2px]">CORDIGRAM</span>
+          </div>
+
+          {/* Step indicator */}
+          <div className="flex items-center mb-4">
+            {[0, 1, 2, 3].map((idx) => (
+              <div key={idx} className="contents">
+                {idx > 0 && (
+                  <div
+                    className="flex-1 h-0.5"
+                    style={{ background: idx <= mobileStepIdx ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.3)" }}
+                  />
+                )}
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0"
+                  style={{
+                    background: idx <= mobileStepIdx ? "#ffffff" : "rgba(255,255,255,0.24)",
+                    color: idx < mobileStepIdx ? "#3470A2" : idx === mobileStepIdx ? "#3470A2" : "rgba(255,255,255,0.6)",
+                  }}
+                >
+                  {idx < mobileStepIdx ? "✓" : idx + 1}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* White card */}
+          <div className="bg-white rounded-[20px] px-4 pt-[18px] pb-4" style={{ boxShadow: "0 10px 26px rgba(15,47,74,0.165)" }}>
+
+            {/* Step header */}
+            <div className="mb-[18px]">
+              {mobileShowBack && (
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-[#3470A2] text-[13px] font-medium mb-2"
+                  onClick={() => {
+                    if (step === "otp") { setStep("email"); setOtpCode(""); setCooldownLeft(null); }
+                    else if (step === "profile") { setStep("otp"); setError(""); }
+                    else if (step === "avatar") { setStep("profile"); setError(""); }
+                  }}
+                >
+                  <svg aria-hidden width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                  Back
+                </button>
+              )}
+              <h2 className="text-[22px] font-extrabold text-[#0F172A]">{mobileTitles[mobileStepIdx]}</h2>
+              <p className="text-[13px] text-[#64748B] mt-1">{mobileSubtitles[mobileStepIdx]}</p>
+            </div>
+
+            {/* Error banner */}
+            {error && (
+              <div className="mb-3 px-3 py-2.5 rounded-[10px] bg-red-50 border border-red-200">
+                <p className="text-red-700 text-[13px]">{error}</p>
+              </div>
+            )}
+
+            {/* ── Step 0: Email ── */}
+            {step === "email" && !isGoogleFlow && (
+              <form onSubmit={handleRequestOtp}>
+                <div className="relative mb-[18px]">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#64748B] pointer-events-none"><MailIcon /></span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value.toLowerCase())}
+                    placeholder="Địa chỉ email"
+                    autoComplete="email"
+                    className="w-full h-[52px] pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
+                  />
+                  {fieldError.email && <p className="mt-1 text-red-600 text-[12px]">{fieldError.email}</p>}
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-[50px] rounded-[14px] bg-[#3470A2] text-white font-semibold text-[15px] flex items-center justify-center disabled:opacity-70 mb-[14px]"
+                >
+                  {loading
+                    ? <span className="w-[22px] h-[22px] border-[2.5px] border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    : "Send OTP"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGoogleAuth}
+                  className="w-full h-[50px] rounded-[14px] border border-[#D7E5F2] bg-white flex items-center justify-center gap-2 text-[#1F2937] font-medium text-[14px] mb-[14px]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48">
+                    <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                    <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                    <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+                    <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+                  </svg>
+                  Tiếp tục với Google
+                </button>
+                <div className="flex items-center justify-center text-[13px]">
+                  <span className="text-[#64748B]">{"Already have an account? "}</span>
+                  <Link href="/login" className="text-[#3470A2] font-semibold ml-1">Sign in</Link>
+                </div>
+              </form>
+            )}
+
+            {/* ── Step 1: OTP ── */}
+            {step === "otp" && !isGoogleFlow && (
+              <form onSubmit={handleVerifyOtp}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="• • • • • •"
+                  className="w-full h-[58px] mb-2 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-center text-[28px] font-bold tracking-[12px] text-[#0F172A] placeholder:text-[#CBD5E1] placeholder:text-[22px] placeholder:tracking-[8px] focus:outline-none focus:border-[#3470A2]"
+                />
+                <div className="flex justify-between mb-[10px]">
+                  <button
+                    type="button"
+                    className="text-[#3470A2] text-[13px] py-1.5"
+                    onClick={() => { setStep("email"); setOtpCode(""); setCooldownLeft(null); }}
+                  >
+                    Change email
+                  </button>
+                  <button
+                    type="button"
+                    className="text-[#3470A2] text-[13px] py-1.5 disabled:opacity-50"
+                    disabled={loading || cooldownLeft !== null}
+                    onClick={handleRequestOtp}
+                  >
+                    {cooldownLeft !== null ? `Resend code (${cooldownLeft}s)` : "Resend code"}
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-[50px] rounded-[14px] bg-[#3470A2] text-white font-semibold text-[15px] flex items-center justify-center disabled:opacity-70"
+                >
+                  {loading
+                    ? <span className="w-[22px] h-[22px] border-[2.5px] border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    : "Verify"}
+                </button>
+              </form>
+            )}
+
+            {/* ── Step 2: Profile ── */}
+            {step === "profile" && (
+              <form onSubmit={handleProfileNext} className="flex flex-col gap-3">
+                {/* Display name */}
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none"><BadgeIcon /></span>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Tên hiển thị"
+                    className="w-full h-[52px] pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
+                  />
+                  {fieldError.displayName && <p className="mt-1 text-red-600 text-[12px]">{fieldError.displayName}</p>}
+                </div>
+                {/* Username */}
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none"><AtIcon /></span>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9_.]/g, "").slice(0, 30);
+                      setUsername(cleaned);
+                    }}
+                    placeholder="Tên người dùng"
+                    className="w-full h-[52px] pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
+                  />
+                  {fieldError.username && <p className="mt-1 text-red-600 text-[12px]">{fieldError.username}</p>}
+                </div>
+                {/* Password */}
+                {!isGoogleFlow && (
+                  <>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none"><LockIcon /></span>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Mật khẩu"
+                        className="w-full h-[52px] pl-[44px] pr-[44px] rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
+                      />
+                      <button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] p-1">
+                        <EyeIcon open={showPassword} />
+                      </button>
+                      {fieldError.password && <p className="mt-1 text-red-600 text-[12px]">{fieldError.password}</p>}
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none"><LockIcon /></span>
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Xác nhận mật khẩu"
+                        className="w-full h-[52px] pl-[44px] pr-[44px] rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
+                      />
+                      <button type="button" onClick={() => setShowConfirmPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] p-1">
+                        <EyeIcon open={showConfirmPassword} />
+                      </button>
+                      {fieldError.confirmPassword && <p className="mt-1 text-red-600 text-[12px]">{fieldError.confirmPassword}</p>}
+                    </div>
+                  </>
+                )}
+                {/* Birthdate — custom overlay giống Flutter DatePicker */}
+                <button
+                  type="button"
+                  onClick={() => setMobileDateOpen(true)}
+                  className="w-full h-[52px] flex items-center gap-3 px-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-left"
+                >
+                  <span className="text-[#94A3B8] flex-shrink-0"><CakeIcon /></span>
+                  <span className={`flex-1 text-[14px] ${birthdate ? "text-[#0F172A]" : "text-[#ADB8C7]"}`}>
+                    {birthdate
+                      ? (() => { const [y, m, d] = birthdate.split("-"); return `${d}/${m}/${y}`; })()
+                      : "Select birthdate"}
+                  </span>
+                  <span className="text-[#94A3B8] flex-shrink-0"><CalendarIcon /></span>
+                </button>
+                {fieldError.birthdate && <p className="text-red-600 text-[12px]">{fieldError.birthdate}</p>}
+                {/* Gender — overlay dialog giống Flutter */}
+                <button
+                  type="button"
+                  className="w-full h-[52px] flex items-center gap-3 px-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-left"
+                  onClick={() => setMobileGenderOpen(true)}
+                >
+                  <span className="text-[#94A3B8] flex-shrink-0"><PersonOutlineIcon /></span>
+                  <span className={`flex-1 text-[14px] ${gender ? "text-[#0F172A]" : "text-[#ADB8C7]"}`}>
+                    {gender ? genderOptions.find((o) => o.value === gender)?.label : "Select gender"}
+                  </span>
+                  <span className="text-[#94A3B8] flex-shrink-0"><ChevronDownIcon /></span>
+                </button>
+                {fieldError.gender && <p className="text-red-600 text-[12px]">{fieldError.gender}</p>}
+                {/* Bio */}
+                <div className="relative">
+                  <span className="absolute left-3.5 top-3.5 text-[#94A3B8] pointer-events-none"><EditNoteIcon /></span>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value.slice(0, 300))}
+                    placeholder="Tiểu sử ngắn (tùy chọn)"
+                    rows={3}
+                    maxLength={300}
+                    className="w-full pt-3.5 pb-3 pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2] resize-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-[50px] rounded-[14px] bg-[#3470A2] text-white font-semibold text-[15px] flex items-center justify-center disabled:opacity-70"
+                >
+                  {loading
+                    ? <span className="w-[22px] h-[22px] border-[2.5px] border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    : "Create account"}
+                </button>
+              </form>
+            )}
+
+            {/* ── Step 3: Avatar ── */}
+            {step === "avatar" && (
+              <div className="flex flex-col items-stretch gap-4">
+                <div className="flex flex-col items-center">
+                  {/* Avatar circle */}
+                  <div
+                    style={{
+                      width: 120,
+                      height: 120,
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      border: "2px solid #B0C4D8",
+                      background: "#EAF0F6",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {(avatarThumb || avatarPreview) ? (
+                      <img
+                        src={avatarThumb || avatarPreview || ""}
+                        alt="Avatar"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <PersonPlaceholderIcon />
+                    )}
+                  </div>
+                  <p className="mt-2 text-center text-[12px] text-[#94A3B8]">
+                    {avatarPreview
+                      ? "Photo ready. Tap below to change."
+                      : "No photo selected — a default avatar will be used"}
+                  </p>
+                </div>
+                <label className="w-full h-[50px] rounded-[14px] border border-[#D7E5F2] flex items-center justify-center gap-2 text-[#3470A2] text-[14px] font-medium cursor-pointer">
+                  <PhotoIcon /> Chọn từ thư viện
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      handleAvatarFileChange(e);
+                      if (e.target.files?.[0]) setMobileCropOpen(true);
+                    }}
+                    hidden
+                  />
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSkipAvatar}
+                    disabled={loading}
+                    className="flex-1 h-[50px] rounded-[14px] border border-[#D7E5F2] text-[#64748B] text-[14px] font-medium disabled:opacity-60"
+                  >
+                    Skip
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitAvatar}
+                    disabled={loading || !signupToken}
+                    className="flex-[2] h-[50px] rounded-[14px] bg-[#3470A2] text-white font-semibold text-[15px] flex items-center justify-center disabled:opacity-70"
+                  >
+                    {loading
+                      ? <span className="w-[22px] h-[22px] border-[2.5px] border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      : "Finish"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Crop overlay — mobile only, fullscreen giống Flutter */}
+      {mobileCropOpen && avatarPreview && (
+        <div className="md:hidden fixed inset-0 z-[70] bg-black flex flex-col">
+          {/* Header */}
+          <div
+            className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+            style={{ background: "#1F4F7A" }}
+          >
+            <button
+              type="button"
+              onClick={() => setMobileCropOpen(false)}
+              className="text-white p-2"
+              aria-label="Cancel crop"
+            >
+              <svg aria-hidden width={22} height={22} viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+            <span className="text-white text-[16px] font-semibold">Cắt ảnh</span>
+            <button
+              type="button"
+              onClick={handleMobileCropConfirm}
+              className="text-white p-2"
+              aria-label="Confirm crop"
+            >
+              <svg aria-hidden width={24} height={24} viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Cropper area */}
+          <div className="flex-1 relative">
+            <Cropper
+              image={avatarPreview}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              cropShape="round"
+              showGrid
+              restrictPosition
+              minZoom={1}
+              maxZoom={3}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
+            />
+          </div>
+
+          {/* Zoom slider */}
+          <div className="bg-black px-6 py-5 flex-shrink-0 flex flex-col items-center gap-2">
+            <span className="text-white text-[12px] font-medium">{Math.round(zoom * 100)}%</span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.01}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              className="w-full accent-[#3470A2]"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Birthdate overlay — mobile only */}
+      <MobileDatePicker
+        open={mobileDateOpen}
+        value={birthdate}
+        onChange={(next) => {
+          setBirthdate(next);
+          setFieldError((prev) => ({ ...prev, birthdate: undefined }));
+        }}
+        onClose={() => setMobileDateOpen(false)}
+        maxDate={new Date()}
+      />
+
+      {/* Gender overlay — mobile only, fixed fullscreen */}
+      {mobileGenderOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 flex items-center justify-center px-6"
+          style={{ background: "rgba(15,23,42,0.45)" }}
+          onClick={() => setMobileGenderOpen(false)}
+        >
+          <div
+            className="bg-white rounded-[20px] w-full max-w-[360px] px-4 pt-5 pb-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-center text-[16px] font-bold text-[#0F172A] mb-2">Select gender</h3>
+            {([
+              { value: "male", label: "Male" },
+              { value: "female", label: "Female" },
+              { value: "other", label: "Other" },
+              { value: "prefer_not_to_say", label: "Prefer not to say" },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className="w-full text-left px-2 py-4 text-[15px] text-[#0F172A] border-b border-[#F1F5F9] last:border-0 flex items-center justify-between"
+                onClick={() => {
+                  setGender(opt.value);
+                  setFieldError((prev) => ({ ...prev, gender: undefined }));
+                  setMobileGenderOpen(false);
+                }}
+              >
+                {opt.label}
+                {gender === opt.value && (
+                  <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#3470A2" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ====== DESKTOP LAYOUT ====== */}
+      <div className="hidden md:block min-h-screen">
         <div className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
           <div className={styles["signup-left"]}>
             <div className="w-full max-w-[520px] rounded-2xl border border-[#e5edf5] bg-white p-10 shadow-xl">

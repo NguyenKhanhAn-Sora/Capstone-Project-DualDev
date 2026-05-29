@@ -33,6 +33,14 @@
   animation: notificationSlideOut 220ms ease forwards;
 }
 
+/* Mobile: full-screen */
+@media (max-width: 767px) {
+  .sheet {
+    width: 100%;
+    right: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .backdrop,
   .sheet {

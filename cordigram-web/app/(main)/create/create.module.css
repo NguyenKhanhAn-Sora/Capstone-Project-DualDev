@@ -371,6 +371,7 @@
   letter-spacing: 0.12em;
   color: var(--color-text-muted);
   font-size: 12px;
+  padding: 5px
 }
 
 .cardTitle {
@@ -1102,6 +1103,40 @@
   padding: 6px 4px;
 }
 
+/* Add hashtag button — mobile only */
+.hashtagAddBtn {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .hashtagAddBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1.5px solid var(--color-primary);
+    background: transparent;
+    color: var(--color-primary);
+    font-size: 20px;
+    font-weight: 300;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .hashtagAddBtn:hover {
+    background: var(--color-primary);
+    color: #fff;
+  }
+
+  .hashtagAddBtn:active {
+    transform: scale(0.94);
+  }
+}
+
 .dropdownShell {
   position: relative;
 }
@@ -1283,6 +1318,343 @@
   .footerActions {
     width: 100%;
     justify-content: stretch;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CREATE PAGE — MOBILE RESPONSIVE (giống Flutter 100%)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Desktop-only: hide mobile elements */
+.mobileAudienceList { display: none; }
+.desktopOnly { display: block; }
+
+@media (max-width: 767px) {
+  /* ── Screen ── */
+  .screen {
+    padding: 0 0 calc(80px + env(safe-area-inset-bottom));
+    gap: 0;
+    min-height: 100dvh;
+  }
+
+  /* ── Header ── */
+  .headerRow {
+    padding: 16px 16px 0;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--color-bg);
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+
+  .title {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+
+  /* ── Mode switch pills — horizontal scroll giống Flutter TabBar ── */
+  .modeSwitch {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    margin-top: 10px;
+    padding: 4px;
+    border-radius: 10px;
+    gap: 4px;
+  }
+
+  .modeButton {
+    padding: 7px 12px;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .modeButtonInner {
+    gap: 6px;
+  }
+
+  /* Hide stepper on mobile (Flutter không có) */
+  .stepper {
+    display: none;
+  }
+
+  /* ── Select step ── */
+  .selectGrid {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 16px;
+  }
+
+  /* Tips card ẩn trên mobile */
+  .tipsCard {
+    display: none;
+  }
+
+  /* Dropzone — compact, mobile-friendly */
+  .dropzone {
+    min-height: 180px;
+    padding: 28px 20px;
+    border-radius: 14px;
+  }
+
+  .dropBadge {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+
+  .dropTitle {
+    font-size: 18px;
+    margin-top: 2px;
+  }
+
+  .dropText {
+    font-size: 13px;
+  }
+
+  .actions {
+    flex-direction: row;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  /* ── Details step ── */
+  .detailsGrid {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 12px 12px 0;
+    background: var(--color-bg);
+  }
+
+  .previewCard,
+  .formCard {
+    border-radius: 14px;
+    margin-bottom: 12px;
+  }
+
+  .mediaFrame {
+    min-height: 180px;
+    margin: 10px;
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .cardHeader,
+  .cardHeaderCompact {
+    padding: 14px 14px 0;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .cardActions {
+    flex-direction: row;
+    width: auto;
+    gap: 8px;
+  }
+
+  /* ── Audience — radio cards giống Flutter ── */
+  .mobileAudienceList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .mobileAudienceCard {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .mobileAudienceCardActive {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  }
+
+  .mobileAudienceIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+    width: 24px;
+    height: 24px;
+  }
+
+  .mobileAudienceCardActive .mobileAudienceIcon {
+    color: var(--color-primary);
+  }
+
+  .mobileAudienceLabel {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  /* Hide desktop dropdown on mobile */
+  .desktopOnly {
+    display: none !important;
+  }
+
+  /* ── Schedule — radio cards full-width giống Flutter ── */
+  .radioRow {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .radioOption {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 12px;
+    justify-content: flex-start;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* ── Toggle switches — iOS-style ── */
+  .switchGroup {
+    border-radius: 14px;
+    border-style: solid;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .switchRow {
+    padding: 14px 16px;
+    border-radius: 0;
+    border: none;
+    border-top: 1px solid var(--color-border);
+    align-items: center;
+    flex-direction: row-reverse;
+    justify-content: space-between;
+  }
+
+  .switchRow:first-of-type {
+    border-top: none;
+  }
+
+  /* iOS-style toggle */
+  .switchRow input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 50px;
+    height: 28px;
+    border-radius: 14px;
+    background: var(--color-border);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+    margin: 0;
+  }
+
+  .switchRow input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    transition: left 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .switchRow input[type="checkbox"]:checked {
+    background: var(--color-primary);
+  }
+
+  .switchRow input[type="checkbox"]:checked::after {
+    left: calc(100% - 25px);
+  }
+
+  .switchTitle {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .switchHint {
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  /* ── Footer submit — sticky bottom giống Flutter ── */
+  .footerActions {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    flex-direction: row !important;
+    gap: 10px;
+    z-index: 50;
+  }
+
+  .footerActions .primaryButton {
+    flex: 1;
+    width: auto;
+    border-radius: 12px;
+    height: 48px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .footerActions .secondaryButton {
+    flex: 0;
+    width: auto;
+    padding: 0 16px;
+    height: 48px;
+  }
+
+  /* ── Form card spacing — padding đủ không sát góc ── */
+  .formCard {
+    padding: 0;
+  }
+
+  .formGroup {
+    padding: 0 16px 14px;
+  }
+
+  .formGroup:first-child {
+    padding-top: 16px;
+  }
+
+  .rowGroup {
+    padding: 0 16px 14px;
+  }
+
+  .rowGroup .formGroup {
+    padding: 0;
+  }
+
+  /* ── Scheduler card on mobile ── */
+  .schedulerCard {
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .schedulerGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 }
 

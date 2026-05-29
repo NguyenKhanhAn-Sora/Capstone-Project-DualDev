@@ -1101,10 +1101,13 @@ class _InputField extends StatelessWidget {
       maxLines: maxLines,
       maxLength: maxLength,
       inputFormatters: inputFormatters,
+      style: const TextStyle(color: Color(0xFF0F172A)),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF64748B)),
         hintText: hint,
-        prefixIcon: Icon(icon, size: 20),
+        hintStyle: const TextStyle(color: Color(0xFFCBD5E1)),
+        prefixIcon: Icon(icon, size: 20, color: const Color(0xFF94A3B8)),
         filled: true,
         fillColor: const Color(0xFFF8FBFF),
         contentPadding: const EdgeInsets.symmetric(
@@ -1157,10 +1160,17 @@ class _PasswordField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       obscureText: !show,
+      style: const TextStyle(color: Color(0xFF0F172A)),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF64748B)),
         hintText: hint,
-        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+        hintStyle: const TextStyle(color: Color(0xFFCBD5E1)),
+        prefixIcon: const Icon(
+          Icons.lock_outline_rounded,
+          size: 20,
+          color: Color(0xFF94A3B8),
+        ),
         suffixIcon: IconButton(
           icon: Icon(
             show ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -1291,39 +1301,49 @@ class _GenderSelector extends StatelessWidget {
       onTap: () {
         showDialog<String>(
           context: context,
-          builder: (ctx) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+          builder: (ctx) => Theme(
+            data: ThemeData(
+              colorScheme: const ColorScheme.light(primary: Color(0xFF3470A2)),
+              dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
             ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Select gender',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
+            child: Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Select gender',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  ..._options.map(
-                    (opt) => ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      title: Text(opt.$2),
-                      trailing: opt.$1 == value
-                          ? const Icon(
-                              Icons.check_rounded,
-                              color: Color(0xFF3470A2),
-                            )
-                          : null,
-                      onTap: () => Navigator.pop(ctx, opt.$1),
+                    const SizedBox(height: 8),
+                    ..._options.map(
+                      (opt) => ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        title: Text(
+                          opt.$2,
+                          style: const TextStyle(color: Color(0xFF1E293B)),
+                        ),
+                        trailing: opt.$1 == value
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: Color(0xFF3470A2),
+                              )
+                            : null,
+                        onTap: () => Navigator.pop(ctx, opt.$1),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
             ),
           ),

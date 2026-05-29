@@ -49,6 +49,7 @@ import {
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
 import PeopleYouMayKnow from "@/ui/people-you-may-know/people-you-may-know";
+import MobilePymk from "@/ui/people-you-may-know/mobile-pymk";
 import { formatRelativeTime } from "@/lib/relative-time";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useGuestAuth } from "@/context/guest-auth-context";
@@ -1660,6 +1661,12 @@ export default function HomePage({
         <PostUploadBanner />
         {headerSlot}
 
+        {/* Mobile PYMK — CSS quyết định hiện/ẩn (≤1100px), không dùng JS */}
+        {!embedded && (
+          <div className={styles.mobilePymkWrapper}>
+            <MobilePymk token={token} />
+          </div>
+        )}
 
         {visibleItems.map(({ item, flags }, index) => (
           <Fragment key={item.id}>
@@ -1796,7 +1803,7 @@ export default function HomePage({
 
       {reportTarget ? (
         <div
-          className={`${styles.modalOverlay} ${
+          className={`${styles.modalOverlay} ${styles.reportOverlay} ${
             reportClosing ? styles.modalOverlayClosing : styles.modalOverlayOpen
           }`}
           role="dialog"
@@ -1806,8 +1813,25 @@ export default function HomePage({
             className={`${styles.modalCard} ${styles.reportCard} ${
               reportClosing ? styles.modalCardClosing : styles.modalCardOpen
             }`}
+            data-mobile-step={reportCategory ? "reasons" : "categories"}
           >
             <div className={styles.modalHeader}>
+              {/* Back button — chỉ hiện trên mobile khi đang ở bước reasons */}
+              {reportCategory && (
+                <button
+                  className={styles.reportBackBtn}
+                  aria-label="Back"
+                  onClick={() => {
+                    setReportCategory(null);
+                    setReportReason(null);
+                  }}
+                >
+                  <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+              )}
               <div>
                 <h3 className={styles.modalTitle}>{t("report.title")}</h3>
                 <p className={styles.modalBody}>

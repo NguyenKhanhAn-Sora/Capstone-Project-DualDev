@@ -145,7 +145,7 @@ export function DateSelect({
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    const width = Math.max(rect.width, 280);
+    const width = Math.max(rect.width, 340);
     const left = clamp(rect.left, 8, Math.max(8, vw - 8 - width));
 
     const gap = 10;

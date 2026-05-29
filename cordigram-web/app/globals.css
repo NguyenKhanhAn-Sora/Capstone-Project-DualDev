@@ -346,10 +346,10 @@ body {
 
   .mobile-page {
     height: auto !important;
-    min-height: calc(100dvh - 56px - 60px);
+    min-height: calc(100dvh - 56px - 44px);
     overflow-y: visible;
-    /* bottom padding accounts for fixed bottom nav + safe area */
-    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    /* tab bar is now sticky at top — no bottom padding needed */
+    padding-bottom: 24px;
   }
 
   /* Messages page wrapper on mobile: fills height below top bar */
@@ -369,8 +369,8 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 10px; /* chiều rộng */
-  height: 10px; /* cho scrollbar ngang */
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -380,6 +380,16 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--color-scrollbar-thumb);
   border-radius: 8px;
+}
+
+/* Ẩn scrollbar trên mobile — không cần thiết và chiếm UI */
+@media (max-width: 767px) {
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes spin {

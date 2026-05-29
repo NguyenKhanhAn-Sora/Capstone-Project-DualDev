@@ -65,9 +65,37 @@
 }
 
 @media (max-width: 768px) {
+  /* Bỏ horizontal padding ở page — card tự có margin giống Flutter */
   .page {
-    padding: 16px 10px 24px;
-    gap: 16px;
+    padding: 0 0 24px;
+    gap: 0;
+  }
+
+  .centerColumn {
+    gap: 0;
+  }
+
+  /* Feed card trên mobile — margin 12px ngang, 6px dọc giống Flutter */
+  .feedCard {
+    margin: 6px 12px;
+    border-radius: 16px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+
+  /* PostUploadBanner vẫn full width */
+  .uploadBanner {
+    margin: 0 12px 6px;
+  }
+}
+
+/* Mobile PYMK strip — chỉ hiện khi sidebar ẩn (mobile/tablet) */
+.mobilePymkWrapper {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .mobilePymkWrapper {
+    display: block;
   }
 }
 
@@ -2108,4 +2136,153 @@
   .headerActions {
     flex-shrink: 0 !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REPORT MODAL — MOBILE BOTTOM SHEET (giống Flutter showModalBottomSheet)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Overlay riêng cho report — align bottom trên mobile */
+.reportOverlay {
+  /* desktop: same as .modalOverlay (inherited) */
+}
+
+@media (max-width: 767px) {
+  /* Overlay: bỏ center, align to bottom */
+  .reportOverlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+    backdrop-filter: blur(4px);
+  }
+
+  /* Card trở thành bottom sheet full-width */
+  .reportCard {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 85dvh;
+    border-radius: 16px 16px 0 0 !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  /* Drag handle pill ở top */
+  .reportCard::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-text-muted);
+    opacity: 0.28;
+    margin: 12px auto 4px;
+  }
+
+  /* Header: padding horizontal giống Flutter */
+  .reportCard .modalHeader {
+    padding: 10px 16px 12px;
+    border-bottom: 1px solid var(--color-border);
+    align-items: center;
+  }
+
+  /* Grid 2 cột → 1 cột, có padding */
+  .reportGrid {
+    grid-template-columns: 1fr !important;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  /* ─── Two-step flow: bước 1 chỉ hiện categories ─── */
+
+  /* Khi chưa chọn category: ẩn reasonPanel */
+  .reportCard[data-mobile-step="categories"] .reasonPanel {
+    display: none;
+  }
+
+  /* Khi đã chọn category: ẩn categoryGrid, chỉ hiện reasons */
+  .reportCard[data-mobile-step="reasons"] .categoryGrid {
+    display: none;
+  }
+
+  /* Category button: full-width list item giống Flutter */
+  .categoryCard {
+    border-radius: 10px !important;
+    padding: 12px 14px !important;
+    font-size: 14px;
+    transform: none !important;
+  }
+
+  .categoryCard:hover {
+    transform: none !important;
+  }
+
+  /* Nút back (mobile only) trong header — ẩn trên desktop */
+  .reportBackBtn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 4px 8px 4px 0;
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* Tên step header */
+  .reportStepTitle {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 2px;
+  }
+
+  /* Actions: 2 button full-width stack */
+  .reportCard .modalActions {
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-border);
+    flex-direction: row;
+    gap: 10px;
+  }
+
+  .reportCard .modalSecondary,
+  .reportCard .modalPrimary {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    padding: 0 12px;
+  }
+
+  /* Bottom sheet animation — slide up */
+  .reportCard.modalCardOpen {
+    animation: reportSheetIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  }
+
+  .reportCard.modalCardClosing {
+    animation: reportSheetOut 180ms ease-in forwards !important;
+  }
+}
+
+@keyframes reportSheetIn {
+  from { transform: translateY(100%); opacity: 0.6; }
+  to   { transform: translateY(0);    opacity: 1;   }
+}
+
+@keyframes reportSheetOut {
+  from { transform: translateY(0);    opacity: 1;   }
+  to   { transform: translateY(100%); opacity: 0;   }
+}
+
+/* Desktop: ẩn reportBackBtn (chỉ dùng trên mobile) */
+.reportBackBtn {
+  display: none;
+}
+
+/* reportStepTitle ẩn trên desktop */
+.reportStepTitle {
+  display: none;
 }

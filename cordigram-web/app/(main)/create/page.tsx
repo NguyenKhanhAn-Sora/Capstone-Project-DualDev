@@ -1016,7 +1016,8 @@ export default function CreatePostPage() {
   };
 
   const onHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
+    // Thêm hashtag khi nhấn Enter, Comma hoặc Space — giống mobile app
+    if (e.key === "Enter" || e.key === "," || e.key === " ") {
       e.preventDefault();
       addHashtag();
     }
@@ -1813,6 +1814,15 @@ export default function CreatePostPage() {
                       }
                       onKeyDown={onHashtagKeyDown}
                     />
+                    {/* Mobile: nút + để thêm hashtag không cần nhấn Enter */}
+                    <button
+                      type="button"
+                      className={styles.hashtagAddBtn}
+                      onClick={addHashtag}
+                      aria-label="Add hashtag"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1882,7 +1892,53 @@ export default function CreatePostPage() {
 
               <div className={styles.formGroup}>
                 <label htmlFor="audience">{t("visibilityLabel")}</label>
-                <div className={styles.dropdownShell} ref={audienceRef}>
+
+                {/* Mobile: full-width radio cards giống Flutter */}
+                <div className={styles.mobileAudienceList}>
+                  {audienceOptions.map((option) => {
+                    const isSelected = form.audience === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`${styles.mobileAudienceCard} ${isSelected ? styles.mobileAudienceCardActive : ""}`}
+                        onClick={() => handleAudienceSelect(option.value)}
+                      >
+                        <span className={styles.mobileAudienceIcon}>
+                          {option.value === "public" ? (
+                            <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z" />
+                            </svg>
+                          ) : option.value === "followers" ? (
+                            <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="9" cy="7" r="4" />
+                              <path d="M3 21v-2a7 7 0 0 1 7-7h4" />
+                              <circle cx="19" cy="15" r="3" />
+                              <path d="M19 12v6M16 15h6" />
+                            </svg>
+                          ) : (
+                            <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="11" width="18" height="11" rx="2" />
+                              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className={styles.mobileAudienceLabel}>{option.label}</span>
+                        {isSelected && (
+                          <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+                            style={{ color: "var(--color-primary)", flexShrink: 0 }}>
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop: dropdown (hidden on mobile) */}
+                <div className={`${styles.dropdownShell} ${styles.desktopOnly}`} ref={audienceRef}>
                   <button
                     type="button"
                     id="audience"
@@ -1945,6 +2001,7 @@ export default function CreatePostPage() {
               </div>
             </div>
 
+            {/* Toggle switches — iOS-style trên mobile */}
             <div className={styles.switchGroup}>
               <label className={styles.switchRow}>
                 <input

@@ -75,6 +75,20 @@ const CloseIcon = () => (
   </svg>
 );
 
+const MailIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="M22 7l-10 7L2 7" />
+  </svg>
+);
+
+const LockIcon = () => (
+  <svg aria-hidden width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -671,7 +685,176 @@ export default function LoginPage() {
 
   return (
     <div className={`${styles.page} ${styles["page-transition"]}`}>
-      <div className="min-h-screen">
+
+      {/* ====== MOBILE LAYOUT — giống 100% Flutter app ====== */}
+      <div
+        className="md:hidden min-h-screen overflow-y-auto"
+        style={{ background: "linear-gradient(to bottom, #1F4F7A 0%, #3470A2 35%, #F4F7FB 75%)" }}
+      >
+        <div className="px-5 pt-3 pb-5 max-w-[430px] mx-auto">
+
+          {/* Brand panel */}
+          <div className="flex flex-col items-center pt-[18px] pb-[18px]">
+            <img src="/logo.png" alt="Cordigram" width={100} height={100} className="rounded-2xl" />
+            <span className="mt-2.5 text-white font-bold text-[14px] tracking-[2px]">CORDIGRAM</span>
+          </div>
+
+          {/* White card */}
+          <div
+            className="bg-white rounded-[20px] px-4 pt-[18px] pb-4"
+            style={{ boxShadow: "0 10px 26px rgba(15,47,74,0.165)" }}
+          >
+            <h1 className="text-center text-[24px] font-extrabold text-[#0F172A]">Login</h1>
+
+            <form className="mt-[18px]" onSubmit={handleSubmit} noValidate>
+              {/* Email */}
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#64748B] pointer-events-none">
+                  <MailIcon />
+                </span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email"
+                  autoComplete="email"
+                  className="w-full h-[52px] pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="relative mt-3">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#64748B] pointer-events-none">
+                  <LockIcon />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                  placeholder="Mật khẩu"
+                  autoComplete="current-password"
+                  className="w-full h-[52px] pl-[44px] pr-[44px] rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] p-1"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  <EyeIcon open={showPassword} />
+                </button>
+              </div>
+
+              {/* Forgot password */}
+              <div className="flex justify-end mt-1 mb-1.5">
+                <button
+                  type="button"
+                  onClick={() => router.push("/forgot-password")}
+                  className="text-[#3470A2] font-semibold text-[14px] py-1.5"
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div className="mb-2 w-full px-3.5 py-2.5 rounded-[10px] bg-red-50 border border-red-200">
+                  <p className="text-red-700 text-[13px]">{error}</p>
+                </div>
+              )}
+
+              {/* Sign in button */}
+              <button
+                type="submit"
+                disabled={loading || checkingSession}
+                className="w-full h-[50px] rounded-[14px] bg-[#3470A2] text-white font-bold text-[16px] flex items-center justify-center disabled:opacity-70"
+              >
+                {loading ? (
+                  <span className="w-[22px] h-[22px] border-[2.5px] border-white border-t-transparent rounded-full animate-spin inline-block" />
+                ) : "Sign in"}
+              </button>
+            </form>
+
+            {/* Google button */}
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="mt-3 w-full h-[48px] rounded-[14px] border border-[#D7E5F2] bg-white flex items-center justify-center gap-2 text-[#1F2937] font-medium text-[14px]"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48">
+                <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+                <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+              </svg>
+              Tiếp tục với Google
+            </button>
+
+            {/* Sign up */}
+            <div className="flex items-center justify-center mt-[14px] text-[14px]">
+              <span className="text-[#64748B] font-medium">{"Don't have an account? "}</span>
+              <Link href="/signup" className="text-[#3470A2] font-bold ml-1">Sign up</Link>
+            </div>
+
+            {/* Recent accounts */}
+            {recentAccounts.length > 0 && (
+              <div className="mt-[14px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-[16px] text-[#0F172A]">Recent accounts</span>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAll(true)}
+                    disabled={clearingAll || !!removingEmail}
+                    className="text-[#3470A2] font-semibold text-[13px] px-2 py-1.5 disabled:opacity-50"
+                  >
+                    {clearingAll ? "Đang xóa..." : "Xóa tất cả"}
+                  </button>
+                </div>
+                <div className="mt-2 flex flex-col gap-2.5">
+                  {recentAccounts.map((acct) => {
+                    const label = acct.displayName || acct.username || "Account";
+                    const initial = label.charAt(0).toUpperCase();
+                    return (
+                      <div
+                        key={acct.email}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleAccountSelect(acct)}
+                        onKeyDown={(e) => handleCardKeyDown(e, acct)}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-[14px] border border-[#D7E5F2] bg-[#F6FAFF] cursor-pointer"
+                      >
+                        <div
+                          className="w-[42px] h-[42px] rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+                          style={{ background: "rgba(52,112,162,0.2)" }}
+                        >
+                          {acct.avatarUrl ? (
+                            <img src={acct.avatarUrl} alt={label} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-[#1D4E89] text-[18px] font-extrabold">{initial}</span>
+                          )}
+                        </div>
+                        <span className="flex-1 text-[14px] font-bold text-[#0F172A] truncate">{label}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setConfirmEmail(acct); }}
+                          disabled={removingEmail === acct.email || clearingAll}
+                          className="text-[#64748B] p-1 flex-shrink-0 disabled:opacity-50"
+                          aria-label={`Remove ${label}`}
+                        >
+                          <CloseIcon />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ====== DESKTOP LAYOUT ====== */}
+      <div className="hidden md:block min-h-screen">
         <div className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
           {hasRecentAccounts ? (
             <div className={styles["hero-panel"]}>
