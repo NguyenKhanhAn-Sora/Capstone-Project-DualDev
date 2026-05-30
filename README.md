@@ -166,49 +166,118 @@ The goal of this project was not to compete with existing platforms, but to deep
 
 ```
 Capstone-Project-DualDev/
-├── cordigram-backend/          # NestJS REST API & WebSocket server
+│
+├── cordigram-backend/                  # NestJS REST API & WebSocket server
 │   └── src/
-│       ├── auth/               # Authentication & authorization
-│       ├── users/              # User management & profiles
-│       ├── posts/              # Posts, reels, interactions
-│       ├── comments/           # Comments & reactions
-│       ├── messages/           # Server channel messaging
-│       ├── direct-messages/    # One-on-one DMs
-│       ├── servers/            # Community servers
-│       ├── channels/           # Server channels
-│       ├── livestream/         # Live streaming
-│       ├── call/               # Video & audio calls
-│       ├── notifications/      # Real-time notifications
-│       ├── hashtags/           # Hashtag tracking
-│       ├── search/             # Global search
-│       ├── payments/           # Stripe integration
-│       ├── moderation/         # Content moderation
-│       ├── admin/              # Admin operations
-│       └── ...
+│       ├── app.module.ts               # Root module
+│       ├── main.ts                     # Entry point
+│       │
+│       ├── auth/                       # JWT, Google OAuth, refresh tokens, OTP
+│       ├── users/                      # User profiles, blocking, muting, privacy
+│       ├── follows/                    # Follow/unfollow, follower lists
+│       ├── creator-verification/       # Creator badge verification queue
+│       │
+│       ├── posts/                      # Posts, visibility, scheduling, interactions
+│       ├── reels/                      # Short-form video feed
+│       ├── comments/                   # Comments & nested replies
+│       ├── polls/                      # In-post interactive polls
+│       ├── hashtags/                   # Trending hashtags, impression tracking
+│       ├── search/                     # Unified search (users, posts, reels, tags)
+│       ├── translation/                # DeepL auto-translate
+│       ├── captions/                   # Whisper AI auto-captions for reels
+│       │
+│       ├── messages/                   # Server channel messaging
+│       ├── direct-messages/            # One-on-one DMs
+│       ├── servers/                    # Discord-style community servers
+│       ├── channels/                   # Server channels & categories
+│       ├── server-invites/             # Invite links with expiration
+│       ├── events/                     # Server events
+│       │
+│       ├── livestream/                 # LiveKit broadcast sessions
+│       ├── call/                       # Video & audio calls (LiveKit + WebRTC)
+│       ├── notifications/              # Real-time push notifications (FCM + Socket.IO)
+│       ├── inbox/                      # Notification inbox
+│       ├── broadcast-notices/          # Admin system-wide notices
+│       │
+│       ├── payments/                   # Stripe checkout & webhooks
+│       ├── ads/                        # Ad campaigns, targeting, engagement
+│       ├── boost/                      # Premium profile upgrades
+│       │
+│       ├── moderation/                 # Flagged content review
+│       ├── report-posts/               # Post reports
+│       ├── report-comments/            # Comment reports
+│       ├── report-users/               # User reports
+│       ├── report-problems/            # Platform problem reports
+│       ├── audit/                      # Admin action audit trail
+│       │
+│       └── database/                   # Mongoose schemas & DB module
 │
-├── cordigram-web/              # Next.js web application
+├── cordigram-web/                      # Next.js 16 web application (App Router)
 │   └── app/
-│       ├── (auth)/             # Login, signup, OAuth
-│       ├── (main)/             # Authenticated user routes
-│       │   ├── page.tsx        # Home feed
-│       │   ├── explore/        # Explore page
-│       │   ├── reels/          # Reels feed
-│       │   ├── messages/       # DM & server messaging
-│       │   ├── search/         # Search
-│       │   ├── profile/        # User profiles
-│       │   ├── livestream/     # Live streams
-│       │   ├── boost/          # Premium features
-│       │   └── ads/            # Ad management
-│       └── (admin)/            # Admin dashboard routes
+│       ├── (auth)/                     # Public auth routes
+│       │   ├── login/
+│       │   ├── signup/
+│       │   ├── forgot-password/
+│       │   └── google-callback/
+│       │
+│       ├── (main)/                     # Protected user routes
+│       │   ├── page.tsx                # Home feed
+│       │   ├── explore/                # Algorithm-driven discovery
+│       │   ├── following/              # Chronological following feed
+│       │   ├── reels/[id]/             # Reel viewer
+│       │   ├── search/                 # Global search
+│       │   ├── profile/[id]/           # User profile (posts, reels, saved)
+│       │   ├── messages/               # DMs & server channel messaging
+│       │   ├── livestream/             # Live broadcast viewer
+│       │   ├── hashtag/                # Hashtag feed
+│       │   ├── ads/                    # Ad campaign management
+│       │   ├── boost/                  # Premium upgrade flow
+│       │   ├── settings/               # Account & privacy settings
+│       │   └── @modal/                 # Intercepted modal routes (post overlay)
+│       │
+│       ├── call/                       # Video/audio call interface
+│       ├── invite/server/[serverId]/   # Server invite landing page
+│       ├── events/[serverId]/[eventId]/ # Server event page
+│       └── api/                        # Internal API routes (translation proxy)
 │
-├── cordigram-mobile/           # Flutter mobile app (iOS & Android)
+├── cordigram-mobile/                   # Flutter mobile app (iOS & Android)
 │   └── lib/
-│       ├── screens/            # App screens
-│       ├── widgets/            # Reusable UI components
-│       ├── services/           # API & socket services
-│       └── models/             # Data models
+│       ├── core/
+│       │   ├── config/                 # App configuration
+│       │   ├── services/               # API, auth storage, push notifications,
+│       │   │                           # deep links, app updates, theme/language
+│       │   └── widgets/                # Shared widgets (comment sheet, etc.)
+│       │
+│       └── features/
+│           ├── auth/                   # Login, signup, forgot password
+│           ├── home/                   # Home feed, post cards, interactions
+│           ├── posts/                  # Create post/reel, polls, reposts, likes
+│           ├── reels/                  # Short-form video feed
+│           ├── explore/                # Discovery interface
+│           ├── following/              # Following feed
+│           ├── search/                 # Search screen
+│           ├── profile/                # User profile, edit, follow lists
+│           ├── messages/               # DMs, server channels, calls (LiveKit),
+│           │                           # polls, pinned messages, search
+│           ├── livestream/             # Create & view live streams
+│           ├── notifications/          # Push & real-time notifications
+│           ├── hashtag/                # Hashtag feed
+│           ├── ads/                    # Ad dashboard, campaign creation, payments
+│           ├── report/                 # Report post/comment/user/problem
+│           └── settings/               # App settings screen
 │
-└── cordigram-admin/            # Standalone admin dashboard (Next.js)
+└── cordigram-admin/                    # Standalone admin dashboard (Next.js 16)
+    └── app/
+        ├── dashboard/                  # Analytics & platform stats
+        ├── moderation/                 # Review flagged posts ([postId] detail)
+        ├── content-moderation/         # Content moderation tools
+        ├── report/                     # User reports with review/[type]/[id]
+        ├── creator-verification/       # Verification requests ([requestId])
+        ├── community-discovery/        # Server discovery management
+        ├── ads-management/             # Ad campaigns ([campaignId] detail)
+        ├── broadcast-notice/           # Send system-wide notices
+        ├── audit/                      # Full moderation audit log
+        └── login/                      # Admin authentication
 ```
 
 ---
@@ -223,14 +292,14 @@ Capstone-Project-DualDev/
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/Capstone-Project-DualDev.git
+git clone https://github.com/NguyenKhanhAn-Sora/Capstone-Project-DualDev
 cd Capstone-Project-DualDev
 ```
 
 ### 2. Backend setup
 ```bash
 cd cordigram-backend
-cp .env.example .env        # Fill in your environment variables
+cp .env.example .env        
 npm install
 npm run start:dev
 ```
@@ -238,7 +307,7 @@ npm run start:dev
 ### 3. Web setup
 ```bash
 cd cordigram-web
-cp .env.example .env.local  # Fill in your environment variables
+cp .env.example .env 
 npm install
 npm run dev
 ```
@@ -253,14 +322,54 @@ flutter run
 ### 5. Admin dashboard setup
 ```bash
 cd cordigram-admin
-cp .env.example .env.local
+cp .env.example .env
 npm install
 npm run dev
 ```
 
 ## 📱 Screenshots
 
-> *Coming soon — UI screenshots across web and mobile*
+### 🌐 Web
+
+| Home | Post | Profile |
+|------|------|---------|
+| ![Home](./cordigram-web/screenshot/home.jpg) | ![Post](./cordigram-web/screenshot/post.jpg) | ![Profile](./cordigram-web/screenshot/profile.jpg) |
+
+| Messages | Notifications | Settings |
+|----------|---------------|----------|
+| ![Messages](./cordigram-web/screenshot/message.jpg) | ![Notifications](./cordigram-web/screenshot/notification.jpg) | ![Settings](./cordigram-web/screenshot/settings.jpg) |
+
+| Ads |
+|-----|
+| ![Ads](./cordigram-web/screenshot/ads.jpg) |
+
+---
+
+### 📱 Mobile
+
+| Login | Home | Reels |
+|-------|------|-------|
+| ![Login](./cordigram-mobile/screenshot/login.jpg) | ![Home](./cordigram-mobile/screenshot/home.jpg) | ![Reels](./cordigram-mobile/screenshot/reels.jpg) |
+
+| Profile | Notifications | Settings |
+|---------|---------------|----------|
+| ![Profile](./cordigram-mobile/screenshot/profile.jpg) | ![Notifications](./cordigram-mobile/screenshot/notification.jpg) | ![Settings](./cordigram-mobile/screenshot/seettings.jpg) |
+
+| Comment Post | Menu User | Dashboard Ads |
+|--------------|-----------|---------------|
+| ![Comment Post](./cordigram-mobile/screenshot/commentpost.jpg) | ![Menu User](./cordigram-mobile/screenshot/menuuser.jpg) | ![Dashboard Ads](./cordigram-mobile/screenshot/dashboardads.jpg) |
+
+---
+
+### 🛡️ Admin Dashboard
+
+| Dashboard | Content Moderation |
+|-----------|--------------------|
+| ![Dashboard](./cordigram-admin/screenshot/dashboard.png) | ![Content Moderation](./cordigram-admin/screenshot/contentmoderation.jpg) |
+
+| Resolve Report | Audit Log |
+|----------------|-----------|
+| ![Resolve Report](./cordigram-admin/screenshot/resolvereport.jpg) | ![Audit Log](./cordigram-admin/screenshot/auditlog.jpg) |
 
 ---
 
@@ -289,12 +398,12 @@ Building Cordigram from scratch across four separate applications taught me:
 
 ## 👨‍💻 Team
 
-| Name | Role |
+| Name | Role | 
 |------|------|
-| Nguyễn Khánh An | Fullstack Developer |
-| *(teammate name)* | Fullstack Developer |
+| Nguyễn Khánh Ân   | Fullstack Developer | VTC Academy
+| Lê Thanh Tú       | Fullstack Developer | VTC Academy
 
-> Graduation Project — VTC Academy, Ho Chi Minh City, 2025
+> Capstone Project — VTC Academy, Ho Chi Minh City, 2026
 
 ---
 
