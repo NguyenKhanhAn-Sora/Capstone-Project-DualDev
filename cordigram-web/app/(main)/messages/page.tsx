@@ -2117,6 +2117,11 @@ export default function MessagesPage() {
   /** Luôn là kênh đang chọn (tránh closure cũ sau await trong loadMessages). */
   const selectedChannelRef = useRef<string | null>(null);
   const loadMessagesSeqRef = useRef(0);
+  const loadChannelsSeqRef = useRef(0);
+  /** Chọn kênh cụ thể ngay sau khi đổi server (tìm kiếm / deep link). */
+  const pendingChannelSelectRef = useRef<{ serverId: string; channelId: string } | null>(
+    null,
+  );
   useEffect(() => {
     selectedChannelRef.current = selectedChannel;
   }, [selectedChannel]);
@@ -3560,7 +3565,24 @@ export default function MessagesPage() {
     if (selectedServer) {
       setMessages([]);
       loadMessagesSeqRef.current += 1;
-      loadChannels(selectedServer);
+      const prevCh = prevChannelRef.current;
+      if (prevCh) {
+        leaveChannel(prevCh);
+        prevChannelRef.current = null;
+      }
+      setSelectedChannel(null);
+      selectedChannelRef.current = null;
+      setAllChannels([]);
+      setInfoChannels([]);
+      setTextChannels([]);
+      setVoiceChannels([]);
+      const pending = pendingChannelSelectRef.current;
+      if (pending?.serverId === selectedServer) {
+        pendingChannelSelectRef.current = null;
+        void loadChannels(selectedServer, { preferredChannelId: pending.channelId });
+      } else {
+        void loadChannels(selectedServer);
+      }
       loadActiveEvents(selectedServer);
       setSelectedDirectMessageFriend(null); // Clear selected DM friend when selecting server
       setShowBoostUpgradeView(false);
@@ -3628,7 +3650,7 @@ export default function MessagesPage() {
       setCanUseMentions(false);
       setServerInteractionSettings(null);
     }
-  }, [selectedServer, loadActiveEvents]);
+  }, [selectedServer, loadActiveEvents, leaveChannel]);
 
   // If selectedServer no longer exists (deleted/left), stop requesting it.
   useEffect(() => {
@@ -4535,6 +4557,7 @@ export default function MessagesPage() {
     serverId: string,
     opts?: { keepSelectedChannel?: boolean; preferredChannelId?: string },
   ) => {
+    const seq = ++loadChannelsSeqRef.current;
     try {
       let channels: serversApi.Channel[];
       let cats: serversApi.ServerCategory[];
@@ -4552,6 +4575,7 @@ export default function MessagesPage() {
       const sorted = (channels || []).sort(
         (a: serversApi.Channel, b: serversApi.Channel) => (a.position ?? 0) - (b.position ?? 0),
       );
+      if (loadChannelsSeqRef.current !== seq) return;
       setAllChannels(sorted);
       const info = sorted.filter(
         (c: serversApi.Channel) => c.type === "text" && c.category === "info" && !c.categoryId,
@@ -4684,6 +4708,8 @@ export default function MessagesPage() {
       prepareScrollToLatest();
       setError(null);
     } catch (err) {
+      if (loadMessagesSeqRef.current !== seq) return;
+      if (selectedChannelRef.current !== channelId) return;
       console.error("Failed to load messages", err);
       setError("Không tải được tin nhắn");
     }
@@ -6289,12 +6315,13 @@ export default function MessagesPage() {
       };
 
       setServers([...servers, serverWithChannels]);
-      setSelectedServer(serverWithChannels._id);
-
-      // Select the first text channel if available
-      if (serverWithChannels.textChannels && serverWithChannels.textChannels.length > 0) {
-        setSelectedChannel(serverWithChannels.textChannels[0]._id);
+      if (serverWithChannels.textChannels?.length) {
+        pendingChannelSelectRef.current = {
+          serverId: serverWithChannels._id,
+          channelId: serverWithChannels.textChannels[0]._id,
+        };
       }
+      setSelectedServer(serverWithChannels._id);
     } catch (err) {
       console.error("Failed to fetch created server", err);
       setError("Không tải được thông tin máy chủ");
@@ -7979,6 +8006,8 @@ export default function MessagesPage() {
       if (channel?.type === "voice") {
         setJoinedVoiceChannelId(channelId);
       }
+      setMessages([]);
+      loadMessagesSeqRef.current += 1;
       setSelectedChannel(channelId);
     },
     [
@@ -10312,6 +10341,11 @@ export default function MessagesPage() {
                 {/* Sticky reaction bar (DM): hiện reaction của tin nhắn khi kéo lên gần header */}
                 {/* Messages Container */}
                 <div
+                  key={
+                    selectedServer && selectedChannel
+                      ? `srv-${selectedServer}-ch-${selectedChannel}`
+                      : "server-channel-none"
+                  }
                   ref={messagesContainerRef}
                   className={styles.messagesContainer}
                   style={{ position: "relative" }}
@@ -11987,19 +12021,18 @@ export default function MessagesPage() {
           const friend = friends.find((f) => f._id === userId);
           if (friend) void handleSelectDirectMessageFriend(friend);
         }}
-        onQuickSwitchChannel={async (sid, cid) => {
+        onQuickSwitchChannel={(sid, cid) => {
           setShowMessageSearch(false);
           setMessageSearchDmConversationOnly(false);
           setSelectedDirectMessageFriend(null);
+          pendingChannelSelectRef.current = { serverId: sid, channelId: cid };
           setSelectedServer(sid);
-          await loadChannels(sid, { preferredChannelId: cid });
         }}
-        onQuickSwitchServer={async (sid) => {
+        onQuickSwitchServer={(sid) => {
           setShowMessageSearch(false);
           setMessageSearchDmConversationOnly(false);
           setSelectedDirectMessageFriend(null);
           setSelectedServer(sid);
-          await loadChannels(sid);
         }}
       />
 
