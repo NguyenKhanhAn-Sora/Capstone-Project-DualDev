@@ -144,12 +144,19 @@ export class DmCallSessionRegistry {
     return session;
   }
 
-  markAnswered(userA: string, userB: string): void {
+  /** Returns true only the first time the pair moves to connected. */
+  tryMarkAnswered(userA: string, userB: string): boolean {
     const session = this.getPairSession(userA, userB);
-    if (!session || session.logged) return;
+    if (!session || session.logged || session.answeredAt) return false;
     session.phase = 'connected';
     session.answeredAt = Date.now();
     session.lastHeartbeatAt = Date.now();
+    return true;
+  }
+
+  isAnswered(userA: string, userB: string): boolean {
+    const session = this.getPairSession(userA, userB);
+    return Boolean(session?.answeredAt && !session.logged);
   }
 
   touchHeartbeat(userA: string, userB: string): void {

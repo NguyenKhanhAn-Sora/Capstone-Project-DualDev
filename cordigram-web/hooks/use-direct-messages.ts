@@ -82,6 +82,11 @@ export interface CallBusyEvent {
   peerId?: string;
 }
 
+export interface CallIncomingDismissEvent {
+  peerId: string;
+  reason: "answered_elsewhere" | "rejected" | "cancelled";
+}
+
 export type { CallSessionsSyncPayload, CallSessionSyncItem };
 
 export interface UserProfileStyleUpdatedEvent {
@@ -166,6 +171,8 @@ export const useDirectMessages = ({
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
   const [callSessionsSync, setCallSessionsSync] =
     useState<CallSessionsSyncPayload>({ sessions: [], at: 0 });
+  const [callIncomingDismiss, setCallIncomingDismiss] =
+    useState<CallIncomingDismissEvent | null>(null);
   const [messageDeleted, setMessageDeleted] = useState<{
     messageId: string;
     deleteType?: "for-everyone" | "for-me";
@@ -447,6 +454,12 @@ export const useDirectMessages = ({
       if (parsed) setCallSessionsSync(parsed);
     });
 
+    socket.on("call-incoming-dismiss", (data: CallIncomingDismissEvent) => {
+      if (!data?.peerId) return;
+      setCallIncomingDismiss(data);
+      setTimeout(() => setCallIncomingDismiss(null), 500);
+    });
+
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
       const evt: CallEvent = {
         from: data.from,
@@ -677,6 +690,7 @@ export const useDirectMessages = ({
     callEvent,
     callBusy,
     callSessionsSync,
+    callIncomingDismiss,
     callEnded,
     messageDeleted,
     userProfileStyleUpdated,

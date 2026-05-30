@@ -74,6 +74,16 @@ class DmCallBusyEvent {
   final String? peerId;
 }
 
+class DmCallIncomingDismissEvent {
+  const DmCallIncomingDismissEvent({
+    required this.peerId,
+    required this.reason,
+  });
+
+  final String peerId;
+  final String reason; // answered_elsewhere | rejected | cancelled
+}
+
 class DirectMessagesRealtimeService {
   DirectMessagesRealtimeService._();
 
@@ -97,6 +107,9 @@ class DirectMessagesRealtimeService {
   static final StreamController<DmCallSessionsSyncPayload>
   _callSessionsSyncController =
       StreamController<DmCallSessionsSyncPayload>.broadcast();
+  static final StreamController<DmCallIncomingDismissEvent>
+  _callIncomingDismissController =
+      StreamController<DmCallIncomingDismissEvent>.broadcast();
   static DmCallSessionsSyncPayload _lastCallSessionsSync =
       const DmCallSessionsSyncPayload(sessions: [], at: 0);
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
@@ -122,6 +135,8 @@ class DirectMessagesRealtimeService {
   static Stream<DmCallBusyEvent> get callBusy => _callBusyController.stream;
   static Stream<DmCallSessionsSyncPayload> get callSessionsSync =>
       _callSessionsSyncController.stream;
+  static Stream<DmCallIncomingDismissEvent> get callIncomingDismiss =>
+      _callIncomingDismissController.stream;
   static DmCallSessionsSyncPayload get lastCallSessionsSync =>
       _lastCallSessionsSync;
   static Stream<Map<String, dynamic>> get messageDeleted =>
@@ -255,6 +270,18 @@ class DirectMessagesRealtimeService {
       if (parsed == null) return;
       _lastCallSessionsSync = parsed;
       _callSessionsSyncController.add(parsed);
+    });
+    socket.on('call-incoming-dismiss', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      final peerId = (data['peerId'] ?? '').toString().trim();
+      if (peerId.isEmpty) return;
+      _callIncomingDismissController.add(
+        DmCallIncomingDismissEvent(
+          peerId: peerId,
+          reason: (data['reason'] ?? 'answered_elsewhere').toString(),
+        ),
+      );
     });
     socket.on('ice-candidate', (payload) {
       if (payload is! Map) return;
@@ -435,6 +462,7 @@ class DirectMessagesRealtimeService {
       socket.off('call-rejected');
       socket.off('call-busy');
       socket.off('call-sessions-sync');
+      socket.off('call-incoming-dismiss');
       socket.off('ice-candidate');
       socket.off('call-ended');
       socket.off('message-deleted');

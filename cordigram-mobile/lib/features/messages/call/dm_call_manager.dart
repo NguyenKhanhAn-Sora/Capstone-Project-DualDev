@@ -41,6 +41,7 @@ class DmCallManager extends ChangeNotifier {
   StreamSubscription<String>? _endedSub;
   StreamSubscription<DmCallBusyEvent>? _busySub;
   StreamSubscription<DmCallSessionsSyncPayload>? _sessionsSyncSub;
+  StreamSubscription<DmCallIncomingDismissEvent>? _incomingDismissSub;
   Timer? _callHeartbeatTimer;
   List<DmCallSessionSyncItem> _serverSessions = const [];
   bool _initialized = false;
@@ -140,6 +141,8 @@ class DmCallManager extends ChangeNotifier {
     _serverSessions = DirectMessagesRealtimeService.lastCallSessionsSync.sessions;
     _sessionsSyncSub =
         DirectMessagesRealtimeService.callSessionsSync.listen(_onSessionsSync);
+    _incomingDismissSub = DirectMessagesRealtimeService.callIncomingDismiss
+        .listen(_onIncomingDismiss);
     unawaited(_refreshMyName());
   }
 
@@ -233,6 +236,7 @@ class DmCallManager extends ChangeNotifier {
     _endedSub?.cancel();
     _busySub?.cancel();
     _sessionsSyncSub?.cancel();
+    _incomingDismissSub?.cancel();
     _stopCallHeartbeat();
     super.dispose();
   }
@@ -334,6 +338,18 @@ class DmCallManager extends ChangeNotifier {
   Future<void> acceptIncoming() async {
     final inc = _incoming;
     if (inc == null) return;
+
+    final alreadyConnected = _serverSessions.any(
+      (s) =>
+          s.phase == 'connected' &&
+          s.peerId == inc.callerUserId,
+    );
+    if (alreadyConnected || _active != null) {
+      _dismissIncomingForPeer(inc.callerUserId);
+      notifyListeners();
+      return;
+    }
+
     try {
       await _ensurePermissions(video: inc.video);
     } catch (err) {
@@ -383,9 +399,16 @@ class DmCallManager extends ChangeNotifier {
   void rejectIncoming() {
     final inc = _incoming;
     if (inc == null) return;
-    DirectMessagesRealtimeService.rejectCall(inc.callerUserId);
-    _incomingTimer?.cancel();
-    _incoming = null;
+    final callerId = inc.callerUserId;
+    final alreadyConnected = _serverSessions.any(
+      (s) => s.phase == 'connected' && s.peerId == callerId,
+    );
+    _dismissIncomingForPeer(callerId);
+    if (alreadyConnected || _active != null) {
+      notifyListeners();
+      return;
+    }
+    DirectMessagesRealtimeService.rejectCall(callerId);
     notifyListeners();
   }
 
@@ -580,8 +603,30 @@ class DmCallManager extends ChangeNotifier {
     _showSnack(msg);
   }
 
+  void _onIncomingDismiss(DmCallIncomingDismissEvent event) {
+    _dismissIncomingForPeer(event.peerId);
+    if (event.reason == 'rejected' ||
+        event.reason == 'answered_elsewhere') {
+      if (_outgoings.containsKey(event.peerId)) {
+        _cancelOutgoingFor(event.peerId, notify: false);
+      }
+    }
+    notifyListeners();
+  }
+
+  void _dismissIncomingForPeer(String peerId) {
+    if (_incoming?.callerUserId != peerId) return;
+    _incomingTimer?.cancel();
+    _incoming = null;
+  }
+
   void _onSessionsSync(DmCallSessionsSyncPayload payload) {
     _serverSessions = payload.sessions;
+    for (final s in _serverSessions) {
+      if (s.phase == 'connected') {
+        _dismissIncomingForPeer(s.peerId);
+      }
+    }
     if (!canMobileInitiateCall(_serverSessions)) {
       for (final peerId in _outgoings.keys.toList()) {
         if (!isBusyWithPeer(_serverSessions, peerId)) {

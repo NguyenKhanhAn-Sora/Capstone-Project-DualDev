@@ -87,6 +87,22 @@ export class DirectMessagesGateway
     }
   }
 
+  /** Close incoming-call UI on every session of [userId] except [exceptSocketId]. */
+  private emitIncomingDismiss(
+    userId: string,
+    peerId: string,
+    reason: 'answered_elsewhere' | 'rejected' | 'cancelled',
+    exceptSocketId?: string,
+  ): void {
+    const sockets = this.connectedUsers.get(userId);
+    if (!sockets?.size) return;
+    const payload = { peerId, reason };
+    for (const sid of sockets) {
+      if (exceptSocketId && sid === exceptSocketId) continue;
+      this.server.to(sid).emit('call-incoming-dismiss', payload);
+    }
+  }
+
   private clearActiveCall(userA: string, userB: string): void {
     this.callRegistry.deletePair(userA, userB);
     this.syncCallSessionsForUsers(userA, userB);
@@ -895,11 +911,24 @@ export class DirectMessagesGateway
     @MessageBody() data: { callerId: string; sdpOffer: any },
   ) {
     const userId = socket.data.userId;
-    this.callRegistry.markAnswered(userId, data.callerId);
-    const session = this.callRegistry.getPairSession(userId, data.callerId);
-    this.syncCallSessionsForUsers(userId, data.callerId);
+    const callerId = data.callerId;
 
-    const callerSocket = this.connectedUsers.get(data.callerId);
+    if (this.callRegistry.isAnswered(userId, callerId)) {
+      this.emitIncomingDismiss(userId, callerId, 'answered_elsewhere');
+      return;
+    }
+
+    const firstAnswer = this.callRegistry.tryMarkAnswered(userId, callerId);
+    if (!firstAnswer) {
+      this.emitIncomingDismiss(userId, callerId, 'answered_elsewhere');
+      return;
+    }
+
+    const session = this.callRegistry.getPairSession(userId, callerId);
+    this.emitIncomingDismiss(userId, callerId, 'answered_elsewhere', socket.id);
+    this.syncCallSessionsForUsers(userId, callerId);
+
+    const callerSocket = this.connectedUsers.get(callerId);
     const answerPayload = {
       from: userId,
       sdpOffer: data.sdpOffer,
@@ -915,6 +944,7 @@ export class DirectMessagesGateway
           this.server.to(firstSid).emit('call-answer', answerPayload);
         }
       }
+      this.emitIncomingDismiss(callerId, userId, 'answered_elsewhere');
     }
   }
 
@@ -924,7 +954,19 @@ export class DirectMessagesGateway
     @MessageBody() data: { callerId: string },
   ) {
     const userId = socket.data.userId;
-    const callerSocket = this.connectedUsers.get(data.callerId);
+    const callerId = data.callerId;
+
+    if (this.callRegistry.isAnswered(userId, callerId)) {
+      socket.emit('call-incoming-dismiss', {
+        peerId: callerId,
+        reason: 'answered_elsewhere',
+      });
+      return;
+    }
+
+    this.emitIncomingDismiss(userId, callerId, 'rejected', socket.id);
+
+    const callerSocket = this.connectedUsers.get(callerId);
 
     if (callerSocket && callerSocket.size) {
       for (const sid of callerSocket) {
@@ -932,10 +974,11 @@ export class DirectMessagesGateway
           from: userId,
         });
       }
+      this.emitIncomingDismiss(callerId, userId, 'rejected');
     }
 
-    await this.finalizeActiveCall(data.callerId, userId, userId, 'missed');
-    this.syncCallSessionsForUsers(data.callerId, userId);
+    await this.finalizeActiveCall(callerId, userId, userId, 'missed');
+    this.syncCallSessionsForUsers(callerId, userId);
   }
 
   @SubscribeMessage('call-heartbeat')
