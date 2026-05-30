@@ -2098,6 +2098,7 @@ export default function MessagesPage() {
     callBusy,
     callSessionsSync,
     callIncomingDismiss,
+    callOutgoingAck,
     callEnded,
     messageDeleted,
     dmUnreadCountEvent,
@@ -2555,7 +2556,14 @@ export default function MessagesPage() {
       callTabIdRef.current = tabId;
       const peerId = selectedDirectMessageFriend._id;
 
-      if (!canWebInitiateToPeer(callSessionsSync.sessions, peerId)) {
+      if (outgoingCallsByPeerRef.current[peerId]?.status === "calling") {
+        return;
+      }
+
+      if (
+        !canWebInitiateToPeer(callSessionsSync.sessions, peerId) &&
+        !outgoingCallsByPeerRef.current[peerId]
+      ) {
         setError(
           "Bạn đang trong cuộc gọi với người này trên thiết bị hoặc tab khác. Hãy kết thúc cuộc gọi trước.",
         );
@@ -2763,23 +2771,37 @@ export default function MessagesPage() {
     if (!callBusy) return;
     const tabId = callTabIdRef.current;
     const peerId = callBusy.receiverId || callBusy.peerId;
-    if (peerId) {
-      releaseOutboundCallLock(tabId, peerId);
-      setOutgoingCallsByPeer((prev) => {
-        if (!prev[peerId]) return prev;
-        const next = { ...prev };
-        delete next[peerId];
-        return next;
-      });
+    if (!peerId) return;
+
+    const outgoing = outgoingCallsByPeerRef.current[peerId];
+    if (outgoing?.status === "calling" && callBusy.code === "already_in_call") {
+      return;
     }
-    const msg =
-      callBusy.code === "peer_busy"
-        ? "Người nhận đang bận cuộc gọi khác."
-        : callBusy.code === "user_busy"
-          ? "Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp."
-          : "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.";
-    setError(msg);
-  }, [callBusy]);
+
+    const hadOutgoing = Boolean(outgoing);
+    releaseOutboundCallLock(tabId, peerId);
+    setOutgoingCallsByPeer((prev) => {
+      if (!prev[peerId]) return prev;
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
+    if (hadOutgoing || callBusy.code === "peer_busy") {
+      endCall(peerId);
+    }
+
+    if (callBusy.code === "peer_busy") {
+      setError("Người nhận đang bận cuộc gọi khác.");
+    } else if (callBusy.code === "user_busy") {
+      setError(
+        "Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp.",
+      );
+    } else if (!hadOutgoing) {
+      setError(
+        "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
+      );
+    }
+  }, [callBusy, endCall]);
 
   useEffect(() => {
     if (!callIncomingDismiss?.peerId) return;
@@ -2801,6 +2823,37 @@ export default function MessagesPage() {
       });
     }
   }, [callIncomingDismiss]);
+
+  useEffect(() => {
+    if (!callOutgoingAck?.peerId) return;
+    const peerId = String(callOutgoingAck.peerId);
+    if (outgoingCallsByPeerRef.current[peerId]) return;
+
+    const friend =
+      friends?.find((f) => String(f._id) === peerId) ??
+      (selectedDirectMessageFriend &&
+      String(selectedDirectMessageFriend._id) === peerId
+        ? selectedDirectMessageFriend
+        : null);
+
+    setOutgoingCallsByPeer((prev) => {
+      if (prev[peerId]) return prev;
+      return {
+        ...prev,
+        [peerId]: {
+          to: peerId,
+          toUser: {
+            displayName:
+              friend?.displayName || friend?.username || "Người dùng",
+            username: friend?.username || "",
+            avatarUrl: friend?.avatarUrl,
+          },
+          type: callOutgoingAck.type === "video" ? "video" : "audio",
+          status: "calling",
+        },
+      };
+    });
+  }, [callOutgoingAck, friends, selectedDirectMessageFriend]);
 
   useEffect(() => {
     const connected = callSessionsSync.sessions.filter(

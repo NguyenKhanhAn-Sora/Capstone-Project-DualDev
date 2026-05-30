@@ -92,13 +92,17 @@ export class DmCallSessionRegistry {
     calleeId: string;
     platform: CallClientPlatform;
   }):
-    | { ok: true }
+    | { ok: true; idempotent?: boolean }
     | { ok: false; code: CallBusyCode; peerId?: string } {
     this.pruneStale();
     const { initiatorId, calleeId, platform } = params;
 
     const pair = this.getPairSession(initiatorId, calleeId);
     if (pair && !pair.logged) {
+      if (pair.initiatorId === initiatorId) {
+        pair.lastHeartbeatAt = Date.now();
+        return { ok: true, idempotent: true };
+      }
       return { ok: false, code: 'already_in_call', peerId: calleeId };
     }
 

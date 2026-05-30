@@ -87,6 +87,12 @@ export interface CallIncomingDismissEvent {
   reason: "answered_elsewhere" | "rejected" | "cancelled";
 }
 
+export interface CallOutgoingAckEvent {
+  peerId: string;
+  type: "audio" | "video";
+  status: "calling";
+}
+
 export type { CallSessionsSyncPayload, CallSessionSyncItem };
 
 export interface UserProfileStyleUpdatedEvent {
@@ -173,6 +179,8 @@ export const useDirectMessages = ({
     useState<CallSessionsSyncPayload>({ sessions: [], at: 0 });
   const [callIncomingDismiss, setCallIncomingDismiss] =
     useState<CallIncomingDismissEvent | null>(null);
+  const [callOutgoingAck, setCallOutgoingAck] =
+    useState<CallOutgoingAckEvent | null>(null);
   const [messageDeleted, setMessageDeleted] = useState<{
     messageId: string;
     deleteType?: "for-everyone" | "for-me";
@@ -460,6 +468,12 @@ export const useDirectMessages = ({
       setTimeout(() => setCallIncomingDismiss(null), 500);
     });
 
+    socket.on("call-outgoing-ack", (data: CallOutgoingAckEvent) => {
+      if (!data?.peerId) return;
+      setCallOutgoingAck(data);
+      setTimeout(() => setCallOutgoingAck(null), 500);
+    });
+
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
       const evt: CallEvent = {
         from: data.from,
@@ -691,6 +705,7 @@ export const useDirectMessages = ({
     callBusy,
     callSessionsSync,
     callIncomingDismiss,
+    callOutgoingAck,
     callEnded,
     messageDeleted,
     userProfileStyleUpdated,

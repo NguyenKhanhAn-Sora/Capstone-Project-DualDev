@@ -74,6 +74,18 @@ class DmCallBusyEvent {
   final String? peerId;
 }
 
+class DmCallOutgoingAckEvent {
+  const DmCallOutgoingAckEvent({
+    required this.peerId,
+    required this.type,
+    required this.status,
+  });
+
+  final String peerId;
+  final String type;
+  final String status;
+}
+
 class DmCallIncomingDismissEvent {
   const DmCallIncomingDismissEvent({
     required this.peerId,
@@ -110,6 +122,9 @@ class DirectMessagesRealtimeService {
   static final StreamController<DmCallIncomingDismissEvent>
   _callIncomingDismissController =
       StreamController<DmCallIncomingDismissEvent>.broadcast();
+  static final StreamController<DmCallOutgoingAckEvent>
+  _callOutgoingAckController =
+      StreamController<DmCallOutgoingAckEvent>.broadcast();
   static DmCallSessionsSyncPayload _lastCallSessionsSync =
       const DmCallSessionsSyncPayload(sessions: [], at: 0);
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
@@ -137,6 +152,8 @@ class DirectMessagesRealtimeService {
       _callSessionsSyncController.stream;
   static Stream<DmCallIncomingDismissEvent> get callIncomingDismiss =>
       _callIncomingDismissController.stream;
+  static Stream<DmCallOutgoingAckEvent> get callOutgoingAck =>
+      _callOutgoingAckController.stream;
   static DmCallSessionsSyncPayload get lastCallSessionsSync =>
       _lastCallSessionsSync;
   static Stream<Map<String, dynamic>> get messageDeleted =>
@@ -270,6 +287,19 @@ class DirectMessagesRealtimeService {
       if (parsed == null) return;
       _lastCallSessionsSync = parsed;
       _callSessionsSyncController.add(parsed);
+    });
+    socket.on('call-outgoing-ack', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      final peerId = (data['peerId'] ?? '').toString().trim();
+      if (peerId.isEmpty) return;
+      _callOutgoingAckController.add(
+        DmCallOutgoingAckEvent(
+          peerId: peerId,
+          type: (data['type'] ?? 'audio').toString(),
+          status: (data['status'] ?? 'calling').toString(),
+        ),
+      );
     });
     socket.on('call-incoming-dismiss', (payload) {
       if (payload is! Map) return;
@@ -462,6 +492,7 @@ class DirectMessagesRealtimeService {
       socket.off('call-rejected');
       socket.off('call-busy');
       socket.off('call-sessions-sync');
+      socket.off('call-outgoing-ack');
       socket.off('call-incoming-dismiss');
       socket.off('ice-candidate');
       socket.off('call-ended');

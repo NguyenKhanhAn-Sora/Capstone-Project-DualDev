@@ -88,6 +88,20 @@ export class DirectMessagesGateway
   }
 
   /** Close incoming-call UI on every session of [userId] except [exceptSocketId]. */
+  /** Sync outbound "calling" UI to every session of the initiator (cross-tab/device). */
+  private emitOutgoingAck(
+    initiatorId: string,
+    peerId: string,
+    type: 'audio' | 'video',
+  ): void {
+    const sockets = this.connectedUsers.get(initiatorId);
+    if (!sockets?.size) return;
+    const payload = { peerId, type, status: 'calling' as const };
+    for (const sid of sockets) {
+      this.server.to(sid).emit('call-outgoing-ack', payload);
+    }
+  }
+
   private emitIncomingDismiss(
     userId: string,
     peerId: string,
@@ -854,6 +868,7 @@ export class DirectMessagesGateway
         return;
       }
 
+      const idempotent = gate.ok && gate.idempotent === true;
       const receiverSocket = this.connectedUsers.get(data.receiverId);
 
       // Get sender's profile for username and avatar
@@ -873,33 +888,37 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
-      this.callRegistry.createSession({
-        initiatorId: senderId,
-        calleeId: data.receiverId,
-        type: data.type,
-        initiatorSocketId: socket.id,
-        platform,
-      });
-      this.syncCallSessionsForUsers(senderId, data.receiverId);
-
-      if (receiverSocket && receiverSocket.size) {
-        const payload = {
-          from: senderId,
+      if (!idempotent) {
+        this.callRegistry.createSession({
+          initiatorId: senderId,
+          calleeId: data.receiverId,
           type: data.type,
-          callerInfo,
-        };
-
-        for (const sid of receiverSocket) {
-          this.server.to(sid).emit('call-incoming', payload);
-        }
-      } else {
-        void this.fcmPushService.pushDmCallIncoming({
-          receiverUserId: data.receiverId,
-          callerUserId: senderId,
-          type: data.type,
-          callerInfo,
+          initiatorSocketId: socket.id,
+          platform,
         });
+
+        if (receiverSocket && receiverSocket.size) {
+          const payload = {
+            from: senderId,
+            type: data.type,
+            callerInfo,
+          };
+
+          for (const sid of receiverSocket) {
+            this.server.to(sid).emit('call-incoming', payload);
+          }
+        } else {
+          void this.fcmPushService.pushDmCallIncoming({
+            receiverUserId: data.receiverId,
+            callerUserId: senderId,
+            type: data.type,
+            callerInfo,
+          });
+        }
       }
+
+      this.syncCallSessionsForUsers(senderId, data.receiverId);
+      this.emitOutgoingAck(senderId, data.receiverId, data.type);
     } catch (error) {
       console.error('❌ [CALL] Error initiating call:', error);
     }
