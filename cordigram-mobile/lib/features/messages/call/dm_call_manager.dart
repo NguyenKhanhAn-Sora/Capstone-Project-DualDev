@@ -42,7 +42,8 @@ class DmCallManager extends ChangeNotifier {
   StreamSubscription<DmCallBusyEvent>? _busySub;
   StreamSubscription<DmCallSessionsSyncPayload>? _sessionsSyncSub;
   StreamSubscription<DmCallIncomingDismissEvent>? _incomingDismissSub;
-  StreamSubscription<DmCallOutgoingAckEvent>? _outgoingAckSub;
+  StreamSubscription<DmCallOutgoingSyncEvent>? _outgoingSyncSub;
+  final Set<String> _callStartInFlight = {};
   Timer? _callHeartbeatTimer;
   List<DmCallSessionSyncItem> _serverSessions = const [];
   bool _initialized = false;
@@ -144,8 +145,8 @@ class DmCallManager extends ChangeNotifier {
         DirectMessagesRealtimeService.callSessionsSync.listen(_onSessionsSync);
     _incomingDismissSub = DirectMessagesRealtimeService.callIncomingDismiss
         .listen(_onIncomingDismiss);
-    _outgoingAckSub =
-        DirectMessagesRealtimeService.callOutgoingAck.listen(_onOutgoingAck);
+    _outgoingSyncSub =
+        DirectMessagesRealtimeService.callOutgoingSync.listen(_onOutgoingSync);
     unawaited(_refreshMyName());
   }
 
@@ -240,7 +241,7 @@ class DmCallManager extends ChangeNotifier {
     _busySub?.cancel();
     _sessionsSyncSub?.cancel();
     _incomingDismissSub?.cancel();
-    _outgoingAckSub?.cancel();
+    _outgoingSyncSub?.cancel();
     _stopCallHeartbeat();
     super.dispose();
   }
@@ -264,67 +265,67 @@ class DmCallManager extends ChangeNotifier {
       return;
     }
     if (_outgoings.containsKey(peerUserId)) return;
+    if (_callStartInFlight.contains(peerUserId)) return;
     if (_outgoings.isNotEmpty) {
       _showSnack('Bạn đang gọi người khác. Hãy hủy cuộc gọi đó trước.');
       return;
     }
-    if (isBusyWithPeer(_serverSessions, peerUserId) &&
-        !_outgoings.containsKey(peerUserId)) {
-      _showSnack(
-        'Cuộc gọi tới người này đang diễn ra trên thiết bị hoặc tab khác.',
-      );
-      return;
-    }
     if (!canMobileInitiateCall(_serverSessions)) {
-      _showSnack(
-        'Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp.',
-      );
+      if (isBusyWithPeer(_serverSessions, peerUserId)) {
+        _showSnack(
+          'Bạn đang gọi người này từ thiết bị hoặc tab khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
+        );
+      } else {
+        _showSnack(
+          'Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp.',
+        );
+      }
       return;
     }
     if ((AuthStorage.accessToken ?? '').isEmpty) {
       await AuthStorage.loadAll();
     }
 
+    _callStartInFlight.add(peerUserId);
     try {
       await _ensurePermissions(video: video);
+
+      await DirectMessagesRealtimeService.connect();
+
+      if (_myName == null || _myName!.isEmpty) {
+        await _refreshMyName();
+      }
+      final resolvedMyName = _resolveMyName(preferred: myName);
+
+      DirectMessagesRealtimeService.initiateCall(
+        receiverId: peerUserId,
+        isVideo: video,
+      );
+
+      _outgoings[peerUserId] = OutgoingCallState(
+        peerUserId: peerUserId,
+        peerName: peerName,
+        peerAvatarUrl: peerAvatarUrl,
+        video: video,
+        myName: resolvedMyName,
+        status: OutgoingCallStatus.calling,
+      );
+      _outgoingTimers[peerUserId]?.cancel();
+      _outgoingTimers[peerUserId] = Timer(_outgoingTimeout, () {
+        final out = _outgoings[peerUserId];
+        if (out?.status == OutgoingCallStatus.calling) {
+          DirectMessagesRealtimeService.endCall(peerUserId);
+          _updateOutgoingStatus(peerUserId, OutgoingCallStatus.noAnswer);
+          _scheduleOutgoingDismiss(peerUserId);
+        }
+      });
+      _restartCallHeartbeat();
+      notifyListeners();
     } catch (err) {
       _showSnack('$err');
-      return;
+    } finally {
+      _callStartInFlight.remove(peerUserId);
     }
-
-    // Make sure the socket is actually connected before we emit.
-    await DirectMessagesRealtimeService.connect();
-
-    // Refresh cached display name on-demand if we don't have one yet.
-    if (_myName == null || _myName!.isEmpty) {
-      await _refreshMyName();
-    }
-    final resolvedMyName = _resolveMyName(preferred: myName);
-
-    DirectMessagesRealtimeService.initiateCall(
-      receiverId: peerUserId,
-      isVideo: video,
-    );
-
-    _outgoings[peerUserId] = OutgoingCallState(
-      peerUserId: peerUserId,
-      peerName: peerName,
-      peerAvatarUrl: peerAvatarUrl,
-      video: video,
-      myName: resolvedMyName,
-      status: OutgoingCallStatus.calling,
-    );
-    _outgoingTimers[peerUserId]?.cancel();
-    _outgoingTimers[peerUserId] = Timer(_outgoingTimeout, () {
-      final out = _outgoings[peerUserId];
-      if (out?.status == OutgoingCallStatus.calling) {
-        DirectMessagesRealtimeService.endCall(peerUserId);
-        _updateOutgoingStatus(peerUserId, OutgoingCallStatus.noAnswer);
-        _scheduleOutgoingDismiss(peerUserId);
-      }
-    });
-    _restartCallHeartbeat();
-    notifyListeners();
   }
 
   void cancelOutgoingFor(String peerUserId) {
@@ -597,27 +598,27 @@ class DmCallManager extends ChangeNotifier {
 
   void _onCallBusy(DmCallBusyEvent event) {
     final peerId = event.receiverId ?? event.peerId;
-    if (peerId != null && peerId.isNotEmpty) {
-      final out = _outgoings[peerId];
-      if (out?.status == OutgoingCallStatus.calling &&
-          event.code == 'already_in_call') {
-        return;
-      }
-      if (_outgoings.containsKey(peerId)) {
-        DirectMessagesRealtimeService.endCall(peerId);
-        _cancelOutgoingFor(peerId, notify: false);
-      }
-    }
+    if (peerId == null || peerId.isEmpty) return;
     final msg = event.code == 'peer_busy'
         ? 'Người nhận đang bận cuộc gọi khác.'
         : event.code == 'user_busy'
         ? 'Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp.'
         : 'Bạn đang gọi người này từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.';
+
+    if (event.code == 'already_in_call') {
+      if (_outgoings.containsKey(peerId)) return;
+      _showSnack(msg);
+      return;
+    }
+
+    if (_outgoings.containsKey(peerId)) {
+      _cancelOutgoingFor(peerId);
+    }
     _showSnack(msg);
   }
 
-  void _onOutgoingAck(DmCallOutgoingAckEvent event) {
-    if (_outgoings.containsKey(event.peerId) || _active != null) return;
+  void _onOutgoingSync(DmCallOutgoingSyncEvent event) {
+    if (_outgoings.containsKey(event.peerId)) return;
     _outgoings[event.peerId] = OutgoingCallState(
       peerUserId: event.peerId,
       peerName: event.peerId,
@@ -626,22 +627,14 @@ class DmCallManager extends ChangeNotifier {
       myName: _resolveMyName(),
       status: OutgoingCallStatus.calling,
     );
-    _outgoingTimers[event.peerId]?.cancel();
-    _outgoingTimers[event.peerId] = Timer(_outgoingTimeout, () {
-      if (_outgoings[event.peerId]?.status == OutgoingCallStatus.calling) {
-        DirectMessagesRealtimeService.endCall(event.peerId);
-        _updateOutgoingStatus(event.peerId, OutgoingCallStatus.noAnswer);
-        _scheduleOutgoingDismiss(event.peerId);
-      }
-    });
-    _restartCallHeartbeat();
     notifyListeners();
   }
 
   void _onIncomingDismiss(DmCallIncomingDismissEvent event) {
     _dismissIncomingForPeer(event.peerId);
     if (event.reason == 'rejected' ||
-        event.reason == 'answered_elsewhere') {
+        event.reason == 'answered_elsewhere' ||
+        event.reason == 'cancelled') {
       if (_outgoings.containsKey(event.peerId)) {
         _cancelOutgoingFor(event.peerId, notify: false);
       }

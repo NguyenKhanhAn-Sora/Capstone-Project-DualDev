@@ -88,20 +88,6 @@ export class DirectMessagesGateway
   }
 
   /** Close incoming-call UI on every session of [userId] except [exceptSocketId]. */
-  /** Sync outbound "calling" UI to every session of the initiator (cross-tab/device). */
-  private emitOutgoingAck(
-    initiatorId: string,
-    peerId: string,
-    type: 'audio' | 'video',
-  ): void {
-    const sockets = this.connectedUsers.get(initiatorId);
-    if (!sockets?.size) return;
-    const payload = { peerId, type, status: 'calling' as const };
-    for (const sid of sockets) {
-      this.server.to(sid).emit('call-outgoing-ack', payload);
-    }
-  }
-
   private emitIncomingDismiss(
     userId: string,
     peerId: string,
@@ -854,6 +840,22 @@ export class DirectMessagesGateway
       }
 
       const platform = this.parseClientPlatform(data.clientPlatform);
+      const existingPair = this.callRegistry.getPairSession(
+        senderId,
+        data.receiverId,
+      );
+      if (existingPair && !existingPair.logged) {
+        if (existingPair.initiatorId === senderId) {
+          this.syncCallSessionsForUsers(senderId, data.receiverId);
+          socket.emit('call-outgoing-sync', {
+            peerId: data.receiverId,
+            type: existingPair.type,
+            phase: existingPair.phase,
+          });
+          return;
+        }
+      }
+
       const gate = this.callRegistry.validateInitiate({
         initiatorId: senderId,
         calleeId: data.receiverId,
@@ -868,7 +870,6 @@ export class DirectMessagesGateway
         return;
       }
 
-      const idempotent = gate.ok && gate.idempotent === true;
       const receiverSocket = this.connectedUsers.get(data.receiverId);
 
       // Get sender's profile for username and avatar
@@ -888,37 +889,33 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
-      if (!idempotent) {
-        this.callRegistry.createSession({
-          initiatorId: senderId,
-          calleeId: data.receiverId,
-          type: data.type,
-          initiatorSocketId: socket.id,
-          platform,
-        });
-
-        if (receiverSocket && receiverSocket.size) {
-          const payload = {
-            from: senderId,
-            type: data.type,
-            callerInfo,
-          };
-
-          for (const sid of receiverSocket) {
-            this.server.to(sid).emit('call-incoming', payload);
-          }
-        } else {
-          void this.fcmPushService.pushDmCallIncoming({
-            receiverUserId: data.receiverId,
-            callerUserId: senderId,
-            type: data.type,
-            callerInfo,
-          });
-        }
-      }
-
+      this.callRegistry.createSession({
+        initiatorId: senderId,
+        calleeId: data.receiverId,
+        type: data.type,
+        initiatorSocketId: socket.id,
+        platform,
+      });
       this.syncCallSessionsForUsers(senderId, data.receiverId);
-      this.emitOutgoingAck(senderId, data.receiverId, data.type);
+
+      if (receiverSocket && receiverSocket.size) {
+        const payload = {
+          from: senderId,
+          type: data.type,
+          callerInfo,
+        };
+
+        for (const sid of receiverSocket) {
+          this.server.to(sid).emit('call-incoming', payload);
+        }
+      } else {
+        void this.fcmPushService.pushDmCallIncoming({
+          receiverUserId: data.receiverId,
+          callerUserId: senderId,
+          type: data.type,
+          callerInfo,
+        });
+      }
     } catch (error) {
       console.error('❌ [CALL] Error initiating call:', error);
     }
@@ -1040,7 +1037,8 @@ export class DirectMessagesGateway
     },
   ) {
     const userId = socket.data.userId;
-    const peerSocket = this.connectedUsers.get(data.peerId);
+    const peerId = data.peerId;
+    const peerSocket = this.connectedUsers.get(peerId);
 
     if (peerSocket && peerSocket.size) {
       for (const sid of peerSocket) {
@@ -1048,14 +1046,15 @@ export class DirectMessagesGateway
           from: userId,
         });
       }
+      this.emitIncomingDismiss(peerId, userId, 'cancelled');
     }
 
-    const session = this.callRegistry.getPairSession(userId, data.peerId);
+    const session = this.callRegistry.getPairSession(userId, peerId);
 
     if (session && !session.logged) {
       if (data.status === 'completed' && session.answeredAt) {
         session.logged = true;
-        this.callRegistry.deletePair(userId, data.peerId);
+        this.callRegistry.deletePair(userId, peerId);
         const durationSec =
           data.durationSec ??
           Math.max(1, Math.floor((Date.now() - session.answeredAt) / 1000));
@@ -1066,20 +1065,20 @@ export class DirectMessagesGateway
           callStatus: 'completed',
           durationSec,
         });
-        this.syncCallSessionsForUsers(userId, data.peerId);
+        this.syncCallSessionsForUsers(userId, peerId);
         return;
       }
 
       await this.finalizeActiveCall(
         userId,
-        data.peerId,
+        peerId,
         userId,
         data.status,
       );
       return;
     }
 
-    this.clearActiveCall(userId, data.peerId);
+    this.clearActiveCall(userId, peerId);
   }
 
   getConnectedUsers() {

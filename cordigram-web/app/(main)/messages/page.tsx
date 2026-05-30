@@ -2004,6 +2004,7 @@ export default function MessagesPage() {
   /** Refs for call socket effect — avoid wrong incoming UI / stale deps (glare, self) */
   const outgoingCallsByPeerRef = useRef(outgoingCallsByPeer);
   const callTabIdRef = useRef<string>("");
+  const callStartInFlightRef = useRef<Set<string>>(new Set());
   if (!callTabIdRef.current && typeof window !== "undefined") {
     callTabIdRef.current = getCallTabId();
   }
@@ -2098,7 +2099,7 @@ export default function MessagesPage() {
     callBusy,
     callSessionsSync,
     callIncomingDismiss,
-    callOutgoingAck,
+    callOutgoingSync,
     callEnded,
     messageDeleted,
     dmUnreadCountEvent,
@@ -2556,14 +2557,14 @@ export default function MessagesPage() {
       callTabIdRef.current = tabId;
       const peerId = selectedDirectMessageFriend._id;
 
-      if (outgoingCallsByPeerRef.current[peerId]?.status === "calling") {
+      if (outgoingCallsByPeerRef.current[peerId]) {
+        return;
+      }
+      if (callStartInFlightRef.current.has(peerId)) {
         return;
       }
 
-      if (
-        !canWebInitiateToPeer(callSessionsSync.sessions, peerId) &&
-        !outgoingCallsByPeerRef.current[peerId]
-      ) {
+      if (!canWebInitiateToPeer(callSessionsSync.sessions, peerId)) {
         setError(
           "Bạn đang trong cuộc gọi với người này trên thiết bị hoặc tab khác. Hãy kết thúc cuộc gọi trước.",
         );
@@ -2577,6 +2578,7 @@ export default function MessagesPage() {
         return;
       }
 
+      callStartInFlightRef.current.add(peerId);
       try {
         const { roomName } = await getDMRoomName(peerId, token);
 
@@ -2604,6 +2606,14 @@ export default function MessagesPage() {
         releaseOutboundCallLock(tabId, peerId);
         console.error("❌ [CALL] Failed to start call:", error);
         setError("Không thể bắt đầu cuộc gọi");
+        setOutgoingCallsByPeer((prev) => {
+          if (!prev[peerId]) return prev;
+          const next = { ...prev };
+          delete next[peerId];
+          return next;
+        });
+      } finally {
+        callStartInFlightRef.current.delete(peerId);
       }
     },
     [
@@ -2773,12 +2783,28 @@ export default function MessagesPage() {
     const peerId = callBusy.receiverId || callBusy.peerId;
     if (!peerId) return;
 
-    const outgoing = outgoingCallsByPeerRef.current[peerId];
-    if (outgoing?.status === "calling" && callBusy.code === "already_in_call") {
+    const msg =
+      callBusy.code === "peer_busy"
+        ? "Người nhận đang bận cuộc gọi khác."
+        : callBusy.code === "user_busy"
+          ? "Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp."
+          : "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.";
+
+    if (
+      callBusy.code === "already_in_call" &&
+      outgoingCallsByPeerRef.current[peerId]
+    ) {
       return;
     }
 
-    const hadOutgoing = Boolean(outgoing);
+    if (
+      callBusy.code === "already_in_call" &&
+      !outgoingCallsByPeerRef.current[peerId]
+    ) {
+      setError(msg);
+      return;
+    }
+
     releaseOutboundCallLock(tabId, peerId);
     setOutgoingCallsByPeer((prev) => {
       if (!prev[peerId]) return prev;
@@ -2786,22 +2812,8 @@ export default function MessagesPage() {
       delete next[peerId];
       return next;
     });
-    if (hadOutgoing || callBusy.code === "peer_busy") {
-      endCall(peerId);
-    }
-
-    if (callBusy.code === "peer_busy") {
-      setError("Người nhận đang bận cuộc gọi khác.");
-    } else if (callBusy.code === "user_busy") {
-      setError(
-        "Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp.",
-      );
-    } else if (!hadOutgoing) {
-      setError(
-        "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
-      );
-    }
-  }, [callBusy, endCall]);
+    setError(msg);
+  }, [callBusy]);
 
   useEffect(() => {
     if (!callIncomingDismiss?.peerId) return;
@@ -2812,7 +2824,8 @@ export default function MessagesPage() {
     });
     if (
       callIncomingDismiss.reason === "rejected" ||
-      callIncomingDismiss.reason === "answered_elsewhere"
+      callIncomingDismiss.reason === "answered_elsewhere" ||
+      callIncomingDismiss.reason === "cancelled"
     ) {
       releaseOutboundCallLock(callTabIdRef.current, peerId);
       setOutgoingCallsByPeer((prev) => {
@@ -2823,37 +2836,6 @@ export default function MessagesPage() {
       });
     }
   }, [callIncomingDismiss]);
-
-  useEffect(() => {
-    if (!callOutgoingAck?.peerId) return;
-    const peerId = String(callOutgoingAck.peerId);
-    if (outgoingCallsByPeerRef.current[peerId]) return;
-
-    const friend =
-      friends?.find((f) => String(f._id) === peerId) ??
-      (selectedDirectMessageFriend &&
-      String(selectedDirectMessageFriend._id) === peerId
-        ? selectedDirectMessageFriend
-        : null);
-
-    setOutgoingCallsByPeer((prev) => {
-      if (prev[peerId]) return prev;
-      return {
-        ...prev,
-        [peerId]: {
-          to: peerId,
-          toUser: {
-            displayName:
-              friend?.displayName || friend?.username || "Người dùng",
-            username: friend?.username || "",
-            avatarUrl: friend?.avatarUrl,
-          },
-          type: callOutgoingAck.type === "video" ? "video" : "audio",
-          status: "calling",
-        },
-      };
-    });
-  }, [callOutgoingAck, friends, selectedDirectMessageFriend]);
 
   useEffect(() => {
     const connected = callSessionsSync.sessions.filter(
@@ -2868,6 +2850,42 @@ export default function MessagesPage() {
       return busy ? null : prev;
     });
   }, [callSessionsSync.sessions]);
+
+  useEffect(() => {
+    if (!callOutgoingSync?.peerId || !selectedDirectMessageFriend) return;
+    const peerId = String(callOutgoingSync.peerId);
+    if (peerId !== String(selectedDirectMessageFriend._id)) return;
+    if (outgoingCallsByPeerRef.current[peerId]) return;
+
+    void (async () => {
+      if (!token) return;
+      try {
+        const { roomName } = await getDMRoomName(peerId, token);
+        setOutgoingCallsByPeer((prev) => ({
+          ...prev,
+          [peerId]: {
+            to: peerId,
+            toUser: {
+              displayName:
+                selectedDirectMessageFriend.displayName ||
+                selectedDirectMessageFriend.username,
+              username: selectedDirectMessageFriend.username,
+              avatarUrl: selectedDirectMessageFriend.avatarUrl,
+            },
+            type: callOutgoingSync.type,
+            status: "calling",
+            roomName,
+          },
+        }));
+      } catch {
+        // ignore — primary tab owns the call UI
+      }
+    })();
+  }, [
+    callOutgoingSync,
+    selectedDirectMessageFriend,
+    token,
+  ]);
 
   // ✅ Handle incoming call & call events
   useEffect(() => {

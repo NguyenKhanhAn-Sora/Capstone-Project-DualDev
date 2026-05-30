@@ -74,18 +74,6 @@ class DmCallBusyEvent {
   final String? peerId;
 }
 
-class DmCallOutgoingAckEvent {
-  const DmCallOutgoingAckEvent({
-    required this.peerId,
-    required this.type,
-    required this.status,
-  });
-
-  final String peerId;
-  final String type;
-  final String status;
-}
-
 class DmCallIncomingDismissEvent {
   const DmCallIncomingDismissEvent({
     required this.peerId,
@@ -94,6 +82,18 @@ class DmCallIncomingDismissEvent {
 
   final String peerId;
   final String reason; // answered_elsewhere | rejected | cancelled
+}
+
+class DmCallOutgoingSyncEvent {
+  const DmCallOutgoingSyncEvent({
+    required this.peerId,
+    required this.type,
+    required this.phase,
+  });
+
+  final String peerId;
+  final String type;
+  final String phase;
 }
 
 class DirectMessagesRealtimeService {
@@ -122,9 +122,9 @@ class DirectMessagesRealtimeService {
   static final StreamController<DmCallIncomingDismissEvent>
   _callIncomingDismissController =
       StreamController<DmCallIncomingDismissEvent>.broadcast();
-  static final StreamController<DmCallOutgoingAckEvent>
-  _callOutgoingAckController =
-      StreamController<DmCallOutgoingAckEvent>.broadcast();
+  static final StreamController<DmCallOutgoingSyncEvent>
+  _callOutgoingSyncController =
+      StreamController<DmCallOutgoingSyncEvent>.broadcast();
   static DmCallSessionsSyncPayload _lastCallSessionsSync =
       const DmCallSessionsSyncPayload(sessions: [], at: 0);
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
@@ -152,8 +152,8 @@ class DirectMessagesRealtimeService {
       _callSessionsSyncController.stream;
   static Stream<DmCallIncomingDismissEvent> get callIncomingDismiss =>
       _callIncomingDismissController.stream;
-  static Stream<DmCallOutgoingAckEvent> get callOutgoingAck =>
-      _callOutgoingAckController.stream;
+  static Stream<DmCallOutgoingSyncEvent> get callOutgoingSync =>
+      _callOutgoingSyncController.stream;
   static DmCallSessionsSyncPayload get lastCallSessionsSync =>
       _lastCallSessionsSync;
   static Stream<Map<String, dynamic>> get messageDeleted =>
@@ -288,19 +288,6 @@ class DirectMessagesRealtimeService {
       _lastCallSessionsSync = parsed;
       _callSessionsSyncController.add(parsed);
     });
-    socket.on('call-outgoing-ack', (payload) {
-      if (payload is! Map) return;
-      final data = Map<String, dynamic>.from(payload);
-      final peerId = (data['peerId'] ?? '').toString().trim();
-      if (peerId.isEmpty) return;
-      _callOutgoingAckController.add(
-        DmCallOutgoingAckEvent(
-          peerId: peerId,
-          type: (data['type'] ?? 'audio').toString(),
-          status: (data['status'] ?? 'calling').toString(),
-        ),
-      );
-    });
     socket.on('call-incoming-dismiss', (payload) {
       if (payload is! Map) return;
       final data = Map<String, dynamic>.from(payload);
@@ -310,6 +297,20 @@ class DirectMessagesRealtimeService {
         DmCallIncomingDismissEvent(
           peerId: peerId,
           reason: (data['reason'] ?? 'answered_elsewhere').toString(),
+        ),
+      );
+    });
+    socket.on('call-outgoing-sync', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      final peerId = (data['peerId'] ?? '').toString().trim();
+      if (peerId.isEmpty) return;
+      _callOutgoingSyncController.add(
+        DmCallOutgoingSyncEvent(
+          peerId: peerId,
+          type: data['type']?.toString() == 'audio' ? 'audio' : 'video',
+          phase:
+              data['phase']?.toString() == 'connected' ? 'connected' : 'ringing',
         ),
       );
     });
@@ -492,8 +493,8 @@ class DirectMessagesRealtimeService {
       socket.off('call-rejected');
       socket.off('call-busy');
       socket.off('call-sessions-sync');
-      socket.off('call-outgoing-ack');
       socket.off('call-incoming-dismiss');
+      socket.off('call-outgoing-sync');
       socket.off('ice-candidate');
       socket.off('call-ended');
       socket.off('message-deleted');

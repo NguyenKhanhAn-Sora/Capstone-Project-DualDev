@@ -87,10 +87,10 @@ export interface CallIncomingDismissEvent {
   reason: "answered_elsewhere" | "rejected" | "cancelled";
 }
 
-export interface CallOutgoingAckEvent {
+export interface CallOutgoingSyncEvent {
   peerId: string;
   type: "audio" | "video";
-  status: "calling";
+  phase: "ringing" | "connected";
 }
 
 export type { CallSessionsSyncPayload, CallSessionSyncItem };
@@ -179,8 +179,8 @@ export const useDirectMessages = ({
     useState<CallSessionsSyncPayload>({ sessions: [], at: 0 });
   const [callIncomingDismiss, setCallIncomingDismiss] =
     useState<CallIncomingDismissEvent | null>(null);
-  const [callOutgoingAck, setCallOutgoingAck] =
-    useState<CallOutgoingAckEvent | null>(null);
+  const [callOutgoingSync, setCallOutgoingSync] =
+    useState<CallOutgoingSyncEvent | null>(null);
   const [messageDeleted, setMessageDeleted] = useState<{
     messageId: string;
     deleteType?: "for-everyone" | "for-me";
@@ -468,10 +468,10 @@ export const useDirectMessages = ({
       setTimeout(() => setCallIncomingDismiss(null), 500);
     });
 
-    socket.on("call-outgoing-ack", (data: CallOutgoingAckEvent) => {
+    socket.on("call-outgoing-sync", (data: CallOutgoingSyncEvent) => {
       if (!data?.peerId) return;
-      setCallOutgoingAck(data);
-      setTimeout(() => setCallOutgoingAck(null), 500);
+      setCallOutgoingSync(data);
+      setTimeout(() => setCallOutgoingSync(null), 500);
     });
 
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
@@ -705,7 +705,7 @@ export const useDirectMessages = ({
     callBusy,
     callSessionsSync,
     callIncomingDismiss,
-    callOutgoingAck,
+    callOutgoingSync,
     callEnded,
     messageDeleted,
     userProfileStyleUpdated,
