@@ -4,9 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStoredAccessToken, setStoredAccessToken } from "@/lib/auth";
-import { apiBaseUrl } from "@/lib/api";
 import { getLiveKitToken } from "@/lib/livekit-api";
-import io from "socket.io-client";
 import styles from "./call.module.css";
 
 const CallRoom = dynamic(() => import("@/components/CallRoom"), {
@@ -151,41 +149,6 @@ export default function CallPage() {
       channelRef.current = null;
     };
   }, [embedded, peerId]);
-
-  // Keep server call-session TTL fresh when only the call tab is open.
-  useEffect(() => {
-    if (!peerId || embedded) return;
-    const queryTokenRaw = tokenFromQuery?.trim() ?? "";
-    const queryToken = queryTokenRaw.replace(/^Bearer\s+/i, "");
-    const token =
-      queryToken ||
-      getStoredAccessToken() ||
-      (typeof window !== "undefined"
-        ? window.localStorage.getItem("token")
-        : null);
-    if (!token) return;
-
-    const socket = io(`${apiBaseUrl}/direct-messages`, {
-      transports: ["websocket"],
-      autoConnect: true,
-      auth: { token },
-      extraHeaders: { Authorization: `Bearer ${token}` },
-    });
-
-    const tick = () => {
-      if (socket.connected) {
-        socket.emit("call-heartbeat", { peerId });
-      }
-    };
-    socket.on("connect", tick);
-    const id = window.setInterval(tick, 25_000);
-
-    return () => {
-      window.clearInterval(id);
-      socket.off("connect", tick);
-      socket.disconnect();
-    };
-  }, [peerId, embedded, tokenFromQuery]);
 
   const handleDisconnect = useCallback(() => {
     if (embedded) {

@@ -25,10 +25,6 @@ import {
   releaseOutboundCallLock,
   subscribeOutboundCallLock,
 } from "@/lib/call-tab-coordination";
-import {
-  canWebInitiateToPeer,
-  isBusyWithPeer,
-} from "@/lib/call-session-sync";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
@@ -2096,8 +2092,6 @@ export default function MessagesPage() {
     markAllAsRead,
     callEvent,
     callBusy,
-    callSessionsSync,
-    callIncomingDismiss,
     callEnded,
     messageDeleted,
     dmUnreadCountEvent,
@@ -2105,7 +2099,6 @@ export default function MessagesPage() {
     answerCall,
     rejectCall,
     endCall,
-    emitCallHeartbeat,
     emitDeleteMessage,
   } = useDirectMessages({
     userId: currentUserId,
@@ -2519,30 +2512,6 @@ export default function MessagesPage() {
     };
   }, [selectedDirectMessageFriend, notifyTyping]);
 
-  const selectedDmPeerBusy = useMemo(() => {
-    const peerId = selectedDirectMessageFriend?._id;
-    if (!peerId) return false;
-    if (outgoingCallsByPeer[peerId]) return true;
-    return !canWebInitiateToPeer(callSessionsSync.sessions, peerId);
-  }, [
-    selectedDirectMessageFriend?._id,
-    outgoingCallsByPeer,
-    callSessionsSync.sessions,
-  ]);
-
-  useEffect(() => {
-    const peers = new Set<string>();
-    for (const s of callSessionsSync.sessions) peers.add(s.peerId);
-    for (const peerId of Object.keys(outgoingCallsByPeer)) peers.add(peerId);
-    if (peers.size === 0) return;
-    const tick = () => {
-      for (const peerId of peers) emitCallHeartbeat(peerId);
-    };
-    tick();
-    const id = window.setInterval(tick, 25_000);
-    return () => window.clearInterval(id);
-  }, [callSessionsSync.sessions, outgoingCallsByPeer, emitCallHeartbeat]);
-
   // ✅ Call handlers - Show outgoing popup first
   const handleStartCall = useCallback(
     async (isVideo: boolean) => {
@@ -2554,17 +2523,6 @@ export default function MessagesPage() {
       const tabId = callTabIdRef.current || getCallTabId();
       callTabIdRef.current = tabId;
       const peerId = selectedDirectMessageFriend._id;
-
-      if (outgoingCallsByPeerRef.current[peerId]?.status === "calling") {
-        return;
-      }
-
-      if (!canWebInitiateToPeer(callSessionsSync.sessions, peerId)) {
-        setError(
-          "Bạn đang trong cuộc gọi với người này trên thiết bị hoặc tab khác. Hãy kết thúc cuộc gọi trước.",
-        );
-        return;
-      }
 
       if (!tryAcquireOutboundCallLock(tabId, peerId)) {
         setError(
@@ -2602,13 +2560,7 @@ export default function MessagesPage() {
         setError("Không thể bắt đầu cuộc gọi");
       }
     },
-    [
-      selectedDirectMessageFriend,
-      token,
-      currentUserProfile,
-      initiateCall,
-      callSessionsSync.sessions,
-    ],
+    [selectedDirectMessageFriend, token, currentUserProfile, initiateCall],
   );
 
   const handleEndCall = useCallback(() => {
@@ -2625,23 +2577,13 @@ export default function MessagesPage() {
       return;
     }
 
-    const callerId = incomingCall.from;
-    const alreadyConnected = callSessionsSync.sessions.some(
-      (s) =>
-        s.phase === "connected" && String(s.peerId) === String(callerId),
-    );
-    if (alreadyConnected) {
-      setIncomingCall(null);
-      return;
-    }
-
     try {
 
       // Get room name
-      const { roomName } = await getDMRoomName(callerId, token);
+      const { roomName } = await getDMRoomName(incomingCall.from, token);
 
       // Notify caller that call was answered (this will open tab on caller's side)
-      answerCall(callerId, { roomName });
+      answerCall(incomingCall.from, { roomName });
 
       // Open call in new tab for receiver (this user). We forward the current
       // access token + peerId so the tab:
@@ -2658,7 +2600,7 @@ export default function MessagesPage() {
         `/call?roomName=${encodeURIComponent(roomName)}` +
         `&participantName=${encodeURIComponent(participantName)}` +
         `&audioOnly=${isAudioOnly}` +
-        `&peerId=${encodeURIComponent(callerId)}` +
+        `&peerId=${encodeURIComponent(incomingCall.from)}` +
         `&accessToken=${encodeURIComponent(token)}`;
 
       window.open(callUrl, "_blank", "noopener,noreferrer");
@@ -2669,27 +2611,17 @@ export default function MessagesPage() {
       console.error("❌ [ACCEPT] Failed to accept call:", error);
       setError("Không thể chấp nhận cuộc gọi");
     }
-  }, [
-    incomingCall,
-    token,
-    currentUserProfile,
-    answerCall,
-    callSessionsSync.sessions,
-  ]);
+  }, [incomingCall, token, currentUserProfile, answerCall]);
 
   // ✅ Reject incoming call — clear UI + ringtone first, then notify caller
   const handleRejectCall = useCallback(() => {
     if (!incomingCall) return;
 
+
     const peerId = incomingCall.from;
-    const alreadyConnected = callSessionsSync.sessions.some(
-      (s) =>
-        s.phase === "connected" && String(s.peerId) === String(peerId),
-    );
     setIncomingCall(null);
-    if (alreadyConnected) return;
     rejectCall(peerId);
-  }, [incomingCall, rejectCall, callSessionsSync.sessions]);
+  }, [incomingCall, rejectCall]);
 
   const handleCancelCall = useCallback(
     (peerId: string) => {
@@ -2708,10 +2640,9 @@ export default function MessagesPage() {
   );
 
   const openCallTabForPeer = useCallback(
-    async (peerId: string, roomNameFromAnswer?: string) => {
+    async (peerId: string) => {
       const outgoing = outgoingCallsByPeerRef.current[peerId];
-      const roomName = roomNameFromAnswer ?? outgoing?.roomName;
-      if (!roomName || !currentUserProfile) return;
+      if (!outgoing || !currentUserProfile) return;
       const tabId = callTabIdRef.current || getCallTabId();
       if (!ownsOutboundCallLock(tabId, peerId)) {
         setOutgoingCallsByPeer((prev) => {
@@ -2727,10 +2658,10 @@ export default function MessagesPage() {
           currentUserProfile.username ||
           currentUserProfile.displayName ||
           "Người dùng";
-        const isAudioOnly = outgoing?.type === "audio";
+        const isAudioOnly = outgoing.type === "audio";
         const qpToken = token ? `&accessToken=${encodeURIComponent(token)}` : "";
         const callUrl =
-          `/call?roomName=${encodeURIComponent(roomName)}` +
+          `/call?roomName=${encodeURIComponent(outgoing.roomName!)}` +
           `&participantName=${encodeURIComponent(participantName)}` +
           `&audioOnly=${isAudioOnly}` +
           `&peerId=${encodeURIComponent(peerId)}` +
@@ -2768,12 +2699,6 @@ export default function MessagesPage() {
     if (!callBusy) return;
     const tabId = callTabIdRef.current;
     const peerId = callBusy.receiverId || callBusy.peerId;
-    if (peerId && callBusy.code === "already_in_call") {
-      const outgoing = outgoingCallsByPeerRef.current[peerId];
-      if (outgoing?.status === "calling") {
-        return;
-      }
-    }
     if (peerId) {
       releaseOutboundCallLock(tabId, peerId);
       setOutgoingCallsByPeer((prev) => {
@@ -2783,56 +2708,10 @@ export default function MessagesPage() {
         return next;
       });
     }
-    const msg =
-      callBusy.code === "peer_busy"
-        ? "Người nhận đang bận cuộc gọi khác."
-        : callBusy.code === "user_busy"
-          ? "Bạn đang trong cuộc gọi khác trên thiết bị khác. Hãy kết thúc trước khi gọi tiếp."
-          : "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.";
-    setError(msg);
-  }, [callBusy]);
-
-  useEffect(() => {
-    if (!callIncomingDismiss?.peerId) return;
-    const peerId = String(callIncomingDismiss.peerId);
-    setIncomingCall((prev) => {
-      if (prev && String(prev.from) === peerId) return null;
-      return prev;
-    });
-    if (callIncomingDismiss.reason === "rejected") {
-      releaseOutboundCallLock(callTabIdRef.current, peerId);
-      setOutgoingCallsByPeer((prev) => {
-        if (!prev[peerId]) return prev;
-        const next = { ...prev };
-        delete next[peerId];
-        return next;
-      });
-    }
-  }, [callIncomingDismiss]);
-
-  useEffect(() => {
-    const connected = callSessionsSync.sessions.filter(
-      (s) => s.phase === "connected",
+    setError(
+      "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
     );
-    if (connected.length === 0) return;
-    setIncomingCall((prev) => {
-      if (!prev) return prev;
-      const busy = connected.some(
-        (s) => String(s.peerId) === String(prev.from),
-      );
-      return busy ? null : prev;
-    });
-    for (const s of connected) {
-      if (s.role !== "initiator") continue;
-      const peerId = String(s.peerId);
-      setOutgoingCallsByPeer((prev) => {
-        if (!prev[peerId]) return prev;
-        const next = { ...prev };
-        delete next[peerId];
-        return next;
-      });
-    }
-  }, [callSessionsSync.sessions]);
+  }, [callBusy]);
 
   // ✅ Handle incoming call & call events
   useEffect(() => {
@@ -2854,17 +2733,6 @@ export default function MessagesPage() {
 
       const oc = outgoingCallsByPeerRef.current[ev.from];
       if (oc && oc.status === "calling") {
-        return;
-      }
-
-      const inAnotherCall = callSessionsSync.sessions.some(
-        (s) => s.phase === "connected" && String(s.peerId) !== String(ev.from),
-      );
-      if (
-        isBusyWithPeer(callSessionsSync.sessions, ev.from) ||
-        inAnotherCall
-      ) {
-        rejectCall(ev.from);
         return;
       }
 
@@ -2899,15 +2767,13 @@ export default function MessagesPage() {
     // auto-open a call tab, skipping the accept/reject step entirely.
     if (isCallAnswerEvent(callEvent) && callEvent.sdpOffer) {
       const peerId = String(callEvent.from);
-      const roomName =
-        typeof callEvent.sdpOffer?.roomName === "string"
-          ? callEvent.sdpOffer.roomName
-          : undefined;
-      void openCallTabForPeer(peerId, roomName);
+      if (outgoingCallsByPeerRef.current[peerId]) {
+        void openCallTabForPeer(peerId);
+      }
       return;
     }
     // Do NOT list incomingCall in deps — setIncomingCall updates it and would retrigger this effect forever.
-  }, [callEvent, openCallTabForPeer, callSessionsSync.sessions, rejectCall]);
+  }, [callEvent, openCallTabForPeer]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
@@ -10351,7 +10217,7 @@ export default function MessagesPage() {
                           type="button"
                           title={t("chat.composer.voiceCall")}
                           onClick={() => handleStartCall(false)}
-                          disabled={selectedDmPeerBusy}
+                          disabled={isInCall}
                         >
                           <svg
                             width="20"
@@ -10368,7 +10234,7 @@ export default function MessagesPage() {
                           type="button"
                           title={t("chat.composer.videoCall")}
                           onClick={() => handleStartCall(true)}
-                          disabled={selectedDmPeerBusy}
+                          disabled={isInCall}
                         >
                           <svg
                             width="20"
