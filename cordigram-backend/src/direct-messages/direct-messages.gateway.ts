@@ -840,22 +840,6 @@ export class DirectMessagesGateway
       }
 
       const platform = this.parseClientPlatform(data.clientPlatform);
-      const existingPair = this.callRegistry.getPairSession(
-        senderId,
-        data.receiverId,
-      );
-      if (existingPair && !existingPair.logged) {
-        if (existingPair.initiatorId === senderId) {
-          this.syncCallSessionsForUsers(senderId, data.receiverId);
-          socket.emit('call-outgoing-sync', {
-            peerId: data.receiverId,
-            type: existingPair.type,
-            phase: existingPair.phase,
-          });
-          return;
-        }
-      }
-
       const gate = this.callRegistry.validateInitiate({
         initiatorId: senderId,
         calleeId: data.receiverId,
@@ -889,13 +873,21 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
-      this.callRegistry.createSession({
-        initiatorId: senderId,
-        calleeId: data.receiverId,
-        type: data.type,
-        initiatorSocketId: socket.id,
-        platform,
-      });
+      if (gate.reRing) {
+        this.callRegistry.refreshRinging(
+          senderId,
+          data.receiverId,
+          socket.id,
+        );
+      } else {
+        this.callRegistry.createSession({
+          initiatorId: senderId,
+          calleeId: data.receiverId,
+          type: data.type,
+          initiatorSocketId: socket.id,
+          platform,
+        });
+      }
       this.syncCallSessionsForUsers(senderId, data.receiverId);
 
       if (receiverSocket && receiverSocket.size) {
@@ -960,7 +952,6 @@ export class DirectMessagesGateway
           this.server.to(firstSid).emit('call-answer', answerPayload);
         }
       }
-      this.emitIncomingDismiss(callerId, userId, 'answered_elsewhere');
     }
   }
 
@@ -1037,8 +1028,7 @@ export class DirectMessagesGateway
     },
   ) {
     const userId = socket.data.userId;
-    const peerId = data.peerId;
-    const peerSocket = this.connectedUsers.get(peerId);
+    const peerSocket = this.connectedUsers.get(data.peerId);
 
     if (peerSocket && peerSocket.size) {
       for (const sid of peerSocket) {
@@ -1046,15 +1036,14 @@ export class DirectMessagesGateway
           from: userId,
         });
       }
-      this.emitIncomingDismiss(peerId, userId, 'cancelled');
     }
 
-    const session = this.callRegistry.getPairSession(userId, peerId);
+    const session = this.callRegistry.getPairSession(userId, data.peerId);
 
     if (session && !session.logged) {
       if (data.status === 'completed' && session.answeredAt) {
         session.logged = true;
-        this.callRegistry.deletePair(userId, peerId);
+        this.callRegistry.deletePair(userId, data.peerId);
         const durationSec =
           data.durationSec ??
           Math.max(1, Math.floor((Date.now() - session.answeredAt) / 1000));
@@ -1065,20 +1054,20 @@ export class DirectMessagesGateway
           callStatus: 'completed',
           durationSec,
         });
-        this.syncCallSessionsForUsers(userId, peerId);
+        this.syncCallSessionsForUsers(userId, data.peerId);
         return;
       }
 
       await this.finalizeActiveCall(
         userId,
-        peerId,
+        data.peerId,
         userId,
         data.status,
       );
       return;
     }
 
-    this.clearActiveCall(userId, peerId);
+    this.clearActiveCall(userId, data.peerId);
   }
 
   getConnectedUsers() {

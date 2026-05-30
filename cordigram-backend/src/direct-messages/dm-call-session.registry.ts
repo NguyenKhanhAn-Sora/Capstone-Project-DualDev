@@ -92,30 +92,61 @@ export class DmCallSessionRegistry {
     calleeId: string;
     platform: CallClientPlatform;
   }):
-    | { ok: true }
+    | { ok: true; reRing?: boolean }
     | { ok: false; code: CallBusyCode; peerId?: string } {
     this.pruneStale();
     const { initiatorId, calleeId, platform } = params;
 
     const pair = this.getPairSession(initiatorId, calleeId);
     if (pair && !pair.logged) {
+      if (pair.initiatorId === initiatorId) {
+        return { ok: true, reRing: true };
+      }
       return { ok: false, code: 'already_in_call', peerId: calleeId };
     }
 
     const initiatorSessions = this.listSessionsForUser(initiatorId);
     if (platform === 'mobile' && initiatorSessions.length > 0) {
-      const first = initiatorSessions[0];
-      const busyPeer =
-        first.initiatorId === initiatorId ? first.calleeId : first.initiatorId;
-      return { ok: false, code: 'user_busy', peerId: busyPeer };
+      const foreign = initiatorSessions.filter(
+        (s) => this.pairKey(s.initiatorId, s.calleeId) !== this.pairKey(initiatorId, calleeId),
+      );
+      if (foreign.length > 0) {
+        const first = foreign[0];
+        const busyPeer =
+          first.initiatorId === initiatorId
+            ? first.calleeId
+            : first.initiatorId;
+        return { ok: false, code: 'user_busy', peerId: busyPeer };
+      }
     }
 
-    const calleeSessions = this.listSessionsForUser(calleeId);
-    if (calleeSessions.length > 0) {
+    const ourPairKey = this.pairKey(initiatorId, calleeId);
+    const calleeBlocked = this.listSessionsForUser(calleeId).some(
+      (s) => this.pairKey(s.initiatorId, s.calleeId) !== ourPairKey,
+    );
+    if (calleeBlocked) {
       return { ok: false, code: 'peer_busy', peerId: calleeId };
     }
 
     return { ok: true };
+  }
+
+  refreshRinging(
+    initiatorId: string,
+    calleeId: string,
+    initiatorSocketId?: string,
+  ): DmCallSessionRecord | undefined {
+    const session = this.getPairSession(initiatorId, calleeId);
+    if (!session || session.logged || session.initiatorId !== initiatorId) {
+      return undefined;
+    }
+    const now = Date.now();
+    session.lastHeartbeatAt = now;
+    session.createdAt = now;
+    if (initiatorSocketId) {
+      session.initiatorSocketId = initiatorSocketId;
+    }
+    return session;
   }
 
   createSession(params: {
