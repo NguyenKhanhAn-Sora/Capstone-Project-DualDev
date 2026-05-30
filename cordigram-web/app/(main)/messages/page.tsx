@@ -2116,6 +2116,7 @@ export default function MessagesPage() {
   const prevChannelRef = useRef<string | null>(null);
   /** Luôn là kênh đang chọn (tránh closure cũ sau await trong loadMessages). */
   const selectedChannelRef = useRef<string | null>(null);
+  const loadMessagesSeqRef = useRef(0);
   useEffect(() => {
     selectedChannelRef.current = selectedChannel;
   }, [selectedChannel]);
@@ -3557,6 +3558,8 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (selectedServer) {
+      setMessages([]);
+      loadMessagesSeqRef.current += 1;
       loadChannels(selectedServer);
       loadActiveEvents(selectedServer);
       setSelectedDirectMessageFriend(null); // Clear selected DM friend when selecting server
@@ -4364,15 +4367,26 @@ export default function MessagesPage() {
   }, [voiceMuteKey, voiceMuteByChannel]);
 
   useEffect(() => {
-    if (selectedChannel && selectedChatTextChannel) {
-      setReplyingTo(null);
-      prepareScrollToLatest();
-      const prev = prevChannelRef.current;
-      if (prev && prev !== selectedChannel) leaveChannel(prev);
-      prevChannelRef.current = selectedChannel;
-      joinChannel(selectedChannel);
-      loadMessages(selectedChannel);
+    if (!selectedChannel) return;
+
+    selectedChannelRef.current = selectedChannel;
+
+    if (!selectedChatTextChannel) {
+      setMessages([]);
+      loadMessagesSeqRef.current += 1;
+      return;
     }
+
+    setReplyingTo(null);
+    prepareScrollToLatest();
+    setMessages([]);
+    loadMessagesSeqRef.current += 1;
+
+    const prev = prevChannelRef.current;
+    if (prev && prev !== selectedChannel) leaveChannel(prev);
+    prevChannelRef.current = selectedChannel;
+    joinChannel(selectedChannel);
+    loadMessages(selectedChannel);
   }, [selectedChannel, selectedChatTextChannel?._id, joinChannel, leaveChannel]);
 
   useEffect(() => {
@@ -4573,9 +4587,8 @@ export default function MessagesPage() {
   };
 
   const loadMessages = async (channelId: string) => {
+    const seq = loadMessagesSeqRef.current;
     try {
-      const requestKey = `${channelId}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
-      (loadMessages as any)._lastKey = requestKey;
       let pack;
       if (isAdminView && selectedServer && selectedServer === adminViewServerId) {
         const adminToken = localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
@@ -4583,8 +4596,8 @@ export default function MessagesPage() {
       } else {
         pack = await serversApi.getMessages(channelId, 50, 0);
       }
-      // Nếu trong lúc chờ user đã chuyển kênh, bỏ qua kết quả cũ để tránh "tin nhắn bị dính sang kênh khác".
-      if ((loadMessages as any)._lastKey !== requestKey) return;
+      // Nếu trong lúc chờ user đã chuyển kênh/server, bỏ qua kết quả cũ.
+      if (loadMessagesSeqRef.current !== seq) return;
       if (selectedChannelRef.current !== channelId) return;
 
       if (!pack.chatViewBlocked) {
@@ -4667,14 +4680,7 @@ export default function MessagesPage() {
         deletedAt: (msg as serversApi.Message).deletedAt || undefined,
       }));
 
-      setMessages((prev) => {
-        const apiMessages = sortServerMessagesAscending(uiMessages);
-        const apiIds = new Set(apiMessages.map((m) => m.id));
-        const recentLocal = prev.filter((m) => !apiIds.has(m.id));
-        return recentLocal.length > 0
-          ? sortServerMessagesAscending([...apiMessages, ...recentLocal])
-          : apiMessages;
-      });
+      setMessages(sortServerMessagesAscending(uiMessages));
       prepareScrollToLatest();
       setError(null);
     } catch (err) {
