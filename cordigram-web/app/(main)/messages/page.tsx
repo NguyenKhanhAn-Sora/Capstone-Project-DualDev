@@ -8,6 +8,10 @@ import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
+import {
+  DM_CALL_ANSWER_EVENT,
+  type DmCallAnswerDetail,
+} from "@/lib/dm-call-session-sync";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 import {
   useDirectMessages,
@@ -2651,21 +2655,16 @@ export default function MessagesPage() {
   const openCallTabForPeer = useCallback(
     async (peerId: string, roomNameOverride?: string) => {
       const outgoing = outgoingCallsByPeerRef.current[peerId];
-      if (!outgoing || !currentUserProfile) return;
+      if (!currentUserProfile) return;
       const tabId = callTabIdRef.current || getCallTabId();
-      const roomName = roomNameOverride || outgoing.roomName;
+      const roomName = roomNameOverride || outgoing?.roomName;
       if (!roomName) {
         console.warn("[CALL] Missing roomName for outgoing call");
         return;
       }
-      const lockOk = ownsOutboundCallLock(tabId, peerId);
-      if (!lockOk && outgoing.status !== "calling") {
-        setOutgoingCallsByPeer((prev) => {
-          const next = { ...prev };
-          delete next[peerId];
-          return next;
-        });
-        return;
+      const callType = outgoing?.type ?? "audio";
+      if (!ownsOutboundCallLock(tabId, peerId)) {
+        tryAcquireOutboundCallLock(tabId, peerId);
       }
 
       try {
@@ -2673,7 +2672,7 @@ export default function MessagesPage() {
           currentUserProfile.username ||
           currentUserProfile.displayName ||
           "Người dùng";
-        const isAudioOnly = outgoing.type === "audio";
+        const isAudioOnly = callType === "audio";
         const callAuthToken = getTabAccessToken() || token;
         const qpToken = callAuthToken
           ? `&accessToken=${encodeURIComponent(callAuthToken)}`
@@ -2791,8 +2790,9 @@ export default function MessagesPage() {
         typeof (callEvent.sdpOffer as { roomName?: string }).roomName === "string"
           ? String((callEvent.sdpOffer as { roomName: string }).roomName)
           : undefined;
-      if (outgoingCallsByPeerRef.current[peerId]) {
-        if (roomFromAnswer) {
+      const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
+      if (hasOutgoing || roomFromAnswer) {
+        if (roomFromAnswer && hasOutgoing) {
           setOutgoingCallsByPeer((prev) => {
             const cur = prev[peerId];
             if (!cur) return prev;
@@ -2808,6 +2808,33 @@ export default function MessagesPage() {
     }
     // Do NOT list incomingCall in deps — setIncomingCall updates it and would retrigger this effect forever.
   }, [callEvent, openCallTabForPeer]);
+
+  // Open caller tab immediately on call-answer (bypasses React state batching / short TTL).
+  useEffect(() => {
+    const onAnswer = (e: Event) => {
+      const detail = (e as CustomEvent<DmCallAnswerDetail>).detail;
+      if (!detail?.from) return;
+      const peerId = String(detail.from);
+      const roomFromAnswer =
+        detail.sdpOffer &&
+        typeof detail.sdpOffer === "object" &&
+        typeof detail.sdpOffer.roomName === "string"
+          ? detail.sdpOffer.roomName
+          : undefined;
+      const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
+      if (!hasOutgoing && !roomFromAnswer) return;
+      if (roomFromAnswer && hasOutgoing) {
+        setOutgoingCallsByPeer((prev) => {
+          const cur = prev[peerId];
+          if (!cur) return prev;
+          return { ...prev, [peerId]: { ...cur, roomName: roomFromAnswer } };
+        });
+      }
+      void openCallTabForPeer(peerId, roomFromAnswer);
+    };
+    window.addEventListener(DM_CALL_ANSWER_EVENT, onAnswer);
+    return () => window.removeEventListener(DM_CALL_ANSWER_EVENT, onAnswer);
+  }, [openCallTabForPeer]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
@@ -2867,14 +2894,17 @@ export default function MessagesPage() {
     if (!callIncomingDismiss?.peerId) return;
     const peerId = String(callIncomingDismiss.peerId);
     setIncomingCall((prev) => (prev?.from === peerId ? null : prev));
+    // Only clear outgoing ring UI when *this tab* was ringing someone else
+    // (callee dismissed on another device). Do not clear our outbound call to
+    // `peerId` when we are the caller waiting for `call-answer`.
     if (callIncomingDismiss.reason === "answered_elsewhere") {
       setOutgoingCallsByPeer((prev) => {
-        if (!prev[peerId]) return prev;
+        const out = prev[peerId];
+        if (!out || out.status !== "calling") return prev;
         const next = { ...prev };
         delete next[peerId];
         return next;
       });
-      releaseOutboundCallLock(callTabIdRef.current, peerId);
     }
   }, [callIncomingDismiss]);
 

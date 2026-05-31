@@ -5,6 +5,8 @@ import {
   CallIncomingDismissEvent,
   DmCallSessionSyncItem,
   detectDmClientPlatform,
+  dispatchDmCallAnswer,
+  dispatchDmCallIncoming,
   registerDmSocketForHeartbeat,
 } from "@/lib/dm-call-session-sync";
 
@@ -432,15 +434,31 @@ export const useDirectMessages = ({
         }
         const evt: CallEvent = { ...data, callSignal: "incoming" };
         setCallEvent(evt);
-        scheduleClearCallEvent(evt);
+        scheduleClearCallEvent(evt, 8000);
+        if (data.callerInfo) {
+          dispatchDmCallIncoming({
+            from: String(data.from),
+            type: data.type,
+            callerInfo: data.callerInfo,
+            callId: (data as { callId?: string }).callId,
+          });
+        }
       },
     );
 
-    socket.on("call-answer", (data: { from: string; sdpOffer: any }) => {
-      const evt: CallEvent = { ...data, callSignal: "answer" };
-      setCallEvent(evt);
-      scheduleClearCallEvent(evt);
-    });
+    socket.on(
+      "call-answer",
+      (data: { from: string; sdpOffer: any; callId?: string }) => {
+        const evt: CallEvent = { ...data, callSignal: "answer" };
+        setCallEvent(evt);
+        scheduleClearCallEvent(evt, 8000);
+        dispatchDmCallAnswer({
+          from: String(data.from),
+          sdpOffer: data.sdpOffer,
+          callId: data.callId,
+        });
+      },
+    );
 
     socket.on("call-rejected", (data: { from: string }) => {
       const evt: CallEvent = { from: data.from, callSignal: "rejected" };

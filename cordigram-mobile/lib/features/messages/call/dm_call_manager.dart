@@ -128,12 +128,7 @@ class DmCallManager extends ChangeNotifier {
 
     // Socket is shared with DMs; `.connect()` is idempotent.
     await DirectMessagesRealtimeService.connect();
-    _callSub = DirectMessagesRealtimeService.callEvents.listen(_onCallEvent);
-    _endedSub =
-        DirectMessagesRealtimeService.callEnded.listen(_onCallEnded);
-    _busySub = DirectMessagesRealtimeService.callBusy.listen(_onCallBusy);
-    _dismissSub = DirectMessagesRealtimeService.callIncomingDismiss
-        .listen(_onIncomingDismiss);
+    await _ensureCallEventSubscriptions();
     unawaited(_refreshMyName());
   }
 
@@ -148,6 +143,7 @@ class DmCallManager extends ChangeNotifier {
     String? username,
     String? avatarUrl,
     bool video = true,
+    String? callId,
   }) {
     final dn = (displayName ?? '').trim();
     final un = (username ?? '').trim();
@@ -163,6 +159,9 @@ class DmCallManager extends ChangeNotifier {
           if (avatarUrl != null && avatarUrl.trim().isNotEmpty)
             'avatar': avatarUrl.trim(),
         },
+        payload: callId != null && callId.isNotEmpty
+            ? <String, dynamic>{'callId': callId}
+            : null,
       ),
     );
   }
@@ -173,8 +172,11 @@ class DmCallManager extends ChangeNotifier {
       _incoming = null;
       notifyListeners();
     }
+    // peerId is the remote party; only drop outbound if we were dialling them.
+    final out = _outgoings[event.peerId];
     if (event.reason == 'answered_elsewhere' &&
-        _outgoings.containsKey(event.peerId)) {
+        out != null &&
+        out.status == OutgoingCallStatus.calling) {
       _cancelOutgoingFor(event.peerId);
     }
   }
@@ -196,11 +198,34 @@ class DmCallManager extends ChangeNotifier {
     _activeCallId = null;
   }
 
+  Future<void> _ensureCallEventSubscriptions() async {
+    if (_callSub == null) {
+      _callSub = DirectMessagesRealtimeService.callEvents.listen(_onCallEvent);
+    }
+    if (_endedSub == null) {
+      _endedSub =
+          DirectMessagesRealtimeService.callEnded.listen(_onCallEnded);
+    }
+    if (_busySub == null) {
+      _busySub = DirectMessagesRealtimeService.callBusy.listen(_onCallBusy);
+    }
+    if (_dismissSub == null) {
+      _dismissSub = DirectMessagesRealtimeService.callIncomingDismiss
+          .listen(_onIncomingDismiss);
+    }
+  }
+
   Future<void> onAuthChanged() async {
     if (!_initialized) return;
     _stopCallHeartbeat();
     await _dismissSub?.cancel();
     _dismissSub = null;
+    await _callSub?.cancel();
+    _callSub = null;
+    await _endedSub?.cancel();
+    _endedSub = null;
+    await _busySub?.cancel();
+    _busySub = null;
     await DirectMessagesRealtimeService.disconnect();
     await ChannelMessagesRealtimeService.disconnect();
     _cancelTimers();
@@ -230,8 +255,7 @@ class DmCallManager extends ChangeNotifier {
     if (token != null && token.isNotEmpty) {
       await DirectMessagesRealtimeService.connect();
       await ChannelMessagesRealtimeService.connect();
-      _dismissSub = DirectMessagesRealtimeService.callIncomingDismiss
-          .listen(_onIncomingDismiss);
+      await _ensureCallEventSubscriptions();
       unawaited(_refreshMyName());
     }
   }
@@ -539,9 +563,13 @@ class DmCallManager extends ChangeNotifier {
   }
 
   void _handleIncoming(DmCallEvent event) {
-    if (_active != null) {
-      // Busy — politely tell the caller we can't pick up.
+    if (_active != null &&
+        _active!.peerUserId != event.fromUserId) {
+      // Busy on another call — politely tell the caller we can't pick up.
       DirectMessagesRealtimeService.rejectCall(event.fromUserId);
+      return;
+    }
+    if (_active != null && _active!.peerUserId == event.fromUserId) {
       return;
     }
     // If we're already ringing the same person, just refresh; otherwise the

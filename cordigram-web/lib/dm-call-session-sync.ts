@@ -69,6 +69,41 @@ export function setActiveDmCallIdForHeartbeat(callId: string | null): void {
   }, HEARTBEAT_MS);
 }
 
+export const DM_CALL_ANSWER_EVENT = "cordigram-dm-call-answer";
+export const DM_CALL_INCOMING_EVENT = "cordigram-dm-call-incoming";
+
+export type DmCallAnswerDetail = {
+  from: string;
+  sdpOffer?: { roomName?: string } | null;
+  callId?: string;
+};
+
+export function dispatchDmCallAnswer(detail: DmCallAnswerDetail): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(DM_CALL_ANSWER_EVENT, { detail }),
+  );
+}
+
+export type DmCallIncomingDetail = {
+  from: string;
+  type?: "audio" | "video";
+  callerInfo?: {
+    userId: string;
+    username: string;
+    displayName: string;
+    avatar?: string;
+  };
+  callId?: string;
+};
+
+export function dispatchDmCallIncoming(detail: DmCallIncomingDetail): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(DM_CALL_INCOMING_EVENT, { detail }),
+  );
+}
+
 export function registerDmSocketForHeartbeat(
   socket: { connected?: boolean; emit: (e: string, p: unknown) => void } | null,
 ): void {

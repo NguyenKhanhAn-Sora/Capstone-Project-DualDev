@@ -149,7 +149,7 @@ class DirectMessagesRealtimeService {
     _token = token;
     final uri = '${AppConfig.apiBaseUrl}/direct-messages';
     final socket = io.io(uri, <String, dynamic>{
-      'transports': ['websocket'],
+      'transports': ['websocket', 'polling'],
       'autoConnect': false,
       'reconnection': true,
       'reconnectionAttempts': -1,

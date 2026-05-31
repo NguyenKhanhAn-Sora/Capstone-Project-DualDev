@@ -8,6 +8,10 @@ import { useDirectMessages } from "@/hooks/use-direct-messages";
 import { isIceCandidateEvent, isIncomingRingEvent } from "@/lib/call-event-guards";
 import { fetchCurrentProfile, type CurrentProfileResponse } from "@/lib/api";
 import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
+import {
+  DM_CALL_INCOMING_EVENT,
+  type DmCallIncomingDetail,
+} from "@/lib/dm-call-session-sync";
 import { getDMRoomName } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 
@@ -126,6 +130,27 @@ export default function GlobalDmIncomingCalls() {
       return;
     }
   }, [callEvent]);
+
+  useEffect(() => {
+    const onIncoming = (e: Event) => {
+      const detail = (e as CustomEvent<DmCallIncomingDetail>).detail;
+      if (!detail?.from || !detail.callerInfo) return;
+      if (
+        currentUserIdRef.current &&
+        String(detail.from) === String(currentUserIdRef.current)
+      ) {
+        return;
+      }
+      setIncomingCall({
+        from: detail.from,
+        type: detail.type || "audio",
+        callerInfo: detail.callerInfo,
+        status: "incoming",
+      });
+    };
+    window.addEventListener(DM_CALL_INCOMING_EVENT, onIncoming);
+    return () => window.removeEventListener(DM_CALL_INCOMING_EVENT, onIncoming);
+  }, []);
 
   useEffect(() => {
     if (!callIncomingDismiss?.peerId) return;

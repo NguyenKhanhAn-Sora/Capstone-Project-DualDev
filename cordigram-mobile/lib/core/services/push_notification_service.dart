@@ -84,6 +84,13 @@ class PushNotificationService {
     );
 
     FirebaseMessaging.onMessage.listen((message) async {
+      final data = Map<String, dynamic>.from(message.data);
+      final type = (data['type'] ?? '').toString();
+      if (_isDmCallIncomingType(type)) {
+        await _routeDmCallIncoming(data);
+        return;
+      }
+
       final title = message.notification?.title ?? 'Cordigram';
       final body = message.notification?.body ?? 'You have a new notification.';
 
@@ -263,12 +270,14 @@ class PushNotificationService {
             .toString()
             .trim();
     await DirectMessagesRealtimeService.connect();
+    final callId = (data['callId'] ?? '').toString().trim();
     DmCallManager.instance.presentIncomingHintFromPush(
       callerUserId: callerId,
       displayName: name.isNotEmpty ? name : null,
       username: username.isNotEmpty ? username : null,
       avatarUrl: avatar.isNotEmpty ? avatar : null,
       video: video,
+      callId: callId.isNotEmpty ? callId : null,
     );
   }
 

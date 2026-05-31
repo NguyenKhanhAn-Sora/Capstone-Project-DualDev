@@ -843,24 +843,20 @@ export class DirectMessagesGateway
         callId: outcome.callId,
       };
 
-      const receiverSocket = this.connectedUsers.get(data.receiverId);
-      const calleeOnline = Boolean(receiverSocket?.size);
-      if (calleeOnline) {
-        this.emitToAllUserSockets(
-          data.receiverId,
-          'call-incoming',
-          incomingPayload,
-        );
-      }
-      // Mobile / background: FCM when callee has no web socket (or as backup).
-      if (!calleeOnline) {
-        void this.fcmPushService.pushDmCallIncoming({
-          receiverUserId: data.receiverId,
-          callerUserId: senderId,
-          type: data.type,
-          callerInfo,
-        });
-      }
+      this.emitToAllUserSockets(
+        data.receiverId,
+        'call-incoming',
+        incomingPayload,
+      );
+      // Always FCM as well: mobile may be foreground without DM socket while a
+      // web tab still holds an online socket for this user.
+      void this.fcmPushService.pushDmCallIncoming({
+        receiverUserId: data.receiverId,
+        callerUserId: senderId,
+        type: data.type,
+        callerInfo,
+        callId: outcome.callId,
+      });
 
       this.emitToAllUserSockets(senderId, 'call-sessions-sync', {
         sessions: await this.dmCallSessions.getSessionsForUser(senderId),

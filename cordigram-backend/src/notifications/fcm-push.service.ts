@@ -51,6 +51,7 @@ export class FcmPushService {
     receiverUserId: string;
     callerUserId: string;
     type: 'audio' | 'video';
+    callId?: string;
     callerInfo: {
       userId: string;
       username: string;
@@ -79,6 +80,7 @@ export class FcmPushService {
       callerUsername: (params.callerInfo.username ?? '').trim(),
       callerDisplayName: (params.callerInfo.displayName ?? '').trim(),
       callerAvatar: (params.callerInfo.avatar ?? '').trim(),
+      ...(params.callId ? { callId: params.callId } : {}),
     };
 
     const message: admin.messaging.MulticastMessage = {
