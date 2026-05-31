@@ -13,6 +13,7 @@ interface OutgoingCallPopupProps {
   onCancel: () => void;
   onJoin?: () => void;
   status: "calling" | "rejected" | "no-answer" | "answered";
+  lightBackdrop?: boolean;
 }
 
 export default function OutgoingCallPopup({
@@ -22,6 +23,7 @@ export default function OutgoingCallPopup({
   onCancel,
   onJoin,
   status,
+  lightBackdrop = false,
 }: OutgoingCallPopupProps) {
   const { t } = useLanguage();
   const uiTone = useMessagesUiTone();
@@ -51,7 +53,10 @@ export default function OutgoingCallPopup({
   };
 
   return (
-    <div className={styles.overlay} data-ui-tone={uiTone}>
+    <div
+      className={`${styles.overlay} ${lightBackdrop ? styles.overlayLight : ""}`}
+      data-ui-tone={uiTone}
+    >
       <div className={styles.popup}>
         <div className={styles.cardAccent} aria-hidden />
         {/* Avatar */}

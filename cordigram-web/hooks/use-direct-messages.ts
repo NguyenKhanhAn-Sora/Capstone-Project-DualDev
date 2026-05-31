@@ -448,7 +448,12 @@ export const useDirectMessages = ({
 
     socket.on(
       "call-answer",
-      (data: { from: string; sdpOffer: any; callId?: string }) => {
+      (data: {
+        from: string;
+        sdpOffer: any;
+        callId?: string;
+        type?: "audio" | "video";
+      }) => {
         const evt: CallEvent = { ...data, callSignal: "answer" };
         setCallEvent(evt);
         scheduleClearCallEvent(evt, 8000);
@@ -456,6 +461,7 @@ export const useDirectMessages = ({
           from: String(data.from),
           sdpOffer: data.sdpOffer,
           callId: data.callId,
+          type: data.type,
         });
       },
     );

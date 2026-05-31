@@ -888,6 +888,7 @@ export class DirectMessagesGateway
       from: userId,
       sdpOffer: data.sdpOffer,
       callId: session?.callId,
+      type: session?.type,
     };
 
     this.emitToAllUserSockets(data.callerId, 'call-answer', answerPayload);

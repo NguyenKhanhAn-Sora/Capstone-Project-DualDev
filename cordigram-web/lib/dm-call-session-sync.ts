@@ -76,6 +76,7 @@ export type DmCallAnswerDetail = {
   from: string;
   sdpOffer?: { roomName?: string } | null;
   callId?: string;
+  type?: "audio" | "video";
 };
 
 export function dispatchDmCallAnswer(detail: DmCallAnswerDetail): void {

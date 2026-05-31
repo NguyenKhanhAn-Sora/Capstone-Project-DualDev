@@ -13,6 +13,12 @@ interface IncomingCallPopupProps {
   onAccept: () => void;
   onReject: () => void;
   status?: "incoming" | "cancelled"; // ✅ Status for when caller cancels
+  /**
+   * When true, the backdrop is a light translucent blur (page behind stays
+   * visible) instead of the near-solid black used inside the messages app.
+   * Used for the global popup shown over social pages.
+   */
+  lightBackdrop?: boolean;
 }
 
 export default function IncomingCallPopup({
@@ -22,6 +28,7 @@ export default function IncomingCallPopup({
   onAccept,
   onReject,
   status = "incoming",
+  lightBackdrop = false,
 }: IncomingCallPopupProps) {
   const { t } = useLanguage();
   const uiTone = useMessagesUiTone();
@@ -31,7 +38,10 @@ export default function IncomingCallPopup({
   useCallSound("incoming", status === "incoming");
 
   return (
-    <div className={styles.overlay} data-ui-tone={uiTone}>
+    <div
+      className={`${styles.overlay} ${lightBackdrop ? styles.overlayLight : ""}`}
+      data-ui-tone={uiTone}
+    >
       <div className={styles.popup}>
         <div className={styles.cardAccent} aria-hidden />
         {/* Avatar */}

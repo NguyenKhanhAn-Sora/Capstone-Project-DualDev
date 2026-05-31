@@ -14,6 +14,7 @@ import {
 } from "@/lib/dm-call-session-sync";
 import { getDMRoomName } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
+import OutgoingCallPopup from "@/components/OutgoingCallPopup";
 
 function isValidAvatarUrl(url: string | undefined): boolean {
   if (!url) return false;
@@ -46,8 +47,17 @@ export default function GlobalDmIncomingCalls() {
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [incomingCall, setIncomingCall] = useState<IncomingCallState | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
+  // Set when WE are the caller and the peer answered, but the browser blocked
+  // the automatic window.open (it's a socket event, not a user gesture). We
+  // keep this popup so the user can join with a real click.
+  const [pendingJoin, setPendingJoin] = useState<{
+    peerId: string;
+    roomName: string;
+    type: "audio" | "video";
+  } | null>(null);
 
   const currentUserIdRef = useRef<string>("");
+  const openedAnswerPeersRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     currentUserIdRef.current = userId;
@@ -161,6 +171,9 @@ export default function GlobalDmIncomingCalls() {
 
   useEffect(() => {
     if (!callEnded) return;
+    setPendingJoin((prev) =>
+      prev && prev.peerId === callEnded.from ? null : prev,
+    );
     setIncomingCall((prev) => {
       if (prev && prev.from === callEnded.from) {
         return { ...prev, status: "cancelled" };
@@ -211,6 +224,76 @@ export default function GlobalDmIncomingCalls() {
     };
   }, [endCall]);
 
+  const buildCallUrl = useCallback(
+    (peerId: string, roomName: string, type: "audio" | "video") => {
+      const participantName =
+        profile?.username || profile?.displayName || "Người dùng";
+      const isAudioOnly = type === "audio";
+      const callAuthToken = getTabAccessToken() || token;
+      const qpToken = callAuthToken
+        ? `&accessToken=${encodeURIComponent(callAuthToken)}`
+        : "";
+      return (
+        `/call?roomName=${encodeURIComponent(roomName)}` +
+        `&participantName=${encodeURIComponent(participantName)}` +
+        `&audioOnly=${isAudioOnly}` +
+        `&peerId=${encodeURIComponent(peerId)}` +
+        qpToken
+      );
+    },
+    [profile, token],
+  );
+
+  // Caller side: the peer answered. Open the /call tab so A also enters the
+  // call. Because this runs from a socket event (no user gesture), the popup
+  // may be blocked — then we show a "Join" button the user can click.
+  useEffect(() => {
+    if (!callEvent || callEvent.callSignal !== "answer") return;
+    if (!callEvent.sdpOffer) return;
+    const peerId = String(callEvent.from);
+    if (
+      currentUserIdRef.current &&
+      peerId === String(currentUserIdRef.current)
+    ) {
+      return;
+    }
+    const roomName =
+      typeof callEvent.sdpOffer === "object" &&
+      callEvent.sdpOffer != null &&
+      typeof (callEvent.sdpOffer as { roomName?: string }).roomName === "string"
+        ? String((callEvent.sdpOffer as { roomName: string }).roomName)
+        : "";
+    if (!roomName) return;
+    if (openedAnswerPeersRef.current.has(peerId)) return;
+
+    const type: "audio" | "video" = callEvent.type === "video" ? "video" : "audio";
+    const win = window.open(
+      buildCallUrl(peerId, roomName, type),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    if (!win) {
+      setPendingJoin({ peerId, roomName, type });
+      return;
+    }
+    openedAnswerPeersRef.current.add(peerId);
+    setPendingJoin((prev) => (prev?.peerId === peerId ? null : prev));
+    window.setTimeout(() => {
+      openedAnswerPeersRef.current.delete(peerId);
+    }, 15000);
+  }, [callEvent, buildCallUrl]);
+
+  const handleJoinPending = useCallback(() => {
+    if (!pendingJoin) return;
+    window.open(
+      buildCallUrl(pendingJoin.peerId, pendingJoin.roomName, pendingJoin.type),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    openedAnswerPeersRef.current.add(pendingJoin.peerId);
+    setPendingJoin(null);
+  }, [pendingJoin, buildCallUrl]);
+
   const handleAcceptCall = useCallback(async () => {
     if (!incomingCall || !token || !profile) {
       setAcceptError("Không thể chấp nhận cuộc gọi");
@@ -249,6 +332,23 @@ export default function GlobalDmIncomingCalls() {
     return null;
   }
 
+  const joinPopup =
+    pendingJoin &&
+    createPortal(
+      <OutgoingCallPopup
+        receiverName="Cuộc gọi"
+        callType={pendingJoin.type}
+        status="answered"
+        lightBackdrop
+        onJoin={handleJoinPending}
+        onCancel={() => {
+          endCall(pendingJoin.peerId);
+          setPendingJoin(null);
+        }}
+      />,
+      document.body,
+    );
+
   const popup =
     incomingCall &&
     createPortal(
@@ -267,6 +367,7 @@ export default function GlobalDmIncomingCalls() {
           onAccept={handleAcceptCall}
           onReject={handleRejectCall}
           status={incomingCall.status}
+          lightBackdrop
         />
         {acceptError ? (
           <div
@@ -288,5 +389,10 @@ export default function GlobalDmIncomingCalls() {
       document.body,
     );
 
-  return <>{popup}</>;
+  return (
+    <>
+      {popup}
+      {joinPopup}
+    </>
+  );
 }
