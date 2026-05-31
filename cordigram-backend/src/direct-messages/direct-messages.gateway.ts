@@ -16,6 +16,11 @@ import { Model } from 'mongoose';
 import { Profile } from '../profiles/profile.schema';
 import { User } from '../users/user.schema';
 import { FcmPushService } from '../notifications/fcm-push.service';
+import { DmCallSessionService } from '../dm-call/dm-call-session.service';
+import {
+  DmCallClientPlatform,
+  DmCallSessionRecord,
+} from '../dm-call/dm-call.types';
 
 @WebSocketGateway({
   namespace: '/direct-messages',
@@ -44,28 +49,10 @@ export class DirectMessagesGateway
 
   private readonly IDLE_AFTER_MS = 60_000;
 
-  /** In-flight 1:1 calls — used to write a single call-log DM when the session ends. */
-  private activeCalls = new Map<
-    string,
-    {
-      initiatorId: string;
-      calleeId: string;
-      type: 'audio' | 'video';
-      answeredAt?: number;
-      logged: boolean;
-      /** Socket that started the ring — call-answer is sent here only. */
-      initiatorSocketId?: string;
-    }
-  >();
-
-  private callPairKey(userA: string, userB: string): string {
-    return [userA, userB].sort().join(':');
-  }
-
   private emitCallBusy(
     socket: Socket,
     payload: {
-      code: 'already_in_call' | 'peer_busy';
+      code: 'already_in_call' | 'peer_busy' | 'user_busy';
       receiverId?: string;
       peerId?: string;
     },
@@ -73,8 +60,38 @@ export class DirectMessagesGateway
     socket.emit('call-busy', payload);
   }
 
-  private clearActiveCall(userA: string, userB: string): void {
-    this.activeCalls.delete(this.callPairKey(userA, userB));
+  /** Emit to every socket of a user (multi-tab / multi-device on same gateway). */
+  private emitToAllUserSockets(
+    userId: string,
+    event: string,
+    payload: unknown,
+    exceptSocketId?: string,
+  ): void {
+    const sockets = this.connectedUsers.get(userId);
+    if (!sockets?.size) return;
+    for (const sid of sockets) {
+      if (exceptSocketId && sid === exceptSocketId) continue;
+      this.server.to(sid).emit(event, payload);
+    }
+  }
+
+  private async emitCallSessionsSync(userId: string, socket: Socket): Promise<void> {
+    const sessions = await this.dmCallSessions.getSessionsForUser(userId);
+    socket.emit('call-sessions-sync', { sessions });
+  }
+
+  private async onCallRingTimeout(session: DmCallSessionRecord): Promise<void> {
+    this.emitToAllUserSockets(session.calleeId, 'call-ended', {
+      from: session.initiatorId,
+      callId: session.callId,
+      reason: 'timeout',
+    });
+    this.emitToAllUserSockets(session.initiatorId, 'call-ended', {
+      from: session.calleeId,
+      callId: session.callId,
+      reason: 'timeout',
+    });
+    await this.finalizeFromSession(session, session.initiatorId, 'missed');
   }
 
   private async persistCallLogAndNotify(params: {
@@ -129,21 +146,13 @@ export class DirectMessagesGateway
     }
   }
 
-  private async finalizeActiveCall(
-    userA: string,
-    userB: string,
+  private async finalizeFromSession(
+    session: DmCallSessionRecord,
     endedByUserId: string,
     explicitStatus?: 'missed' | 'completed' | 'declined' | 'cancelled',
   ): Promise<void> {
-    const key = this.callPairKey(userA, userB);
-    const session = this.activeCalls.get(key);
-    if (!session || session.logged) {
-      this.activeCalls.delete(key);
-      return;
-    }
-
-    session.logged = true;
-    this.activeCalls.delete(key);
+    if (this.dmCallSessions.wasCallLogPersisted(session.callId)) return;
+    this.dmCallSessions.markCallLogPersisted(session.callId);
 
     const { initiatorId, calleeId, type, answeredAt } = session;
     const peerId = calleeId;
@@ -417,6 +426,7 @@ export class DirectMessagesGateway
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(User.name) private userModel: Model<User>,
     private readonly fcmPushService: FcmPushService,
+    private readonly dmCallSessions: DmCallSessionService,
   ) {}
 
   async handleConnection(socket: Socket) {
@@ -452,6 +462,8 @@ export class DirectMessagesGateway
 
       // Mark as online (or keep offline for others if sharePresence=false)
       this.setPresence(userId, 'online', { bumpActivity: true });
+
+      await this.emitCallSessionsSync(userId, socket);
     } catch (error) {
       console.error('Connection error:', error);
       socket.disconnect();
@@ -473,28 +485,19 @@ export class DirectMessagesGateway
       if (!stillOnline) {
         this.setPresence(userId, 'offline');
         this.dmPresenceSubs.delete(userId);
-        // Tear down unanswered rings when the initiator goes fully offline.
-        for (const [, session] of [...this.activeCalls]) {
-          if (
-            session.initiatorId === userId &&
-            !session.logged &&
-            !session.answeredAt
-          ) {
-            const calleeSockets = this.connectedUsers.get(session.calleeId);
-            if (calleeSockets?.size) {
-              for (const sid of calleeSockets) {
-                this.server.to(sid).emit('call-ended', {
-                  from: session.initiatorId,
-                });
-              }
-            }
-            await this.finalizeActiveCall(
-              session.initiatorId,
-              session.calleeId,
-              session.initiatorId,
-              'cancelled',
-            );
-          }
+        const endedSessions =
+          await this.dmCallSessions.onInitiatorFullyOffline(userId);
+        for (const session of endedSessions) {
+          this.emitToAllUserSockets(session.calleeId, 'call-ended', {
+            from: session.initiatorId,
+            callId: session.callId,
+            reason: 'cancelled',
+          });
+          await this.finalizeFromSession(
+            session,
+            session.initiatorId,
+            'cancelled',
+          );
         }
       }
     }
@@ -785,7 +788,12 @@ export class DirectMessagesGateway
   @SubscribeMessage('call-initiate')
   async handleCallInitiate(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: { receiverId: string; type: 'audio' | 'video' },
+    @MessageBody()
+    data: {
+      receiverId: string;
+      type: 'audio' | 'video';
+      clientPlatform?: DmCallClientPlatform;
+    },
   ) {
     try {
       const senderId = socket.data.userId;
@@ -794,20 +802,24 @@ export class DirectMessagesGateway
         return;
       }
 
-      const key = this.callPairKey(senderId, data.receiverId);
-      const existingPair = this.activeCalls.get(key);
-      if (existingPair && !existingPair.logged) {
+      const outcome = await this.dmCallSessions.tryInitiate({
+        initiatorId: senderId,
+        calleeId: data.receiverId,
+        type: data.type,
+        initiatorSocketId: socket.id,
+        platform: data.clientPlatform,
+        onRingTimeout: (s) => void this.onCallRingTimeout(s),
+      });
+
+      if (!outcome.ok) {
         this.emitCallBusy(socket, {
-          code: 'already_in_call',
+          code: outcome.code,
           receiverId: data.receiverId,
-          peerId: data.receiverId,
+          peerId: outcome.peerId,
         });
         return;
       }
 
-      const receiverSocket = this.connectedUsers.get(data.receiverId);
-
-      // Get sender's profile for username and avatar
       const { Types } = require('mongoose');
       const senderObjectId = new Types.ObjectId(senderId);
 
@@ -824,24 +836,20 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
-      this.activeCalls.set(key, {
-        initiatorId: senderId,
-        calleeId: data.receiverId,
+      const incomingPayload = {
+        from: senderId,
         type: data.type,
-        logged: false,
-        initiatorSocketId: socket.id,
-      });
+        callerInfo,
+        callId: outcome.callId,
+      };
 
-      if (receiverSocket && receiverSocket.size) {
-        const payload = {
-          from: senderId,
-          type: data.type,
-          callerInfo,
-        };
-
-        for (const sid of receiverSocket) {
-          this.server.to(sid).emit('call-incoming', payload);
-        }
+      const receiverSocket = this.connectedUsers.get(data.receiverId);
+      if (receiverSocket?.size) {
+        this.emitToAllUserSockets(
+          data.receiverId,
+          'call-incoming',
+          incomingPayload,
+        );
       } else {
         void this.fcmPushService.pushDmCallIncoming({
           receiverUserId: data.receiverId,
@@ -850,39 +858,59 @@ export class DirectMessagesGateway
           callerInfo,
         });
       }
+
+      this.emitToAllUserSockets(senderId, 'call-sessions-sync', {
+        sessions: await this.dmCallSessions.getSessionsForUser(senderId),
+      });
     } catch (error) {
       console.error('❌ [CALL] Error initiating call:', error);
     }
   }
 
   @SubscribeMessage('call-answer')
-  handleCallAnswer(
+  async handleCallAnswer(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: { callerId: string; sdpOffer: any },
   ) {
     const userId = socket.data.userId;
-    const key = this.callPairKey(userId, data.callerId);
-    const session = this.activeCalls.get(key);
-    if (session) {
-      session.answeredAt = Date.now();
-    }
+    const roomId =
+      typeof data.sdpOffer?.roomName === 'string'
+        ? data.sdpOffer.roomName
+        : undefined;
 
-    const callerSocket = this.connectedUsers.get(data.callerId);
+    const session = await this.dmCallSessions.markAnswered({
+      userId,
+      callerId: data.callerId,
+      answeringSocketId: socket.id,
+      roomId,
+    });
+
     const answerPayload = {
       from: userId,
       sdpOffer: data.sdpOffer,
+      callId: session?.callId,
     };
 
-    if (callerSocket && callerSocket.size) {
-      const initiatorSid = session?.initiatorSocketId;
-      if (initiatorSid && callerSocket.has(initiatorSid)) {
-        this.server.to(initiatorSid).emit('call-answer', answerPayload);
-      } else {
-        const firstSid = callerSocket.values().next().value as string | undefined;
-        if (firstSid) {
-          this.server.to(firstSid).emit('call-answer', answerPayload);
-        }
-      }
+    this.emitToAllUserSockets(data.callerId, 'call-answer', answerPayload);
+
+    this.emitToAllUserSockets(
+      userId,
+      'call-incoming-dismiss',
+      {
+        peerId: data.callerId,
+        callId: session?.callId,
+        reason: 'answered_elsewhere',
+      },
+      socket.id,
+    );
+
+    if (session) {
+      this.emitToAllUserSockets(data.callerId, 'call-sessions-sync', {
+        sessions: await this.dmCallSessions.getSessionsForUser(data.callerId),
+      });
+      this.emitToAllUserSockets(userId, 'call-sessions-sync', {
+        sessions: await this.dmCallSessions.getSessionsForUser(userId),
+      });
     }
   }
 
@@ -892,17 +920,42 @@ export class DirectMessagesGateway
     @MessageBody() data: { callerId: string },
   ) {
     const userId = socket.data.userId;
-    const callerSocket = this.connectedUsers.get(data.callerId);
 
-    if (callerSocket && callerSocket.size) {
-      for (const sid of callerSocket) {
-        this.server.to(sid).emit('call-rejected', {
-          from: userId,
-        });
-      }
+    this.emitToAllUserSockets(data.callerId, 'call-rejected', {
+      from: userId,
+    });
+
+    this.emitToAllUserSockets(
+      userId,
+      'call-incoming-dismiss',
+      {
+        peerId: data.callerId,
+        reason: 'rejected_elsewhere',
+      },
+      socket.id,
+    );
+
+    const session = await this.dmCallSessions.markEnded({
+      userId,
+      peerId: data.callerId,
+      explicitStatus: 'declined',
+    });
+    if (session) {
+      await this.finalizeFromSession(session, userId, 'declined');
     }
+  }
 
-    await this.finalizeActiveCall(data.callerId, userId, userId, 'missed');
+  @SubscribeMessage('call-heartbeat')
+  async handleCallHeartbeat(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: { callId: string },
+  ) {
+    const userId = socket.data.userId;
+    if (!data?.callId) return;
+    const ok = await this.dmCallSessions.heartbeat(data.callId, userId);
+    if (!ok) {
+      socket.emit('call-ended', { from: null, reason: 'session_gone' });
+    }
   }
 
   @SubscribeMessage('ice-candidate')
@@ -934,46 +987,42 @@ export class DirectMessagesGateway
     },
   ) {
     const userId = socket.data.userId;
-    const peerSocket = this.connectedUsers.get(data.peerId);
 
-    if (peerSocket && peerSocket.size) {
-      for (const sid of peerSocket) {
-        this.server.to(sid).emit('call-ended', {
-          from: userId,
-        });
-      }
-    }
+    const endedPayload = {
+      from: userId,
+      reason: data.status ?? 'ended',
+    };
+    this.emitToAllUserSockets(data.peerId, 'call-ended', endedPayload);
+    this.emitToAllUserSockets(userId, 'call-ended', {
+      from: data.peerId,
+      reason: data.status ?? 'ended',
+    });
 
-    const key = this.callPairKey(userId, data.peerId);
-    const session = this.activeCalls.get(key);
+    const session = await this.dmCallSessions.markEnded({
+      userId,
+      peerId: data.peerId,
+      explicitStatus: data.status,
+    });
 
-    if (session && !session.logged) {
-      if (data.status === 'completed' && session.answeredAt) {
-        session.logged = true;
-        this.activeCalls.delete(key);
-        const durationSec =
-          data.durationSec ??
-          Math.max(1, Math.floor((Date.now() - session.answeredAt) / 1000));
-        await this.persistCallLogAndNotify({
-          initiatorId: session.initiatorId,
-          peerId: session.calleeId,
-          callType: session.type,
-          callStatus: 'completed',
-          durationSec,
-        });
-        return;
-      }
+    if (!session) return;
 
-      await this.finalizeActiveCall(
-        userId,
-        data.peerId,
-        userId,
-        data.status,
-      );
+    if (data.status === 'completed' && session.answeredAt) {
+      if (this.dmCallSessions.wasCallLogPersisted(session.callId)) return;
+      this.dmCallSessions.markCallLogPersisted(session.callId);
+      const durationSec =
+        data.durationSec ??
+        Math.max(1, Math.floor((Date.now() - session.answeredAt) / 1000));
+      await this.persistCallLogAndNotify({
+        initiatorId: session.initiatorId,
+        peerId: session.calleeId,
+        callType: session.type,
+        callStatus: 'completed',
+        durationSec,
+      });
       return;
     }
 
-    this.clearActiveCall(userId, data.peerId);
+    await this.finalizeFromSession(session, userId, data.status);
   }
 
   getConnectedUsers() {

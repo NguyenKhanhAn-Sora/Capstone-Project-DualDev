@@ -2093,6 +2093,8 @@ export default function MessagesPage() {
     callEvent,
     callBusy,
     callEnded,
+    callIncomingDismiss,
+    callSessionsSync,
     messageDeleted,
     dmUnreadCountEvent,
     initiateCall,
@@ -2833,6 +2835,37 @@ export default function MessagesPage() {
 
     return () => clearTimeout(timer);
   }, [callEnded]); // ✅ Only depend on callEnded, not incomingCall
+
+  // Đóng popup incoming trên tab/thiết bị khác khi đã accept/reject ở nơi khác.
+  useEffect(() => {
+    if (!callIncomingDismiss?.peerId) return;
+    const peerId = String(callIncomingDismiss.peerId);
+    setIncomingCall((prev) => (prev?.from === peerId ? null : prev));
+    if (callIncomingDismiss.reason === "answered_elsewhere") {
+      setOutgoingCallsByPeer((prev) => {
+        if (!prev[peerId]) return prev;
+        const next = { ...prev };
+        delete next[peerId];
+        return next;
+      });
+      releaseOutboundCallLock(callTabIdRef.current, peerId);
+    }
+  }, [callIncomingDismiss]);
+
+  // Đồng bộ session sau reconnect — xóa ring ảo nếu server không còn ringing.
+  useEffect(() => {
+    if (!callSessionsSync?.sessions) return;
+    const ringingPeers = new Set(
+      callSessionsSync.sessions
+        .filter((s) => s.state === "ringing" && s.role === "callee")
+        .map((s) => s.peerId),
+    );
+    setIncomingCall((prev) => {
+      if (!prev) return prev;
+      if (ringingPeers.has(prev.from)) return prev;
+      return null;
+    });
+  }, [callSessionsSync]);
 
   // ✅ Listen for the call tab telling us the user ended the call.
   //

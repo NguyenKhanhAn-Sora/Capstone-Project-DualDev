@@ -39,6 +39,9 @@ class DmCallManager extends ChangeNotifier {
   StreamSubscription<DmCallEvent>? _callSub;
   StreamSubscription<String>? _endedSub;
   StreamSubscription<DmCallBusyEvent>? _busySub;
+  StreamSubscription<DmCallIncomingDismissEvent>? _dismissSub;
+  Timer? _callHeartbeatTimer;
+  String? _activeCallId;
   bool _initialized = false;
   bool _callRouteOnStack = false;
 
@@ -129,6 +132,8 @@ class DmCallManager extends ChangeNotifier {
     _endedSub =
         DirectMessagesRealtimeService.callEnded.listen(_onCallEnded);
     _busySub = DirectMessagesRealtimeService.callBusy.listen(_onCallBusy);
+    _dismissSub = DirectMessagesRealtimeService.callIncomingDismiss
+        .listen(_onIncomingDismiss);
     unawaited(_refreshMyName());
   }
 
@@ -162,8 +167,40 @@ class DmCallManager extends ChangeNotifier {
     );
   }
 
+  void _onIncomingDismiss(DmCallIncomingDismissEvent event) {
+    if (_incoming?.callerUserId == event.peerId) {
+      _incomingTimer?.cancel();
+      _incoming = null;
+      notifyListeners();
+    }
+    if (event.reason == 'answered_elsewhere' &&
+        _outgoings.containsKey(event.peerId)) {
+      _cancelOutgoingFor(event.peerId);
+    }
+  }
+
+  void _startCallHeartbeat(String? callId) {
+    _callHeartbeatTimer?.cancel();
+    _activeCallId = callId;
+    if (callId == null || callId.isEmpty) return;
+    DirectMessagesRealtimeService.emitCallHeartbeat(callId);
+    _callHeartbeatTimer = Timer.periodic(
+      const Duration(seconds: 25),
+      (_) => DirectMessagesRealtimeService.emitCallHeartbeat(callId),
+    );
+  }
+
+  void _stopCallHeartbeat() {
+    _callHeartbeatTimer?.cancel();
+    _callHeartbeatTimer = null;
+    _activeCallId = null;
+  }
+
   Future<void> onAuthChanged() async {
     if (!_initialized) return;
+    _stopCallHeartbeat();
+    await _dismissSub?.cancel();
+    _dismissSub = null;
     await DirectMessagesRealtimeService.disconnect();
     await ChannelMessagesRealtimeService.disconnect();
     _cancelTimers();
@@ -193,6 +230,8 @@ class DmCallManager extends ChangeNotifier {
     if (token != null && token.isNotEmpty) {
       await DirectMessagesRealtimeService.connect();
       await ChannelMessagesRealtimeService.connect();
+      _dismissSub = DirectMessagesRealtimeService.callIncomingDismiss
+          .listen(_onIncomingDismiss);
       unawaited(_refreshMyName());
     }
   }
@@ -340,6 +379,7 @@ class DmCallManager extends ChangeNotifier {
       peerName: inc.callerName,
       peerAvatarUrl: inc.callerAvatarUrl,
       video: inc.video,
+      callId: inc.callId,
     );
   }
 
@@ -357,6 +397,7 @@ class DmCallManager extends ChangeNotifier {
   Future<void> hangupActive() async {
     final act = _active;
     if (act == null) return;
+    _stopCallHeartbeat();
     DirectMessagesRealtimeService.endCall(act.peerUserId);
     _active = null;
     _activeCallStartedAt = null;
@@ -512,6 +553,7 @@ class DmCallManager extends ChangeNotifier {
     if (_myName == null || _myName!.isEmpty) {
       unawaited(_refreshMyName());
     }
+    final callId = event.payload?['callId']?.toString();
     _incoming = IncomingCallState(
       callerUserId: event.fromUserId,
       callerName: (info['displayName'] ?? info['username'] ?? 'Người dùng')
@@ -519,6 +561,7 @@ class DmCallManager extends ChangeNotifier {
       callerAvatarUrl: info['avatar']?.toString(),
       video: event.type == 'video',
       myName: _resolveMyName(),
+      callId: callId,
     );
     _incomingTimer = Timer(_incomingTimeout, () {
       if (_incoming != null) {
@@ -597,6 +640,7 @@ class DmCallManager extends ChangeNotifier {
       changed = true;
     }
     if (_active?.peerUserId == fromUserId) {
+      _stopCallHeartbeat();
       _active = null;
       _activeCallStartedAt = null;
       _callRouteOnStack = false;
@@ -622,6 +666,7 @@ class DmCallManager extends ChangeNotifier {
     required String peerName,
     required String? peerAvatarUrl,
     required bool video,
+    String? callId,
   }) {
     _active = ActiveCallState(
       session: session,
@@ -637,6 +682,7 @@ class DmCallManager extends ChangeNotifier {
     _activeMicEnabled = true;
     _activeSoundEnabled = true;
     notifyListeners();
+    _startCallHeartbeat(callId);
     _pushCallScreen();
   }
 
@@ -792,6 +838,7 @@ class IncomingCallState {
     required this.callerAvatarUrl,
     required this.video,
     required this.myName,
+    this.callId,
   });
 
   final String callerUserId;
@@ -799,6 +846,7 @@ class IncomingCallState {
   final String? callerAvatarUrl;
   final bool video;
   final String myName;
+  final String? callId;
 }
 
 @immutable

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import io, { Socket } from "socket.io-client";
 import { apiBaseUrl } from "@/lib/api";
+import {
+  CallIncomingDismissEvent,
+  DmCallSessionSyncItem,
+  detectDmClientPlatform,
+  registerDmSocketForHeartbeat,
+} from "@/lib/dm-call-session-sync";
 
 interface UseDirectMessagesOptions {
   userId: string;
@@ -72,10 +78,12 @@ export interface CallEvent {
 }
 
 export interface CallBusyEvent {
-  code: "already_in_call" | "peer_busy";
+  code: "already_in_call" | "peer_busy" | "user_busy";
   receiverId?: string;
   peerId?: string;
 }
+
+export type { CallIncomingDismissEvent, DmCallSessionSyncItem };
 
 export interface UserProfileStyleUpdatedEvent {
   userId: string;
@@ -157,6 +165,11 @@ export const useDirectMessages = ({
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callBusy, setCallBusy] = useState<CallBusyEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
+  const [callIncomingDismiss, setCallIncomingDismiss] =
+    useState<CallIncomingDismissEvent | null>(null);
+  const [callSessionsSync, setCallSessionsSync] = useState<{
+    sessions: DmCallSessionSyncItem[];
+  } | null>(null);
   const [messageDeleted, setMessageDeleted] = useState<{
     messageId: string;
     deleteType?: "for-everyone" | "for-me";
@@ -182,6 +195,8 @@ export const useDirectMessages = ({
       setIsConnected(false);
       setCallEvent(null);
       setCallEnded(null);
+      setCallIncomingDismiss(null);
+      setCallSessionsSync(null);
       setUserTyping(null);
       setMessagesRead(null);
       setReactionUpdate(null);
@@ -198,6 +213,8 @@ export const useDirectMessages = ({
       // re-login would re-fire old socket events from React state.
       setCallEvent(null);
       setCallEnded(null);
+      setCallIncomingDismiss(null);
+      setCallSessionsSync(null);
       setUserTyping(null);
       setMessagesRead(null);
       setReactionUpdate(null);
@@ -221,6 +238,7 @@ export const useDirectMessages = ({
 
     socket.on("connect", () => {
       setIsConnected(true);
+      registerDmSocketForHeartbeat(socket);
     });
 
     socket.on("disconnect", () => {
@@ -452,6 +470,27 @@ export const useDirectMessages = ({
     });
 
     socket.on(
+      "call-incoming-dismiss",
+      (data: CallIncomingDismissEvent) => {
+        if (!data?.peerId) return;
+        const evt = { ...data };
+        setCallIncomingDismiss(evt);
+        setTimeout(() => {
+          setCallIncomingDismiss((prev) => (prev === evt ? null : prev));
+        }, 1200);
+      },
+    );
+
+    socket.on(
+      "call-sessions-sync",
+      (data: { sessions?: DmCallSessionSyncItem[] }) => {
+        const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+        setCallSessionsSync({ sessions });
+        setTimeout(() => setCallSessionsSync(null), 800);
+      },
+    );
+
+    socket.on(
       "message-deleted",
       (data: {
         messageId: string;
@@ -509,8 +548,10 @@ export const useDirectMessages = ({
     });
 
     socketRef.current = socket;
+    registerDmSocketForHeartbeat(socket);
 
     return () => {
+      registerDmSocketForHeartbeat(null);
       socket.disconnect();
     };
   }, [userId, token, enabled]);
@@ -593,6 +634,7 @@ export const useDirectMessages = ({
         socketRef.current.emit("call-initiate", {
           receiverId,
           type,
+          clientPlatform: detectDmClientPlatform(),
         });
       }
     },
@@ -656,6 +698,8 @@ export const useDirectMessages = ({
     callEvent,
     callBusy,
     callEnded,
+    callIncomingDismiss,
+    callSessionsSync,
     messageDeleted,
     userProfileStyleUpdated,
     boostEntitlementUpdated,

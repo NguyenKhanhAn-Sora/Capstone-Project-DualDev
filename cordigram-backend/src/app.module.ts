@@ -27,6 +27,7 @@ import { DirectMessagesModule } from './direct-messages/direct-messages.module';
 import { PollsModule } from './polls/polls.module';
 import { LivekitModule } from './livekit/livekit.module';
 import { CallModule } from './call/call.module';
+import { DmCallModule } from './dm-call/dm-call.module';
 import { ActivityModule } from './activity/activity.module';
 import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
@@ -68,6 +69,7 @@ import { AppUpdateModule } from './app-update/app-update.module';
     DirectMessagesModule,
     PollsModule,
     LivekitModule,
+    DmCallModule,
     CallModule,
     ActivityModule,
     AdminModule,

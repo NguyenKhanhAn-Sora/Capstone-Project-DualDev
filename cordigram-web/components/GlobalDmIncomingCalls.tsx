@@ -74,7 +74,14 @@ export default function GlobalDmIncomingCalls() {
   const socketEnabled =
     !isMessagesRoute && authOk && Boolean(userId && token);
 
-  const { callEvent, callEnded, answerCall, rejectCall, endCall } = useDirectMessages({
+  const {
+    callEvent,
+    callEnded,
+    callIncomingDismiss,
+    answerCall,
+    rejectCall,
+    endCall,
+  } = useDirectMessages({
     userId: userId || " ",
     token: token || " ",
     enabled: socketEnabled,
@@ -101,6 +108,13 @@ export default function GlobalDmIncomingCalls() {
       return;
     }
   }, [callEvent]);
+
+  useEffect(() => {
+    if (!callIncomingDismiss?.peerId) return;
+    setIncomingCall((prev) =>
+      prev?.from === callIncomingDismiss.peerId ? null : prev,
+    );
+  }, [callIncomingDismiss]);
 
   useEffect(() => {
     if (!callEnded) return;

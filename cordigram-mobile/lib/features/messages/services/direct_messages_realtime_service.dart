@@ -68,9 +68,21 @@ class DmCallBusyEvent {
     this.peerId,
   });
 
-  final String code; // already_in_call | peer_busy
+  final String code; // already_in_call | peer_busy | user_busy
   final String? receiverId;
   final String? peerId;
+}
+
+class DmCallIncomingDismissEvent {
+  const DmCallIncomingDismissEvent({
+    required this.peerId,
+    this.callId,
+    this.reason = 'answered_elsewhere',
+  });
+
+  final String peerId;
+  final String? callId;
+  final String reason;
 }
 
 class DirectMessagesRealtimeService {
@@ -93,6 +105,9 @@ class DirectMessagesRealtimeService {
       StreamController<String>.broadcast();
   static final StreamController<DmCallBusyEvent> _callBusyController =
       StreamController<DmCallBusyEvent>.broadcast();
+  static final StreamController<DmCallIncomingDismissEvent>
+      _callIncomingDismissController =
+      StreamController<DmCallIncomingDismissEvent>.broadcast();
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messagesReadController =
@@ -114,6 +129,8 @@ class DirectMessagesRealtimeService {
   static Stream<DmCallEvent> get callEvents => _callController.stream;
   static Stream<String> get callEnded => _callEndedController.stream;
   static Stream<DmCallBusyEvent> get callBusy => _callBusyController.stream;
+  static Stream<DmCallIncomingDismissEvent> get callIncomingDismiss =>
+      _callIncomingDismissController.stream;
   static Stream<Map<String, dynamic>> get messageDeleted =>
       _messageDeletedController.stream;
   static Stream<Map<String, dynamic>> get messagesRead =>
@@ -256,6 +273,19 @@ class DirectMessagesRealtimeService {
       final data = Map<String, dynamic>.from(payload);
       _callEndedController.add((data['from'] ?? '').toString());
     });
+    socket.on('call-incoming-dismiss', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      final peerId = (data['peerId'] ?? '').toString();
+      if (peerId.isEmpty) return;
+      _callIncomingDismissController.add(
+        DmCallIncomingDismissEvent(
+          peerId: peerId,
+          callId: data['callId']?.toString(),
+          reason: (data['reason'] ?? 'answered_elsewhere').toString(),
+        ),
+      );
+    });
     socket.on('message-deleted', (payload) {
       if (payload is! Map) return;
       _messageDeletedController.add(Map<String, dynamic>.from(payload));
@@ -377,7 +407,13 @@ class DirectMessagesRealtimeService {
     _socket?.emit('call-initiate', {
       'receiverId': receiverId,
       'type': isVideo ? 'video' : 'audio',
+      'clientPlatform': 'mobile',
     });
+  }
+
+  static void emitCallHeartbeat(String callId) {
+    if (callId.isEmpty) return;
+    _socket?.emit('call-heartbeat', {'callId': callId});
   }
 
   static void answerCall(String callerId, Map<String, dynamic> sdpOffer) {
@@ -413,6 +449,7 @@ class DirectMessagesRealtimeService {
       socket.off('call-busy');
       socket.off('ice-candidate');
       socket.off('call-ended');
+      socket.off('call-incoming-dismiss');
       socket.off('message-deleted');
       socket.off('messages-read');
       socket.disconnect();
