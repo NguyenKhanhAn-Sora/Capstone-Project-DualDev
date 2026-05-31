@@ -1994,7 +1994,7 @@ export default function MessagesPage() {
       avatarUrl?: string;
     };
     type: "audio" | "video";
-    status: "calling" | "rejected" | "no-answer";
+    status: "calling" | "rejected" | "no-answer" | "answered";
     roomName?: string;
   };
 
@@ -2004,6 +2004,10 @@ export default function MessagesPage() {
 
   /** Refs for call socket effect — avoid wrong incoming UI / stale deps (glare, self) */
   const outgoingCallsByPeerRef = useRef(outgoingCallsByPeer);
+  // Tracks peers whose call tab we've already opened for the current answer, so
+  // the two answer paths (custom window event + callEvent effect) don't open
+  // the same /call tab twice.
+  const openedCallTabPeersRef = useRef<Set<string>>(new Set());
   const callTabIdRef = useRef<string>("");
   if (!callTabIdRef.current && typeof window !== "undefined") {
     callTabIdRef.current = getCallTabId();
@@ -2543,6 +2547,8 @@ export default function MessagesPage() {
         );
         return;
       }
+      // Fresh call — clear any stale "already opened" guard for this peer.
+      openedCallTabPeersRef.current.delete(peerId);
 
       try {
         const { roomName } = await getDMRoomName(peerId, token);
@@ -2643,6 +2649,7 @@ export default function MessagesPage() {
 
       endCall(peerId);
       releaseOutboundCallLock(callTabIdRef.current, peerId);
+      openedCallTabPeersRef.current.delete(peerId);
       setOutgoingCallsByPeer((prev) => {
         const next = { ...prev };
         delete next[peerId];
@@ -2652,10 +2659,35 @@ export default function MessagesPage() {
     [endCall],
   );
 
+  const buildCallUrl = useCallback(
+    (peerId: string, roomName: string, callType: "audio" | "video") => {
+      const participantName =
+        currentUserProfile?.username ||
+        currentUserProfile?.displayName ||
+        "Người dùng";
+      const isAudioOnly = callType === "audio";
+      const callAuthToken = getTabAccessToken() || token;
+      const qpToken = callAuthToken
+        ? `&accessToken=${encodeURIComponent(callAuthToken)}`
+        : "";
+      return (
+        `/call?roomName=${encodeURIComponent(roomName)}` +
+        `&participantName=${encodeURIComponent(participantName)}` +
+        `&audioOnly=${isAudioOnly}` +
+        `&peerId=${encodeURIComponent(peerId)}` +
+        qpToken
+      );
+    },
+    [currentUserProfile, token],
+  );
+
   const openCallTabForPeer = useCallback(
     async (peerId: string, roomNameOverride?: string) => {
-      const outgoing = outgoingCallsByPeerRef.current[peerId];
       if (!currentUserProfile) return;
+      // Already opened for this answer — don't spawn a duplicate /call tab.
+      if (openedCallTabPeersRef.current.has(peerId)) return;
+
+      const outgoing = outgoingCallsByPeerRef.current[peerId];
       const tabId = callTabIdRef.current || getCallTabId();
       const roomName = roomNameOverride || outgoing?.roomName;
       if (!roomName) {
@@ -2668,35 +2700,77 @@ export default function MessagesPage() {
       }
 
       try {
-        const participantName =
-          currentUserProfile.username ||
-          currentUserProfile.displayName ||
-          "Người dùng";
-        const isAudioOnly = callType === "audio";
-        const callAuthToken = getTabAccessToken() || token;
-        const qpToken = callAuthToken
-          ? `&accessToken=${encodeURIComponent(callAuthToken)}`
-          : "";
-        const callUrl =
-          `/call?roomName=${encodeURIComponent(roomName)}` +
-          `&participantName=${encodeURIComponent(participantName)}` +
-          `&audioOnly=${isAudioOnly}` +
-          `&peerId=${encodeURIComponent(peerId)}` +
-          qpToken;
+        const callUrl = buildCallUrl(peerId, roomName, callType);
 
-        window.open(callUrl, "_blank", "noopener,noreferrer");
+        // The answer arrives via a socket event, NOT a user gesture, so most
+        // browsers block this window.open. Detect the block and keep the
+        // outgoing popup around with a "Join" button (a real click), instead
+        // of silently failing — which is exactly why the caller never entered
+        // the call after the callee accepted.
+        const win = window.open(callUrl, "_blank", "noopener,noreferrer");
+        if (!win) {
+          console.warn(
+            "[CALL] Popup blocked — showing manual join button for",
+            peerId,
+          );
+          setOutgoingCallsByPeer((prev) => {
+            const cur = prev[peerId];
+            const base =
+              cur ??
+              ({
+                to: peerId,
+                toUser: { displayName: peerId, username: peerId },
+                type: callType,
+              } as OutgoingCallEntry);
+            return {
+              ...prev,
+              [peerId]: { ...base, status: "answered", roomName },
+            };
+          });
+          return;
+        }
 
+        openedCallTabPeersRef.current.add(peerId);
         releaseOutboundCallLock(tabId, peerId);
         setOutgoingCallsByPeer((prev) => {
           const next = { ...prev };
           delete next[peerId];
           return next;
         });
+        // Allow a future call to the same peer to open a tab again.
+        window.setTimeout(() => {
+          openedCallTabPeersRef.current.delete(peerId);
+        }, 15000);
       } catch (error) {
         console.error("❌ [CALLER] Failed to open call window:", error);
       }
     },
-    [currentUserProfile, token],
+    [currentUserProfile, buildCallUrl],
+  );
+
+  // Manual join (real user gesture) used when the browser blocked the
+  // automatic window.open after the callee accepted.
+  const handleJoinCall = useCallback(
+    (peerId: string) => {
+      const outgoing = outgoingCallsByPeerRef.current[peerId];
+      const roomName = outgoing?.roomName;
+      if (!roomName) return;
+      const callType = outgoing?.type ?? "audio";
+      const tabId = callTabIdRef.current || getCallTabId();
+      const callUrl = buildCallUrl(peerId, roomName, callType);
+      window.open(callUrl, "_blank", "noopener,noreferrer");
+      openedCallTabPeersRef.current.add(peerId);
+      releaseOutboundCallLock(tabId, peerId);
+      setOutgoingCallsByPeer((prev) => {
+        const next = { ...prev };
+        delete next[peerId];
+        return next;
+      });
+      window.setTimeout(() => {
+        openedCallTabPeersRef.current.delete(peerId);
+      }, 15000);
+    },
+    [buildCallUrl],
   );
 
   useEffect(() => {
@@ -13245,6 +13319,7 @@ export default function MessagesPage() {
           }
           callType={outgoingCall.type}
           onCancel={() => handleCancelCall(peerId)}
+          onJoin={() => handleJoinCall(peerId)}
           status={outgoingCall.status}
         />
       ))}

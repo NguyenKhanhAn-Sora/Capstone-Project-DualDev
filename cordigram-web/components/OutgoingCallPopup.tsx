@@ -11,7 +11,8 @@ interface OutgoingCallPopupProps {
   receiverAvatar?: string;
   callType: "audio" | "video";
   onCancel: () => void;
-  status: "calling" | "rejected" | "no-answer";
+  onJoin?: () => void;
+  status: "calling" | "rejected" | "no-answer" | "answered";
 }
 
 export default function OutgoingCallPopup({
@@ -19,6 +20,7 @@ export default function OutgoingCallPopup({
   receiverAvatar,
   callType,
   onCancel,
+  onJoin,
   status,
 }: OutgoingCallPopupProps) {
   const { t } = useLanguage();
@@ -31,6 +33,8 @@ export default function OutgoingCallPopup({
     switch (status) {
       case "calling":
         return t("chat.popups.outgoingCall.calling");
+      case "answered":
+        return `${receiverName} đã trả lời — nhấn để tham gia`;
       case "rejected":
         return t("chat.popups.outgoingCall.rejected", { name: receiverName });
       case "no-answer":
@@ -41,7 +45,9 @@ export default function OutgoingCallPopup({
   };
 
   const getStatusColor = () => {
-    return status === "calling" ? "#43b581" : "#ed4245";
+    if (status === "calling") return "#43b581";
+    if (status === "answered") return "#43b581";
+    return "#ed4245";
   };
 
   return (
@@ -89,8 +95,28 @@ export default function OutgoingCallPopup({
           {getStatusText()}
         </p>
 
-        {/* Cancel button */}
+        {/* Actions */}
         <div className={styles.actions}>
+          {status === "answered" && onJoin && (
+            <button
+              onClick={onJoin}
+              className={`${styles.button}`}
+              style={{ background: "#43b581" }}
+              aria-label="Tham gia cuộc gọi"
+            >
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+              <span>Tham gia</span>
+            </button>
+          )}
           <button
             onClick={onCancel}
             className={`${styles.button} ${styles.cancelButton}`}
