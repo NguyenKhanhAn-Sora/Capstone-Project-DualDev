@@ -7,6 +7,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 import {
   useDirectMessages,
@@ -2648,11 +2649,17 @@ export default function MessagesPage() {
   );
 
   const openCallTabForPeer = useCallback(
-    async (peerId: string) => {
+    async (peerId: string, roomNameOverride?: string) => {
       const outgoing = outgoingCallsByPeerRef.current[peerId];
       if (!outgoing || !currentUserProfile) return;
       const tabId = callTabIdRef.current || getCallTabId();
-      if (!ownsOutboundCallLock(tabId, peerId)) {
+      const roomName = roomNameOverride || outgoing.roomName;
+      if (!roomName) {
+        console.warn("[CALL] Missing roomName for outgoing call");
+        return;
+      }
+      const lockOk = ownsOutboundCallLock(tabId, peerId);
+      if (!lockOk && outgoing.status !== "calling") {
         setOutgoingCallsByPeer((prev) => {
           const next = { ...prev };
           delete next[peerId];
@@ -2667,9 +2674,12 @@ export default function MessagesPage() {
           currentUserProfile.displayName ||
           "Người dùng";
         const isAudioOnly = outgoing.type === "audio";
-        const qpToken = token ? `&accessToken=${encodeURIComponent(token)}` : "";
+        const callAuthToken = getTabAccessToken() || token;
+        const qpToken = callAuthToken
+          ? `&accessToken=${encodeURIComponent(callAuthToken)}`
+          : "";
         const callUrl =
-          `/call?roomName=${encodeURIComponent(outgoing.roomName!)}` +
+          `/call?roomName=${encodeURIComponent(roomName)}` +
           `&participantName=${encodeURIComponent(participantName)}` +
           `&audioOnly=${isAudioOnly}` +
           `&peerId=${encodeURIComponent(peerId)}` +
@@ -2775,8 +2785,24 @@ export default function MessagesPage() {
     // auto-open a call tab, skipping the accept/reject step entirely.
     if (isCallAnswerEvent(callEvent) && callEvent.sdpOffer) {
       const peerId = String(callEvent.from);
+      const roomFromAnswer =
+        typeof callEvent.sdpOffer === "object" &&
+        callEvent.sdpOffer != null &&
+        typeof (callEvent.sdpOffer as { roomName?: string }).roomName === "string"
+          ? String((callEvent.sdpOffer as { roomName: string }).roomName)
+          : undefined;
       if (outgoingCallsByPeerRef.current[peerId]) {
-        void openCallTabForPeer(peerId);
+        if (roomFromAnswer) {
+          setOutgoingCallsByPeer((prev) => {
+            const cur = prev[peerId];
+            if (!cur) return prev;
+            return {
+              ...prev,
+              [peerId]: { ...cur, roomName: roomFromAnswer },
+            };
+          });
+        }
+        void openCallTabForPeer(peerId, roomFromAnswer);
       }
       return;
     }
@@ -3048,10 +3074,30 @@ export default function MessagesPage() {
     setShowJoinApplicationsView(false);
   }, [isAdminView]);
 
+  // Keep tab-scoped JWT in sync (two accounts in two tabs on one PC).
+  useEffect(() => {
+    const syncAuthFromTab = () => {
+      const authToken = getTabAccessToken();
+      if (!authToken) return;
+      setToken(authToken);
+      try {
+        const payload = JSON.parse(atob(authToken.split(".")[1]));
+        setCurrentUserId(String(payload.userId || payload.sub || ""));
+      } catch {
+        // ignore
+      }
+    };
+    syncAuthFromTab();
+    window.addEventListener("focus", syncAuthFromTab);
+    return () => window.removeEventListener("focus", syncAuthFromTab);
+  }, []);
+
   // Load servers on mount
   useEffect(() => {
     const authToken =
-      localStorage.getItem("accessToken") || localStorage.getItem("token");
+      ensureTabAccessToken() ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("token");
     if (authToken) {
       setToken(authToken);
       try {

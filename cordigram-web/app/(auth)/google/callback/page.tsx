@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getAccessTokenStatus } from "@/lib/auth";
+import { getAccessTokenStatus, setStoredAccessToken } from "@/lib/auth";
 
 function decodeJwtEmail(token: string): string | null {
   try {
@@ -26,7 +26,7 @@ export default function GoogleCallbackPage() {
     const signupToken = searchParams.get("signupToken");
 
     if (accessToken && !needsProfile) {
-      localStorage.setItem("accessToken", accessToken);
+      setStoredAccessToken(accessToken);
       const redirectAfterLogin =
         getAccessTokenStatus(accessToken) === "banned" ? "/banned" : "/";
       router.replace(redirectAfterLogin);

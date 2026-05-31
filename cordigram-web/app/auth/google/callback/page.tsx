@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchCurrentProfile, fetchUserSettings } from "@/lib/api";
-import { getAccessTokenStatus } from "@/lib/auth";
+import { getAccessTokenStatus, setStoredAccessToken } from "@/lib/auth";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -82,7 +82,7 @@ export default function GoogleCallbackPage() {
     const signupToken = searchParams.get("signupToken");
 
     if (accessToken && !needsProfile) {
-      localStorage.setItem("accessToken", accessToken);
+      setStoredAccessToken(accessToken);
       const redirectAfterLogin =
         getAccessTokenStatus(accessToken) === "banned" ? "/banned" : "/";
 

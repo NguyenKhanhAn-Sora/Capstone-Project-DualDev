@@ -34,18 +34,45 @@ export function isAccessTokenValid(token: string | null): boolean {
   return payload.exp > nowSeconds;
 }
 
-export function getStoredAccessToken(): string | null {
+const TAB_ACCESS_TOKEN_KEY = "cordigramTabAccessToken";
+
+/**
+ * Token scoped to this browser tab (sessionStorage).
+ * Prevents two tabs logged in as different users from sharing one JWT via localStorage.
+ */
+export function getTabAccessToken(): string | null {
   if (typeof window === "undefined") return null;
+  const tab = window.sessionStorage.getItem(TAB_ACCESS_TOKEN_KEY);
+  if (tab) return tab;
   return window.localStorage.getItem("accessToken");
+}
+
+/** First load in tab: pin current localStorage token to this tab if not set yet. */
+export function ensureTabAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  let tab = window.sessionStorage.getItem(TAB_ACCESS_TOKEN_KEY);
+  if (!tab) {
+    tab = window.localStorage.getItem("accessToken");
+    if (tab) {
+      window.sessionStorage.setItem(TAB_ACCESS_TOKEN_KEY, tab);
+    }
+  }
+  return tab;
+}
+
+export function getStoredAccessToken(): string | null {
+  return getTabAccessToken();
 }
 
 export function setStoredAccessToken(token: string): void {
   if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(TAB_ACCESS_TOKEN_KEY, token);
   window.localStorage.setItem("accessToken", token);
 }
 
 export function clearStoredAccessToken(): void {
   if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(TAB_ACCESS_TOKEN_KEY);
   window.localStorage.removeItem("accessToken");
 }
 

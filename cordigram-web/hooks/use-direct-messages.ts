@@ -223,18 +223,16 @@ export const useDirectMessages = ({
       return;
     }
 
-    const socket = io(
-      `${apiBaseUrl}/direct-messages`,
-      {
-        auth: {
-          token,
-        },
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5,
-      },
-    );
+    const socket = io(`${apiBaseUrl}/direct-messages`, {
+      auth: { token },
+      transports: ["websocket", "polling"],
+      upgrade: true,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 8000,
+      reconnectionAttempts: 20,
+      timeout: 20000,
+    });
 
     socket.on("connect", () => {
       setIsConnected(true);
@@ -242,6 +240,11 @@ export const useDirectMessages = ({
     });
 
     socket.on("disconnect", () => {
+      setIsConnected(false);
+    });
+
+    socket.on("connect_error", (err) => {
+      console.warn("[DM socket] connect_error:", err?.message ?? err);
       setIsConnected(false);
     });
 

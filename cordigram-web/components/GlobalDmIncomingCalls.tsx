@@ -7,6 +7,7 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useDirectMessages } from "@/hooks/use-direct-messages";
 import { isIceCandidateEvent, isIncomingRingEvent } from "@/lib/call-event-guards";
 import { fetchCurrentProfile, type CurrentProfileResponse } from "@/lib/api";
+import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
 import { getDMRoomName } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 
@@ -52,7 +53,7 @@ export default function GlobalDmIncomingCalls() {
     if (isMessagesRoute || !authOk) return;
     const t =
       typeof window !== "undefined"
-        ? localStorage.getItem("accessToken") || localStorage.getItem("token") || ""
+        ? ensureTabAccessToken() || getTabAccessToken() || ""
         : "";
     setToken(t);
     if (!t) {
@@ -69,6 +70,23 @@ export default function GlobalDmIncomingCalls() {
     void fetchCurrentProfile({ token: t })
       .then((p) => setProfile(p))
       .catch(() => setProfile(null));
+  }, [isMessagesRoute, authOk]);
+
+  useEffect(() => {
+    if (isMessagesRoute || !authOk) return;
+    const sync = () => {
+      const t = getTabAccessToken();
+      if (!t) return;
+      setToken(t);
+      try {
+        const payload = JSON.parse(atob(t.split(".")[1]));
+        setUserId(String(payload.userId || payload.sub || ""));
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener("focus", sync);
+    return () => window.removeEventListener("focus", sync);
   }, [isMessagesRoute, authOk]);
 
   const socketEnabled =

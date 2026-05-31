@@ -844,13 +844,16 @@ export class DirectMessagesGateway
       };
 
       const receiverSocket = this.connectedUsers.get(data.receiverId);
-      if (receiverSocket?.size) {
+      const calleeOnline = Boolean(receiverSocket?.size);
+      if (calleeOnline) {
         this.emitToAllUserSockets(
           data.receiverId,
           'call-incoming',
           incomingPayload,
         );
-      } else {
+      }
+      // Mobile / background: FCM when callee has no web socket (or as backup).
+      if (!calleeOnline) {
         void this.fcmPushService.pushDmCallIncoming({
           receiverUserId: data.receiverId,
           callerUserId: senderId,
