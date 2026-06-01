@@ -1795,6 +1795,92 @@
 }
 
 
+/* ── Mobile inline info section — giống Flutter's info card ── */
+/* Desktop: hidden */
+.mobileInfoCard {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mobileInfoCard {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    overflow: hidden;
+    margin-top: 6px;
+    margin-bottom: 2px;
+  }
+
+  .mobileInfoRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--color-border);
+    min-height: 0;
+  }
+
+  .mobileInfoRow:last-child {
+    border-bottom: none;
+  }
+
+  .mobileInfoIcon {
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    opacity: 0.8;
+  }
+
+  .mobileInfoText {
+    font-size: 14px;
+    color: var(--color-text);
+    font-weight: 400;
+    line-height: 1.4;
+  }
+}
+
+/* ── Poll badge — mobile: chỉ hiện icon, ẩn text ── */
+@media (max-width: 767px) {
+  .pollTileBadge {
+    font-size: 0 !important; /* ẩn text node, SVG không bị ảnh hưởng */
+    gap: 0 !important;
+    padding: 5px !important;
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 50% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .pollTileBadge svg {
+    width: 13px !important;
+    height: 13px !important;
+  }
+}
+
+/* ── Video badge — top-right corner giống Flutter (18px, top 6, right 6) ── */
+.videoBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(8, 12, 24, 0.6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: #ffffff;
+}
+
 /* ── Poll tile placeholder ────────────────────────────────── */
 .pollTilePlaceholder {
   width: 100%;
@@ -1883,109 +1969,186 @@
 
 /* ── Mobile profile: full-screen, no card box ─────────────────── */
 @media (max-width: 767px) {
-  /* Page: no padding, no centering, full width */
+  /* ── Page & card ───────────────────────────────────────────── */
   .page {
     padding: 0 !important;
     display: block !important;
     background: var(--color-bg) !important;
   }
 
-  /* Card becomes flat, full-width strip */
   .card {
     width: 100% !important;
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    padding: 16px 16px 0 !important;
+    padding: 14px 14px 0 !important;
     background: var(--color-surface) !important;
-    gap: 10px !important;
+    gap: 0 !important;
   }
 
-  /* Header: vertical, avatar centered */
+  /* ── Header: grid — avatar trái, identity phải, stats + actions full-width ── */
+  /* Giống Flutter: Row(avatar | name/username) → StatsRow → Actions */
   .header {
-    flex-direction: column !important;
-    align-items: center !important;
-    text-align: center !important;
-    gap: 10px !important;
-    flex-wrap: nowrap !important;
+    display: grid !important;
+    grid-template-columns: 80px 1fr !important;
+    grid-template-rows: auto auto auto !important;
+    column-gap: 12px !important;
+    row-gap: 10px !important;
+    align-items: start !important;
+    text-align: left !important;
+    flex-direction: unset !important;
+    align-items: unset !important;
+    flex-wrap: unset !important;
   }
 
-  .avatarRing {
-    width: 100px !important;
-    height: 100px !important;
+  /* Avatar: column 1, row 1 */
+  .avatarRing,
+  .avatarRingButton {
+    width: 80px !important;
+    height: 80px !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    padding: 3px !important;
   }
 
-  /* Identity block: centered */
+  /* Unnamed right div → display: contents để children vào grid trực tiếp */
+  .header > div {
+    display: contents !important;
+  }
+
+  /* Identity: column 2, row 1 */
   .identity {
-    align-items: center !important;
-    width: 100% !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    align-self: center !important;
+    text-align: left !important;
+    width: auto !important;
   }
 
   .displayName {
-    font-size: 20px !important;
-    text-align: center !important;
+    font-size: 18px !important;
+    text-align: left !important;
   }
 
   .username {
-    text-align: center !important;
+    text-align: left !important;
+    font-size: 13px !important;
   }
 
-  .bio {
-    text-align: center !important;
-    max-width: 100% !important;
-  }
-
-  /* Stats row: evenly distributed with dividers */
+  /* Stats row: full-width, row 2 — 3 cards giống Flutter */
   .statsRow {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    display: flex !important;
+    justify-content: space-around !important;
     border-top: 1px solid var(--color-border) !important;
     border-bottom: 1px solid var(--color-border) !important;
     padding: 0 !important;
-    justify-content: space-around !important;
     gap: 0 !important;
     width: 100% !important;
-    margin-top: 4px !important;
+    margin-top: 10px !important;
   }
 
   .statCard {
     flex-direction: column !important;
-    gap: 2px !important;
+    gap: 1px !important;
     padding: 10px 0 !important;
     flex: 1 !important;
     align-items: center !important;
     justify-content: center !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
   }
 
-  /* Actions: Edit profile full-width, icon buttons side by side */
+  /* Actions: full-width, row 3 */
   .actions {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    display: flex !important;
     flex-direction: row !important;
     flex-wrap: wrap !important;
     width: 100% !important;
     gap: 8px !important;
-    margin-top: 4px !important;
+    margin-top: 0 !important;
+    padding: 10px 0 !important;
   }
 
-  /* "Edit profile" / primary action takes full row */
+  /* Edit / Follow button: cùng hàng với icon buttons giống Flutter */
   .ownerActions .primaryButton,
   .viewerActions .primaryButton {
-    width: 100% !important;
-    min-width: unset !important;
-    flex: 1 0 100% !important;
-  }
-
-  /* Settings + Share icon buttons: equal small squares */
-  .secondaryButton {
     flex: 1 !important;
     min-width: 0 !important;
     width: auto !important;
-    padding: 10px !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
   }
 
-  /* About / bio info rows */
+  /* Icon buttons (settings, share, dots): fixed width */
+  .secondaryButton {
+    flex: 0 0 44px !important;
+    min-width: 0 !important;
+    width: 44px !important;
+    height: 40px !important;
+    padding: 0 !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Message button (viewer mode — has text, not icon-only): flex: 1 giống Flutter */
+  .viewerActions .secondaryButton:not(.menuButton) {
+    flex: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 0 8px !important;
+  }
+
+  /* menuWrapper: giữ cố định 44px cho nút dots */
+  .viewerActions .menuWrapper {
+    flex: 0 0 44px !important;
+    width: 44px !important;
+  }
+
+  /* ── Bio section: reset desktop indent, hiện inline giống Flutter ── */
+  .bioSection {
+    margin-left: 0 !important;
+    padding: 6px 0 4px !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+  }
+
+  .bio {
+    text-align: left !important;
+    max-width: 100% !important;
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+    margin: 0 !important;
+  }
+
+  /* "See more" — màu cyan như Flutter's _accent color */
+  .bioToggle {
+    color: var(--color-primary) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    align-self: flex-start !important;
+  }
+
+  /* ── About info section ── */
   .aboutGrid {
-    padding-top: 4px !important;
+    padding-top: 0 !important;
+    margin-top: 4px !important;
   }
 
-  /* Nav tabs: horizontal scrollable, full-width, no grid */
+  /* ── Nav tabs: horizontal scrollable giống Flutter tab bar ── */
   .navRow {
     display: flex !important;
     overflow-x: auto !important;
@@ -2010,7 +2173,7 @@
     border-radius: 0 !important;
     padding: 12px 8px !important;
     width: 100% !important;
-    font-size: 13px !important;
+    font-size: 12px !important;
   }
 
   .navItemContent {
@@ -2018,12 +2181,24 @@
     gap: 4px !important;
   }
 
-  /* Posts grid: tight 3-column (handled by child page, but override any padding) */
+  /* ── Post grid: 3 cột tight giống Flutter crossAxisCount: 3 ── */
+  .grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 2px !important;
+    margin-top: 0 !important;
+  }
+
+  .tile {
+    aspect-ratio: 1 / 1 !important;
+    border-radius: 0 !important;
+  }
+
   .postsGrid,
   .reelsGrid,
   .savedGrid {
     padding: 0 !important;
     gap: 2px !important;
     border-radius: 0 !important;
+    grid-template-columns: repeat(3, 1fr) !important;
   }
 }

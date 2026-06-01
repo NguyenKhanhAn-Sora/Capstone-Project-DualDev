@@ -11,6 +11,7 @@ import {
   type PostLikeItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { useLanguage } from "@/component/language-provider";
 
 type Props = {
   open: boolean;
@@ -51,6 +52,7 @@ function toProfileHref(item: { userId: string; username?: string }) {
 
 export default function PostLikesOverlay(props: Props) {
   const { open, closing, postId, viewerId, onClose } = props;
+  const { t } = useLanguage();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -63,7 +65,7 @@ export default function PostLikesOverlay(props: Props) {
   });
   const [search, setSearch] = useState("");
 
-  const title = useMemo(() => "Likes", []);
+  const title = useMemo(() => t("postLikesOverlay.title"), [t]);
   const filteredItems = useMemo(() => {
     const trimmed = search.trim().toLowerCase();
     if (!trimmed) return state.items;
@@ -86,7 +88,7 @@ export default function PostLikesOverlay(props: Props) {
   const loadFirstPage = async () => {
     const token = getStoredAccessToken();
     if (!token) {
-      setState((p) => ({ ...p, loading: false, error: "Session expired." }));
+      setState((p) => ({ ...p, loading: false, error: t("postLikesOverlay.sessionExpired") }));
       return;
     }
 
@@ -109,7 +111,7 @@ export default function PostLikesOverlay(props: Props) {
       setState((p) => ({
         ...p,
         loading: false,
-        error: err?.message || "Failed to load likes",
+        error: err?.message || t("postLikesOverlay.failedToLoad"),
       }));
     }
   };
@@ -121,7 +123,7 @@ export default function PostLikesOverlay(props: Props) {
 
     const token = getStoredAccessToken();
     if (!token) {
-      setState((p) => ({ ...p, error: "Session expired." }));
+      setState((p) => ({ ...p, error: t("postLikesOverlay.sessionExpired") }));
       return;
     }
 
@@ -147,7 +149,7 @@ export default function PostLikesOverlay(props: Props) {
       setState((p) => ({
         ...p,
         loadingMore: false,
-        error: err?.message || "Failed to load more",
+        error: err?.message || t("postLikesOverlay.failedToLoadMore"),
       }));
     }
   };
@@ -239,7 +241,7 @@ export default function PostLikesOverlay(props: Props) {
             className={styles.close}
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("postLikesOverlay.close")}
           >
             <IconClose />
           </button>
@@ -249,16 +251,16 @@ export default function PostLikesOverlay(props: Props) {
           <input
             className={styles.searchInput}
             type="search"
-            placeholder="Search username"
+            placeholder={t("postLikesOverlay.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search username"
+            aria-label={t("postLikesOverlay.searchPlaceholder")}
           />
         </div>
 
         <div className={styles.list} ref={scrollRef}>
           {state.loading ? (
-            <div className={styles.loading}>Loading…</div>
+            <div className={styles.loading}>{t("postLikesOverlay.loading")}</div>
           ) : null}
           {state.error && !state.loading ? (
             <div className={styles.error}>{state.error}</div>
@@ -266,7 +268,7 @@ export default function PostLikesOverlay(props: Props) {
 
           {!state.loading && !state.error && !filteredItems.length ? (
             <div className={styles.loading}>
-              {search.trim() ? "No matching users" : "No likes yet"}
+              {search.trim() ? t("postLikesOverlay.noMatchingUsers") : t("postLikesOverlay.noLikesYet")}
             </div>
           ) : null}
 
@@ -298,16 +300,16 @@ export default function PostLikesOverlay(props: Props) {
                 disabled={Boolean(viewerId && item.userId === viewerId)}
               >
                 {viewerId && item.userId === viewerId
-                  ? "You"
+                  ? t("postLikesOverlay.you")
                   : item.isFollowing
-                    ? "Following"
-                    : "Follow"}
+                    ? t("postLikesOverlay.following")
+                    : t("postLikesOverlay.follow")}
               </button>
             </div>
           ))}
 
           {state.loadingMore ? (
-            <div className={styles.loading}>Loading more…</div>
+            <div className={styles.loading}>{t("postLikesOverlay.loadingMore")}</div>
           ) : null}
           <div ref={sentinelRef} className={styles.sentinel} />
         </div>

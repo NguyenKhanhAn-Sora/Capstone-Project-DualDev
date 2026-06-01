@@ -5923,6 +5923,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               <div className={styles.infoScrollArea}>
                 {header}
                 <div className={styles.infoContent}>
+                  {/* postMeta: caption + location + hashtags + poll — reordered above media on mobile */}
+                  <div className={styles.postMeta}>
                   {captionDisplayText ? (
                     <>
                       <div
@@ -6014,6 +6016,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       <PollWidget poll={post.poll} token={token} viewerId={viewer?.userId || viewer?.id} />
                     </div>
                   ) : null}
+                  </div>{/* end postMeta */}
 
                   <div className={styles.statsRow}>
                     <div className={styles.statItem}>

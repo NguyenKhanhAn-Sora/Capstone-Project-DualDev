@@ -35,6 +35,7 @@ import {
   HashTile,
   IconClear,
   IconView,
+  toCloudinaryVideoThumbnail,
 } from "./_components/search-shared";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
@@ -467,6 +468,14 @@ export default function SearchAllPage() {
                           onMouseEnter={handleReelEnter}
                           onMouseLeave={handleReelLeave}
                         />
+                        {toCloudinaryVideoThumbnail(media.url) && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={toCloudinaryVideoThumbnail(media.url)}
+                            alt=""
+                            className={styles.reelThumb}
+                          />
+                        )}
                         <div className={styles.reelBadge}>
                           <IconView />
                           {formatCount(

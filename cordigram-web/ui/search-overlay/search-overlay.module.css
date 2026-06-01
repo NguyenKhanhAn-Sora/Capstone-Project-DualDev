@@ -448,6 +448,21 @@
   background: rgba(0, 0, 0, 0.06);
 }
 
+.reelTileThumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 2;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+
+.reelTile:hover .reelTileThumb {
+  opacity: 0;
+}
+
 @media (max-width: 767px) {
   .sheet {
     width: 100%;

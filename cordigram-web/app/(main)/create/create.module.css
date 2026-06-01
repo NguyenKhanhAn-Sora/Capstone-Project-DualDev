@@ -490,9 +490,24 @@
   height: 78vh;
   max-height: 860px;
   object-fit: cover;
+  object-position: center center;
   background: #000;
   border-radius: 14px;
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.32);
+}
+
+.reelCropHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(88, 135, 255, 0.12);
+  border: 1px solid rgba(88, 135, 255, 0.3);
+  color: var(--color-primary, #5887ff);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 @media (max-width: 1200px) {
@@ -608,6 +623,12 @@
 .formGroup label {
   font-weight: 600;
   color: var(--color-text);
+}
+
+.fieldHint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 0;
 }
 
 .labelRow {

@@ -174,8 +174,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 '')
             .toString()
             .trim();
-    final username =
-        (data['callerUsername'] ?? data['username'] ?? '').toString().trim();
+    final username = (data['callerUsername'] ?? data['username'] ?? '')
+        .toString()
+        .trim();
     final avatar =
         (data['callerAvatar'] ?? data['avatarUrl'] ?? data['avatar'] ?? '')
             .toString()
@@ -626,7 +627,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-
   Future<void> _loadLiveStreams({bool silent = false}) async {
     if (_loadingLiveStreams) return;
 
@@ -638,14 +638,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     try {
       final response = await LivestreamCreateService.listLiveLivestreams();
-      final items = response.items
-          .where((item) => item.isLive && (_viewerId == null || item.hostUserId != _viewerId))
-          .toList()
-        ..sort((a, b) {
-          final aTime = a.startedAt?.millisecondsSinceEpoch ?? 0;
-          final bTime = b.startedAt?.millisecondsSinceEpoch ?? 0;
-          return bTime.compareTo(aTime);
-        });
+      final items =
+          response.items
+              .where(
+                (item) =>
+                    item.isLive &&
+                    (_viewerId == null || item.hostUserId != _viewerId),
+              )
+              .toList()
+            ..sort((a, b) {
+              final aTime = a.startedAt?.millisecondsSinceEpoch ?? 0;
+              final bTime = b.startedAt?.millisecondsSinceEpoch ?? 0;
+              return bTime.compareTo(aTime);
+            });
 
       if (!mounted) return;
       setState(() {
@@ -714,7 +719,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (_states.isEmpty) return;
     try {
       final loadedPages = _page - 1;
-      final pageCount = loadedPages.clamp(1, 5); // cap at 5 pages to limit requests
+      final pageCount = loadedPages.clamp(
+        1,
+        5,
+      ); // cap at 5 pages to limit requests
       final results = await Future.wait([
         for (var p = 1; p <= pageCount; p++) FeedService.fetchFeed(page: p),
       ]);
@@ -889,7 +897,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _showSnack(LanguageController.instance.t('home.snack.saved'));
       } else {
         await PostInteractionService.unsave(postId);
-        _showSnack(LanguageController.instance.t('home.snack.removedFromSaved'));
+        _showSnack(
+          LanguageController.instance.t('home.snack.removedFromSaved'),
+        );
       }
     } catch (_) {
       // Roll back on failure
@@ -905,7 +915,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           impressions: s.stats.impressions,
         );
       });
-      _showSnack(LanguageController.instance.t('home.snack.saveError'), error: true);
+      _showSnack(
+        LanguageController.instance.t('home.snack.saveError'),
+        error: true,
+      );
     }
   }
 
@@ -935,7 +948,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _handleQuickRepost(FeedPostState targetState) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
+      _showSnack(
+        LanguageController.instance.t('home.snack.signInToRepost'),
+        error: true,
+      );
       return;
     }
 
@@ -968,12 +984,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _showSnack(LanguageController.instance.t('home.snack.reposted'));
       } catch (_) {
         _showSnack(
-          e.message.isNotEmpty ? e.message : LanguageController.instance.t('home.snack.repostError'),
+          e.message.isNotEmpty
+              ? e.message
+              : LanguageController.instance.t('home.snack.repostError'),
           error: true,
         );
       }
     } catch (_) {
-      _showSnack(LanguageController.instance.t('home.snack.repostError'), error: true);
+      _showSnack(
+        LanguageController.instance.t('home.snack.repostError'),
+        error: true,
+      );
     }
   }
 
@@ -982,7 +1003,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     RepostQuoteInput input,
   ) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
+      _showSnack(
+        LanguageController.instance.t('home.snack.signInToRepost'),
+        error: true,
+      );
       return;
     }
 
@@ -1016,17 +1040,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _showSnack(LanguageController.instance.t('home.snack.repostedWithQuote'));
     } on ApiException catch (e) {
       _showSnack(
-        e.message.isNotEmpty ? e.message : LanguageController.instance.t('home.snack.repostWithQuoteError'),
+        e.message.isNotEmpty
+            ? e.message
+            : LanguageController.instance.t('home.snack.repostWithQuoteError'),
         error: true,
       );
     } catch (_) {
-      _showSnack(LanguageController.instance.t('home.snack.repostWithQuoteError'), error: true);
+      _showSnack(
+        LanguageController.instance.t('home.snack.repostWithQuoteError'),
+        error: true,
+      );
     }
   }
 
   Future<void> _onRepost(FeedPostState state) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
+      _showSnack(
+        LanguageController.instance.t('home.snack.signInToRepost'),
+        error: true,
+      );
       return;
     }
 
@@ -1047,7 +1079,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (quoteInput == null) return;
       await _handleQuoteRepost(state, quoteInput);
     } catch (_) {
-      _showSnack(LanguageController.instance.t('home.snack.repostMenuError'), error: true);
+      _showSnack(
+        LanguageController.instance.t('home.snack.repostMenuError'),
+        error: true,
+      );
     }
   }
 
@@ -1119,7 +1154,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           post.id,
           state.copyWith(post: post.copyWith(visibility: nextVisibility)),
         );
-        _showSnack(LanguageController.instance.t('home.snack.visibilityUpdated'));
+        _showSnack(
+          LanguageController.instance.t('home.snack.visibilityUpdated'),
+        );
         return;
       case PostMenuAction.toggleComments:
         final currentAllowed = post.allowComments != false;
@@ -1131,14 +1168,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         try {
           await PostInteractionService.setAllowComments(post.id, nextAllowed);
           _showSnack(
-            nextAllowed ? LanguageController.instance.t('home.snack.commentsOn') : LanguageController.instance.t('home.snack.commentsOff'),
+            nextAllowed
+                ? LanguageController.instance.t('home.snack.commentsOn')
+                : LanguageController.instance.t('home.snack.commentsOff'),
           );
         } catch (_) {
           _replaceState(
             post.id,
             state.copyWith(post: post.copyWith(allowComments: currentAllowed)),
           );
-          _showSnack(LanguageController.instance.t('home.snack.commentsError'), error: true);
+          _showSnack(
+            LanguageController.instance.t('home.snack.commentsError'),
+            error: true,
+          );
         }
         return;
       case PostMenuAction.toggleHideLike:
@@ -1150,13 +1192,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
         try {
           await PostInteractionService.setHideLikeCount(post.id, nextHidden);
-          _showSnack(nextHidden ? LanguageController.instance.t('home.snack.likeHidden') : LanguageController.instance.t('home.snack.likeVisible'));
+          _showSnack(
+            nextHidden
+                ? LanguageController.instance.t('home.snack.likeHidden')
+                : LanguageController.instance.t('home.snack.likeVisible'),
+          );
         } catch (_) {
           _replaceState(
             post.id,
             state.copyWith(post: post.copyWith(hideLikeCount: currentHidden)),
           );
-          _showSnack(LanguageController.instance.t('home.snack.likeError'), error: true);
+          _showSnack(
+            LanguageController.instance.t('home.snack.likeError'),
+            error: true,
+          );
         }
         return;
       case PostMenuAction.muteNotifications:
@@ -1205,7 +1254,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           if (snapshot != null) {
             setState(() => _states.insert(0, snapshot));
           }
-          _showSnack(LanguageController.instance.t('home.snack.deleteError'), error: true);
+          _showSnack(
+            LanguageController.instance.t('home.snack.deleteError'),
+            error: true,
+          );
         }
         return;
       case PostMenuAction.followToggle:
@@ -1223,7 +1275,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack(LanguageController.instance.t('home.snack.signInFirst'), error: true);
+          _showSnack(
+            LanguageController.instance.t('home.snack.signInFirst'),
+            error: true,
+          );
           return;
         }
         final reported = await showReportPostSheet(
@@ -1231,7 +1286,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           postId: post.id,
           authHeader: {'Authorization': 'Bearer $token'},
         );
-        if (reported) _showSnack(LanguageController.instance.t('home.snack.reportSubmitted'));
+        if (reported)
+          _showSnack(
+            LanguageController.instance.t('home.snack.reportSubmitted'),
+          );
         return;
       case PostMenuAction.blockAccount:
         final userId = post.authorId;
@@ -1254,9 +1312,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           setState(() {
             _states.removeWhere((s) => s.post.authorId == userId);
           });
-          _showSnack(LanguageController.instance.t('home.snack.accountBlocked'));
+          _showSnack(
+            LanguageController.instance.t('home.snack.accountBlocked'),
+          );
         } catch (_) {
-          _showSnack(LanguageController.instance.t('home.snack.blockError'), error: true);
+          _showSnack(
+            LanguageController.instance.t('home.snack.blockError'),
+            error: true,
+          );
         }
         return;
     }
@@ -1468,7 +1531,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.5),
                 ),
               ),
               child: CircularProgressIndicator(
@@ -1566,7 +1631,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  LanguageController.instance.t('home.live.wentLive', {'ago': _formatLiveStartedAgo(stream.startedAt)}),
+                                  LanguageController.instance
+                                      .t('home.live.wentLive', {
+                                        'ago': _formatLiveStartedAgo(
+                                          stream.startedAt,
+                                        ),
+                                      }),
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.65),
                                     fontSize: 12,
@@ -1710,7 +1780,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final campaignId = await resolveCampaignId();
       if (!mounted) return;
       if (campaignId == null || campaignId.isEmpty) {
-        _showSnack(LanguageController.instance.t('home.snack.adsNotFound'), error: true);
+        _showSnack(
+          LanguageController.instance.t('home.snack.adsNotFound'),
+          error: true,
+        );
         return;
       }
 
@@ -1722,7 +1795,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } on ApiException catch (e) {
       _showSnack(e.message, error: true);
     } catch (_) {
-      _showSnack(LanguageController.instance.t('home.snack.adsDetailError'), error: true);
+      _showSnack(
+        LanguageController.instance.t('home.snack.adsDetailError'),
+        error: true,
+      );
     }
   }
 
@@ -1844,7 +1920,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(LanguageController.instance.t('home.savedItemsUnavailable')),
+                content: Text(
+                  LanguageController.instance.t('home.savedItemsUnavailable'),
+                ),
               ),
             );
           }
@@ -2024,9 +2102,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildFeedTab() {
     final scheme = Theme.of(context).colorScheme;
     if (_initialLoad && _loading) {
-      return Center(
-        child: CircularProgressIndicator(color: scheme.primary),
-      );
+      return Center(child: CircularProgressIndicator(color: scheme.primary));
     }
 
     if (_error != null && _states.isEmpty) {
@@ -2136,7 +2212,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     const SizedBox(height: 12),
                     Text(
                       LanguageController.instance.t('home.feed.allSeen'),
-                      style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+                      style: const TextStyle(
+                        color: Color(0xFF7A8BB0),
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -2858,35 +2937,49 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                 maxLines: 5,
                 maxLength: 500,
                 style: const TextStyle(color: Color(0xFFE8ECF8)),
-                decoration: _sheetInputDecoration(lc.t('home.quoteRepost.contentHint')),
+                decoration: _sheetInputDecoration(
+                  lc.t('home.quoteRepost.contentHint'),
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _hashtagsCtrl,
                 style: const TextStyle(color: Color(0xFFE8ECF8)),
-                decoration: _sheetInputDecoration(lc.t('home.quoteRepost.hashtagsHint')),
+                decoration: _sheetInputDecoration(
+                  lc.t('home.quoteRepost.hashtagsHint'),
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _locationCtrl,
                 style: const TextStyle(color: Color(0xFFE8ECF8)),
-                decoration: _sheetInputDecoration(lc.t('home.quoteRepost.locationHint')),
+                decoration: _sheetInputDecoration(
+                  lc.t('home.quoteRepost.locationHint'),
+                ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _visibility,
                 items: [
-                  DropdownMenuItem(value: 'public', child: Text(lc.t('home.visibility.public'))),
+                  DropdownMenuItem(
+                    value: 'public',
+                    child: Text(lc.t('home.visibility.public')),
+                  ),
                   DropdownMenuItem(
                     value: 'followers',
                     child: Text(lc.t('home.visibility.followers')),
                   ),
-                  DropdownMenuItem(value: 'private', child: Text(lc.t('home.visibility.private'))),
+                  DropdownMenuItem(
+                    value: 'private',
+                    child: Text(lc.t('home.visibility.private')),
+                  ),
                 ],
                 dropdownColor: const Color(0xFF111C37),
                 iconEnabledColor: const Color(0xFF9BAECF),
                 style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
-                decoration: _sheetInputDecoration(lc.t('home.quoteRepost.visibilityHint')),
+                decoration: _sheetInputDecoration(
+                  lc.t('home.quoteRepost.visibilityHint'),
+                ),
                 onChanged: (v) {
                   if (v == null) return;
                   setState(() => _visibility = v);
@@ -3047,7 +3140,7 @@ class _PlaceholderTab extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '$label coming soon',
+            '$label',
             style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 15),
           ),
         ],
@@ -3157,7 +3250,6 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-
 class _InlineError extends StatelessWidget {
   const _InlineError({required this.message, required this.onRetry});
   final String message;
@@ -3166,29 +3258,21 @@ class _InlineError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme.bodyMedium?.color ?? scheme.onSurface;
+    final text =
+        Theme.of(context).textTheme.bodyMedium?.color ?? scheme.onSurface;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: scheme.error.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: scheme.error.withValues(alpha: 0.35)),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.error_outline_rounded,
-            color: scheme.error,
-            size: 18,
-          ),
+          Icon(Icons.error_outline_rounded, color: scheme.error, size: 18),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: text, fontSize: 13),
-            ),
+            child: Text(message, style: TextStyle(color: text, fontSize: 13)),
           ),
           TextButton(
             onPressed: onRetry,

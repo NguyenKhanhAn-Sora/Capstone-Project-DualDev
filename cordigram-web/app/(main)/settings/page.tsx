@@ -4391,7 +4391,7 @@ export default function SettingsPage() {
                                     };
                                     const key = actionKeyMap[item.action] ?? "policyAction";
                                     return t(`settingsPage.violations.actions.${key}`);
-                                  })()} Â·{" "}
+                                  })()} ·{" "}
                                   {item.targetType.toUpperCase()}
                                 </p>
                                 <span className={styles.activityTime}>
@@ -4402,13 +4402,13 @@ export default function SettingsPage() {
                                 {isMuteInteraction
                                   ? `${t("settingsPage.violations.interactionMuted")}${
                                       remainingMute
-                                        ? ` Â· Remaining ${remainingMute}`
-                                        : ` Â· ${t("settingsPage.violations.untilTurnOn")}`
+                                        ? ` · Remaining ${remainingMute}`
+                                        : ` · ${t("settingsPage.violations.untilTurnOn")}`
                                     }`
-                                  : `Severity ${t(`settingsPage.violations.severity.${item.severity ?? "na"}`)} Â· ${
+                                  : `Severity ${t(`settingsPage.violations.severity.${item.severity ?? "na"}`)} · ${
                                       isWarn
                                         ? "No strike added"
-                                        : `Strike +${item.strikeDelta} (Total ${item.strikeTotalAfter})`
+                                        : `Strike ${item.strikeDelta > 0 ? "+" : ""}${item.strikeDelta} (Total ${item.strikeTotalAfter})`
                                     }`}
                               </p>
                               <p className={styles.contentSub}>

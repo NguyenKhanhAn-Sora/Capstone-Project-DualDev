@@ -648,17 +648,29 @@ export default function ProfileLayoutClient({
     const ownerId = profile?.userId;
     if (!ownerId) return;
     setAuthoredCount(null);
-    Promise.all([
-      fetchUserPosts({ token, userId: ownerId, limit: 200 }),
-      fetchUserReels({ token, userId: ownerId, limit: 200 }),
-    ])
-      .then(([posts, reels]) => {
-        const originals = [...(posts || []), ...(reels || [])].filter(
-          (item) => !item?.repostOf && !(item as any)?.sponsored,
-        );
-        setAuthoredCount(originals.length);
-      })
-      .catch(() => setAuthoredCount(null));
+    Promise.allSettled([
+      fetchUserPosts({ token, userId: ownerId, limit: 100 }),
+      fetchUserReels({ token, userId: ownerId, limit: 100 }),
+    ]).then(([postsResult, reelsResult]) => {
+      const posts = postsResult.status === "fulfilled" ? (postsResult.value || []) : [];
+      const reels = reelsResult.status === "fulfilled" ? (reelsResult.value || []) : [];
+      if (posts.length === 0 && reels.length === 0) {
+        setAuthoredCount(null);
+        return;
+      }
+      const seen = new Set<string>();
+      const originals = [...posts, ...reels].filter((item) => {
+        if (!item) return false;
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        if (item.repostOf) return false;
+        if ((item as any)?.sponsored) return false;
+        const hasMedia = Boolean(item.media?.[0]);
+        const hasPoll = Boolean((item as any)?.poll);
+        return hasMedia || hasPoll;
+      });
+      setAuthoredCount(originals.length);
+    });
   }, [profile?.userId]);
 
   useEffect(() => {
@@ -1159,9 +1171,19 @@ export default function ProfileLayoutClient({
     );
   }
 
+  // Count from loaded tab data so it exactly matches what the grid renders
+  const tabDerivedCount =
+    tabs.posts.loaded || tabs.reels.loaded
+      ? (tabs.posts.loaded
+          ? tabs.posts.items.filter((item) => {
+              if (!item || item.repostOf || (item as any)?.sponsored) return false;
+              return Boolean(item.media?.[0]) || Boolean((item as any)?.poll);
+            }).length
+          : 0) + (tabs.reels.loaded ? tabs.reels.items.length : 0)
+      : null;
   const statsOriginalFallback =
     (profile?.stats?.posts ?? 0) + (profile?.stats?.reels ?? 0);
-  const displayedPostsCount = authoredCount ?? statsOriginalFallback;
+  const displayedPostsCount = tabDerivedCount ?? authoredCount ?? statsOriginalFallback;
   const appendPreviewQuery = (path: string) => {
     if (!isAdminPreviewMode) return path;
     const previewToken = searchParams.get("admin_preview");
@@ -1443,6 +1465,73 @@ export default function ProfileLayoutClient({
                   ) : null}
                 </div>
               ) : null}
+
+              {/* ── Mobile inline info section — giống Flutter profile_screen ── */}
+              {canViewAbout && (
+                <div className={styles.mobileInfoCard}>
+                  {[
+                    profile.location?.trim() ? {
+                      key: "location",
+                      value: profile.location.trim(),
+                      icon: (
+                        <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11Z" />
+                          <circle cx="12" cy="10" r="2.5" />
+                        </svg>
+                      ),
+                    } : null,
+                    (profile as any).workplace?.companyName?.trim() ? {
+                      key: "workplace",
+                      value: (profile as any).workplace.companyName.trim(),
+                      icon: (
+                        <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="7" width="20" height="14" rx="2" />
+                          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                          <line x1="12" y1="12" x2="12" y2="12.01" strokeWidth={3} />
+                          <path d="M2 13c6 2 14 2 20 0" />
+                        </svg>
+                      ),
+                    } : null,
+                    (profile as any).birthdate?.trim() ? {
+                      key: "birthdate",
+                      value: (() => {
+                        try {
+                          const d = new Date((profile as any).birthdate);
+                          return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                        } catch { return (profile as any).birthdate; }
+                      })(),
+                      icon: (
+                        <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" />
+                          <path d="M4 16.5s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" />
+                          <path d="M2 21h20" />
+                          <path d="M7 11V7M12 11V7M17 11V7" />
+                          <path d="M7 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM12 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" fill="currentColor" stroke="none" />
+                        </svg>
+                      ),
+                    } : null,
+                    (profile as any).gender?.trim() ? {
+                      key: "gender",
+                      value: (() => {
+                        const g = (profile as any).gender.trim();
+                        const map: Record<string, string> = { male: "Male", female: "Female", other: "Other", prefer_not_to_say: "Prefer not to say" };
+                        return map[g] ?? g.charAt(0).toUpperCase() + g.slice(1);
+                      })(),
+                      icon: (
+                        <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="8" r="4" />
+                          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                        </svg>
+                      ),
+                    } : null,
+                  ].filter(Boolean).map((row, idx, arr) => (
+                    <div key={(row as any).key} className={styles.mobileInfoRow}>
+                      <span className={styles.mobileInfoIcon}>{(row as any).icon}</span>
+                      <span className={styles.mobileInfoText}>{(row as any).value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className={styles.navRow}>
                 {navItems.map((item) => {

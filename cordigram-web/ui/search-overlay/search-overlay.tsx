@@ -123,8 +123,7 @@ function toCloudinaryVideoThumbnail(url: string): string {
   const hasUpload = base.includes("/upload/");
   if (!isVideoExt || !hasUpload) return "";
 
-  // Cloudinary supports extracting video frame thumbnails via `so_0` and `.jpg`.
-  const withFrame = base.replace("/upload/", "/upload/so_0/");
+  const withFrame = base.replace("/upload/", "/upload/so_10p/");
   const jpg = withFrame.replace(/\.(mp4|mov|webm|mkv)$/i, ".jpg");
   return query ? `${jpg}?${query}` : jpg;
 }
@@ -849,9 +848,18 @@ export default function SearchOverlay(props: {
                                 muted
                                 playsInline
                                 preload="metadata"
+                                onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.1; }}
                                 onMouseEnter={handleReelEnter}
                                 onMouseLeave={handleReelLeave}
                               />
+                              {toCloudinaryVideoThumbnail(media.url) && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={toCloudinaryVideoThumbnail(media.url)}
+                                  alt=""
+                                  className={styles.reelTileThumb}
+                                />
+                              )}
                             </button>
                           );
                         })}

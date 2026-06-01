@@ -20,6 +20,9 @@ import 'profile_edit_sheet.dart';
 import 'services/profile_service.dart';
 import '../livestream/livestream_create_service.dart';
 import '../livestream/livestream_hub_screen.dart';
+import '../messages/messages_shell.dart';
+import '../messages/models/message_thread.dart';
+import '../messages/utils/messages_navigator.dart';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2406,7 +2409,25 @@ class _ProfileScreenState extends State<ProfileScreen>
           flex: 2,
           child: _SecondaryButton(
             label: LanguageController.instance.t('profile.message'),
-            onTap: () => _showToast(_t('profile.messagingSoon')),
+            onTap: () {
+              final p = _profile;
+              if (p == null) return;
+              final thread = MessageThread(
+                id: p.userId,
+                name: p.displayName.trim().isNotEmpty
+                    ? p.displayName.trim()
+                    : p.username,
+                lastMessage: '',
+                lastActiveLabel: '',
+                unreadCount: 0,
+                avatarUrl: p.avatarUrl.trim().isNotEmpty
+                    ? p.avatarUrl.trim()
+                    : null,
+              );
+              Navigator.of(context).push(
+                messagesEntryRoute(MessagesShell(initialThread: thread)),
+              );
+            },
           ),
         ),
         const SizedBox(width: 8),

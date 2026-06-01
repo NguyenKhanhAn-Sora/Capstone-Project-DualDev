@@ -28,7 +28,9 @@ import 'utils/messages_navigator.dart';
 import 'widgets/messages_chrome_builder.dart';
 
 class MessageHomeScreen extends StatefulWidget {
-  const MessageHomeScreen({super.key});
+  const MessageHomeScreen({super.key, this.initialThread});
+
+  final MessageThread? initialThread;
 
   @override
   State<MessageHomeScreen> createState() => _MessageHomeScreenState();
@@ -56,6 +58,9 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await AccentColorController.instance.bindUser(_messagesController.myUserId);
       if (mounted) _serverListController.loadServers();
+      if (mounted && widget.initialThread != null) {
+        _openThread(widget.initialThread!);
+      }
     });
     _serverRealtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
       _onServerRealtimeEvent,
