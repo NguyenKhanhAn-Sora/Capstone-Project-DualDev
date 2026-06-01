@@ -1128,6 +1128,7 @@
     "hashtagsLabel": "Hashtag #",
     "addHashtag": "Thêm hashtag",
     "hashtagPlaceholder": "Ví dụ: dulich",
+    "hashtagHint": "Nhấn Enter hoặc Space để thêm hashtag",
     "locationLabel": "Địa điểm",
     "locationPlaceholder": "Thêm địa điểm (tùy chọn)",
     "searching": "Đang tìm...",

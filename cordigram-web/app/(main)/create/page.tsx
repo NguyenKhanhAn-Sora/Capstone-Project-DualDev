@@ -1834,6 +1834,7 @@ export default function CreatePostPage() {
                     </button>
                   </div>
                 </div>
+                <p className={styles.fieldHint}>{t("hashtagHint")}</p>
               </div>
             </div>
 
@@ -2327,6 +2328,7 @@ function PollCreateForm({
                   onKeyDown={onHashtagKey}
                 />
               </div>
+              <p className={styles.fieldHint}>{t("hashtagHint")}</p>
             </div>
 
             {/* Location */}

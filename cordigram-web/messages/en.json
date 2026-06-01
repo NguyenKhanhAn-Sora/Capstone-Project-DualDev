@@ -1128,6 +1128,7 @@
     "hashtagsLabel": "Hashtags #",
     "addHashtag": "Add hashtag",
     "hashtagPlaceholder": "Example: travel",
+    "hashtagHint": "Press Enter or Space to add a hashtag",
     "locationLabel": "Location",
     "locationPlaceholder": "Add a location (optional)",
     "searching": "Searching...",
