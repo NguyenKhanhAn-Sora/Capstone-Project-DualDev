@@ -2767,5 +2767,20 @@
     "captionLangEn": "English",
     "captionLangZh": "Chinese",
     "captionLangJa": "Japanese"
+  },
+  "postLikesOverlay": {
+    "title": "Likes",
+    "searchPlaceholder": "Search username",
+    "loading": "Loading…",
+    "loadingMore": "Loading more…",
+    "noLikesYet": "No likes yet",
+    "noMatchingUsers": "No matching users",
+    "you": "You",
+    "follow": "Follow",
+    "following": "Following",
+    "close": "Close",
+    "sessionExpired": "Session expired.",
+    "failedToLoad": "Failed to load likes",
+    "failedToLoadMore": "Failed to load more"
   }
 }

@@ -2666,7 +2666,7 @@
     "violations": {
       "title": "Trung tâm vi phạm",
       "desc": "Xem lại các hành động kiểm duyệt và lịch sử vi phạm của bạn.",
-      "currentStrikes": "Tổng số lần vi phạm hiện tại",
+      "currentStrikes": "Tổng số điểm vi phạm hiện tại",
       "loading": "Đang tải lịch sử vi phạm...",
       "noViolations": "Không tìm thấy vi phạm nào.",
       "refreshBtn": "Làm mới",
@@ -2767,5 +2767,20 @@
     "captionLangEn": "Tiếng Anh",
     "captionLangZh": "Tiếng Trung",
     "captionLangJa": "Tiếng Nhật"
+  },
+  "postLikesOverlay": {
+    "title": "Lượt thích",
+    "searchPlaceholder": "Tìm tên người dùng",
+    "loading": "Đang tải…",
+    "loadingMore": "Đang tải thêm…",
+    "noLikesYet": "Chưa có lượt thích",
+    "noMatchingUsers": "Không tìm thấy người dùng",
+    "you": "Bạn",
+    "follow": "Theo dõi",
+    "following": "Đang theo dõi",
+    "close": "Đóng",
+    "sessionExpired": "Phiên đăng nhập đã hết hạn.",
+    "failedToLoad": "Không thể tải danh sách thích",
+    "failedToLoadMore": "Không thể tải thêm"
   }
 }

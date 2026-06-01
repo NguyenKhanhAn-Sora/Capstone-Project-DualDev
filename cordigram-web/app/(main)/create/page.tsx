@@ -139,7 +139,7 @@ function TabPollIcon() {
 const MAX_POLL_OPTIONS = 10;
 const MIN_POLL_OPTIONS = 2;
 
-const REEL_MAX_DURATION_SECONDS = 90;
+const REEL_MAX_DURATION_SECONDS = 180;
 const REEL_MAX_BYTES = 50 * 1024 * 1024;
 const POST_MAX_BYTES = 100 * 1024 * 1024;
 const MAX_MEDIA_ITEMS = 10;
@@ -1608,6 +1608,15 @@ export default function CreatePostPage() {
                           }`}
                         />
                       )}
+                      {mode === "reel" && item.kind === "video" ? (
+                        <div className={styles.reelCropHint}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <path d="M3 9h18M3 15h18" />
+                          </svg>
+                          {t("reelAutoCropHint")}
+                        </div>
+                      ) : null}
                       {mode === "post" ? (
                         <p className={styles.previewMeta}>
                           {item.file.name} ·{" "}

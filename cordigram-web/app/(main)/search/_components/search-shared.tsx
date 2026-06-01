@@ -60,7 +60,7 @@ export function toCloudinaryVideoThumbnail(url: string): string {
   const hasUpload = base.includes("/upload/");
   if (!isVideoExt || !hasUpload) return "";
 
-  const withFrame = base.replace("/upload/", "/upload/so_0/");
+  const withFrame = base.replace("/upload/", "/upload/so_10p/");
   const jpg = withFrame.replace(/\.(mp4|mov|webm|mkv)$/i, ".jpg");
   return query ? `${jpg}?${query}` : jpg;
 }

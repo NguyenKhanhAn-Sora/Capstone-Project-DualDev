@@ -323,15 +323,111 @@
   padding: 8px 0;
 }
 
-/* ── Responsive ── */
+/* ── Responsive: Mobile bottom sheet (≤767px) ── */
 
-@media (max-width: 640px) {
-  .reportGrid {
-    grid-template-columns: 1fr;
+@media (max-width: 767px) {
+  /* Overlay: anchor to bottom */
+  .overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
   }
 
+  /* Card: bottom sheet */
   .card {
-    padding: 16px;
-    gap: 12px;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    padding: 0 16px 32px !important;
+    gap: 14px !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+    animation: mobileCardIn 300ms cubic-bezier(0.32, 0.72, 0, 1) forwards !important;
   }
+
+  .card::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Drag handle via ::before */
+  .card::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.16);
+    margin: 10px auto 4px;
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .cardClosing {
+    animation: mobileCardOut 220ms ease forwards !important;
+  }
+
+  /* Header: separator bottom */
+  .header {
+    padding-bottom: 12px !important;
+    border-bottom: 1px solid var(--color-border) !important;
+    margin-bottom: 0 !important;
+  }
+
+  .title {
+    font-size: 18px !important;
+  }
+
+  /* Report layout: single column */
+  .reportGrid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Category grid: chips wrapped 2 per row like Flutter */
+  .categoryGrid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    grid-column: 1 !important;
+  }
+
+  .categoryCard {
+    flex: 1 0 calc(50% - 4px) !important;
+    max-width: calc(50% - 4px) !important;
+    padding: 10px 12px !important;
+    border-radius: 12px !important;
+    font-size: 13px !important;
+    justify-content: flex-start !important;
+  }
+
+  /* Reason panel: full width below categories */
+  .reasonPanel {
+    border-radius: 12px !important;
+  }
+
+  /* Actions: two equal buttons */
+  .actions {
+    justify-content: stretch !important;
+    gap: 10px !important;
+    margin-top: 0 !important;
+  }
+
+  .btnSecondary,
+  .btnPrimary {
+    flex: 1 !important;
+    padding: 12px !important;
+    font-size: 15px !important;
+    border-radius: 12px !important;
+    text-align: center !important;
+  }
+}
+
+@keyframes mobileCardIn {
+  from { transform: translateY(100%); opacity: 0.85; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes mobileCardOut {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
 }

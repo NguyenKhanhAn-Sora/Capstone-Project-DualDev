@@ -1031,9 +1031,9 @@
       "dec": "Dec"
     },
     "followError": "Unable to update follow status",
-    "shareSoon": "Share coming soon",
-    "messagingSoon": "Messaging coming soon",
-    "linkCopied": "Link copied (coming soon)",
+    "shareSoon": "Share",
+    "messagingSoon": "Messaging ",
+    "linkCopied": "Link copied",
     "dataUnavailable": "Profile data is unavailable. Please try again.",
     "errorGeneric": "Something went wrong",
     "retry": "Retry",

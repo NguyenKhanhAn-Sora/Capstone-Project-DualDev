@@ -17,7 +17,7 @@ import {
   filterFeedItemsByBlockedAuthors,
   refreshBlockedUserIds,
 } from "@/lib/blocked-users";
-import { IconClear, IconView, formatCount } from "../_components/search-shared";
+import { IconClear, IconView, formatCount, toCloudinaryVideoThumbnail } from "../_components/search-shared";
 
 function useDebouncedUrlQueryParam(param: string, delayMs: number) {
   const router = useRouter();
@@ -257,6 +257,14 @@ export default function SearchReelsPage() {
                     onMouseEnter={handleEnter}
                     onMouseLeave={handleLeave}
                   />
+                  {toCloudinaryVideoThumbnail(media.url) && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={toCloudinaryVideoThumbnail(media.url)}
+                      alt=""
+                      className={styles.reelThumb}
+                    />
+                  )}
                   <div className={styles.reelBadge}>
                     <IconView />
                     {formatCount(

@@ -6,6 +6,7 @@ import EmojiPicker from "emoji-picker-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
+import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
 import RepostOverlay, {
   type QuoteInput,
   type RepostTarget,
@@ -518,6 +519,7 @@ export default function HomePage({
   const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
   const [interactionMuteOverlayMessage, setInteractionMuteOverlayMessage] =
     useState<string | null>(null);
+  const [likesOverlayPostId, setLikesOverlayPostId] = useState<string | null>(null);
   const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1703,6 +1705,7 @@ export default function HomePage({
               token={token}
               onRemoteUpdate={onRemoteUpdate}
               onPersistFeedCache={persistFeedCache}
+              onLikesClick={setLikesOverlayPostId}
             />
             {token && index + 1 === livestreamInsertIndex ? (
               <LivestreamHub viewerId={viewerId} />
@@ -2002,6 +2005,13 @@ export default function HomePage({
       ) : null}
 
       {toastMessage ? <div className={styles.toast}>{toastMessage}</div> : null}
+
+      <PostLikesOverlay
+        open={Boolean(likesOverlayPostId)}
+        postId={likesOverlayPostId ?? ""}
+        viewerId={viewerId}
+        onClose={() => setLikesOverlayPostId(null)}
+      />
     </div>
   );
 }
@@ -2031,6 +2041,7 @@ function FeedCard({
   token,
   onRemoteUpdate,
   onPersistFeedCache,
+  onLikesClick,
 }: {
   data: FeedItem;
   liked: boolean;
@@ -2056,6 +2067,7 @@ function FeedCard({
   token: string | null;
   onRemoteUpdate: (postId: string, patch: FeedRemotePatch) => void;
   onPersistFeedCache?: () => void;
+  onLikesClick?: (postId: string) => void;
 }) {
   const t = useTranslations("home");
   const tCommon = useTranslations("common");
@@ -4716,12 +4728,25 @@ function FeedCard({
       <div className={styles.statRow}>
         <div>
           {!shouldHideLikeStat ? (
-            <div className={styles.statItem}>
-              <span className={styles.statIcon}>
-                <IconLike size={18} />
-              </span>
-              <span>{displayHearts}</span>
-            </div>
+            onLikesClick && displayHearts > 0 ? (
+              <button
+                type="button"
+                className={`${styles.statItem} ${styles.statItemClickable}`}
+                onClick={() => onLikesClick(id)}
+              >
+                <span className={styles.statIcon}>
+                  <IconLike size={18} />
+                </span>
+                <span>{displayHearts}</span>
+              </button>
+            ) : (
+              <div className={styles.statItem}>
+                <span className={styles.statIcon}>
+                  <IconLike size={18} />
+                </span>
+                <span>{displayHearts}</span>
+              </div>
+            )
           ) : null}
           <div className={styles.statItem}>
             <span className={styles.statIcon}>

@@ -717,6 +717,20 @@
   color: var(--color-text-muted);
 }
 
+.statItemClickable {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.statItemClickable:hover {
+  color: var(--color-text);
+}
+
 .statIcon {
   display: inline-flex;
   align-items: center;

@@ -497,6 +497,14 @@ function PostGrid({
                 loading="lazy"
               />
             ) : null}
+            {/* Video play icon — top-right, giống Flutter */}
+            {!isPoll && media?.type === "video" && (
+              <div className={styles.videoBadge} aria-hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5.14v14.72a1 1 0 0 0 1.5.86l11-7.36a1 1 0 0 0 0-1.72l-11-7.36A1 1 0 0 0 8 5.14Z" />
+                </svg>
+              </div>
+            )}
             {isPoll && (
               <div className={styles.pollTileBadge}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
