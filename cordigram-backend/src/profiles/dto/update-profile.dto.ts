@@ -5,13 +5,20 @@ import {
   IsString,
   Matches,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 
-const USERNAME_REGEX = /^[a-z0-9_.]{3,30}$/;
+const USERNAME_REGEX = /^(?!.*\.\.)[a-z0-9][a-z0-9_.]{1,18}[a-z0-9]$/;
+const DISPLAY_NAME_REGEX = /^[\p{L}\p{N}\s'.,\-]+$/u;
 
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
+  @MinLength(2)
+  @MaxLength(30)
+  @Matches(DISPLAY_NAME_REGEX, {
+    message: "Display name can only contain letters, numbers, spaces and ' . , -",
+  })
   displayName?: string;
 
   @IsOptional()

@@ -499,10 +499,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       : const Color(0xFF0F355F);
   static const Color _danger = Color(0xFFE53935);
   static final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-  static final RegExp _passwordRegex = RegExp(
-    r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$',
-  );
-  static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
+static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
 
   static const List<String> _visibilityOptions = [
     'public',
@@ -2315,10 +2312,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
       return;
     }
-    if (!_passwordRegex.hasMatch(next)) {
-      setState(() {
-        _passwordError = lc.t('settings.passwordSecurity.passwordFormatError');
-      });
+    // Specific password strength checks
+    if (next.length < 8) {
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.passwordTooShort'));
+      return;
+    }
+    if (next.length > 72) {
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.passwordTooLong'));
+      return;
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(next)) {
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.passwordNoUpper'));
+      return;
+    }
+    if (!RegExp(r'[a-z]').hasMatch(next)) {
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.passwordNoLower'));
+      return;
+    }
+    if (!RegExp(r'[0-9]').hasMatch(next)) {
+      setState(() => _passwordError = lc.t('settings.passwordSecurity.passwordNoNumber'));
       return;
     }
     if (next != confirm) {

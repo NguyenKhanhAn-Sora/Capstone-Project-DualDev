@@ -714,12 +714,14 @@ class _SignupScreenState extends State<SignupScreen> {
             onChanged: (_) => _clearError(),
             validator: (v) {
               final s = (v ?? '').trim();
-              if (s.isEmpty) return 'Display name is required';
-              if (s.length < 3 || s.length > 30) {
-                return 'Between 3 and 30 characters';
-              }
-              if (!RegExp(r'^[\p{L}\s]+$', unicode: true).hasMatch(s)) {
-                return 'Only letters and spaces allowed';
+              final lc = LanguageController.instance;
+              if (s.isEmpty) return lc.t('profile.editSheet.errorDisplayNameRequired');
+              if (s.length < 2 || s.length > 30) return lc.t('profile.editSheet.errorDisplayNameLength');
+              final letterCount = s.runes.where((r) =>
+                RegExp(r'\p{L}', unicode: true).hasMatch(String.fromCharCode(r))).length;
+              if (letterCount < 2) return lc.t('profile.editSheet.errorDisplayNameLetters');
+              if (!RegExp(r"^[\p{L}\p{N}\s'.,\-]+$", unicode: true).hasMatch(s)) {
+                return lc.t('profile.editSheet.errorDisplayNameChars');
               }
               return null;
             },
@@ -738,15 +740,17 @@ class _SignupScreenState extends State<SignupScreen> {
             },
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9_.]')),
-              LengthLimitingTextInputFormatter(30),
+              LengthLimitingTextInputFormatter(20),
             ],
             validator: (v) {
               final s = (v ?? '').trim();
-              if (s.isEmpty) return 'Username is required';
-              if (s.length < 3) return 'At least 3 characters';
-              if (!RegExp(r'^[a-z0-9_.]{3,30}$').hasMatch(s)) {
-                return 'Letters, numbers, _ and . only';
-              }
+              final lc = LanguageController.instance;
+              if (s.isEmpty) return lc.t('profile.editSheet.errorUsernameTooShort');
+              if (s.length < 3) return lc.t('profile.editSheet.errorUsernameTooShort');
+              if (s.length > 20) return lc.t('profile.editSheet.errorUsernameTooLong');
+              if (RegExp(r'^[._]|[._]$').hasMatch(s)) return lc.t('profile.editSheet.errorUsernameStartEnd');
+              if (s.contains('..')) return lc.t('profile.editSheet.errorUsernameConsecutiveDots');
+              if (!RegExp(r'^[a-z0-9_.]+$').hasMatch(s)) return lc.t('profile.editSheet.errorUsernameFormat');
               return null;
             },
           ),
@@ -765,12 +769,13 @@ class _SignupScreenState extends State<SignupScreen> {
               onChanged: (_) => _clearError(),
               validator: (v) {
                 final s = (v ?? '').trim();
-                if (s.isEmpty) return 'Password is required';
-                if (s.length < 8) return 'At least 8 characters';
-                if (!RegExp(r'[a-zA-Z]').hasMatch(s))
-                  return 'Must contain at least one letter';
-                if (!RegExp(r'[0-9]').hasMatch(s))
-                  return 'Must contain at least one number';
+                final lc = LanguageController.instance;
+                if (s.isEmpty) return lc.t('profile.editSheet.passwordRequired');
+                if (s.length < 8) return lc.t('profile.editSheet.passwordTooShort');
+                if (s.length > 72) return lc.t('profile.editSheet.passwordTooLong');
+                if (!RegExp(r'[A-Z]').hasMatch(s)) return lc.t('profile.editSheet.passwordNoUpper');
+                if (!RegExp(r'[a-z]').hasMatch(s)) return lc.t('profile.editSheet.passwordNoLower');
+                if (!RegExp(r'[0-9]').hasMatch(s)) return lc.t('profile.editSheet.passwordNoNumber');
                 return null;
               },
             ),
@@ -785,7 +790,7 @@ class _SignupScreenState extends State<SignupScreen> {
               onChanged: (_) => _clearError(),
               validator: (v) {
                 if ((v ?? '') != _passwordController.text) {
-                  return 'Passwords do not match';
+                  return LanguageController.instance.t('profile.editSheet.passwordMismatchError');
                 }
                 return null;
               },

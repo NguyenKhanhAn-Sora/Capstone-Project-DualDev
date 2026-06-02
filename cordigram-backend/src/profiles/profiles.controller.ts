@@ -103,7 +103,7 @@ const avatarFileFilter = (
   cb(null, true);
 };
 
-const USERNAME_REGEX = /^[a-z0-9_.]{3,30}$/;
+const USERNAME_REGEX = /^(?!.*\.\.)[a-z0-9][a-z0-9_.]{1,18}[a-z0-9]$/;
 const BIO_CHAR_LIMIT = 300;
 
 @Controller('profiles')

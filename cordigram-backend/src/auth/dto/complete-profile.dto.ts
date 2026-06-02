@@ -8,15 +8,22 @@ import {
   MaxLength,
 } from 'class-validator';
 
+const DISPLAY_NAME_REGEX = /^[\p{L}\p{N}\s'.,\-]+$/u;
+
 export class CompleteProfileDto {
   @IsEmail()
   email: string;
 
   @IsString()
+  @MinLength(2)
+  @MaxLength(30)
+  @Matches(DISPLAY_NAME_REGEX, {
+    message: "Display name can only contain letters, numbers, spaces and ' . , -",
+  })
   displayName: string;
 
   @IsString()
-  @Matches(/^[a-z0-9_\.]{3,30}$/)
+  @Matches(/^(?!.*\.\.)[a-z0-9][a-z0-9_.]{1,18}[a-z0-9]$/)
   username: string;
 
   @IsOptional()

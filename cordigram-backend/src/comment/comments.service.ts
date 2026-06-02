@@ -1534,7 +1534,7 @@ export class CommentsService {
       raw.forEach((val) => {
         if (typeof val === 'string') {
           const username = val.trim().replace(/^@/, '').toLowerCase();
-          if (username && /^[a-z0-9_.]{1,30}$/i.test(username)) {
+          if (username && /^[a-z0-9_.]{1,20}$/i.test(username)) {
             const existing = map.get(username) ?? {};
             map.set(username, { ...existing, username });
           }
@@ -1544,7 +1544,7 @@ export class CommentsService {
         if (val && typeof val === 'object') {
           const username = val.username?.toString?.().trim?.();
           const userId = val.userId?.toString?.();
-          if (username && /^[a-z0-9_.]{1,30}$/i.test(username)) {
+          if (username && /^[a-z0-9_.]{1,20}$/i.test(username)) {
             const key = username.toLowerCase();
             const existing = map.get(key) ?? {};
             map.set(key, {

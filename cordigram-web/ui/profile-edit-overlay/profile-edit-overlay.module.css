@@ -127,6 +127,21 @@
   color: var(--color-text);
 }
 
+.usernameCooldownHint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .input,
 .textarea {
   width: 100%;

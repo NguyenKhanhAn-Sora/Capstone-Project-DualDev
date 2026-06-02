@@ -29,6 +29,9 @@ export class Profile extends Document {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   username: string;
 
+  @Prop({ type: Date, default: null })
+  usernameChangedAt?: Date | null;
+
   @Prop({ default: DEFAULT_AVATAR_URL })
   avatarUrl: string;
 

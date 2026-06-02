@@ -179,7 +179,7 @@ export class UsersService {
     };
   }
 
-  private readonly passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+  private readonly passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/;
   private readonly passkeyRegex = /^\d{6}$/;
   private readonly deviceLimit = 10;
   private readonly twoFactorTrustMs = 7 * 24 * 60 * 60 * 1000;

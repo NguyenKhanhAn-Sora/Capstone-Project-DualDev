@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../login/login.module.css";
 import { requestPasswordReset, resetPassword, verifyResetOtp } from "@/lib/api";
+import { useLanguage } from "@/component/language-provider";
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
     aria-hidden
@@ -24,6 +25,7 @@ const EyeIcon = ({ open }: { open: boolean }) => (
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [step, setStep] = useState<"email" | "otp" | "reset">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -42,13 +44,24 @@ export default function ForgotPasswordPage() {
 
   const canVerifyOtp = useMemo(() => !!otp.trim() && !loading, [otp, loading]);
 
+  const passwordError = useMemo(() => {
+    const p = newPassword.trim();
+    if (!p) return null;
+    if (p.length < 8) return t("settingsPage.security.password.errors.passwordTooShort");
+    if (p.length > 72) return t("settingsPage.security.password.errors.passwordTooLong");
+    if (!/[A-Z]/.test(p)) return t("settingsPage.security.password.errors.passwordNoUpper");
+    if (!/[a-z]/.test(p)) return t("settingsPage.security.password.errors.passwordNoLower");
+    if (!/\d/.test(p)) return t("settingsPage.security.password.errors.passwordNoNumber");
+    return null;
+  }, [newPassword, t]);
+
   const canReset = useMemo(
     () =>
       !!newPassword.trim() &&
+      !passwordError &&
       newPassword === confirmPassword &&
-      newPassword.length >= 8 &&
       !loading,
-    [newPassword, confirmPassword, loading],
+    [newPassword, passwordError, confirmPassword, loading],
   );
 
   const handleSendEmail = async (event: FormEvent) => {
@@ -224,6 +237,14 @@ export default function ForgotPasswordPage() {
                   <EyeIcon open={showConfirmPassword} />
                 </button>
               </div>
+              {passwordError && newPassword && (
+                <p className={styles["overlay-error"]}>{passwordError}</p>
+              )}
+              {confirmPassword && newPassword !== confirmPassword && (
+                <p className={styles["overlay-error"]}>
+                  {t("settingsPage.security.password.errors.passwordMismatch")}
+                </p>
+              )}
               {error && <p className={styles["overlay-error"]}>{error}</p>}
               {message && <p className={styles["overlay-sub"]}>{message}</p>}
               <button
