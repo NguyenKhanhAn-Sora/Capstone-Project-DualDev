@@ -295,6 +295,27 @@
       "founded": "创建于 {date}",
       "goToServer": "前往服务器"
     },
+    "mediaViewer": {
+      "title": "照片/视频",
+      "today": "今天",
+      "yesterday": "昨天",
+      "close": "关闭",
+      "download": "下载",
+      "hideSidebar": "隐藏列表",
+      "showSidebar": "显示列表",
+      "prev": "上一张",
+      "next": "下一张",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "resetZoom": "重置 (1:1)",
+      "fullscreen": "全屏",
+      "theme": "背景",
+      "themeDark": "深色",
+      "themeBlur": "模糊",
+      "themeDim": "暗淡",
+      "themeLight": "浅色",
+      "counter": "{cur} / {total}"
+    },
     "toast": {
       "deletedForMe": "已为你删除这条消息",
       "recalled": "已为所有人删除消息",

@@ -295,6 +295,27 @@
       "founded": "Founded {date}",
       "goToServer": "Go to server"
     },
+    "mediaViewer": {
+      "title": "Photos/Videos",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "close": "Close",
+      "download": "Download",
+      "hideSidebar": "Hide list",
+      "showSidebar": "Show list",
+      "prev": "Previous",
+      "next": "Next",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "resetZoom": "Reset (1:1)",
+      "fullscreen": "Fullscreen",
+      "theme": "Background",
+      "themeDark": "Dark",
+      "themeBlur": "Blur",
+      "themeDim": "Dim",
+      "themeLight": "Light",
+      "counter": "{cur} / {total}"
+    },
     "toast": {
       "deletedForMe": "Message deleted for you",
       "recalled": "Message deleted for everyone",

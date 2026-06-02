@@ -295,6 +295,27 @@
       "founded": "Thành lập từ {date}",
       "goToServer": "Đi tới Máy chủ"
     },
+    "mediaViewer": {
+      "title": "Ảnh/Video",
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua",
+      "close": "Đóng",
+      "download": "Tải xuống",
+      "hideSidebar": "Ẩn danh sách",
+      "showSidebar": "Hiện danh sách",
+      "prev": "Ảnh trước",
+      "next": "Ảnh sau",
+      "zoomIn": "Phóng to",
+      "zoomOut": "Thu nhỏ",
+      "resetZoom": "Reset (1:1)",
+      "fullscreen": "Xem toàn màn hình",
+      "theme": "Nền",
+      "themeDark": "Tối",
+      "themeBlur": "Mờ",
+      "themeDim": "Xám",
+      "themeLight": "Sáng",
+      "counter": "{cur} / {total}"
+    },
     "toast": {
       "deletedForMe": "Bạn đã xóa một tin nhắn",
       "recalled": "Đã xóa tin nhắn với mọi người",

@@ -303,6 +303,8 @@ interface UIMessage {
    */
   isDeletedForEveryone?: boolean;
   deletedAt?: string;
+  /** Raw attachment URLs — kept for backward compat with messages sent before the emoji-prefix format. */
+  attachments?: string[];
 }
 
 type PendingMessageJump = {
@@ -2500,6 +2502,7 @@ export default function MessagesPage() {
       replyToMessage: mapReplyToMessage(msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null),
       isDeletedForEveryone: msg.isDeleted === true,
       deletedAt: msg.deletedAt || undefined,
+      attachments: Array.isArray((msg as any).attachments) ? (msg as any).attachments : undefined,
     };
     setMessages((prev) => appendServerMessage(prev, uiMessage));
     if (isChatScrolledNearBottom()) {
@@ -4421,6 +4424,7 @@ export default function MessagesPage() {
         replyToMessage: mapReplyToMessage(msg.replyTo),
         isDeletedForEveryone: msg.isDeleted === true,
         deletedAt: msg.deletedAt || undefined,
+        attachments: Array.isArray(msg.attachments) ? msg.attachments : undefined,
       };
 
 
@@ -4947,21 +4951,22 @@ export default function MessagesPage() {
         senderDisplayNameAccentHex: msg.senderId.displayNameAccentHex ?? undefined,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: msg.senderId._id === currentUserId,
-        type: "direct", // Phân biệt là message từ direct message
-        isRead: msg.isRead || false, // Load initial read status
-        messageType: msg.type || "text", // Type of message content
+        type: "direct",
+        isRead: msg.isRead || false,
+        messageType: msg.type || "text",
         ...mapCallFieldsToUiMessage(msg),
-        giphyId: msg.giphyId || undefined, // Giphy ID if it's a GIF/sticker
+        giphyId: msg.giphyId || undefined,
         customStickerUrl: msg.customStickerUrl || undefined,
         serverStickerId:
           msg.serverStickerId != null ? String(msg.serverStickerId) : undefined,
-        voiceUrl: msg.voiceUrl ?? undefined, // Voice message URL
-        voiceDuration: msg.voiceDuration ?? undefined, // Voice message duration
+        voiceUrl: msg.voiceUrl ?? undefined,
+        voiceDuration: msg.voiceDuration ?? undefined,
         reactions: normalizeReactions(msg.reactions),
         replyTo: msg.replyTo?._id || undefined,
         replyToMessage: mapReplyToMessage(msg.replyTo),
         isDeletedForEveryone: msg.isDeleted === true,
         deletedAt: msg.deletedAt || undefined,
+        attachments: Array.isArray(msg.attachments) ? msg.attachments : undefined,
       }));
 
       setConversations((prev) => {
@@ -7048,26 +7053,46 @@ export default function MessagesPage() {
     (clickedUrl: string) => {
       const IMAGE_RE = /📷 \[Image\]: (https?:\/\/[^\s]+)/g;
       const VIDEO_RE = /🎬 \[Video\]: (https?:\/\/[^\s]+)/;
+      const PLAIN_IMG_RE = /^https?:\/\/[^\s]+\.(jpe?g|png|webp)(\?[^\s]*)?$/i;
+      const PLAIN_VID_RE = /^https?:\/\/[^\s]+\.(mp4|webm|mov)(\?[^\s]*)?$/i;
       const allMedia: ChatMediaItem[] = [];
       let clickedIndex = 0;
+
+      const pushMedia = (url: string, mediaType: "image" | "video", ts: Date, sender?: string) => {
+        // deduplicate
+        if (allMedia.some((m) => m.url === url)) return;
+        allMedia.push({ url, mediaType, timestamp: ts, senderName: sender });
+        if (url === clickedUrl) clickedIndex = allMedia.length - 1;
+      };
+
       for (const msg of messages) {
         const text = msg.text || "";
         const ts = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp);
         const sender = msg.senderDisplayName || msg.senderName;
-        // collect images
+
+        // 1. New format: emoji-prefix in text
         for (const match of text.matchAll(IMAGE_RE)) {
-          const url = match[1];
-          allMedia.push({ url, mediaType: "image", timestamp: ts, senderName: sender });
-          if (url === clickedUrl) clickedIndex = allMedia.length - 1;
+          pushMedia(match[1], "image", ts, sender);
         }
-        // collect video
         const vMatch = text.match(VIDEO_RE);
-        if (vMatch) {
-          const url = vMatch[1];
-          allMedia.push({ url, mediaType: "video", timestamp: ts, senderName: sender });
-          if (url === clickedUrl) clickedIndex = allMedia.length - 1;
+        if (vMatch) pushMedia(vMatch[1], "video", ts, sender);
+
+        // 2. Legacy format A: plain image/video URL as entire text
+        const trimmed = text.trim();
+        if (PLAIN_IMG_RE.test(trimmed)) pushMedia(trimmed, "image", ts, sender);
+        else if (PLAIN_VID_RE.test(trimmed)) pushMedia(trimmed, "video", ts, sender);
+
+        // 3. Legacy format B: raw URLs in attachments field
+        if (msg.attachments && msg.attachments.length > 0) {
+          for (const att of msg.attachments) {
+            const a = att.trim();
+            if (!a) continue;
+            if (PLAIN_VID_RE.test(a)) pushMedia(a, "video", ts, sender);
+            else if (a.startsWith("http")) pushMedia(a, "image", ts, sender);
+          }
         }
       }
+
       if (allMedia.length === 0) return;
       setMediaViewerState({ items: allMedia, index: clickedIndex });
     },
@@ -7335,11 +7360,48 @@ export default function MessagesPage() {
         return <PollMessage pollId={pollId} token={token} onError={setError} />;
       }
 
+      // ── Backward-compat: old images stored in `attachments` field without emoji prefix ──
+      // If text doesn't contain the new-format prefix but there are raw attachment URLs,
+      // synthesize the new format so the rest of the render path works uniformly.
+      const PLAIN_IMAGE_URL_RE = /^https?:\/\/[^\s]+\.(jpe?g|png|webp|gif)(\?[^\s]*)?$/i;
+      const PLAIN_VIDEO_URL_RE = /^https?:\/\/[^\s]+\.(mp4|webm|mov)(\?[^\s]*)?$/i;
+      let resolvedText = text;
+      if (
+        message.attachments &&
+        message.attachments.length > 0 &&
+        !text.includes("📷 [Image]:") &&
+        !text.includes("🎬 [Video]:")
+      ) {
+        const extraLines: string[] = [];
+        for (const att of message.attachments) {
+          if (PLAIN_VIDEO_URL_RE.test(att.trim())) {
+            extraLines.push(`🎬 [Video]: ${att.trim()}`);
+          } else if (att.trim().startsWith("https://") || att.trim().startsWith("http://")) {
+            extraLines.push(`📷 [Image]: ${att.trim()}`);
+          }
+        }
+        if (extraLines.length > 0) {
+          resolvedText = extraLines.join("\n");
+        }
+      }
+      // Also handle bare image/video URL as the entire text (legacy direct URL format)
+      if (
+        !resolvedText.includes("📷 [Image]:") &&
+        !resolvedText.includes("🎬 [Video]:")
+      ) {
+        const trimmed = resolvedText.trim();
+        if (PLAIN_IMAGE_URL_RE.test(trimmed)) {
+          resolvedText = `📷 [Image]: ${trimmed}`;
+        } else if (PLAIN_VIDEO_URL_RE.test(trimmed)) {
+          resolvedText = `🎬 [Video]: ${trimmed}`;
+        }
+      }
+
       // Check if message contains media (single or multiple images)
       const IMAGE_RE_GLOBAL = /📷 \[Image\]: (https?:\/\/[^\s]+)/g;
-      const allImageMatches = [...text.matchAll(IMAGE_RE_GLOBAL)];
-      const videoMatch = text.match(/🎬 \[Video\]: (https?:\/\/[^\s]+)/);
-      const gifMatch = text.match(/(https?:\/\/[^\s]+\.gif)/i);
+      const allImageMatches = [...resolvedText.matchAll(IMAGE_RE_GLOBAL)];
+      const videoMatch = resolvedText.match(/🎬 \[Video\]: (https?:\/\/[^\s]+)/);
+      const gifMatch = resolvedText.match(/(https?:\/\/[^\s]+\.gif)/i);
 
       if (allImageMatches.length > 0) {
         const imageUrls = allImageMatches.map((m) => m[1]);
