@@ -1276,52 +1276,44 @@
   align-self: center;
 }
 
-.emojiButton {
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 8px;
-  color: var(--color-text, #e5e7eb);
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease;
-}
-
-.mediaButton {
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 8px;
-  color: var(--color-text, #e5e7eb);
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease;
-}
-
+.emojiButton,
+.mediaButton,
 .stickerButton {
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 8px;
-  color: var(--color-text, #e5e7eb);
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted, #94a3b8);
+  flex-shrink: 0;
+  transition: color 0.12s ease, transform 0.12s ease;
 }
 
-.mediaButton:hover {
-  transform: translateY(-1px);
+.emojiButton svg,
+.mediaButton svg,
+.stickerButton svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
+.emojiButton:hover,
+.mediaButton:hover,
 .stickerButton:hover {
+  color: var(--color-text, #e5e7eb);
   transform: translateY(-1px);
 }
 
-.emojiButton:hover {
-  transform: translateY(-1px);
+.emojiButton:disabled,
+.mediaButton:disabled,
+.stickerButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .commentMedia {
@@ -1423,9 +1415,11 @@
 .commentMediaImage,
 .commentMediaVideo {
   width: 100%;
-  max-height: 280px;
+  height: auto;
+  max-height: 420px;
   border-radius: 12px;
-  object-fit: cover;
+  object-fit: contain;
+  display: block;
 }
 
 .commentMediaImageCompact {
@@ -1577,6 +1571,50 @@
   background: transparent;
   color: var(--color-text, #e5e7eb);
   border-color: var(--color-border, rgba(255, 255, 255, 0.15));
+}
+
+.viewMoreCommentsBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  width: 100%;
+  justify-content: center;
+  margin-top: 6px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: var(--color-surface-muted, rgba(255, 255, 255, 0.04));
+  color: var(--color-text-muted, #9ca3af);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.viewMoreCommentsBtn:hover:not(:disabled) {
+  background: var(--color-surface, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #e5e7eb);
+  border-color: var(--color-border-strong, rgba(255, 255, 255, 0.22));
+}
+
+.viewMoreCommentsBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.viewMoreSpinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spinComment 0.7s linear infinite;
+}
+
+@keyframes spinComment {
+  to { transform: rotate(360deg); }
 }
 
 .replyBadge {

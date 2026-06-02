@@ -935,12 +935,12 @@ export default function LoginPage() {
             <div className={styles["hero-panel"]}>
               <div className={styles["hero-tilt"]}>
                 <div className={styles["hero-card"]}>
-                  <h2 className="mt-4 text-[38px] font-semibold leading-tight text-white">
-                    Welcome Back!
+                  <h2 className="mt-4 text-[40px] font-bold leading-tight text-white tracking-tight">
+                    Welcome back
                   </h2>
-                  <p className="mt-3 text-[16px] leading-6 text-slate-100/90">
-                    Continue conversations, update channels, and collaborate
-                    with your team. Everything stays synced, secure, and ready.
+                  <p className="mt-3 text-[15px] leading-6 text-white/70 max-w-[360px]">
+                    Continue conversations, manage channels, and stay connected
+                    with your team — right where you left off.
                   </p>
 
                   <div className={styles["hero-chip-row"]}>
@@ -960,16 +960,28 @@ export default function LoginPage() {
 
                   <div className={styles["hero-badges"]}>
                     <div className={styles["hero-badge"]}>
-                      <span className={styles["hero-badge-icon"]}>◆</span>
+                      <span className={styles["hero-badge-icon"]}>
+                        <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      </span>
                       <p>Clear access control for every channel.</p>
                     </div>
                     <div className={styles["hero-badge"]}>
-                      <span className={styles["hero-badge-icon"]}>⇆</span>
+                      <span className={styles["hero-badge-icon"]}>
+                        <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                      </span>
                       Single sign-on, synced across web and mobile.
                     </div>
                     <div className={styles["hero-badge"]}>
-                      <span className={styles["hero-badge-icon"]}>★</span>
+                      <span className={styles["hero-badge-icon"]}>
+                        <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                      </span>
                       UI optimized for work and content sharing.
+                    </div>
+                    <div className={styles["hero-badge"]}>
+                      <span className={styles["hero-badge-icon"]}>
+                        <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      </span>
+                      Real-time messaging and posts in one place.
                     </div>
                   </div>
                 </div>
@@ -978,12 +990,16 @@ export default function LoginPage() {
           )}
 
           <div className={styles["login-right"]}>
-            <div className="w-full max-w-[420px] rounded-2xl border border-[#e5edf5] bg-white p-10 shadow-xl">
-              <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900 text-center">
-                Login
+            <div className="w-full max-w-[420px] rounded-2xl bg-white px-8 py-9 shadow-[0_4px_32px_rgba(15,23,42,0.10),0_1px_4px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col items-center mb-6">
+                <img src="/logo.png" alt="Cordigram" width={48} height={48} className="rounded-[14px]" />
+                <span className="mt-2 text-[11px] font-bold tracking-[2.5px] text-slate-400 uppercase">Cordigram</span>
+              </div>
+              <h1 className="text-[26px] font-bold leading-[1.2] text-slate-900 text-center tracking-tight">
+                Sign in
               </h1>
               <form
-                className="mt-[30px] space-y-5"
+                className="mt-6 space-y-5"
                 onSubmit={handleSubmit}
                 noValidate
               >
@@ -998,7 +1014,7 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
                     autoComplete="email"
-                    className="h-11 w-full max-w-[360px] rounded-[10px] border border-[#d7e5f2] bg-white px-3 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45"
+                    className="h-11 w-full rounded-[10px] border border-[#d7e5f2] bg-[#F8FBFF] px-3 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45"
                   />
                 </div>
 
@@ -1007,7 +1023,7 @@ export default function LoginPage() {
                     Password
                   </label>
                   <div
-                    className={`${styles.passwordField} w-full max-w-[360px]`}
+                    className={`${styles.passwordField} w-full`}
                   >
                     <input
                       type={showPassword ? "text" : "password"}
@@ -1019,7 +1035,7 @@ export default function LoginPage() {
                       }}
                       placeholder="Enter your password"
                       autoComplete="current-password"
-                      className={`h-11 w-full max-w-[360px] rounded-[10px] border border-[#d7e5f2] bg-white pl-3 pr-11 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45 ${styles.passwordInput}`}
+                      className={`h-11 w-full rounded-[10px] border border-[#d7e5f2] bg-[#F8FBFF] pl-3 pr-11 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45 ${styles.passwordInput}`}
                     />
                     <button
                       type="button"
@@ -1045,7 +1061,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={isDisabled}
-                  className={`${styles["primary-button"]} mt-3 h-11 w-full max-w-[360px] rounded-[10px] text-[13px] font-semibold leading-normal shadow-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-[#9AACEF]/55 disabled:cursor-not-allowed disabled:opacity-60`}
+                  className={`${styles["primary-button"]} mt-3 h-11 w-full rounded-[10px] text-[14px] font-semibold leading-normal shadow-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-[#9AACEF]/55 disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   {loading ? "Logging in..." : "Log in"}
                 </button>
@@ -1058,7 +1074,7 @@ export default function LoginPage() {
                   Forgot password?
                 </button>
 
-                <div className=" max-w-[360px] text-center text-[14px] font-medium leading-normal text-slate-700">
+                <div className="text-center text-[14px] font-medium leading-normal text-slate-700">
                   Don't have an account?{" "}
                   <Link
                     href="/signup"

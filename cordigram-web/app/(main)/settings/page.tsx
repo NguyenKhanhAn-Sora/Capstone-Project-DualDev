@@ -147,12 +147,12 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/;
 const passkeyRegex = /^\d{6}$/;
 
 function getPasswordError(pwd: string, tFn: (k: string) => string): string | null {
-  if (!pwd) return tFn("settingsPage.security.password.errors.passwordRequired");
-  if (pwd.length < 8) return tFn("settingsPage.security.password.errors.passwordTooShort");
-  if (pwd.length > 72) return tFn("settingsPage.security.password.errors.passwordTooLong");
-  if (!/[A-Z]/.test(pwd)) return tFn("settingsPage.security.password.errors.passwordNoUpper");
-  if (!/[a-z]/.test(pwd)) return tFn("settingsPage.security.password.errors.passwordNoLower");
-  if (!/\d/.test(pwd)) return tFn("settingsPage.security.password.errors.passwordNoNumber");
+  if (!pwd) return tFn("settingsPage.privacy.password.errors.passwordRequired");
+  if (pwd.length < 8) return tFn("settingsPage.privacy.password.errors.passwordTooShort");
+  if (pwd.length > 72) return tFn("settingsPage.privacy.password.errors.passwordTooLong");
+  if (!/[A-Z]/.test(pwd)) return tFn("settingsPage.privacy.password.errors.passwordNoUpper");
+  if (!/[a-z]/.test(pwd)) return tFn("settingsPage.privacy.password.errors.passwordNoLower");
+  if (!/\d/.test(pwd)) return tFn("settingsPage.privacy.password.errors.passwordNoNumber");
   return null;
 }
 const RECENT_ACCOUNTS_KEY = "recentAccounts";
@@ -495,6 +495,7 @@ export default function SettingsPage() {
   const [passwordOtp, setPasswordOtp] = useState("");
   const [passwordCurrent, setPasswordCurrent] = useState("");
   const [passwordNew, setPasswordNew] = useState("");
+  const [passwordNewBlurred, setPasswordNewBlurred] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
@@ -827,6 +828,17 @@ export default function SettingsPage() {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("accessToken");
   }, [canRender]);
+
+  const passwordNewRules = useMemo(
+    () => [
+      { key: "len",   label: t("settingsPage.privacy.password.errors.passwordTooShort"), met: passwordNew.trim().length >= 8 },
+      { key: "upper", label: t("settingsPage.privacy.password.errors.passwordNoUpper"),  met: /[A-Z]/.test(passwordNew) },
+      { key: "lower", label: t("settingsPage.privacy.password.errors.passwordNoLower"),  met: /[a-z]/.test(passwordNew) },
+      { key: "num",   label: t("settingsPage.privacy.password.errors.passwordNoNumber"), met: /\d/.test(passwordNew) },
+    ],
+    [passwordNew, t],
+  );
+  const allPasswordNewRulesMet = passwordNewRules.every((r) => r.met);
 
   useEffect(() => {
     const payload = token ? (decodeJwt(token) as { email?: string }) : null;
@@ -2192,13 +2204,17 @@ export default function SettingsPage() {
       );
       return;
     }
+    if (!allPasswordNewRulesMet) {
+      setPasswordNewBlurred(true);
+      return;
+    }
     const pwdErr = getPasswordError(passwordNew, t);
     if (pwdErr) {
       setPasswordError(pwdErr);
       return;
     }
     if (passwordNew !== passwordConfirm) {
-      setPasswordError(t("settingsPage.security.password.errors.passwordMismatch"));
+      setPasswordError(t("settingsPage.privacy.password.errors.passwordMismatch"));
       return;
     }
     if (!token) {
@@ -3321,12 +3337,13 @@ export default function SettingsPage() {
                               {t("settingsPage.privacy.password.newPasswordLabel")}
                               <div className={styles.inputGroup}>
                                 <input
-                                  className={`${styles.input} ${styles.inputWithIcon}`}
+                                  className={`${styles.input} ${styles.inputWithIcon}${passwordNewBlurred && !allPasswordNewRulesMet ? ` ${styles.inputError}` : ""}`}
                                   type={showPasswordNew ? "text" : "password"}
                                   autoComplete="new-password"
                                   placeholder={t("settingsPage.privacy.password.newPasswordPlaceholder")}
                                   value={passwordNew}
-                                  onChange={(e) => setPasswordNew(e.target.value)}
+                                  onChange={(e) => { setPasswordNew(e.target.value); setPasswordError(null); }}
+                                  onBlur={() => { if (passwordNew) setPasswordNewBlurred(true); }}
                                 />
                                 <EyeToggle
                                   show={showPasswordNew}
@@ -3334,6 +3351,25 @@ export default function SettingsPage() {
                                 />
                               </div>
                             </label>
+                            {(passwordNew.length > 0 || passwordNewBlurred) && (
+                              <div className={styles.pwdRules}>
+                                {passwordNewRules.map((rule) => (
+                                  <div
+                                    key={rule.key}
+                                    className={`${styles.pwdRule} ${rule.met ? styles.pwdRuleMet : passwordNewBlurred ? styles.pwdRuleError : ""}`}
+                                  >
+                                    <div className={`${styles.pwdRuleIcon} ${rule.met ? styles.pwdRuleIconMet : passwordNewBlurred ? styles.pwdRuleIconError : ""}`}>
+                                      {rule.met && (
+                                        <svg width={10} height={10} viewBox="0 0 12 12" fill="none">
+                                          <polyline points="2,7 5,10 10,3" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                    <span>{rule.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             <label className={styles.label}>
                               {t("settingsPage.privacy.password.confirmPasswordLabel")}
                               <div className={styles.inputGroup}>
@@ -3343,9 +3379,7 @@ export default function SettingsPage() {
                                   autoComplete="new-password"
                                   placeholder={t("settingsPage.privacy.password.confirmPasswordPlaceholder")}
                                   value={passwordConfirm}
-                                  onChange={(e) =>
-                                    setPasswordConfirm(e.target.value)
-                                  }
+                                  onChange={(e) => setPasswordConfirm(e.target.value)}
                                 />
                                 <EyeToggle
                                   show={showPasswordConfirm}
@@ -3353,9 +3387,6 @@ export default function SettingsPage() {
                                 />
                               </div>
                             </label>
-                            <p className={styles.hint}>
-                              {t("settingsPage.privacy.password.requirement")}
-                            </p>
                             {passwordError ? (
                               <p className={styles.error}>{passwordError}</p>
                             ) : null}
