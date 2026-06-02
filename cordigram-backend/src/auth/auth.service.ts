@@ -637,6 +637,12 @@ export class AuthService {
     }
 
     if (params.password) {
+      const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/;
+      if (!PASSWORD_REGEX.test(params.password)) {
+        throw new BadRequestException(
+          'Password must be 8–72 characters and include uppercase, lowercase, and a number.',
+        );
+      }
       const saltRounds = this.config.bcryptSaltRounds;
       const hash = await bcrypt.hash(params.password, saltRounds);
       await this.usersService.setPassword(user.id, hash);

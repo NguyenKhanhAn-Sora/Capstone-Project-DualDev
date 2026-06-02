@@ -420,15 +420,41 @@ export class ProfilesService {
 
     if (data.username !== undefined) {
       const normalized = data.username.toLowerCase();
+
+      // Kiểm tra cooldown 30 ngày — cho phép nếu chưa có usernameChangedAt (account cũ)
+      const lastChanged = (profile as any).usernameChangedAt as Date | null | undefined;
+      if (lastChanged) {
+        const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+        const elapsed = Date.now() - new Date(lastChanged).getTime();
+        if (elapsed < COOLDOWN_MS) {
+          const daysLeft = Math.ceil((COOLDOWN_MS - elapsed) / (24 * 60 * 60 * 1000));
+          throw new BadRequestException(
+            `Username can only be changed once every 30 days. Try again in ${daysLeft} day(s).`,
+          );
+        }
+      }
+
       const available = await this.isUsernameAvailable(normalized, userId);
       if (!available) {
         throw new BadRequestException('Username already taken');
       }
       profile.username = normalized;
+      (profile as any).usernameChangedAt = new Date();
     }
 
     if (data.displayName !== undefined) {
-      profile.displayName = data.displayName.trim();
+      const trimmed = data.displayName.trim();
+      if (trimmed.length < 2 || trimmed.length > 30) {
+        throw new BadRequestException('Display name must be between 2 and 30 characters');
+      }
+      const letterCount = [...trimmed].filter((c) => /\p{L}/u.test(c)).length;
+      if (letterCount < 2) {
+        throw new BadRequestException('Display name must contain at least 2 letters');
+      }
+      if (!/^[\p{L}\p{N}\s'.,\-]+$/u.test(trimmed)) {
+        throw new BadRequestException("Display name can only contain letters, numbers, spaces and ' . , -");
+      }
+      profile.displayName = trimmed;
     }
 
     if (data.bio !== undefined) {
@@ -775,6 +801,8 @@ export class ProfilesService {
       displayName: string;
       avatarUrl: string;
     }>;
+    /** ISO timestamp lần cuối đổi username. Chỉ trả về cho chủ tài khoản. */
+    usernameChangedAt?: string | null;
   }> {
     const raw = params.usernameOrId?.toString().trim();
     if (!raw) {
@@ -964,6 +992,12 @@ export class ProfilesService {
       mutualServers,
       mutualFollowCount,
       mutualFollowUsers,
+      // Chỉ trả về cho chủ tài khoản — người khác không cần biết
+      usernameChangedAt: isOwner
+        ? ((profile as any).usernameChangedAt
+            ? new Date((profile as any).usernameChangedAt).toISOString()
+            : null)
+        : undefined,
     };
   }
 

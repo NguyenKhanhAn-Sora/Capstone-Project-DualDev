@@ -11,21 +11,45 @@ import 'services/profile_service.dart';
 
 // -- Regex / validation -------------------------------------------------------
 
-final _usernameRegex = RegExp(r'^[a-z0-9_.]{3,30}$');
+
+/// Returns days remaining in cooldown, 0 if free to change.
+int _usernameLockedDaysLeft(String? usernameChangedAt) {
+  if (usernameChangedAt == null) return 0;
+  final changedAt = DateTime.tryParse(usernameChangedAt);
+  if (changedAt == null) return 0;
+  const cooldown = Duration(days: 30);
+  final remaining = changedAt.add(cooldown).difference(DateTime.now());
+  if (remaining.isNegative) return 0;
+  return remaining.inDays + 1;
+}
+
+String? _usernameFormatError(String trimmed, LanguageController lc) {
+  if (trimmed.length < 3) return lc.t('profile.editSheet.errorUsernameTooShort');
+  if (trimmed.length > 20) return lc.t('profile.editSheet.errorUsernameTooLong');
+  if (RegExp(r'^[._]|[._]$').hasMatch(trimmed)) {
+    return lc.t('profile.editSheet.errorUsernameStartEnd');
+  }
+  if (trimmed.contains('..')) return lc.t('profile.editSheet.errorUsernameConsecutiveDots');
+  if (!RegExp(r'^[a-z0-9_.]+$').hasMatch(trimmed)) {
+    return lc.t('profile.editSheet.errorUsernameFormat');
+  }
+  return null;
+}
 
 String? _validateDisplayName(String name) {
   final lc = LanguageController.instance;
   final trimmed = name.trim();
   if (trimmed.isEmpty) return lc.t('profile.editSheet.errorDisplayNameRequired');
-  if (trimmed.length < 3 || trimmed.length > 30) {
-    return lc.t('profile.editSheet.errorDisplayNameTooShort');
+  if (trimmed.length < 2 || trimmed.length > 30) {
+    return lc.t('profile.editSheet.errorDisplayNameLength');
   }
-  final condensed = trimmed.replaceAll(' ', '');
-  if (condensed.length < 3) {
-    return lc.t('profile.editSheet.errorDisplayNameTooShort');
-  }
-  if (!RegExp(r'^[\p{L}\s]+$', unicode: true).hasMatch(trimmed)) {
-    return lc.t('profile.editSheet.errorDisplayNameInvalid');
+  final letterCount = trimmed.runes.where((r) {
+    final ch = String.fromCharCode(r);
+    return RegExp(r'\p{L}', unicode: true).hasMatch(ch);
+  }).length;
+  if (letterCount < 2) return lc.t('profile.editSheet.errorDisplayNameLetters');
+  if (!RegExp(r"^[\p{L}\p{N}\s'.,\-]+$", unicode: true).hasMatch(trimmed)) {
+    return lc.t('profile.editSheet.errorDisplayNameChars');
   }
   return null;
 }
@@ -220,10 +244,11 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
       return;
     }
 
-    if (!_usernameRegex.hasMatch(trimmed)) {
+    final fmtErr = _usernameFormatError(trimmed, LanguageController.instance);
+    if (fmtErr != null) {
       setState(() {
         _usernameAvailable = false;
-        _usernameError = LanguageController.instance.t('profile.editSheet.errorUsernameFormat');
+        _usernameError = fmtErr;
         _checkingUsername = false;
       });
       return;
@@ -537,10 +562,12 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
 
     final lc = LanguageController.instance;
     final username = _usernameCtrl.text.trim();
-    if (!_usernameRegex.hasMatch(username)) {
-      return lc.t('profile.editSheet.errorUsernameFormat');
+    final daysLeft = _usernameLockedDaysLeft(widget.profile.usernameChangedAt);
+    if (daysLeft == 0) {
+      final fmtErr = _usernameFormatError(username, lc);
+      if (fmtErr != null) return fmtErr;
+      if (_usernameAvailable == false) return lc.t('profile.editSheet.errorUsernameTaken');
     }
-    if (_usernameAvailable == false) return lc.t('profile.editSheet.errorUsernameTaken');
 
     if (_bioCtrl.text.length > 300) return lc.t('profile.editSheet.errorBioTooLong');
 
@@ -863,23 +890,50 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel(LanguageController.instance.t('profile.editSheet.username')),
-        TextField(
-          controller: _usernameCtrl,
-          maxLength: 30,
-          onChanged: _onUsernameChanged,
-          style: TextStyle(color: _textPrimary, fontSize: 14),
-          decoration:
-              _baseDecoration(
-                hint: LanguageController.instance.t('profile.editSheet.hintUsername'),
-                suffix: suffix,
-                borderColor: borderColor,
-              ).copyWith(
-                counterStyle: TextStyle(
-                  color: _textSecondary.withValues(alpha: 0.6),
+        Builder(builder: (context) {
+          final lc = LanguageController.instance;
+          final daysLeft = _usernameLockedDaysLeft(widget.profile.usernameChangedAt);
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _fieldLabel(lc.t('profile.editSheet.username')),
+              if (daysLeft > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _textSecondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: _border),
+                  ),
+                  child: Text(
+                    lc.t('profile.editSheet.errorUsernameCooldown').replaceAll('{days}', '$daysLeft'),
+                    style: TextStyle(fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w600),
+                  ),
                 ),
+              ],
+            ],
+          );
+        }),
+        Builder(builder: (context) {
+          final daysLeft = _usernameLockedDaysLeft(widget.profile.usernameChangedAt);
+          return TextField(
+            controller: _usernameCtrl,
+            maxLength: 20,
+            enabled: daysLeft == 0,
+            onChanged: daysLeft == 0 ? _onUsernameChanged : null,
+            style: TextStyle(color: _textPrimary, fontSize: 14),
+            decoration: _baseDecoration(
+              hint: LanguageController.instance.t('profile.editSheet.hintUsername'),
+              suffix: suffix,
+              borderColor: borderColor,
+            ).copyWith(
+              counterStyle: TextStyle(
+                color: _textSecondary.withValues(alpha: 0.6),
               ),
-        ),
+            ),
+          );
+        }),
         if (_usernameError != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),

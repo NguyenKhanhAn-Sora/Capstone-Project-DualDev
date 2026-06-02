@@ -4,14 +4,16 @@ import '../../core/services/api_service.dart';
 import '../../core/services/language_controller.dart';
 import 'login_screen.dart';
 
-// Password must be ≥8 chars, contain at least one letter and one digit.
+// Password: 8–72 chars, uppercase + lowercase + number.
 String? _validatePassword(String? v) {
+  final lc = LanguageController.instance;
   final s = (v ?? '').trim();
-  if (s.isEmpty) return 'Password is required';
-  if (s.length < 8) return 'At least 8 characters';
-  if (!RegExp(r'[a-zA-Z]').hasMatch(s))
-    return 'Must contain at least one letter';
-  if (!RegExp(r'[0-9]').hasMatch(s)) return 'Must contain at least one number';
+  if (s.isEmpty) return lc.t('profile.editSheet.passwordRequired');
+  if (s.length < 8) return lc.t('profile.editSheet.passwordTooShort');
+  if (s.length > 72) return lc.t('profile.editSheet.passwordTooLong');
+  if (!RegExp(r'[A-Z]').hasMatch(s)) return lc.t('profile.editSheet.passwordNoUpper');
+  if (!RegExp(r'[a-z]').hasMatch(s)) return lc.t('profile.editSheet.passwordNoLower');
+  if (!RegExp(r'[0-9]').hasMatch(s)) return lc.t('profile.editSheet.passwordNoNumber');
   return null;
 }
 
@@ -440,7 +442,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onFieldSubmitted: (_) => _resetPassword(),
           validator: (v) {
             if ((v ?? '') != _newPasswordController.text) {
-              return 'Passwords do not match';
+              return LanguageController.instance.t('profile.editSheet.passwordMismatchError');
             }
             return null;
           },

@@ -14,7 +14,7 @@ import {
   type UpdateMyProfilePayload,
 } from "@/lib/api";
 
-const USERNAME_REGEX = /^[a-z0-9_.]{3,30}$/;
+const USERNAME_REGEX = /^(?!.*\.\.)[a-z0-9][a-z0-9_.]{1,18}[a-z0-9]$/;
 type GeoStatus = "idle" | "requesting" | "granted" | "denied" | "error";
 
 const BIO_CHAR_LIMIT = 300;
@@ -88,6 +88,16 @@ export default function ProfileEditOverlay({
 }: ProfileEditOverlayProps) {
   const { t } = useLanguage();
 
+  const usernameLockedDaysLeft = useMemo(() => {
+    const changedAt = profile?.usernameChangedAt;
+    if (!changedAt) return 0;
+    const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+    const elapsed = Date.now() - new Date(changedAt).getTime();
+    const remaining = COOLDOWN_MS - elapsed;
+    if (remaining <= 0) return 0;
+    return Math.ceil(remaining / (24 * 60 * 60 * 1000));
+  }, [profile?.usernameChangedAt]);
+
   const genderOptions = useMemo(
     () => [
       { value: "male" as const, label: t("profilePage.editOverlay.genderMale") },
@@ -100,10 +110,11 @@ export default function ProfileEditOverlay({
 
   const validateDisplayName = (name: string): string | null => {
     if (!name) return t("profilePage.editOverlay.displayNameRequired");
-    const condensed = name.replace(/\s/g, "");
-    if (name.length < 3 || name.length > 30) return t("profilePage.editOverlay.displayNameLengthError");
-    if (condensed.length < 3) return t("profilePage.editOverlay.displayNameLettersError");
-    if (!/^[\p{L}\s]+$/u.test(name)) return t("profilePage.editOverlay.displayNameCharsError");
+    const trimmed = name.trim();
+    if (trimmed.length < 2 || trimmed.length > 30) return t("profilePage.editOverlay.displayNameLengthError");
+    const letterCount = [...trimmed].filter((c) => /\p{L}/u.test(c)).length;
+    if (letterCount < 2) return t("profilePage.editOverlay.displayNameLettersError");
+    if (!/^[\p{L}\p{N}\s'.,\-]+$/u.test(trimmed)) return t("profilePage.editOverlay.displayNameCharsError");
     return null;
   };
 
@@ -546,12 +557,18 @@ export default function ProfileEditOverlay({
       return;
     }
 
-    if (!USERNAME_REGEX.test(username)) {
+    const usernameFormatError = (() => {
+      if (username.length < 3) return t("profilePage.editOverlay.usernameTooShort");
+      if (username.length > 20) return t("profilePage.editOverlay.usernameTooLong");
+      if (/^[._]|[._]$/.test(username)) return t("profilePage.editOverlay.usernameStartEndError");
+      if (/\.\./.test(username)) return t("profilePage.editOverlay.usernameConsecutiveDotsError");
+      if (!/^[a-z0-9_.]+$/.test(username)) return t("profilePage.editOverlay.usernameCharsError");
+      return null;
+    })();
+
+    if (usernameFormatError) {
       setUsernameError(null);
-      setFieldError((prev) => ({
-        ...prev,
-        username: t("profilePage.editOverlay.usernameCharsError"),
-      }));
+      setFieldError((prev) => ({ ...prev, username: usernameFormatError }));
       return;
     }
 
@@ -659,12 +676,19 @@ export default function ProfileEditOverlay({
       return;
     }
 
-    if (!USERNAME_REGEX.test(username)) {
-      setFieldError((prev) => ({
-        ...prev,
-        username: t("profilePage.editOverlay.usernameCharsError"),
-      }));
-      return;
+    if (usernameLockedDaysLeft === 0) {
+      const submitUsernameErr = (() => {
+        if (username.length < 3) return t("profilePage.editOverlay.usernameTooShort");
+        if (username.length > 20) return t("profilePage.editOverlay.usernameTooLong");
+        if (/^[._]|[._]$/.test(username)) return t("profilePage.editOverlay.usernameStartEndError");
+        if (/\.\./.test(username)) return t("profilePage.editOverlay.usernameConsecutiveDotsError");
+        if (!USERNAME_REGEX.test(username)) return t("profilePage.editOverlay.usernameCharsError");
+        return null;
+      })();
+      if (submitUsernameErr) {
+        setFieldError((prev) => ({ ...prev, username: submitUsernameErr }));
+        return;
+      }
     }
 
     const birthErr = validateBirthdate(birthdate);
@@ -687,7 +711,8 @@ export default function ProfileEditOverlay({
     try {
       const payload: UpdateMyProfilePayload = {
         displayName: displayName.trim(),
-        username: username.trim().toLowerCase(),
+        // Không gửi username nếu đang trong cooldown
+        ...(usernameLockedDaysLeft === 0 && { username: username.trim().toLowerCase() }),
         gender: gender as Exclude<GenderValue, "">,
         location: locationInput.trim(),
         workplaceName: workplaceInput.trim(),
@@ -762,10 +787,13 @@ export default function ProfileEditOverlay({
             </div>
 
             <div>
-              <label className={styles.label}>{t("profilePage.editOverlay.usernameLabel")}</label>
+              <label className={styles.label}>
+                {t("profilePage.editOverlay.usernameLabel")}
+              </label>
               <input
                 className={styles.input}
                 value={username}
+                disabled={usernameLockedDaysLeft > 0}
                 onChange={(e) => {
                   const cleaned = e.target.value
                     .normalize("NFD")
@@ -781,7 +809,15 @@ export default function ProfileEditOverlay({
                 autoCorrect="off"
                 spellCheck={false}
               />
-              {fieldError.username ? (
+              {usernameLockedDaysLeft > 0 ? (
+                <div className={styles.usernameCooldownHint}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  {t("profilePage.editOverlay.usernameCooldown", { days: String(usernameLockedDaysLeft) })}
+                </div>
+              ) : fieldError.username ? (
                 <div className={styles.error}>{fieldError.username}</div>
               ) : (
                 <div className={styles.hint}>

@@ -2745,6 +2745,8 @@ export type ProfileDetailResponse = {
     displayName: string;
     avatarUrl: string;
   }>;
+  /** ISO timestamp của lần cuối đổi username. Null nếu chưa từng đổi. */
+  usernameChangedAt?: string | null;
 };
 
 /** Hồ sơ hiển thị trong chat/DM — tách khỏi Profile social (`/profiles`). */

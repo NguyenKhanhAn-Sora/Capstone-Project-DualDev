@@ -92,6 +92,7 @@ class ProfileDetail {
     this.visibility,
     this.isCreatorVerified = false,
     this.isFollowing = false,
+    this.usernameChangedAt,
   });
 
   factory ProfileDetail.fromJson(Map<String, dynamic> j) => ProfileDetail(
@@ -115,6 +116,7 @@ class ProfileDetail {
         : null,
     isCreatorVerified: j['isCreatorVerified'] as bool? ?? false,
     isFollowing: j['isFollowing'] as bool? ?? false,
+    usernameChangedAt: j['usernameChangedAt'] as String?,
   );
 
   final String id;
@@ -133,6 +135,7 @@ class ProfileDetail {
   final ProfileVisibility? visibility;
   final bool isCreatorVerified;
   bool isFollowing;
+  final String? usernameChangedAt;
 
   ProfileDetail copyWith({
     bool? isFollowing,

@@ -143,8 +143,18 @@ const SETTINGS_SECTIONS = [
 ];
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/;
 const passkeyRegex = /^\d{6}$/;
+
+function getPasswordError(pwd: string, tFn: (k: string) => string): string | null {
+  if (!pwd) return tFn("settingsPage.security.password.errors.passwordRequired");
+  if (pwd.length < 8) return tFn("settingsPage.security.password.errors.passwordTooShort");
+  if (pwd.length > 72) return tFn("settingsPage.security.password.errors.passwordTooLong");
+  if (!/[A-Z]/.test(pwd)) return tFn("settingsPage.security.password.errors.passwordNoUpper");
+  if (!/[a-z]/.test(pwd)) return tFn("settingsPage.security.password.errors.passwordNoLower");
+  if (!/\d/.test(pwd)) return tFn("settingsPage.security.password.errors.passwordNoNumber");
+  return null;
+}
 const RECENT_ACCOUNTS_KEY = "recentAccounts";
 
 const relativeFormatter = new Intl.RelativeTimeFormat("en", {
@@ -2182,14 +2192,13 @@ export default function SettingsPage() {
       );
       return;
     }
-    if (!passwordRegex.test(passwordNew)) {
-      setPasswordError(
-        "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
-      );
+    const pwdErr = getPasswordError(passwordNew, t);
+    if (pwdErr) {
+      setPasswordError(pwdErr);
       return;
     }
     if (passwordNew !== passwordConfirm) {
-      setPasswordError("New passwords do not match.");
+      setPasswordError(t("settingsPage.security.password.errors.passwordMismatch"));
       return;
     }
     if (!token) {

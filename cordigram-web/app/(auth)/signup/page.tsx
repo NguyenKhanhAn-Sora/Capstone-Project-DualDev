@@ -16,6 +16,7 @@ import Cropper, { Area } from "react-easy-crop";
 import { apiFetch, ApiError, getApiBaseUrl } from "@/lib/api";
 import { setStoredAccessToken } from "@/lib/auth";
 import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
+import { useLanguage } from "@/component/language-provider";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { MobileDatePicker } from "@/ui/mobile-date-picker/mobile-date-picker";
 
@@ -24,7 +25,7 @@ type Step = "email" | "otp" | "profile" | "avatar";
 type GeoStatus = "idle" | "requesting" | "granted" | "denied" | "error";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const usernameRegex = /^[a-z0-9_.]{3,30}$/;
+const usernameRegex = /^(?!.*\.\.)[a-z0-9][a-z0-9_.]{1,18}[a-z0-9]$/;
 
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
@@ -179,20 +180,7 @@ function decodeJwtEmail(token: string): string | null {
   }
 }
 
-function validateDisplayName(name: string): string | null {
-  if (!name) return null;
-  const condensed = name.replace(/\s/g, "");
-  if (name.length < 3 || name.length > 30) {
-    return "Atleast 3 and maximum 30 character";
-  }
-  if (condensed.length < 3) {
-    return "Display name needs at least 3 letters after removing spaces";
-  }
-  if (!/^[\p{L}\s]+$/u.test(name)) {
-    return "Display name can only contain letters and spaces";
-  }
-  return null;
-}
+// Moved inside component to access t() — see SignupPage below
 
 async function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -335,6 +323,17 @@ export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const canRender = useRedirectIfAuthed();
+  const { t } = useLanguage();
+
+  const validateDisplayName = (name: string): string | null => {
+    if (!name) return null;
+    const trimmed = name.trim();
+    if (trimmed.length < 2 || trimmed.length > 30) return t("profilePage.editOverlay.displayNameLengthError");
+    const letterCount = [...trimmed].filter((c) => /\p{L}/u.test(c)).length;
+    if (letterCount < 2) return t("profilePage.editOverlay.displayNameLettersError");
+    if (!/^[\p{L}\p{N}\s'.,\-]+$/u.test(trimmed)) return t("profilePage.editOverlay.displayNameCharsError");
+    return null;
+  };
 
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -491,29 +490,18 @@ export default function SignupPage() {
       return;
     }
 
-    if (username.length < 3) {
+    const usernameFormatError = (() => {
+      if (username.length < 3) return t("profilePage.editOverlay.usernameTooShort");
+      if (username.length > 20) return t("profilePage.editOverlay.usernameTooLong");
+      if (/^[._]|[._]$/.test(username)) return t("profilePage.editOverlay.usernameStartEndError");
+      if (/\.\./.test(username)) return t("profilePage.editOverlay.usernameConsecutiveDotsError");
+      if (!usernameRegex.test(username)) return t("profilePage.editOverlay.usernameCharsError");
+      return null;
+    })();
+
+    if (usernameFormatError) {
       setUsernameError(null);
-      setFieldError((prev) => ({
-        ...prev,
-        username: "Username must be at least 3 characters",
-      }));
-      return;
-    }
-    if (username.length > 30) {
-      setUsernameError(null);
-      setFieldError((prev) => ({
-        ...prev,
-        username: "Username must be at most 30 characters",
-      }));
-      return;
-    }
-    if (!usernameRegex.test(username)) {
-      setUsernameError(null);
-      setFieldError((prev) => ({
-        ...prev,
-        username:
-          "Username can only include letters, numbers, underscores, and dots",
-      }));
+      setFieldError((prev) => ({ ...prev, username: usernameFormatError }));
       return;
     }
 
@@ -895,24 +883,23 @@ export default function SignupPage() {
 
     if (!isGoogleFlow) {
       const trimmedPassword = password.trim();
-      if (!trimmedPassword) {
-        setFieldError((prev) => ({
-          ...prev,
-          password: "Password is reqiure",
-        }));
-        return;
-      }
-      if (trimmedPassword.length < 8) {
-        setFieldError((prev) => ({
-          ...prev,
-          password: "Password must be at least 8 characters",
-        }));
+      const pwdErr = (() => {
+        if (!trimmedPassword) return t("settingsPage.security.password.errors.passwordRequired");
+        if (trimmedPassword.length < 8) return t("settingsPage.security.password.errors.passwordTooShort");
+        if (trimmedPassword.length > 72) return t("settingsPage.security.password.errors.passwordTooLong");
+        if (!/[A-Z]/.test(trimmedPassword)) return t("settingsPage.security.password.errors.passwordNoUpper");
+        if (!/[a-z]/.test(trimmedPassword)) return t("settingsPage.security.password.errors.passwordNoLower");
+        if (!/\d/.test(trimmedPassword)) return t("settingsPage.security.password.errors.passwordNoNumber");
+        return null;
+      })();
+      if (pwdErr) {
+        setFieldError((prev) => ({ ...prev, password: pwdErr }));
         return;
       }
       if (trimmedPassword !== confirmPassword) {
         setFieldError((prev) => ({
           ...prev,
-          confirmPassword: "Passwords do not match",
+          confirmPassword: t("settingsPage.security.password.errors.passwordMismatch"),
         }));
         return;
       }
