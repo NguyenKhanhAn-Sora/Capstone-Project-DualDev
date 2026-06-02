@@ -316,6 +316,31 @@
       "themeLight": "ライト",
       "counter": "{cur} / {total}"
     },
+    "conversationDetails": {
+      "title": "会話の詳細",
+      "encrypted": "エンドツーエンド暗号化",
+      "search": "検索",
+      "searchPlaceholder": "メッセージを検索...",
+      "noResults": "メッセージが見つかりません",
+      "pinnedMessages": "ピン留めメッセージ",
+      "noPinned": "ピン留めメッセージはありません",
+      "sharedMedia": "メディア",
+      "noMedia": "写真や動画はありません",
+      "loadMore": "もっと見る（{n}件残り）",
+      "sharedFiles": "ファイル",
+      "noFiles": "共有ファイルはありません",
+      "searchFiles": "ファイルを検索...",
+      "noFilesFound": "ファイルが見つかりません",
+      "loading": "読み込み中...",
+      "today": "今日",
+      "yesterday": "昨日",
+      "download": "ダウンロード",
+      "close": "閉じる"
+    },
+    "linkPreview": {
+      "noDescription": "説明なし",
+      "visitLink": "リンクを開く"
+    },
     "toast": {
       "deletedForMe": "メッセージを削除しました",
       "recalled": "全員のメッセージを削除しました",

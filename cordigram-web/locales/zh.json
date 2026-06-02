@@ -316,6 +316,31 @@
       "themeLight": "浅色",
       "counter": "{cur} / {total}"
     },
+    "conversationDetails": {
+      "title": "对话详情",
+      "encrypted": "端到端加密",
+      "search": "搜索",
+      "searchPlaceholder": "搜索消息...",
+      "noResults": "未找到消息",
+      "pinnedMessages": "置顶消息",
+      "noPinned": "暂无置顶消息",
+      "sharedMedia": "媒体文件",
+      "noMedia": "暂无照片或视频",
+      "loadMore": "查看更多（剩余{n}条）",
+      "sharedFiles": "文件",
+      "noFiles": "暂无共享文件",
+      "searchFiles": "搜索文件...",
+      "noFilesFound": "未找到文件",
+      "loading": "加载中...",
+      "today": "今天",
+      "yesterday": "昨天",
+      "download": "下载",
+      "close": "关闭"
+    },
+    "linkPreview": {
+      "noDescription": "无描述",
+      "visitLink": "打开链接"
+    },
     "toast": {
       "deletedForMe": "已为你删除这条消息",
       "recalled": "已为所有人删除消息",

@@ -316,6 +316,31 @@
       "themeLight": "Light",
       "counter": "{cur} / {total}"
     },
+    "conversationDetails": {
+      "title": "Conversation Details",
+      "encrypted": "End-to-end encrypted",
+      "search": "Search",
+      "searchPlaceholder": "Search messages...",
+      "noResults": "No messages found",
+      "pinnedMessages": "Pinned Messages",
+      "noPinned": "No pinned messages yet",
+      "sharedMedia": "Media",
+      "noMedia": "No photos or videos yet",
+      "loadMore": "Show more ({n} remaining)",
+      "sharedFiles": "Files",
+      "noFiles": "No shared files yet",
+      "searchFiles": "Search files...",
+      "noFilesFound": "No files found",
+      "loading": "Loading...",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "download": "Download",
+      "close": "Close"
+    },
+    "linkPreview": {
+      "noDescription": "No description",
+      "visitLink": "Open link"
+    },
     "toast": {
       "deletedForMe": "Message deleted for you",
       "recalled": "Message deleted for everyone",

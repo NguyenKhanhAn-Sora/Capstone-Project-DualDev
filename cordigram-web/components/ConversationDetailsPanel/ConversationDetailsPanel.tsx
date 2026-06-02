@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./ConversationDetailsPanel.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,25 +136,28 @@ function extractFiles(messages: DetailsPanelMessage[]): FileItem[] {
   return items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 }
 
-function formatDate(date: Date): string {
+function formatDate(date: Date, todayLabel: string, yesterdayLabel: string, lang: string): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
-  if (diff < 86400000) return "Hôm nay";
-  if (diff < 172800000) return "Hôm qua";
-  return date.toLocaleDateString("vi-VN");
+  if (diff < 86400000) return todayLabel;
+  if (diff < 172800000) return yesterdayLabel;
+  const locale = lang === "vi" ? "vi-VN" : lang === "ja" ? "ja-JP" : lang === "zh" ? "zh-CN" : "en-US";
+  return date.toLocaleDateString(locale);
 }
 
-function formatDateTime(d: Date | string): string {
+function formatDateTime(d: Date | string, lang: string): string {
   const dt = d instanceof Date ? d : new Date(d);
-  return dt.toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" });
+  const locale = lang === "vi" ? "vi-VN" : lang === "ja" ? "ja-JP" : lang === "zh" ? "zh-CN" : "en-US";
+  return dt.toLocaleString(locale, { dateStyle: "short", timeStyle: "short" });
 }
 
 function groupByDate<T extends { timestamp: Date }>(
   items: T[],
+  labelFn: (d: Date) => string = (d) => d.toLocaleDateString(),
 ): Array<{ label: string; items: T[] }> {
   const map = new Map<string, T[]>();
   for (const item of items) {
-    const label = formatDate(item.timestamp);
+    const label = labelFn(item.timestamp);
     const arr = map.get(label) ?? [];
     arr.push(item);
     map.set(label, arr);
@@ -205,6 +209,13 @@ export function ConversationDetailsPanel({
   onJumpToMessage,
   onOpenMedia,
 }: ConversationDetailsPanelProps) {
+  const { t, language } = useLanguage();
+  const cd = (key: string, vars?: Record<string, string | number>) => {
+    let s: string = (t as any)(`chat.conversationDetails.${key}`) ?? key;
+    if (vars) Object.entries(vars).forEach(([k, v]) => { s = s.replace(`{${k}}`, String(v)); });
+    return s;
+  };
+
   // ── Section open states
   const [searchOpen, setSearchOpen] = useState(true);
   const [pinnedOpen, setPinnedOpen] = useState(true);
@@ -273,7 +284,13 @@ export function ConversationDetailsPanel({
   const allMedia = useMemo(() => extractMedia(messages), [messages]);
   const [mediaPage, setMediaPage] = useState(1);
   const visibleMedia = allMedia.slice(0, mediaPage * MEDIA_PAGE_SIZE);
-  const mediaGroups = useMemo(() => groupByDate(visibleMedia), [visibleMedia]);
+  const todayLabel = cd("today");
+  const yesterdayLabel = cd("yesterday");
+  const mediaGroups = useMemo(
+    () => groupByDate(visibleMedia, (d) => formatDate(d, todayLabel, yesterdayLabel, language)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleMedia, todayLabel, yesterdayLabel, language],
+  );
 
   // ── Shared files
   const [fileSearch, setFileSearch] = useState("");
@@ -295,10 +312,10 @@ export function ConversationDetailsPanel({
   const initials = name ? name.trim().charAt(0).toUpperCase() : "?";
 
   return (
-    <aside className={`${styles.panel} ${open ? "" : styles.collapsed}`} aria-label="Chi tiết cuộc trò chuyện">
+    <aside className={`${styles.panel} ${open ? "" : styles.collapsed}`} aria-label={cd("title")}>
       {/* Header */}
       <div className={styles.panelHeader} style={{ position: "relative" }}>
-        <button type="button" className={styles.panelCloseBtn} onClick={onClose} title="Đóng">
+        <button type="button" className={styles.panelCloseBtn} onClick={onClose} title={cd("close")}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -320,7 +337,7 @@ export function ConversationDetailsPanel({
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
-          Được mã hóa đầu cuối
+          {cd("encrypted")}
         </span>
       </div>
 
@@ -329,7 +346,7 @@ export function ConversationDetailsPanel({
 
         {/* ── Search ── */}
         <div className={styles.section}>
-          <SectionToggle label="Tìm kiếm" open={searchOpen} onToggle={() => setSearchOpen((v) => !v)} />
+          <SectionToggle label={cd("search")} open={searchOpen} onToggle={() => setSearchOpen((v) => !v)} />
           {searchOpen && (
             <div className={styles.sectionContent}>
               <div className={styles.searchInputWrap}>
@@ -339,7 +356,7 @@ export function ConversationDetailsPanel({
                 <input
                   type="text"
                   className={styles.searchInput}
-                  placeholder="Tìm tin nhắn..."
+                  placeholder={cd("searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -348,7 +365,7 @@ export function ConversationDetailsPanel({
               {searchQuery.trim() && (
                 <div className={styles.searchResults}>
                   {searchResults.length === 0 ? (
-                    <p className={styles.noResults}>Không tìm thấy tin nhắn</p>
+                    <p className={styles.noResults}>{cd("noResults")}</p>
                   ) : (
                     searchResults.map((msg) => (
                       <div
@@ -377,7 +394,7 @@ export function ConversationDetailsPanel({
         {/* ── Pinned Messages ── */}
         <div className={styles.section}>
           <SectionToggle
-            label={`Tin nhắn đã ghim${pinnedItems.length > 0 ? ` (${pinnedItems.length})` : ""}`}
+            label={`${cd("pinnedMessages")}${pinnedItems.length > 0 ? ` (${pinnedItems.length})` : ""}`}
             open={pinnedOpen}
             onToggle={() => {
               setPinnedOpen((v) => !v);
@@ -389,7 +406,7 @@ export function ConversationDetailsPanel({
               {pinnedLoading ? (
                 <div className={styles.spinner}><div className={styles.spinnerDot} /></div>
               ) : pinnedItems.length === 0 ? (
-                <p className={styles.emptyNote}>Chưa có tin nhắn được ghim</p>
+                <p className={styles.emptyNote}>{cd("noPinned")}</p>
               ) : (
                 <div className={styles.pinnedList}>
                   {pinnedItems.map((item) => (
@@ -402,10 +419,10 @@ export function ConversationDetailsPanel({
                       onKeyDown={(e) => e.key === "Enter" && onJumpToMessage(item.id)}
                     >
                       <p className={styles.pinnedItemSender}>
-                        {item.senderDisplayName || item.senderName || "Người dùng"}
+                          {item.senderDisplayName || item.senderName || "—"}
                       </p>
                       <p className={styles.pinnedItemText}>{item.text.slice(0, 120)}</p>
-                      <p className={styles.pinnedItemTime}>{formatDateTime(item.timestamp)}</p>
+                      <p className={styles.pinnedItemTime}>{formatDateTime(item.timestamp, language)}</p>
                     </div>
                   ))}
                 </div>
@@ -417,14 +434,14 @@ export function ConversationDetailsPanel({
         {/* ── Shared Media ── */}
         <div className={styles.section}>
           <SectionToggle
-            label={`File phương tiện${allMedia.length > 0 ? ` (${allMedia.length})` : ""}`}
+            label={`${cd("sharedMedia")}${allMedia.length > 0 ? ` (${allMedia.length})` : ""}`}
             open={mediaOpen}
             onToggle={() => setMediaOpen((v) => !v)}
           />
           {mediaOpen && (
             <div className={styles.sectionContent}>
               {allMedia.length === 0 ? (
-                <p className={styles.emptyNote}>Chưa có ảnh hoặc video nào</p>
+                <p className={styles.emptyNote}>{cd("noMedia")}</p>
               ) : (
                 <>
                   <div className={styles.mediaGrid}>
@@ -439,7 +456,7 @@ export function ConversationDetailsPanel({
                             role="button"
                             tabIndex={0}
                             onKeyDown={(e) => e.key === "Enter" && onOpenMedia(item.url)}
-                            title={item.type === "video" ? "Mở video" : "Mở ảnh"}
+                            title={cd(item.type === "video" ? "sharedMedia" : "sharedMedia")}
                           >
                             {item.type === "image" ? (
                               <img src={item.url} alt="" loading="lazy" />
@@ -470,7 +487,7 @@ export function ConversationDetailsPanel({
                       className={styles.loadMoreBtn}
                       onClick={() => setMediaPage((p) => p + 1)}
                     >
-                      Xem thêm ({allMedia.length - visibleMedia.length} ảnh/video còn lại)
+                      {cd("loadMore", { n: allMedia.length - visibleMedia.length })}
                     </button>
                   )}
                 </>
@@ -482,7 +499,7 @@ export function ConversationDetailsPanel({
         {/* ── Shared Files ── */}
         <div className={styles.section}>
           <SectionToggle
-            label={`File${allFiles.length > 0 ? ` (${allFiles.length})` : ""}`}
+            label={`${cd("sharedFiles")}${allFiles.length > 0 ? ` (${allFiles.length})` : ""}`}
             open={filesOpen}
             onToggle={() => setFilesOpen((v) => !v)}
           />
@@ -496,7 +513,7 @@ export function ConversationDetailsPanel({
                   <input
                     type="text"
                     className={styles.searchInput}
-                    placeholder="Tìm file..."
+                    placeholder={cd("searchFiles")}
                     value={fileSearch}
                     onChange={(e) => setFileSearch(e.target.value)}
                   />
@@ -505,7 +522,7 @@ export function ConversationDetailsPanel({
 
               {filteredFiles.length === 0 ? (
                 <p className={styles.emptyNote}>
-                  {fileSearch.trim() ? "Không tìm thấy file" : "Chưa có file nào được chia sẻ"}
+                  {fileSearch.trim() ? cd("noFilesFound") : cd("noFiles")}
                 </p>
               ) : (
                 <div className={styles.fileList}>
@@ -517,7 +534,7 @@ export function ConversationDetailsPanel({
                       </svg>
                       <div className={styles.fileInfo}>
                         <p className={styles.fileName}>{file.name}</p>
-                        <p className={styles.fileDate}>{formatDateTime(file.timestamp)}</p>
+                        <p className={styles.fileDate}>{formatDateTime(file.timestamp, language)}</p>
                       </div>
                       <a
                         href={file.url}
@@ -525,7 +542,7 @@ export function ConversationDetailsPanel({
                         target="_blank"
                         rel="noopener noreferrer"
                         className={styles.fileDownloadBtn}
-                        title="Tải xuống"
+                        title={cd("download")}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -316,6 +316,31 @@
       "themeLight": "Sáng",
       "counter": "{cur} / {total}"
     },
+    "conversationDetails": {
+      "title": "Chi tiết cuộc trò chuyện",
+      "encrypted": "Được mã hóa đầu cuối",
+      "search": "Tìm kiếm",
+      "searchPlaceholder": "Tìm tin nhắn...",
+      "noResults": "Không tìm thấy tin nhắn",
+      "pinnedMessages": "Tin nhắn đã ghim",
+      "noPinned": "Chưa có tin nhắn được ghim",
+      "sharedMedia": "File phương tiện",
+      "noMedia": "Chưa có ảnh hoặc video nào",
+      "loadMore": "Xem thêm ({n} còn lại)",
+      "sharedFiles": "File",
+      "noFiles": "Chưa có file nào được chia sẻ",
+      "searchFiles": "Tìm file...",
+      "noFilesFound": "Không tìm thấy file",
+      "loading": "Đang tải...",
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua",
+      "download": "Tải xuống",
+      "close": "Đóng"
+    },
+    "linkPreview": {
+      "noDescription": "Không có mô tả",
+      "visitLink": "Mở liên kết"
+    },
     "toast": {
       "deletedForMe": "Bạn đã xóa một tin nhắn",
       "recalled": "Đã xóa tin nhắn với mọi người",

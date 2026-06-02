@@ -21,7 +21,9 @@ import 'widgets/gif_toolbar_icon.dart';
 import 'widgets/sticker_toolbar_icon.dart';
 import 'widgets/dm_call_message_card.dart';
 import 'widgets/dm_giphy_message.dart';
+import 'widgets/conversation_details_sheet.dart';
 import 'widgets/dm_peer_profile_sheet.dart';
+import 'widgets/link_preview_card.dart';
 import 'widgets/report_dm_message_sheet.dart';
 import 'widgets/server_join_flow.dart';
 import 'widgets/messages_chrome_builder.dart';
@@ -1237,6 +1239,27 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     }
   }
 
+  void _openConversationDetails() {
+    final messages = widget.controller.liveMessages(widget.thread.id);
+    ConversationDetailsSheet.show(
+      context,
+      peerUserId: widget.thread.id,
+      peerName: widget.thread.name,
+      peerAvatarUrl: widget.thread.avatarUrl,
+      messages: messages,
+      onJumpToMessage: (_) {
+        // Dismiss sheet — actual scroll-to-message can be wired to a
+        // GlobalKey<AnimatedListState> in a future iteration.
+      },
+      onOpenMediaViewer: (cdsItems, index) {
+        final mapped = cdsItems
+            .map((i) => _MediaItem(url: i.url, isVideo: i.isVideo))
+            .toList();
+        _openMediaViewer(context, mapped, index);
+      },
+    );
+  }
+
   Future<void> _showHamburgerMenu() async {
     await showDialog<void>(
       context: context,
@@ -1965,6 +1988,18 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       );
     }
 
+    // Plain text — show link preview if a URL is detected
+    final previewUrl = extractFirstUrl(text);
+    if (previewUrl != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildEmojiAwareText(text),
+          LinkPreviewCard(url: previewUrl),
+        ],
+      );
+    }
     return _buildEmojiAwareText(text);
   }
 
@@ -2055,6 +2090,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                 fallbackAvatarUrl: widget.thread.avatarUrl,
               );
             },
+          ),
+          _TopActionIcon(
+            icon: Icons.info_outline_rounded,
+            onTap: _openConversationDetails,
           ),
           _TopActionIcon(
             icon: Icons.search_rounded,

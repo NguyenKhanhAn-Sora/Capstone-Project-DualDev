@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
+import { LinkPreviewCard, extractFirstUrl } from "@/components/LinkPreviewCard/LinkPreviewCard";
+import { apiBaseUrl } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
 import {
@@ -7708,23 +7710,29 @@ export default function MessagesPage() {
       if (last < text.length) {
         nodes.push(<span key="tail">{text.slice(last)}</span>);
       }
+      const previewUrl = extractFirstUrl(text);
       return (
-        <span
-          style={{
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            ...(isJumboEmojiRow
-              ? {
-                  display: "inline-flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: 6,
-                }
-              : {}),
-          }}
-        >
-          {nodes}
-        </span>
+        <div style={{ display: "contents" }}>
+          <span
+            style={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              ...(isJumboEmojiRow
+                ? {
+                    display: "inline-flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 6,
+                  }
+                : {}),
+            }}
+          >
+            {nodes}
+          </span>
+          {previewUrl && (
+            <LinkPreviewCard url={previewUrl} apiBase={apiBaseUrl} token={token} />
+          )}
+        </div>
       );
     },
     [

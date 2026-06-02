@@ -42,6 +42,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
 import { BoostModule } from './boost/boost.module';
 import { MessagingProfilesModule } from './messaging-profiles/messaging-profiles.module';
 import { AppUpdateModule } from './app-update/app-update.module';
+import { LinkPreviewModule } from './link-preview/link-preview.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { AppUpdateModule } from './app-update/app-update.module';
     BoostModule,
     MessagingProfilesModule,
     AppUpdateModule,
+    LinkPreviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],
