@@ -7,6 +7,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
 import { LinkPreviewCard } from "@/components/LinkPreviewCard/LinkPreviewCard";
+import { apiBaseUrl } from "@/lib/api";
+import { extractFirstUrl } from "@/components/LinkPreviewCard/LinkPreviewCard";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
 import {
@@ -7725,50 +7727,47 @@ export default function MessagesPage() {
       if (last < text.length) {
         nodes.push(<span key="tail">{text.slice(last)}</span>);
       }
-      const previews = Array.isArray(message.linkPreviews) && message.linkPreviews.length > 0
-        ? message.linkPreviews
-        : null;
+      const storedPreviews =
+        Array.isArray(message.linkPreviews) && message.linkPreviews.length > 0
+          ? message.linkPreviews
+          : null;
 
-      if (!previews) {
-        return (
-          <span
-            style={{
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              ...(isJumboEmojiRow
-                ? {
-                    display: "inline-flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: 6,
-                  }
-                : {}),
-            }}
-          >
-            {nodes}
-          </span>
-        );
+      // Fallback for messages sent before the server-side pre-fetch feature
+      const fallbackUrl = !storedPreviews ? (extractFirstUrl(text) ?? undefined) : undefined;
+      const hasPreviewData = storedPreviews || fallbackUrl;
+
+      const textSpan = (
+        <span
+          style={{
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            ...(isJumboEmojiRow
+              ? {
+                  display: "inline-flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 6,
+                }
+              : {}),
+          }}
+        >
+          {nodes}
+        </span>
+      );
+
+      if (!hasPreviewData) {
+        return textSpan;
       }
 
       return (
         <div>
-          <span
-            style={{
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              ...(isJumboEmojiRow
-                ? {
-                    display: "inline-flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: 6,
-                  }
-                : {}),
-            }}
-          >
-            {nodes}
-          </span>
-          <LinkPreviewCard previews={previews} />
+          {textSpan}
+          <LinkPreviewCard
+            previews={storedPreviews ?? []}
+            fallbackUrl={fallbackUrl}
+            apiBase={apiBaseUrl}
+            token={token}
+          />
         </div>
       );
     },
