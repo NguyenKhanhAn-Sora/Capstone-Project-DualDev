@@ -7046,26 +7046,30 @@ export default function MessagesPage() {
 
   const openMediaViewer = useCallback(
     (clickedUrl: string) => {
-      const IMAGE_RE_G = /📷 \[Image\]: (https?:\/\/[^\s]+)/g;
-      const allImages: ChatMediaItem[] = [];
+      const IMAGE_RE = /📷 \[Image\]: (https?:\/\/[^\s]+)/g;
+      const VIDEO_RE = /🎬 \[Video\]: (https?:\/\/[^\s]+)/;
+      const allMedia: ChatMediaItem[] = [];
       let clickedIndex = 0;
       for (const msg of messages) {
         const text = msg.text || "";
-        const matches = [...text.matchAll(IMAGE_RE_G)];
-        for (const match of matches) {
+        const ts = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp);
+        const sender = msg.senderDisplayName || msg.senderName;
+        // collect images
+        for (const match of text.matchAll(IMAGE_RE)) {
           const url = match[1];
-          allImages.push({
-            url,
-            timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
-            senderName: msg.senderDisplayName || msg.senderName,
-          });
-          if (url === clickedUrl) {
-            clickedIndex = allImages.length - 1;
-          }
+          allMedia.push({ url, mediaType: "image", timestamp: ts, senderName: sender });
+          if (url === clickedUrl) clickedIndex = allMedia.length - 1;
+        }
+        // collect video
+        const vMatch = text.match(VIDEO_RE);
+        if (vMatch) {
+          const url = vMatch[1];
+          allMedia.push({ url, mediaType: "video", timestamp: ts, senderName: sender });
+          if (url === clickedUrl) clickedIndex = allMedia.length - 1;
         }
       }
-      if (allImages.length === 0) return;
-      setMediaViewerState({ items: allImages, index: clickedIndex });
+      if (allMedia.length === 0) return;
+      setMediaViewerState({ items: allMedia, index: clickedIndex });
     },
     [messages],
   );
@@ -7376,6 +7380,7 @@ export default function MessagesPage() {
                   src={imageUrls[0]}
                   alt="Ảnh được chia sẻ"
                   className={styles.messageImage}
+                  style={{ cursor: "pointer" }}
                   onClick={() => openMediaViewer(imageUrls[0])}
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
@@ -7435,14 +7440,16 @@ export default function MessagesPage() {
       }
 
       if (videoMatch) {
-        const videoUrl = optimizeHeavyVideoUrl(videoMatch[1]);
+        const rawVideoUrl = videoMatch[1];
+        const videoUrl = optimizeHeavyVideoUrl(rawVideoUrl);
         return (
-          <div className={styles.mediaMessage}>
+          <div className={styles.mediaMessage} style={{ position: "relative" }}>
             <LazyInViewVideo
               src={videoUrl}
               className={styles.messageVideo}
               preload={boostVideoOptimizationEnabled ? "none" : "metadata"}
               playsInline
+              controls
               onError={(e) => {
                 e.currentTarget.style.display = "none";
                 e.currentTarget.nextElementSibling?.classList.remove(
@@ -7450,6 +7457,32 @@ export default function MessagesPage() {
                 );
               }}
             />
+            {/* Fullscreen button overlay */}
+            <button
+              aria-label="Xem toàn màn hình"
+              title="Xem toàn màn hình"
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                background: "rgba(0,0,0,0.55)",
+                border: "none",
+                borderRadius: "50%",
+                width: 32,
+                height: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "#fff",
+                zIndex: 2,
+              }}
+              onClick={() => openMediaViewer(rawVideoUrl)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+              </svg>
+            </button>
             <span
               className={styles.hidden}
               style={{ fontSize: "12px", color: "var(--color-text-muted)" }}
