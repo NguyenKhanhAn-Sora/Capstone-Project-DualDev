@@ -4881,6 +4881,7 @@ export default function MessagesPage() {
         ),
         isDeletedForEveryone: (msg as serversApi.Message).isDeleted === true,
         deletedAt: (msg as serversApi.Message).deletedAt || undefined,
+        attachments: Array.isArray((msg as any).attachments) ? (msg as any).attachments : undefined,
       }));
 
       setMessages(sortServerMessagesAscending(uiMessages));

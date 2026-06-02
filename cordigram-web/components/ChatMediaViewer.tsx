@@ -193,7 +193,10 @@ export default function ChatMediaViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, language]);
 
-  if (!current) return null;
+  // Don't render anything until client-side mount so we can use createPortal safely.
+  // Rendering inline (non-portal) with position:fixed can get clipped when any
+  // ancestor has `transform` / `will-change` / `filter` applied (common in chat UIs).
+  if (!mounted || !current) return null;
 
   const isVideo = current.mediaType === "video";
   const textColor = THEME_TEXT_COLOR[theme];
@@ -483,8 +486,5 @@ export default function ChatMediaViewer({
     </div>
   );
 
-  if (mounted && typeof document !== "undefined") {
-    return createPortal(overlay, document.body);
-  }
-  return overlay;
+  return createPortal(overlay, document.body);
 }
