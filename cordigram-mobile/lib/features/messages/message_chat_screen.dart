@@ -1817,6 +1817,22 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     return RichText(text: TextSpan(children: spans));
   }
 
+  void _openMediaViewer(BuildContext ctx, List<_MediaItem> items, int initialIndex) {
+    Navigator.of(ctx).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        pageBuilder: (_, __, ___) => _MediaViewerScreen(
+          items: items,
+          initialIndex: initialIndex,
+        ),
+        transitionsBuilder: (_, animation, __, child) => FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageContent(DmMessage message) {
     if ((message.type == 'gif' || message.type == 'sticker') &&
         (message.giphyId ?? '').isNotEmpty) {
@@ -1861,21 +1877,74 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     }
 
     if (text.startsWith('📷 [Image]:') || text.startsWith('🎬 [Video]:')) {
+      final isVideo = text.startsWith('🎬 [Video]:');
+      final rawUrl = text.substring(text.indexOf(':') + 1).trim();
       final mediaUrl = MessagesMediaService.optimizeHeavyVideoUrl(
-        text.substring(text.indexOf(':') + 1).trim(),
+        rawUrl.startsWith('http://') ? 'https://${rawUrl.substring(7)}' : rawUrl,
       );
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          mediaUrl,
-          width: 220,
-          height: 160,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.low,
-          cacheWidth: 660,
-          cacheHeight: 480,
-          errorBuilder: (_, __, ___) =>
-              Text(text, style: const TextStyle(color: Colors.white)),
+
+      // Collect all media items from this conversation for gallery navigation
+      final allMessages = widget.controller.liveMessages(widget.thread.id);
+      final mediaItems = <_MediaItem>[];
+      int initialIndex = 0;
+      for (final msg in allMessages) {
+        final t = _normalizedText(msg).trim();
+        if (t.startsWith('📷 [Image]:') || t.startsWith('🎬 [Video]:')) {
+          final u = t.substring(t.indexOf(':') + 1).trim();
+          final safeU = u.startsWith('http://') ? 'https://${u.substring(7)}' : u;
+          final isVid = t.startsWith('🎬 [Video]:');
+          final optimized = MessagesMediaService.optimizeHeavyVideoUrl(safeU);
+          if (optimized == mediaUrl) initialIndex = mediaItems.length;
+          mediaItems.add(_MediaItem(url: optimized, isVideo: isVid));
+        }
+        // Handle raw attachments
+        for (final att in msg.attachments) {
+          final a = att.trim();
+          if (a.isEmpty) continue;
+          final safeA = a.startsWith('http://') ? 'https://${a.substring(7)}' : a;
+          final isVid = safeA.endsWith('.mp4') || safeA.endsWith('.webm') || safeA.endsWith('.mov');
+          if (safeA == mediaUrl) initialIndex = mediaItems.length;
+          mediaItems.add(_MediaItem(url: safeA, isVideo: isVid));
+        }
+      }
+      if (mediaItems.isEmpty) {
+        mediaItems.add(_MediaItem(url: mediaUrl, isVideo: isVideo));
+        initialIndex = 0;
+      }
+
+      return GestureDetector(
+        onTap: () => _openMediaViewer(context, mediaItems, initialIndex),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            children: [
+              Image.network(
+                mediaUrl,
+                width: 220,
+                height: 160,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.low,
+                cacheWidth: 660,
+                cacheHeight: 480,
+                errorBuilder: (_, __, ___) =>
+                    Container(
+                      width: 220,
+                      height: 160,
+                      color: const Color(0xFF1A2340),
+                      child: const Icon(Icons.broken_image_rounded, color: Colors.white54),
+                    ),
+              ),
+              if (isVideo)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black26,
+                    child: const Center(
+                      child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 44),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       );
     }
@@ -3252,6 +3321,255 @@ class _PollMessageCardState extends State<_PollMessageCard> {
     );
   }
 }
+
+// ── Media Viewer ─────────────────────────────────────────────────────────────
+
+class _MediaItem {
+  const _MediaItem({required this.url, required this.isVideo});
+  final String url;
+  final bool isVideo;
+}
+
+class _MediaViewerScreen extends StatefulWidget {
+  const _MediaViewerScreen({required this.items, required this.initialIndex});
+
+  final List<_MediaItem> items;
+  final int initialIndex;
+
+  @override
+  State<_MediaViewerScreen> createState() => _MediaViewerScreenState();
+}
+
+class _MediaViewerScreenState extends State<_MediaViewerScreen> {
+  late final PageController _pageController;
+  late int _currentIndex;
+  bool _uiVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _toggleUi() => setState(() => _uiVisible = !_uiVisible);
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.items[_currentIndex];
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // ── Paged media content ──
+          PageView.builder(
+            controller: _pageController,
+            itemCount: widget.items.length,
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            itemBuilder: (ctx, i) {
+              final m = widget.items[i];
+              return GestureDetector(
+                onTap: _toggleUi,
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 6.0,
+                  child: Center(
+                    child: m.isVideo
+                        ? _VideoThumbCard(url: m.url)
+                        : Image.network(
+                            m.url,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (_, child, progress) {
+                              if (progress == null) return child;
+                              return const Center(
+                                child: CircularProgressIndicator(color: Colors.white54),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.broken_image_rounded,
+                              color: Colors.white38,
+                              size: 64,
+                            ),
+                          ),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // ── Top bar ──
+          if (_uiVisible)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black87, Colors.transparent],
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${_currentIndex + 1} / ${widget.items.length}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                      const SizedBox(width: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Prev / Next navigation arrows ──
+          if (_uiVisible && widget.items.length > 1) ...[
+            if (_currentIndex > 0)
+              Positioned(
+                left: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: _NavArrow(
+                    icon: Icons.chevron_left_rounded,
+                    onTap: () => _pageController.previousPage(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                    ),
+                  ),
+                ),
+              ),
+            if (_currentIndex < widget.items.length - 1)
+              Positioned(
+                right: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: _NavArrow(
+                    icon: Icons.chevron_right_rounded,
+                    onTap: () => _pageController.nextPage(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+
+          // ── Bottom bar: media type indicator ──
+          if (_uiVisible)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Colors.black87, Colors.transparent],
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          item.isVideo
+                              ? Icons.videocam_rounded
+                              : Icons.photo_rounded,
+                          color: Colors.white54,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          item.isVideo ? 'Video' : 'Ảnh',
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavArrow extends StatelessWidget {
+  const _NavArrow({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
+}
+
+class _VideoThumbCard extends StatelessWidget {
+  const _VideoThumbCard({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 280,
+          height: 200,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A2340),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Center(
+            child: Icon(Icons.videocam_rounded, color: Colors.white54, size: 64),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Video không hỗ trợ xem trực tiếp',
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _TopActionIcon extends StatelessWidget {
   const _TopActionIcon({required this.icon, required this.onTap});

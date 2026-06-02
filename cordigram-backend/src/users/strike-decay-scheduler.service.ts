@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { Job, Queue, Worker } from 'bullmq';
-import IORedis from 'ioredis';
+import { RedisService } from '../redis/redis.service';
 import { UsersService } from './users.service';
 
 type StrikeDecayJobData = {
@@ -21,11 +21,13 @@ export class StrikeDecaySchedulerService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(StrikeDecaySchedulerService.name);
-  private connection?: IORedis;
   private queue?: Queue<StrikeDecayJobData>;
   private worker?: Worker<StrikeDecayJobData>;
 
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async onModuleInit() {
     this.initQueue();
@@ -35,20 +37,13 @@ export class StrikeDecaySchedulerService
   async onModuleDestroy() {
     await this.worker?.close();
     await this.queue?.close();
-    await this.connection?.quit();
   }
 
   private initQueue() {
     if (this.queue || this.worker) return;
 
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    this.connection = new IORedis(redisUrl, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    });
-
     this.queue = new Queue<StrikeDecayJobData>(QUEUE_NAME, {
-      connection: this.connection,
+      connection: this.redisService.queueConnection,
       defaultJobOptions: {
         removeOnComplete: true,
         removeOnFail: true,
@@ -59,7 +54,7 @@ export class StrikeDecaySchedulerService
       QUEUE_NAME,
       async (job) => this.handleSweep(job),
       {
-        connection: this.connection,
+        connection: this.redisService.workerConnection,
       },
     );
 

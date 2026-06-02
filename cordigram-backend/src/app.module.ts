@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
+import { RedisModule } from './redis/redis.module';
 import { MailModule } from './mail/mail.module';
 import { OtpModule } from './otp/otp.module';
 import { UsersModule } from './users/users.module';
@@ -45,6 +46,7 @@ import { AppUpdateModule } from './app-update/app-update.module';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    RedisModule,
     ConfigModule,
     DatabaseModule,
     MailModule,

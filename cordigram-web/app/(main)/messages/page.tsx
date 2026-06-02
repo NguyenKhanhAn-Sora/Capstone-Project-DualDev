@@ -155,6 +155,7 @@ import { formatDmPresenceLabel, resolvePresenceStatus } from "@/lib/dm-presence-
 import { buildServerEmojiRenderMapFromPickerGroups } from "@/lib/server-emoji-render";
 import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
 import ChatMediaViewer, { type ChatMediaItem } from "@/components/ChatMediaViewer";
+import { ConversationDetailsPanel, type DetailsPanelMessage, type DetailsPanelPinnedItem } from "@/components/ConversationDetailsPanel/ConversationDetailsPanel";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
 const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
@@ -1970,6 +1971,7 @@ export default function MessagesPage() {
   const [noticePopupMessage, setNoticePopupMessage] = useState<string | null>(
     null,
   );
+  const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
   const [pinnedModalOpen, setPinnedModalOpen] = useState(false);
   const [pinnedModalLoading, setPinnedModalLoading] = useState(false);
   const [pinnedModalTitle, setPinnedModalTitle] = useState("Tin nhắn đã ghim");
@@ -5359,6 +5361,34 @@ export default function MessagesPage() {
     }
   };
 
+  /** Loader for ConversationDetailsPanel pinned messages section */
+  const loadPinnedMessagesForPanel = useCallback(async (): Promise<DetailsPanelPinnedItem[]> => {
+    try {
+      if (selectedDirectMessageFriend) {
+        const raw = await getPinnedMessages(selectedDirectMessageFriend._id, { token });
+        return (Array.isArray(raw) ? raw : []).map((msg: any) => ({
+          id: String(msg._id),
+          text: msg.content ?? "",
+          senderDisplayName: msg.senderId?.displayName || undefined,
+          senderName: msg.senderId?.username || msg.senderId?.email || "",
+          timestamp: new Date(msg.createdAt),
+        }));
+      } else if (selectedChannel) {
+        const raw = await serversApi.getPinnedChannelMessages(selectedChannel);
+        return raw.map((msg: serversApi.Message) => ({
+          id: msg._id,
+          text: msg.content,
+          senderDisplayName: typeof msg.senderId === "string" ? undefined : (msg.senderId as any).displayName || undefined,
+          senderName: typeof msg.senderId === "string" ? "" : (msg.senderId as any).username || (msg.senderId as any).email || "",
+          timestamp: new Date(msg.createdAt),
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }, [selectedDirectMessageFriend, selectedChannel, token]);
+
   // Handler for pinning messages
   const handlePinMessage = async (messageId: string) => {
     try {
@@ -7113,6 +7143,22 @@ export default function MessagesPage() {
     },
     [messages, conversations, selectedDirectMessageFriend],
   );
+
+  /** Messages fed to ConversationDetailsPanel — pick from correct source (DM or channel) */
+  const detailsPanelMessages = useMemo((): DetailsPanelMessage[] => {
+    const source: UIMessage[] = selectedDirectMessageFriend
+      ? (conversations.get(selectedDirectMessageFriend._id) || [])
+      : messages;
+    return source.map((m) => ({
+      id: m.id,
+      text: m.text || "",
+      senderId: m.senderId,
+      senderDisplayName: m.senderDisplayName,
+      senderName: m.senderName,
+      timestamp: m.timestamp,
+      attachments: m.attachments,
+    }));
+  }, [selectedDirectMessageFriend, conversations, messages]);
 
   const renderMessageContent = useCallback(
     (message: UIMessage) => {
@@ -10721,14 +10767,14 @@ export default function MessagesPage() {
                     </button>
                     <button
                       type="button"
-                      title="Tin nhắn đã ghim"
-                      aria-label="Tin nhắn đã ghim"
-                      onClick={() => void openPinnedMessagesModal()}
+                      title="Chi tiết cuộc trò chuyện"
+                      aria-label="Chi tiết cuộc trò chuyện"
+                      onClick={() => setDetailsPanelOpen((v) => !v)}
+                      style={detailsPanelOpen ? { background: "var(--color-surface-muted)", color: "var(--color-text)" } : undefined}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 17v5" />
-                        <path d="M5 9V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v5" />
-                        <path d="M6 9h12l-3 7H9L6 9Z" />
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
                       </svg>
                     </button>
                   </div>
@@ -11864,6 +11910,28 @@ export default function MessagesPage() {
                 <span>{t("chat.profile.title")}</span>
               </button>
             )
+          )}
+
+          {/* Conversation Details Panel — right sidebar for DM and channel chat */}
+          {(selectedDirectMessageFriend || (selectedChatTextChannel && !viewingVoiceChannel)) && (
+            <ConversationDetailsPanel
+              open={detailsPanelOpen}
+              onClose={() => setDetailsPanelOpen(false)}
+              type={selectedDirectMessageFriend ? "dm" : "channel"}
+              name={
+                selectedDirectMessageFriend
+                  ? (selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username)
+                  : `#${translateChannelName(allChannels.find((c) => c._id === selectedChannel)?.name ?? "channel", language)}`
+              }
+              avatarUrl={selectedDirectMessageFriend?.avatarUrl}
+              messages={detailsPanelMessages}
+              loadPinnedMessages={loadPinnedMessagesForPanel}
+              onJumpToMessage={(id) => {
+                setDetailsPanelOpen(false);
+                setTimeout(() => scrollToMessageBubble(id), 80);
+              }}
+              onOpenMedia={(url) => openMediaViewer(url)}
+            />
           )}
         </div>
       </div>

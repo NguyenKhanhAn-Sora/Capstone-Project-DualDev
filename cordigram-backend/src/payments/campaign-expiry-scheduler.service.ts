@@ -7,7 +7,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Job, Queue, Worker } from 'bullmq';
-import IORedis from 'ioredis';
+import { RedisService } from '../redis/redis.service';
 import { PaymentTransaction } from './payment-transaction.schema';
 
 type ExpireCampaignJobData = {
@@ -21,13 +21,13 @@ export class CampaignExpirySchedulerService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(CampaignExpirySchedulerService.name);
-  private connection?: IORedis;
   private queue?: Queue<ExpireCampaignJobData>;
   private worker?: Worker<ExpireCampaignJobData>;
 
   constructor(
     @InjectModel(PaymentTransaction.name)
     private readonly paymentTransactions: Model<PaymentTransaction>,
+    private readonly redisService: RedisService,
   ) {}
 
   async onModuleInit() {
@@ -38,7 +38,6 @@ export class CampaignExpirySchedulerService
   async onModuleDestroy() {
     await this.worker?.close();
     await this.queue?.close();
-    await this.connection?.quit();
   }
 
   async syncCampaignExpiry(params: {
@@ -108,14 +107,8 @@ export class CampaignExpirySchedulerService
   private initQueue() {
     if (this.queue || this.worker) return;
 
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    this.connection = new IORedis(redisUrl, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    });
-
     this.queue = new Queue<ExpireCampaignJobData>(QUEUE_NAME, {
-      connection: this.connection,
+      connection: this.redisService.queueConnection,
       defaultJobOptions: {
         removeOnComplete: true,
         removeOnFail: true,
@@ -126,7 +119,7 @@ export class CampaignExpirySchedulerService
       QUEUE_NAME,
       async (job) => this.handleExpireCampaign(job),
       {
-        connection: this.connection,
+        connection: this.redisService.workerConnection,
       },
     );
 

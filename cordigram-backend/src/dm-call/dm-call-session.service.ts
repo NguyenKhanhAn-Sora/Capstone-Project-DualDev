@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import IORedis from 'ioredis';
+import { RedisService } from '../redis/redis.service';
 import {
   DM_CALL_CONNECTED_TTL_SEC,
   DM_CALL_RING_TTL_SEC,
@@ -22,33 +23,19 @@ const ACTIVE_STATES: DmCallState[] = [
 @Injectable()
 export class DmCallSessionService implements OnModuleDestroy {
   private readonly logger = new Logger(DmCallSessionService.name);
-  private redis: IORedis | null = null;
+  private readonly redis: IORedis | null;
   private readonly memorySessions = new Map<string, DmCallSessionRecord>();
   private readonly memoryUserCall = new Map<string, string>();
   private readonly ringTimers = new Map<string, NodeJS.Timeout>();
   /** Prevents duplicate Mongo call-log writes for the same callId. */
   private readonly persistedCallIds = new Set<string>();
 
-  constructor() {
-    const url = process.env.REDIS_URL?.trim();
-    if (url) {
-      try {
-        this.redis = new IORedis(url, {
-          maxRetriesPerRequest: 2,
-          enableReadyCheck: true,
-          lazyConnect: true,
-        });
-        void this.redis.connect().catch((err) => {
-          this.logger.warn(
-            `Redis unavailable for DM calls, using in-memory fallback: ${err}`,
-          );
-          this.redis = null;
-        });
-      } catch (err) {
-        this.logger.warn(`Redis init failed, in-memory fallback: ${err}`);
-        this.redis = null;
-      }
-    } else {
+  constructor(private readonly redisService: RedisService) {
+    // Reuse the shared queue connection — avoids adding a new connection slot
+    this.redis = process.env.REDIS_URL?.trim()
+      ? redisService.queueConnection
+      : null;
+    if (!this.redis) {
       this.logger.warn(
         'REDIS_URL not set — DM call sessions are process-local only',
       );
@@ -58,7 +45,7 @@ export class DmCallSessionService implements OnModuleDestroy {
   onModuleDestroy(): void {
     for (const t of this.ringTimers.values()) clearTimeout(t);
     this.ringTimers.clear();
-    void this.redis?.quit();
+    // Do NOT quit — connection is owned by RedisService
   }
 
   pairKey(userA: string, userB: string): string {

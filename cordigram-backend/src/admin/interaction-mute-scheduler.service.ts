@@ -7,7 +7,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Job, Queue, Worker } from 'bullmq';
-import IORedis from 'ioredis';
+import { RedisService } from '../redis/redis.service';
 import { User } from '../users/user.schema';
 
 type UnmuteJobData = {
@@ -21,12 +21,12 @@ export class InteractionMuteSchedulerService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(InteractionMuteSchedulerService.name);
-  private connection?: IORedis;
   private queue?: Queue<UnmuteJobData>;
   private worker?: Worker<UnmuteJobData>;
 
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    private readonly redisService: RedisService,
   ) {}
 
   onModuleInit() {
@@ -36,7 +36,6 @@ export class InteractionMuteSchedulerService
   async onModuleDestroy() {
     await this.worker?.close();
     await this.queue?.close();
-    await this.connection?.quit();
   }
 
   async scheduleUnmute(userId: string, expiresAt: Date) {
@@ -60,14 +59,8 @@ export class InteractionMuteSchedulerService
   private initQueue() {
     if (this.queue || this.worker) return;
 
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    this.connection = new IORedis(redisUrl, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    });
-
     this.queue = new Queue<UnmuteJobData>(QUEUE_NAME, {
-      connection: this.connection,
+      connection: this.redisService.queueConnection,
       defaultJobOptions: {
         removeOnComplete: true,
         removeOnFail: true,
@@ -78,7 +71,7 @@ export class InteractionMuteSchedulerService
       QUEUE_NAME,
       async (job) => this.handleUnmute(job),
       {
-        connection: this.connection,
+        connection: this.redisService.workerConnection,
       },
     );
 

@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { Job, Queue, Worker } from 'bullmq';
-import IORedis from 'ioredis';
+import { RedisService } from '../redis/redis.service';
 import { CaptionService } from './caption.service';
 
 type CaptionJobData = {
@@ -18,11 +18,13 @@ const QUEUE_NAME = 'caption-generate';
 @Injectable()
 export class CaptionQueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CaptionQueueService.name);
-  private connection?: IORedis;
   private queue?: Queue<CaptionJobData>;
   private worker?: Worker<CaptionJobData>;
 
-  constructor(private readonly captionService: CaptionService) {}
+  constructor(
+    private readonly captionService: CaptionService,
+    private readonly redisService: RedisService,
+  ) {}
 
   onModuleInit() {
     this.initQueue();
@@ -31,7 +33,6 @@ export class CaptionQueueService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     await this.worker?.close();
     await this.queue?.close();
-    await this.connection?.quit();
   }
 
   async enqueue(postId: string, mediaIndex: number): Promise<void> {
@@ -52,21 +53,15 @@ export class CaptionQueueService implements OnModuleInit, OnModuleDestroy {
   private initQueue() {
     if (this.queue || this.worker) return;
 
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    this.connection = new IORedis(redisUrl, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    });
-
     this.queue = new Queue<CaptionJobData>(QUEUE_NAME, {
-      connection: this.connection,
+      connection: this.redisService.queueConnection,
       defaultJobOptions: { removeOnComplete: true, removeOnFail: true },
     });
 
     this.worker = new Worker<CaptionJobData>(
       QUEUE_NAME,
       async (job) => this.handleJob(job),
-      { connection: this.connection },
+      { connection: this.redisService.workerConnection },
     );
 
     this.worker.on('failed', (job, err) => {

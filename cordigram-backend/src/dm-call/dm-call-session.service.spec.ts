@@ -1,9 +1,14 @@
 import { DmCallSessionService } from './dm-call-session.service';
+import { RedisService } from '../redis/redis.service';
+
+/** Minimal mock — REDIS_URL is not set in tests so redis is null (in-memory mode). */
+const mockRedisService = { queueConnection: null, workerConnection: null } as unknown as RedisService;
+
 describe('DmCallSessionService (in-memory)', () => {
   let service: DmCallSessionService;
 
   beforeEach(() => {
-    service = new DmCallSessionService();
+    service = new DmCallSessionService(mockRedisService);
   });
 
   it('blocks peer_busy when callee is in another call', async () => {
