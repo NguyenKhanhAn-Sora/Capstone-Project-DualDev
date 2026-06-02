@@ -7065,6 +7065,12 @@ export default function MessagesPage() {
       const allMedia: ChatMediaItem[] = [];
       let clickedIndex = 0;
 
+      // DM messages live in the `conversations` Map; server-channel messages live in `messages`.
+      // Always pick the correct source to avoid showing images from the wrong context.
+      const sourceMessages: UIMessage[] = selectedDirectMessageFriend
+        ? (conversations.get(selectedDirectMessageFriend._id) || [])
+        : messages;
+
       const pushMedia = (url: string, mediaType: "image" | "video", ts: Date, sender?: string) => {
         const safeUrl = toHttps(url);
         // deduplicate (compare after normalizing to https)
@@ -7074,7 +7080,7 @@ export default function MessagesPage() {
         if (safeUrl === toHttps(clickedUrl)) clickedIndex = allMedia.length - 1;
       };
 
-      for (const msg of messages) {
+      for (const msg of sourceMessages) {
         const text = msg.text || "";
         const ts = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp);
         const sender = msg.senderDisplayName || msg.senderName;
@@ -7105,7 +7111,7 @@ export default function MessagesPage() {
       if (allMedia.length === 0) return;
       setMediaViewerState({ items: allMedia, index: clickedIndex });
     },
-    [messages],
+    [messages, conversations, selectedDirectMessageFriend],
   );
 
   const renderMessageContent = useCallback(
