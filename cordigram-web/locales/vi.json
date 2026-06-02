@@ -92,7 +92,8 @@
       "everyoneTitle": "@everyone",
       "everyoneDesc": "Thông báo đến tất cả mọi người có quyền xem kênh này.",
       "hereTitle": "@here",
-      "hereDesc": "Thông báo đến mọi người đang trực tuyến có quyền xem kênh này."
+      "hereDesc": "Thông báo đến mọi người đang trực tuyến có quyền xem kênh này.",
+      "tooltip": "Đề cập (@mention)"
     },
     "mediaPicker": {
       "railStickerAria": "Danh mục sticker",
@@ -1632,9 +1633,6 @@
       "sent": "Đã gửi",
       "seen": "Đã xem"
     },
-    "mention": {
-      "tooltip": "Đề cập (@mention)"
-    },
     "applyPending": {
       "title": "Đơn đăng ký tham gia {server} của bạn đang được xem xét!",
       "desc": "Bạn sẽ nhận được thông báo khi có bản cập nhật.",
@@ -2302,6 +2300,8 @@
       "deleteComment": "Xóa bình luận",
       "reportComment": "Báo cáo bình luận",
       "blockUser": "Chặn người dùng này",
+      "viewLikes": "Xem ai đã thích",
+      "dropHint": "Thả ảnh hoặc video vào đây",
       "reply": "Trả lời",
       "replyingTo": "Đang trả lời @{username}",
       "editingComment": "Đang chỉnh sửa bình luận",

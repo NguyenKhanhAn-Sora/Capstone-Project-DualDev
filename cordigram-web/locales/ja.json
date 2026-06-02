@@ -2297,6 +2297,8 @@
       "deleteComment": "コメントを削除",
       "reportComment": "コメントを報告",
       "blockUser": "このユーザーをブロック",
+      "viewLikes": "いいねしたユーザーを見る",
+      "dropHint": "画像または動画をここにドロップ",
       "reply": "返信",
       "replyingTo": "@{username} に返信中",
       "editingComment": "コメントを編集中",

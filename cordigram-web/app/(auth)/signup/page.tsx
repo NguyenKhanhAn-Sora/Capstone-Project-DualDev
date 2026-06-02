@@ -2,6 +2,7 @@
 
 import {
   ChangeEvent,
+  Fragment,
   FormEvent,
   KeyboardEvent,
   useEffect,
@@ -349,6 +350,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordBlurred, setPasswordBlurred] = useState(false);
   const [birthdate, setBirthdate] = useState("");
 
   const [gender, setGender] = useState<
@@ -379,6 +381,7 @@ export default function SignupPage() {
   const [crop, setCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -848,7 +851,8 @@ export default function SignupPage() {
       });
       setSignupToken(res.signupToken);
       setStep("profile");
-      showInfo("Verification successful. Complete your account info.");
+      setInfo("");
+      setError("");
     } catch (err) {
       const apiErr = err as ApiError;
       showError(apiErr.message || "Could not verify OTP");
@@ -883,23 +887,23 @@ export default function SignupPage() {
 
     if (!isGoogleFlow) {
       const trimmedPassword = password.trim();
-      const pwdErr = (() => {
-        if (!trimmedPassword) return t("settingsPage.security.password.errors.passwordRequired");
-        if (trimmedPassword.length < 8) return t("settingsPage.security.password.errors.passwordTooShort");
-        if (trimmedPassword.length > 72) return t("settingsPage.security.password.errors.passwordTooLong");
-        if (!/[A-Z]/.test(trimmedPassword)) return t("settingsPage.security.password.errors.passwordNoUpper");
-        if (!/[a-z]/.test(trimmedPassword)) return t("settingsPage.security.password.errors.passwordNoLower");
-        if (!/\d/.test(trimmedPassword)) return t("settingsPage.security.password.errors.passwordNoNumber");
-        return null;
-      })();
-      if (pwdErr) {
-        setFieldError((prev) => ({ ...prev, password: pwdErr }));
+      if (!trimmedPassword) {
+        setFieldError((prev) => ({ ...prev, password: t("settingsPage.privacy.password.errors.passwordRequired") }));
+        setPasswordBlurred(true);
+        return;
+      }
+      if (trimmedPassword.length > 72) {
+        setFieldError((prev) => ({ ...prev, password: t("settingsPage.privacy.password.errors.passwordTooLong") }));
+        return;
+      }
+      if (!allRulesMet) {
+        setPasswordBlurred(true);
         return;
       }
       if (trimmedPassword !== confirmPassword) {
         setFieldError((prev) => ({
           ...prev,
-          confirmPassword: t("settingsPage.security.password.errors.passwordMismatch"),
+          confirmPassword: t("settingsPage.privacy.password.errors.passwordMismatch"),
         }));
         return;
       }
@@ -925,12 +929,12 @@ export default function SignupPage() {
       return;
     }
     setError("");
+    setInfo("");
     setStep("avatar");
   };
 
-  const handleAvatarFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const processAvatarFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return;
     setAvatarFile(file);
     const reader = new FileReader();
     reader.onload = () => {
@@ -941,6 +945,12 @@ export default function SignupPage() {
       setAvatarThumb(null);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleAvatarFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processAvatarFile(file);
   };
 
   const completeSignup = async (avatarData?: AvatarUploadResponse) => {
@@ -994,6 +1004,33 @@ export default function SignupPage() {
     const found = genderOptions.find((opt) => opt.value === gender);
     return found?.label ?? "Select an option";
   }, [gender, genderOptions]);
+
+  const passwordRules = useMemo(
+    () => [
+      {
+        key: "len",
+        label: t("settingsPage.privacy.password.errors.passwordTooShort"),
+        met: password.trim().length >= 8,
+      },
+      {
+        key: "upper",
+        label: t("settingsPage.privacy.password.errors.passwordNoUpper"),
+        met: /[A-Z]/.test(password),
+      },
+      {
+        key: "lower",
+        label: t("settingsPage.privacy.password.errors.passwordNoLower"),
+        met: /[a-z]/.test(password),
+      },
+      {
+        key: "num",
+        label: t("settingsPage.privacy.password.errors.passwordNoNumber"),
+        met: /\d/.test(password),
+      },
+    ],
+    [password, t],
+  );
+  const allRulesMet = passwordRules.every((r) => r.met);
 
   useEffect(() => {
     if (!genderOpen) return;
@@ -1150,22 +1187,50 @@ export default function SignupPage() {
   const renderOtpStep = () => {
     if (isGoogleFlow) return null;
     return (
-      <form className="space-y-[16px]" onSubmit={handleVerifyOtp}>
-        <div className="space-y-[6px]">
-          <div className={styles.labelRow}>
-            <label className={styles.label}>Enter OTP code</label>
-            <span className={styles.muted}>Sent to {email}</span>
+      <form className="space-y-[20px]" onSubmit={handleVerifyOtp}>
+        <div className="space-y-[10px]">
+          <p className="text-[13px] text-slate-500 font-medium text-center">
+            Enter the 6-digit code sent to <span className="font-semibold text-slate-700">{email}</span>
+          </p>
+          {/* 6-box OTP input */}
+          <div className="relative flex gap-2.5 justify-center">
+            {[0, 1, 2, 3, 4, 5].map((i) => {
+              const filled = i < otpCode.length;
+              const active = i === otpCode.length;
+              return (
+                <div
+                  key={i}
+                  className={`w-12 h-14 flex items-center justify-center rounded-xl text-[22px] font-bold select-none transition-all duration-150 ${
+                    filled
+                      ? "border-2 border-[#3470A2] bg-white text-slate-900 shadow-[0_0_0_3px_rgba(52,112,162,0.12)]"
+                      : active
+                      ? "border-2 border-[#3470A2] bg-[#f0f7ff]"
+                      : "border-2 border-[#D7E5F2] bg-[#F8FBFF] text-slate-300"
+                  }`}
+                >
+                  {filled ? (
+                    otpCode[i]
+                  ) : active ? (
+                    <span className="w-[2px] h-5 bg-[#3470A2] rounded-full animate-pulse" />
+                  ) : (
+                    <span className="w-2 h-2 rounded-full bg-[#C8D8EA]" />
+                  )}
+                </div>
+              );
+            })}
+            {/* Invisible input overlay that captures all keyboard input */}
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+              autoFocus
+              className="absolute inset-0 w-full h-full opacity-0 cursor-text"
+              aria-label="Enter OTP code"
+            />
           </div>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={6}
-            value={otpCode}
-            onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
-            className={styles.input}
-            placeholder="Example: 123456"
-          />
         </div>
         <div className={styles.inlineActions}>
           <button
@@ -1260,8 +1325,11 @@ export default function SignupPage() {
                   setPassword(e.target.value);
                   setFieldError((prev) => ({ ...prev, password: undefined }));
                 }}
-                className={`${styles.input} ${styles.passwordInput}`}
-                placeholder="At least 8 characters"
+                onBlur={() => {
+                  if (password) setPasswordBlurred(true);
+                }}
+                className={`${styles.input} ${styles.passwordInput} ${passwordBlurred && !allRulesMet ? styles.inputError : ""}`}
+                placeholder={t("settingsPage.privacy.password.requirement")}
               />
               <button
                 type="button"
@@ -1272,8 +1340,33 @@ export default function SignupPage() {
                 <EyeIcon open={showPassword} />
               </button>
             </div>
-            {fieldError.password && (
+            {fieldError.password && !password && (
               <p className={styles.fieldError}>{fieldError.password}</p>
+            )}
+            {(password.length > 0 || passwordBlurred) && (
+              <div className={styles.pwdRules}>
+                {passwordRules.map((rule) => (
+                  <div
+                    key={rule.key}
+                    className={`${styles.pwdRule} ${rule.met ? styles.pwdRuleMet : passwordBlurred ? styles.pwdRuleError : ""}`}
+                  >
+                    <div className={`${styles.pwdRuleIcon} ${rule.met ? styles.pwdRuleIconMet : passwordBlurred ? styles.pwdRuleIconError : ""}`}>
+                      {rule.met && (
+                        <svg width={10} height={10} viewBox="0 0 12 12" fill="none">
+                          <polyline
+                            points="2,7 5,10 10,3"
+                            stroke="#fff"
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <span>{rule.label}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <div className="space-y-[6px]">
@@ -1288,6 +1381,16 @@ export default function SignupPage() {
                     ...prev,
                     confirmPassword: undefined,
                   }));
+                }}
+                onBlur={(e) => {
+                  const val = e.target.value;
+                  if (!val) return;
+                  if (val !== password) {
+                    setFieldError((prev) => ({
+                      ...prev,
+                      confirmPassword: t("settingsPage.privacy.password.errors.passwordMismatch"),
+                    }));
+                  }
                 }}
                 className={`${styles.input} ${styles.passwordInput}`}
                 placeholder="Re-enter to confirm"
@@ -1559,7 +1662,30 @@ export default function SignupPage() {
       </div>
 
       <div className={styles.avatarGrid}>
-        <div className={styles.cropperCard}>
+        {/* Drop zone */}
+        <div
+          className={`${styles.cropperCard} transition-all duration-150 ${
+            isDragOver
+              ? "!border-2 !border-dashed !border-[#3470A2] !bg-[#f0f7ff]"
+              : !avatarPreview
+              ? "border-2 border-dashed border-[#d7e5f2] hover:border-[#559ac2] hover:bg-[#f8fbff] cursor-pointer"
+              : ""
+          }`}
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragEnter={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragOver(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) processAvatarFile(file);
+          }}
+          onClick={() => {
+            if (!avatarPreview) {
+              document.getElementById("avatar-drop-input")?.click();
+            }
+          }}
+        >
           {avatarPreview ? (
             <div className={styles.cropperWrapper}>
               <Cropper
@@ -1581,17 +1707,35 @@ export default function SignupPage() {
               />
             </div>
           ) : (
-            <div className={styles.avatarPlaceholder}>
-              <p className="text-[14px] text-slate-600">
-                Pick an image to preview and crop.
-              </p>
+            <div className={`${styles.avatarPlaceholder} flex-col gap-3`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-150 ${isDragOver ? "bg-[#3470A2]" : "bg-[#e8f1fa]"}`}>
+                <svg aria-hidden width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={isDragOver ? "#ffffff" : "#3470A2"} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <div className="text-center">
+                <p className={`text-[14px] font-semibold transition-colors duration-150 ${isDragOver ? "text-[#3470A2]" : "text-slate-700"}`}>
+                  {isDragOver ? "Drop image here" : "Drag & drop an image here"}
+                </p>
+                <p className="text-[12px] text-slate-400 mt-0.5">or click to browse from device</p>
+              </div>
             </div>
           )}
+          {/* Hidden file input driven by drop zone click */}
+          <input
+            id="avatar-drop-input"
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarFileChange}
+            hidden
+          />
         </div>
 
         <div className={styles.avatarControls}>
           <label className={styles.fileButton}>
-            Choose image from device
+            {avatarPreview ? "Change image" : "Choose image from device"}
             <input
               type="file"
               accept="image/*"
@@ -1855,14 +1999,39 @@ export default function SignupPage() {
                       <input
                         type={showPassword ? "text" : "password"}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setFieldError((prev) => ({ ...prev, password: undefined }));
+                        }}
+                        onBlur={() => {
+                          if (password) setPasswordBlurred(true);
+                        }}
                         placeholder="Mật khẩu"
-                        className="w-full h-[52px] pl-[44px] pr-[44px] rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
+                        className={`w-full h-[52px] pl-[44px] pr-[44px] rounded-[14px] border bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none transition-colors ${passwordBlurred && !allRulesMet ? "border-red-400 focus:border-red-400" : "border-[#D7E5F2] focus:border-[#3470A2]"}`}
                       />
                       <button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] p-1">
                         <EyeIcon open={showPassword} />
                       </button>
-                      {fieldError.password && <p className="mt-1 text-red-600 text-[12px]">{fieldError.password}</p>}
+                      {fieldError.password && !password && <p className="mt-1 text-red-600 text-[12px]">{fieldError.password}</p>}
+                      {(password.length > 0 || passwordBlurred) && (
+                        <div className="mt-2 flex flex-col gap-[5px]">
+                          {passwordRules.map((rule) => (
+                            <div key={rule.key} className={`flex items-center gap-2 text-[11px] font-medium transition-colors ${rule.met ? "text-[#3470a2]" : passwordBlurred ? "text-red-500" : "text-[#94A3B8]"}`}>
+                              <div
+                                className={`w-[16px] h-[16px] rounded-full border flex items-center justify-center flex-shrink-0 transition-all ${rule.met ? "border-[#3470a2]" : passwordBlurred ? "border-red-400 bg-transparent" : "border-[#CBD5E1] bg-transparent"}`}
+                                style={rule.met ? { background: "linear-gradient(135deg, #559ac2 0%, #3470a2 55%, #9aacef 100%)", boxShadow: "0 2px 6px rgba(52,112,162,0.32)" } : undefined}
+                              >
+                                {rule.met && (
+                                  <svg width={9} height={9} viewBox="0 0 12 12" fill="none">
+                                    <polyline points="2,7 5,10 10,3" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span>{rule.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="relative">
                       <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none"><LockIcon /></span>
@@ -2133,7 +2302,11 @@ export default function SignupPage() {
       <div className="hidden md:block min-h-screen">
         <div className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
           <div className={styles["signup-left"]}>
-            <div className="w-full max-w-[520px] rounded-2xl border border-[#e5edf5] bg-white p-10 shadow-xl">
+            <div className="w-full max-w-[520px] rounded-2xl bg-white px-10 py-9 shadow-[0_4px_32px_rgba(15,23,42,0.10),0_1px_4px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col items-center mb-6">
+                <img src="/logo.png" alt="Cordigram" width={48} height={48} className="rounded-[14px]" />
+                <span className="mt-2 text-[11px] font-bold tracking-[2.5px] text-slate-400 uppercase">Cordigram</span>
+              </div>
               <div className={styles.cardHeader}>
                 {step === "avatar" && (
                   <button
@@ -2149,30 +2322,42 @@ export default function SignupPage() {
                     <ArrowLeftIcon />
                   </button>
                 )}
-                <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900">
-                  Create a Cordigram account
-                </h1>
-                <p className="whitespace-nowrap text-[14px] text-slate-600">
+                <div>
+                  <h1 className="text-[26px] font-bold leading-[1.2] text-slate-900 tracking-tight">
+                    Create your account
+                  </h1>
+                  <p className="mt-1 text-[13px] text-slate-500 font-medium">
+                    Join Cordigram — it only takes a minute.
+                  </p>
+                </div>
+                <p className="whitespace-nowrap text-[13px] text-slate-500 font-medium">
                   Step {currentStepIndex + 1} / {steps.length}
                 </p>
               </div>
 
               <div className={styles.stepper}>
-                {steps.map(({ key, label }) => {
-                  const index = steps.findIndex((s) => s.key === key);
+                {steps.map(({ key, label }, index) => {
                   const active = visualStep === key;
                   const done = currentStepIndex > index;
+                  const isLast = index === steps.length - 1;
                   return (
-                    <div key={key} className={styles.stepItem}>
-                      <div
-                        className={`${styles.stepBullet} ${
-                          active ? styles.stepBulletActive : ""
-                        } ${done ? styles.stepBulletDone : ""}`}
-                      >
-                        {done ? "✓" : index + 1}
+                    <Fragment key={key}>
+                      <div className={styles.stepItem}>
+                        <div className={`${styles.stepBullet} ${active ? styles.stepBulletActive : ""} ${done ? styles.stepBulletDone : ""}`}>
+                          {done ? (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          ) : index + 1}
+                        </div>
+                        <span className={`${styles.stepLabel} ${active ? styles.stepLabelActive : ""} ${done ? styles.stepLabelDone : ""}`}>
+                          {label}
+                        </span>
                       </div>
-                      <span className={styles.stepLabel}>{label}</span>
-                    </div>
+                      {!isLast && (
+                        <div className={`${styles.stepConnector} ${done ? styles.stepConnectorDone : ""}`} />
+                      )}
+                    </Fragment>
                   );
                 })}
               </div>
@@ -2239,23 +2424,20 @@ export default function SignupPage() {
           <div className={styles["hero-panel"]}>
             <div className={styles["hero-tilt"]}>
               <div className={styles["hero-card"]}>
-                <h2 className="mt-4 text-[38px] font-semibold leading-tight text-white">
-                  Welcome to Cordigram!
+                <h2 className="mt-4 text-[40px] font-bold leading-tight text-white tracking-tight">
+                  Welcome to Cordigram
                 </h2>
-                <p className="mt-3 text-[16px] leading-6 text-slate-100/90">
-                  A social platform with real-time chat channels. Create
-                  Discord-style channels, share photos/videos like Instagram,
-                  and connect communities the modern way.
+                <p className="mt-3 text-[15px] leading-6 text-white/70 max-w-[360px]">
+                  Channels, feeds, and communities — all in one place.
+                  Built for the way people actually connect online.
                 </p>
 
                 <div className={styles["hero-chip-row"]}>
                   <div className={styles["hero-chip"]}>
-                    <span className={styles["hero-chip-dot"]} /> Realtime
-                    channels
+                    <span className={styles["hero-chip-dot"]} /> Realtime channels
                   </div>
                   <div className={styles["hero-chip"]}>
-                    <span className={styles["hero-chip-dot"]} /> Media feed &
-                    stories
+                    <span className={styles["hero-chip-dot"]} /> Media feed & reels
                   </div>
                   <div className={styles["hero-chip"]}>
                     <span className={styles["hero-chip-dot"]} /> Voice-ready
@@ -2264,16 +2446,28 @@ export default function SignupPage() {
 
                 <div className={styles["hero-badges"]}>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>◆</span>
+                    <span className={styles["hero-badge-icon"]}>
+                      <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </span>
                     <p>Permissions and roles to manage communities safely.</p>
                   </div>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>⇆</span>
+                    <span className={styles["hero-badge-icon"]}>
+                      <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+                    </span>
                     Multi-device sync with instant notifications.
                   </div>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>★</span>
+                    <span className={styles["hero-badge-icon"]}>
+                      <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    </span>
                     Modern UI optimized for sharing content.
+                  </div>
+                  <div className={styles["hero-badge"]}>
+                    <span className={styles["hero-badge-icon"]}>
+                      <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                    </span>
+                    Share photos, videos, and reels with your network.
                   </div>
                 </div>
               </div>

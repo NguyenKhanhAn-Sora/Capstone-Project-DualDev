@@ -213,7 +213,7 @@ const REPORT_GROUPS: ReportCategory[] = [
 ];
 
 const COMMENT_POLL_INTERVAL = 4000;
-const COMMENT_PAGE_SIZE = 20;
+const COMMENT_PAGE_SIZE = 10;
 const PROFILE_POST_NAV_KEY_PREFIX = "profile-post-nav:";
 
 const normalizeHashtag = (value: string) =>
@@ -457,7 +457,7 @@ const IconClose = ({ size = 18 }: IconProps) => (
 
 export default function PostView({ postId, asModal }: PostViewProps) {
   const router = useRouter();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { showLoginOverlay } = useGuestAuth();
   const searchParams = useSearchParams();
   const fromProfile = searchParams?.get("fromProfile") === "1";
@@ -2386,7 +2386,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             page: 0,
             hasMore: true,
             loading: false,
-            expanded: true,
+            expanded: false,
           },
         );
       };
@@ -4099,6 +4099,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     <div className={styles.commentMenuList}>
                       {isCommentOwner ? (
                         <>
+                          <button
+                            className={styles.commentMoreItem}
+                            onClick={() => { setOpenCommentMenuId(null); openCommentLikesOverlay(comment.id); }}
+                          >
+                            {t("reelsPage.comments.viewLikes")}
+                          </button>
                           {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
                             <button
                               className={styles.commentMoreItem}
@@ -4137,6 +4143,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         </>
                       ) : isAuthor ? (
                         <>
+                          <button
+                            className={styles.commentMoreItem}
+                            onClick={() => { setOpenCommentMenuId(null); openCommentLikesOverlay(comment.id); }}
+                          >
+                            {t("reelsPage.comments.viewLikes")}
+                          </button>
                           {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
                             <button
                               className={styles.commentMoreItem}
@@ -4186,6 +4198,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         </>
                       ) : (
                         <>
+                          <button
+                            className={styles.commentMoreItem}
+                            onClick={() => { setOpenCommentMenuId(null); openCommentLikesOverlay(comment.id); }}
+                          >
+                            {t("reelsPage.comments.viewLikes")}
+                          </button>
                           {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
                             <button
                               className={styles.commentMoreItem}
@@ -4250,7 +4268,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     }
                     disabled={loading}
                   >
-                    {loading ? "Loading..." : "Load more replies"}
+                    {loading ? "Loading..." : "View replies"}
                   </button>
                 ) : null}
               </div>
@@ -6155,11 +6173,20 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     </div>
                     {hasMoreComments ? (
                       <button
-                        className={styles.loadMoreBtn}
+                        className={styles.viewMoreCommentsBtn}
                         onClick={() => loadComments(commentsPage + 1)}
                         disabled={commentsLoading}
                       >
-                        {commentsLoading ? "Loading..." : "Load more"}
+                        {commentsLoading ? (
+                          <span className={styles.viewMoreSpinner} />
+                        ) : (
+                          <>
+                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                            View more comments
+                          </>
+                        )}
                       </button>
                     ) : null}
                   </div>
@@ -6444,20 +6471,28 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               aria-label="Add GIF"
                               disabled={commentsLocked || submitting}
                             >
-                              <span
-                                style={{
-                                  padding: "2px 4px",
-                                  border: "1.2px solid currentColor",
-                                  borderRadius: 3,
-                                  fontSize: 9,
-                                  fontWeight: 700,
-                                  lineHeight: 1,
-                                  letterSpacing: 0.2,
-                                  display: "inline-block",
-                                }}
+                              <svg
+                                aria-hidden
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
                               >
-                                GIF
-                              </span>
+                                <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" strokeWidth="1.8" />
+                                <text
+                                  x="12"
+                                  y="15.5"
+                                  textAnchor="middle"
+                                  fontFamily="system-ui, -apple-system, sans-serif"
+                                  fontSize="7.5"
+                                  fontWeight="800"
+                                  fill="currentColor"
+                                  letterSpacing="0.8"
+                                >
+                                  GIF
+                                </text>
+                              </svg>
                             </button>
                             {showGifPicker ? (
                               <div className={styles.stickerPopover}>
@@ -6746,37 +6781,43 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         </div>
       ) : null}
 
-      {commentImageViewerUrl ? (
-        <div
-          className={styles.commentImageOverlay}
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setCommentImageViewerUrl(null)}
-        >
-          <button
-            type="button"
-            className={styles.commentImageClose}
-            aria-label="Close image"
-            onClick={(e) => {
-              e.stopPropagation();
-              setCommentImageViewerUrl(null);
-            }}
-          >
-            ×
-          </button>
-          <div
-            className={styles.commentImageFigure}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              className={styles.commentImagePreview}
-              src={commentImageViewerUrl}
-              alt="Comment image"
-              onContextMenu={(e) => e.preventDefault()}
-            />
-          </div>
-        </div>
-      ) : null}
+      {commentImageViewerUrl && mounted && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className={styles.commentImageOverlay}
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCommentImageViewerUrl(null);
+              }}
+            >
+              <button
+                type="button"
+                className={styles.commentImageClose}
+                aria-label="Close image"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCommentImageViewerUrl(null);
+                }}
+              >
+                ×
+              </button>
+              <div
+                className={styles.commentImageFigure}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <img
+                  className={styles.commentImagePreview}
+                  src={commentImageViewerUrl}
+                  alt="Comment image"
+                  onContextMenu={(e) => e.preventDefault()}
+                />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {editOpen
         ? mounted && typeof document !== "undefined"

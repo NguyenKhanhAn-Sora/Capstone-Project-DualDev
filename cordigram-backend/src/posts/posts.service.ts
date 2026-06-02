@@ -54,7 +54,7 @@ const ADS_FREQUENCY_COOLDOWN_MINUTES = 30
 const ADS_FREQUENCY_MAX_IMPRESSIONS_24H = 3
 const REACH_RESTRICT_SCORE_MULTIPLIER = 0.15
 // Feed ranking tunables
-const FRESHNESS_HALF_LIFE_HOURS = 72          // 72 h half-life — quality content stays visible longer
+const FRESHNESS_HALF_LIFE_HOURS = 24          // 24 h half-life — standard social-media decay; prevents old viral posts from dominating
 const FOLLOW_RELATIONSHIP_BOOST = 2.0         // score multiplier for followed users (home feed)
 const VERIFIED_CREATOR_BOOST = 1.25           // reduced from 1.8 — prevents explore being dominated by influencers
 const NEW_CREATOR_BOOST = 1.15                // mild discovery boost for accounts < 90 days old
@@ -2065,6 +2065,10 @@ export class PostsService {
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
     const now = new Date();
+    // Explore pool only surfaces content published within the last 90 days.
+    // Posts older than this are excluded from discovery so that highly-engaged
+    // but stale content cannot keep outscoring newer posts in the ranking.
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 3_600_000);
     const activeSponsoredPostIds = await this.getActiveSponsoredPostIds(
       now,
       candidateLimit,
@@ -2117,7 +2121,7 @@ export class PostsService {
         visibility: 'public',
         moderationState: publicDiscoveryModerationFilter,
         deletedAt: null,
-        publishedAt: { $ne: null },
+        publishedAt: { $gte: ninetyDaysAgo },
         _id: { $nin: hiddenObjectIds },
       })
       .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
@@ -5179,7 +5183,6 @@ export class PostsService {
       0.1,
       (now.getTime() - createdAt.getTime()) / 3_600_000,
     );
-    // Slower decay: half-life 36 h so quality content stays visible longer
     const freshness = 1 / (1 + ageHours / FRESHNESS_HALF_LIFE_HOURS);
     const stats = post.stats ?? ({} as PostStats);
     const engagement =
@@ -5188,8 +5191,8 @@ export class PostsService {
       (stats.saves ?? 0) * 4 +
       (stats.shares ?? 0) * 3 +
       (stats.reposts ?? 0) * 3 +
-      (stats.views ?? 0) * 0.3 +
-      (stats.impressions ?? 0) * 0.1;
+      Math.log1p(stats.views ?? 0) * 1.5 +
+      Math.log1p(stats.impressions ?? 0) * 0.5;
 
     const qualityBoost =
       1 + ((post.qualityScore ?? 0) - (post.spamScore ?? 0)) * 0.01;

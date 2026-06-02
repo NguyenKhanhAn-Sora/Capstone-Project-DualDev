@@ -2297,6 +2297,8 @@
       "deleteComment": "删除评论",
       "reportComment": "举报评论",
       "blockUser": "屏蔽此用户",
+      "viewLikes": "查看点赞用户",
+      "dropHint": "将图片或视频拖放到此处",
       "reply": "回复",
       "replyingTo": "正在回复 @{username}",
       "editingComment": "正在编辑评论",

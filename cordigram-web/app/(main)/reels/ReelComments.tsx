@@ -30,6 +30,7 @@ import {
   filterCommentsByBlockedAuthors,
   refreshBlockedUserIds,
 } from "@/lib/blocked-users";
+import CommentLikesOverlay from "@/ui/comment-likes-overlay/comment-likes-overlay";
 import postStyles from "../post/post.module.css";
 import styles from "./reel.module.css";
 import feedStyles from "../home-feed.module.css";
@@ -392,6 +393,10 @@ export default function ReelComments({
   const [deleteTarget, setDeleteTarget] = useState<CommentItem | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [commentLikesOverlayOpen, setCommentLikesOverlayOpen] = useState(false);
+  const [commentLikesOverlayClosing, setCommentLikesOverlayClosing] = useState(false);
+  const [commentLikesOverlayId, setCommentLikesOverlayId] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [blockTarget, setBlockTarget] = useState<{
     id: string;
     label: string;
@@ -894,6 +899,22 @@ export default function ReelComments({
   const closeBlockUserModal = () => {
     if (blocking) return;
     setBlockTarget(null);
+  };
+
+  const openCommentLikesOverlay = (commentId: string) => {
+    if (!token) { showLoginOverlay(); return; }
+    setCommentLikesOverlayId(commentId);
+    setCommentLikesOverlayOpen(true);
+    setCommentLikesOverlayClosing(false);
+  };
+
+  const closeCommentLikesOverlay = () => {
+    setCommentLikesOverlayClosing(true);
+    window.setTimeout(() => {
+      setCommentLikesOverlayOpen(false);
+      setCommentLikesOverlayClosing(false);
+      setCommentLikesOverlayId(null);
+    }, 180);
   };
 
   const confirmBlockUser = async () => {
@@ -1477,6 +1498,12 @@ export default function ReelComments({
                       <div className={postStyles.commentMenuList}>
                         {isCommentOwner ? (
                           <>
+                            <button
+                              className={postStyles.commentMoreItem}
+                              onClick={() => { closeCommentMenu(); openCommentLikesOverlay(comment.id); }}
+                            >
+                              {t("reelsPage.comments.viewLikes")}
+                            </button>
                             {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
                               <button
                                 className={postStyles.commentMoreItem}
@@ -1515,6 +1542,12 @@ export default function ReelComments({
                           </>
                         ) : isPostOwner ? (
                           <>
+                            <button
+                              className={postStyles.commentMoreItem}
+                              onClick={() => { closeCommentMenu(); openCommentLikesOverlay(comment.id); }}
+                            >
+                              {t("reelsPage.comments.viewLikes")}
+                            </button>
                             {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
                               <button
                                 className={postStyles.commentMoreItem}
@@ -1559,6 +1592,12 @@ export default function ReelComments({
                           </>
                         ) : (
                           <>
+                            <button
+                              className={postStyles.commentMoreItem}
+                              onClick={() => { closeCommentMenu(); openCommentLikesOverlay(comment.id); }}
+                            >
+                              {t("reelsPage.comments.viewLikes")}
+                            </button>
                             {(comment.lang && comment.lang !== language) || translatedComments.has(comment.id) ? (
                               <button
                                 className={postStyles.commentMoreItem}
@@ -2363,19 +2402,11 @@ export default function ReelComments({
     }
   };
 
-  const handleCommentMediaChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const applyCommentMediaFile = (file: File) => {
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
       setCommentMediaError(t("reelsPage.comments.onlyImageOrVideo"));
-      if (commentMediaInputRef.current) {
-        commentMediaInputRef.current.value = "";
-      }
       return;
     }
-
     setCommentMediaError("");
     clearStickerSelection();
     setCommentMediaFile(file);
@@ -2383,6 +2414,39 @@ export default function ReelComments({
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
     });
+  };
+
+  const handleCommentMediaChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (commentMediaInputRef.current) {
+      commentMediaInputRef.current.value = "";
+    }
+    applyCommentMediaFile(file);
+  };
+
+  const handleCommentDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!canInteract || submitting) return;
+    setIsDragOver(true);
+  };
+
+  const handleCommentDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleCommentDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    if (!canInteract || submitting) return;
+    const file = e.dataTransfer.files[0];
+    if (file) applyCommentMediaFile(file);
   };
 
   const selectSticker = (sticker: { id: string; url: string }) => {
@@ -2559,9 +2623,17 @@ export default function ReelComments({
             ) : null}
 
             <div
-              className={postStyles.commentComposer}
+              className={`${postStyles.commentComposer}${isDragOver ? ` ${postStyles.commentComposerDragOver}` : ""}`}
               style={{ paddingBottom: 12, paddingRight: 12 }}
+              onDragOver={handleCommentDragOver}
+              onDragLeave={handleCommentDragLeave}
+              onDrop={handleCommentDrop}
             >
+              {isDragOver && (
+                <div className={postStyles.commentComposerDropHint}>
+                  {t("reelsPage.comments.dropHint")}
+                </div>
+              )}
               <div className={postStyles.commentComposerRow}>
                 <div className={postStyles.composerInput}>
                   <textarea
@@ -2776,20 +2848,28 @@ export default function ReelComments({
                         aria-label={t("reelsPage.comments.ariaAddGif")}
                         disabled={!canInteract || submitting}
                       >
-                        <span
-                          style={{
-                            padding: "2px 4px",
-                            border: "1.2px solid currentColor",
-                            borderRadius: 3,
-                            fontSize: 9,
-                            fontWeight: 700,
-                            lineHeight: 1,
-                            letterSpacing: 0.2,
-                            display: "inline-block",
-                          }}
+                        <svg
+                          aria-hidden
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
                         >
-                          GIF
-                        </span>
+                          <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" strokeWidth="1.8" />
+                          <text
+                            x="12"
+                            y="15.5"
+                            textAnchor="middle"
+                            fontFamily="system-ui, -apple-system, sans-serif"
+                            fontSize="7.5"
+                            fontWeight="800"
+                            fill="currentColor"
+                            letterSpacing="0.8"
+                          >
+                            GIF
+                          </text>
+                        </svg>
                       </button>
                       {showGifPicker ? (
                         <div
@@ -3272,6 +3352,17 @@ export default function ReelComments({
             />
           </div>
         </div>
+      ) : null}
+
+      {postId && commentLikesOverlayId ? (
+        <CommentLikesOverlay
+          open={commentLikesOverlayOpen}
+          closing={commentLikesOverlayClosing}
+          postId={postId}
+          commentId={commentLikesOverlayId}
+          viewerId={viewerId}
+          onClose={closeCommentLikesOverlay}
+        />
       ) : null}
     </>
   );
