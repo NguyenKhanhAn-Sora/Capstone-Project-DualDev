@@ -154,6 +154,7 @@ import { getDmSidebarPeersMode } from "@/lib/messages-dm-sidebar-prefs";
 import { formatDmPresenceLabel, resolvePresenceStatus } from "@/lib/dm-presence-label";
 import { buildServerEmojiRenderMapFromPickerGroups } from "@/lib/server-emoji-render";
 import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
+import ChatMediaViewer, { type ChatMediaItem } from "@/components/ChatMediaViewer";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
 const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
@@ -1912,6 +1913,12 @@ export default function MessagesPage() {
   >({});
   const [showPlusMenu, setShowPlusMenu] = useState(false);
 
+  // Chat media viewer
+  const [mediaViewerState, setMediaViewerState] = useState<{
+    items: ChatMediaItem[];
+    index: number;
+  } | null>(null);
+
   // Voice recording states
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [isUploadingVoice, setIsUploadingVoice] = useState(false);
@@ -2702,31 +2709,17 @@ export default function MessagesPage() {
       try {
         const callUrl = buildCallUrl(peerId, roomName, callType);
 
-        // The answer arrives via a socket event, NOT a user gesture, so most
-        // browsers block this window.open. Detect the block and keep the
-        // outgoing popup around with a "Join" button (a real click), instead
-        // of silently failing — which is exactly why the caller never entered
-        // the call after the callee accepted.
+        // The answer arrives via a socket event (no user gesture), so most
+        // browsers block window.open. Try opening a new tab first; if blocked,
+        // navigate the CURRENT tab instead (the user is on /messages anyway).
         const win = window.open(callUrl, "_blank", "noopener,noreferrer");
         if (!win) {
           console.warn(
-            "[CALL] Popup blocked — showing manual join button for",
+            "[CALL] Popup blocked — navigating current tab to call for",
             peerId,
           );
-          setOutgoingCallsByPeer((prev) => {
-            const cur = prev[peerId];
-            const base =
-              cur ??
-              ({
-                to: peerId,
-                toUser: { displayName: peerId, username: peerId },
-                type: callType,
-              } as OutgoingCallEntry);
-            return {
-              ...prev,
-              [peerId]: { ...base, status: "answered", roomName },
-            };
-          });
+          releaseOutboundCallLock(tabId, peerId);
+          window.location.href = callUrl;
           return;
         }
 
@@ -2737,7 +2730,6 @@ export default function MessagesPage() {
           delete next[peerId];
           return next;
         });
-        // Allow a future call to the same peer to open a tab again.
         window.setTimeout(() => {
           openedCallTabPeersRef.current.delete(peerId);
         }, 15000);
@@ -7052,6 +7044,32 @@ export default function MessagesPage() {
     [currentUserId, currentUserProfile],
   );
 
+  const openMediaViewer = useCallback(
+    (clickedUrl: string) => {
+      const IMAGE_RE_G = /📷 \[Image\]: (https?:\/\/[^\s]+)/g;
+      const allImages: ChatMediaItem[] = [];
+      let clickedIndex = 0;
+      for (const msg of messages) {
+        const text = msg.text || "";
+        const matches = [...text.matchAll(IMAGE_RE_G)];
+        for (const match of matches) {
+          const url = match[1];
+          allImages.push({
+            url,
+            timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
+            senderName: msg.senderDisplayName || msg.senderName,
+          });
+          if (url === clickedUrl) {
+            clickedIndex = allImages.length - 1;
+          }
+        }
+      }
+      if (allImages.length === 0) return;
+      setMediaViewerState({ items: allImages, index: clickedIndex });
+    },
+    [messages],
+  );
+
   const renderMessageContent = useCallback(
     (message: UIMessage) => {
       const boostVideoOptimizationEnabled = Boolean(boostStatus?.active);
@@ -7313,22 +7331,23 @@ export default function MessagesPage() {
         return <PollMessage pollId={pollId} token={token} onError={setError} />;
       }
 
-      // Check if message contains media
-      const imageMatch = text.match(/📷 \[Image\]: (https?:\/\/[^\s]+)/);
+      // Check if message contains media (single or multiple images)
+      const IMAGE_RE_GLOBAL = /📷 \[Image\]: (https?:\/\/[^\s]+)/g;
+      const allImageMatches = [...text.matchAll(IMAGE_RE_GLOBAL)];
       const videoMatch = text.match(/🎬 \[Video\]: (https?:\/\/[^\s]+)/);
       const gifMatch = text.match(/(https?:\/\/[^\s]+\.gif)/i);
 
-      if (imageMatch) {
-        const imageUrl = imageMatch[1];
-        const isBlurred = imageUrl.includes("e_blur:");
+      if (allImageMatches.length > 0) {
+        const imageUrls = allImageMatches.map((m) => m[1]);
         const modResult = message.contentModerationResult;
+        const hasBlurred = imageUrls.some((u) => u.includes("e_blur:"));
 
-        if (isBlurred) {
+        if (hasBlurred) {
           return (
             <div>
               <div className={styles.mediaMessage}>
                 <BlurredImage
-                  blurredUrl={imageUrl}
+                  blurredUrl={imageUrls[0]}
                   canReveal={isAgeRestrictedRef.current}
                   className={styles.messageImage}
                 />
@@ -7348,38 +7367,69 @@ export default function MessagesPage() {
           );
         }
 
-        return (
-          <div>
-            <div className={styles.mediaMessage}>
-              <img
-                src={imageUrl}
-                alt="Ảnh được chia sẻ"
-                className={styles.messageImage}
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                  e.currentTarget.nextElementSibling?.classList.remove(
-                    styles.hidden,
-                  );
-                }}
-              />
-              <span
-                className={styles.hidden}
-                style={{ fontSize: "12px", color: "var(--color-text-muted)" }}
-              >
-                Không tải được ảnh
-              </span>
-            </div>
-            {modResult === "rejected" && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 10px", borderRadius: 4,
-                background: "rgba(237, 66, 69, 0.15)", color: "#ed4245",
-                fontSize: 12, marginTop: 4,
-              }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                Hình ảnh đã bị xóa do vi phạm chính sách nội dung.
+        // Multi-image grid (like Zalo) or single image
+        if (imageUrls.length === 1) {
+          return (
+            <div>
+              <div className={styles.mediaMessage}>
+                <img
+                  src={imageUrls[0]}
+                  alt="Ảnh được chia sẻ"
+                  className={styles.messageImage}
+                  onClick={() => openMediaViewer(imageUrls[0])}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
-            )}
+              {modResult === "rejected" && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 10px", borderRadius: 4,
+                  background: "rgba(237, 66, 69, 0.15)", color: "#ed4245",
+                  fontSize: 12, marginTop: 4,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                  Hình ảnh đã bị xóa do vi phạm chính sách nội dung.
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // Multiple images — render a grid
+        const cols = imageUrls.length === 2 ? 2 : imageUrls.length === 4 ? 2 : 3;
+        return (
+          <div className={styles.mediaMessage}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                gap: "3px",
+                borderRadius: "10px",
+                overflow: "hidden",
+                maxWidth: "320px",
+              }}
+            >
+              {imageUrls.map((url, idx) => (
+                <img
+                  key={idx}
+                  src={url}
+                  alt={`Ảnh ${idx + 1}`}
+                  style={{
+                    width: "100%",
+                    aspectRatio: imageUrls.length <= 2 ? "4/3" : "1",
+                    objectFit: "cover",
+                    cursor: "pointer",
+                    transition: "opacity 0.15s",
+                  }}
+                  onClick={() => openMediaViewer(url)}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ))}
+            </div>
           </div>
         );
       }
@@ -7525,6 +7575,7 @@ export default function MessagesPage() {
       boostStatus?.active,
       currentUserId,
       handleStartCall,
+      openMediaViewer,
       t,
     ],
   );
@@ -7606,19 +7657,83 @@ export default function MessagesPage() {
                 cordigramUploadContext: "messages",
               });
 
+        // Group all images into a single combined message; videos stay separate.
+        const imageResults: UploadMediaResponse[] = [];
+        const videoResults: { media: UploadMediaResponse; loadingMsgId: string }[] = [];
         for (let i = 0; i < uploadResults.length; i++) {
           const media = uploadResults[i];
-          const loadingMsgId = loadingMessages[i].id;
-          const isImage = media.resourceType === "image";
-          const isVideo = media.resourceType === "video";
-          const mediaMessage = isImage
-            ? `📷 [Image]: ${media.url}`
-            : isVideo
-              ? `🎬 [Video]: ${media.url}`
-              : media.url;
+          if (media.resourceType === "image") {
+            imageResults.push(media);
+          } else {
+            videoResults.push({ media, loadingMsgId: loadingMessages[i].id });
+          }
+        }
+
+        // Send grouped images as ONE message (URLs separated by newline)
+        if (imageResults.length > 0) {
+          const combinedText = imageResults
+            .map((m) => `📷 [Image]: ${m.url}`)
+            .join("\n");
+          const combinedUrls = imageResults.map((m) => m.url);
+          const firstLoadingId = loadingMessages[0].id;
 
           const finalMessage: UIMessage = {
-            id: `temp-${Date.now()}-${i}`,
+            id: `temp-${Date.now()}-img-group`,
+            text: combinedText,
+            senderId: currentUserId,
+            senderEmail: "",
+            senderDisplayName: selfMessagingIdentity.displayName || undefined,
+            senderName: selfMessagingIdentity.chatUsername || "",
+            senderAvatar: selfMessagingIdentity.avatar,
+            timestamp: new Date(),
+            isFromCurrentUser: true,
+            type: selectedDirectMessageFriend ? "direct" : "server",
+          };
+
+          // Remove ALL image loading placeholders and insert one final message
+          const imageLoadingIds = new Set(
+            loadingMessages
+              .slice(0, imageResults.length)
+              .map((m) => m.id),
+          );
+
+          if (selectedDirectMessageFriend) {
+            setMessages((prev) => {
+              const filtered = prev.filter((m) => !imageLoadingIds.has(m.id));
+              const idx = prev.findIndex((m) => m.id === firstLoadingId);
+              const insertAt = Math.max(0, idx >= 0 ? idx : filtered.length);
+              return [
+                ...filtered.slice(0, insertAt),
+                finalMessage,
+                ...filtered.slice(insertAt),
+              ];
+            });
+            setConversations((prev) => {
+              const newMap = new Map(prev);
+              const current = newMap.get(selectedDirectMessageFriend._id) || [];
+              const filtered = current.filter((m) => !imageLoadingIds.has(m.id));
+              newMap.set(selectedDirectMessageFriend._id, [...filtered, finalMessage]);
+              return newMap;
+            });
+            emitSendMessage(
+              selectedDirectMessageFriend._id,
+              combinedText,
+              combinedUrls,
+            );
+          } else if (selectedChannel) {
+            setMessages((prev) => {
+              const filtered = prev.filter((m) => !imageLoadingIds.has(m.id));
+              return [...filtered, finalMessage];
+            });
+            await serversApi.createMessage(selectedChannel, combinedText);
+          }
+        }
+
+        // Send videos individually (unchanged)
+        for (const { media, loadingMsgId } of videoResults) {
+          const mediaMessage = `🎬 [Video]: ${media.url}`;
+          const finalMessage: UIMessage = {
+            id: `temp-${Date.now()}-${loadingMsgId}`,
             text: mediaMessage,
             senderId: currentUserId,
             senderEmail: "",
@@ -13838,6 +13953,14 @@ function CommunityOverviewSection({
             </div>
           </div>
         </>
+      )}
+
+      {mediaViewerState && (
+        <ChatMediaViewer
+          items={mediaViewerState.items}
+          initialIndex={mediaViewerState.index}
+          onClose={() => setMediaViewerState(null)}
+        />
       )}
     </div>
   );

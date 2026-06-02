@@ -14,7 +14,6 @@ import {
 } from "@/lib/dm-call-session-sync";
 import { getDMRoomName } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
-import OutgoingCallPopup from "@/components/OutgoingCallPopup";
 
 function isValidAvatarUrl(url: string | undefined): boolean {
   if (!url) return false;
@@ -47,14 +46,6 @@ export default function GlobalDmIncomingCalls() {
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [incomingCall, setIncomingCall] = useState<IncomingCallState | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
-  // Set when WE are the caller and the peer answered, but the browser blocked
-  // the automatic window.open (it's a socket event, not a user gesture). We
-  // keep this popup so the user can join with a real click.
-  const [pendingJoin, setPendingJoin] = useState<{
-    peerId: string;
-    roomName: string;
-    type: "audio" | "video";
-  } | null>(null);
 
   const currentUserIdRef = useRef<string>("");
   const openedAnswerPeersRef = useRef<Set<string>>(new Set());
@@ -171,9 +162,6 @@ export default function GlobalDmIncomingCalls() {
 
   useEffect(() => {
     if (!callEnded) return;
-    setPendingJoin((prev) =>
-      prev && prev.peerId === callEnded.from ? null : prev,
-    );
     setIncomingCall((prev) => {
       if (prev && prev.from === callEnded.from) {
         return { ...prev, status: "cancelled" };
@@ -267,32 +255,18 @@ export default function GlobalDmIncomingCalls() {
     if (openedAnswerPeersRef.current.has(peerId)) return;
 
     const type: "audio" | "video" = callEvent.type === "video" ? "video" : "audio";
-    const win = window.open(
-      buildCallUrl(peerId, roomName, type),
-      "_blank",
-      "noopener,noreferrer",
-    );
+    const callUrl = buildCallUrl(peerId, roomName, type);
+    const win = window.open(callUrl, "_blank", "noopener,noreferrer");
     if (!win) {
-      setPendingJoin({ peerId, roomName, type });
+      // Popup blocked — navigate current tab (user was just browsing social).
+      window.location.href = callUrl;
       return;
     }
     openedAnswerPeersRef.current.add(peerId);
-    setPendingJoin((prev) => (prev?.peerId === peerId ? null : prev));
     window.setTimeout(() => {
       openedAnswerPeersRef.current.delete(peerId);
     }, 15000);
   }, [callEvent, buildCallUrl]);
-
-  const handleJoinPending = useCallback(() => {
-    if (!pendingJoin) return;
-    window.open(
-      buildCallUrl(pendingJoin.peerId, pendingJoin.roomName, pendingJoin.type),
-      "_blank",
-      "noopener,noreferrer",
-    );
-    openedAnswerPeersRef.current.add(pendingJoin.peerId);
-    setPendingJoin(null);
-  }, [pendingJoin, buildCallUrl]);
 
   const handleAcceptCall = useCallback(async () => {
     if (!incomingCall || !token || !profile) {
@@ -312,8 +286,11 @@ export default function GlobalDmIncomingCalls() {
         `&audioOnly=${isAudioOnly}` +
         `&peerId=${encodeURIComponent(incomingCall.from)}` +
         `&accessToken=${encodeURIComponent(token)}`;
-      window.open(callUrl, "_blank", "noopener,noreferrer");
       setIncomingCall(null);
+      const win = window.open(callUrl, "_blank", "noopener,noreferrer");
+      if (!win) {
+        window.location.href = callUrl;
+      }
     } catch (e) {
       console.error("[GlobalDmIncomingCalls] accept failed", e);
       setAcceptError("Không thể chấp nhận cuộc gọi");
@@ -331,23 +308,6 @@ export default function GlobalDmIncomingCalls() {
   if (isMessagesRoute || !authOk || !socketEnabled) {
     return null;
   }
-
-  const joinPopup =
-    pendingJoin &&
-    createPortal(
-      <OutgoingCallPopup
-        receiverName="Cuộc gọi"
-        callType={pendingJoin.type}
-        status="answered"
-        lightBackdrop
-        onJoin={handleJoinPending}
-        onCancel={() => {
-          endCall(pendingJoin.peerId);
-          setPendingJoin(null);
-        }}
-      />,
-      document.body,
-    );
 
   const popup =
     incomingCall &&
@@ -389,10 +349,5 @@ export default function GlobalDmIncomingCalls() {
       document.body,
     );
 
-  return (
-    <>
-      {popup}
-      {joinPopup}
-    </>
-  );
+  return <>{popup}</>;
 }

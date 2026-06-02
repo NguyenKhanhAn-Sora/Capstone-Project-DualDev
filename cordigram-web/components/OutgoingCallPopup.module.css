@@ -16,14 +16,9 @@
 
 /* Lighter backdrop for the global popup over social pages. */
 .overlayLight {
-  background: radial-gradient(
-    ellipse 120% 80% at 50% 40%,
-    rgba(67, 181, 129, 0.1) 0%,
-    rgba(12, 14, 20, 0.5) 55%,
-    rgba(8, 9, 14, 0.62) 100%
-  );
-  backdrop-filter: blur(10px) saturate(1.1);
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
 }
 
 @keyframes fadeIn {
