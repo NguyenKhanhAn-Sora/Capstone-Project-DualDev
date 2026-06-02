@@ -21,6 +21,7 @@ import 'services/polls_api_service.dart';
 import 'services/server_media_service.dart';
 import 'search/message_search_sheet.dart';
 import 'widgets/channel_chat_gate_sheet.dart';
+import 'widgets/chat_link_preview.dart';
 import 'widgets/gif_toolbar_icon.dart';
 import 'widgets/sticker_toolbar_icon.dart';
 import 'widgets/messages_chrome_builder.dart';
@@ -1542,6 +1543,19 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         return _VoiceMessageBubble(url: url, durationSec: duration);
       }
     }
+    // Pre-fetched link previews (fetched server-side on send)
+    if (message.linkPreviews.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildEmojiAwareText(text),
+          const SizedBox(height: 6),
+          ChatLinkPreviewList(previews: message.linkPreviews),
+        ],
+      );
+    }
+
     return _buildEmojiAwareText(text);
   }
 

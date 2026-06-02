@@ -36,6 +36,7 @@ import {
   parseMessageSearchQuery,
   type ParsedMessageSearch,
 } from './message-search-query.parser';
+import { LinkPreviewService } from '../comment/link-preview.service';
 
 @Injectable()
 export class MessagesService {
@@ -57,6 +58,7 @@ export class MessagesService {
     private readonly cloudinaryService: CloudinaryService,
     @Inject(forwardRef(() => BoostService))
     private readonly boostService: BoostService,
+    private readonly linkPreviewService: LinkPreviewService,
   ) {}
 
   private readonly defaultAvatarUrl =
@@ -867,6 +869,12 @@ export class MessagesService {
       resolvedServerStickerId = new Types.ObjectId(sid);
     }
 
+    // Pre-fetch link previews for plain-text messages only
+    const linkPreviews =
+      messageTypeResolved === 'text' && moderatedContent
+        ? await this.linkPreviewService.extractFromText(moderatedContent)
+        : [];
+
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
       senderId: userObjectId,
@@ -883,6 +891,7 @@ export class MessagesService {
       serverStickerId: resolvedServerStickerId,
       voiceUrl: createMessageDto.voiceUrl || null,
       voiceDuration: createMessageDto.voiceDuration ?? null,
+      linkPreviews,
     });
 
     const savedMessage = await message.save();

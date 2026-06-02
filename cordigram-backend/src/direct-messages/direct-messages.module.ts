@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { DirectMessagesService } from './direct-messages.service';
+import { LinkPreviewService } from '../comment/link-preview.service';
 import { DirectMessagesController } from './direct-messages.controller';
 import { DirectMessagesGateway } from './direct-messages.gateway';
 import { DirectMessage, DirectMessageSchema } from './direct-message.schema';
@@ -33,7 +34,7 @@ import { Server, ServerSchema } from '../servers/server.schema';
       secret: process.env.JWT_SECRET || 'your_secret_key',
     }),
   ],
-  providers: [DirectMessagesService, DirectMessagesGateway],
+  providers: [DirectMessagesService, DirectMessagesGateway, LinkPreviewService],
   controllers: [DirectMessagesController],
   exports: [DirectMessagesService, DirectMessagesGateway],
 })

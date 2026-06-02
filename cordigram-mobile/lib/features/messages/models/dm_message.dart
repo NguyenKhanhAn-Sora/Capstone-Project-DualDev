@@ -1,5 +1,38 @@
 import 'message_reaction.dart';
 
+class DmLinkPreview {
+  const DmLinkPreview({
+    required this.url,
+    this.canonicalUrl,
+    this.domain,
+    this.siteName,
+    this.title,
+    this.description,
+    this.image,
+    this.favicon,
+  });
+
+  final String url;
+  final String? canonicalUrl;
+  final String? domain;
+  final String? siteName;
+  final String? title;
+  final String? description;
+  final String? image;
+  final String? favicon;
+
+  factory DmLinkPreview.fromJson(Map<String, dynamic> j) => DmLinkPreview(
+        url: (j['url'] ?? '').toString(),
+        canonicalUrl: j['canonicalUrl']?.toString(),
+        domain: j['domain']?.toString(),
+        siteName: j['siteName']?.toString(),
+        title: j['title']?.toString(),
+        description: j['description']?.toString(),
+        image: j['image']?.toString(),
+        favicon: j['favicon']?.toString(),
+      );
+}
+
 class DmMessage {
   const DmMessage({
     required this.id,
@@ -15,6 +48,7 @@ class DmMessage {
     this.replyTo,
     this.attachments = const [],
     this.reactions = const [],
+    this.linkPreviews = const [],
     this.isPinned = false,
     this.pinnedAt,
     this.senderDisplayName,
@@ -42,6 +76,7 @@ class DmMessage {
   final DmReplyMessage? replyTo;
   final List<String> attachments;
   final List<MessageReaction> reactions;
+  final List<DmLinkPreview> linkPreviews;
   final bool isPinned;
   final DateTime? pinnedAt;
   final String? senderDisplayName;
@@ -131,6 +166,14 @@ class DmMessage {
       attachments: attachmentsRaw is List
           ? attachmentsRaw.map((e) => e.toString()).toList()
           : const <String>[],
+      linkPreviews: () {
+        final raw = json['linkPreviews'];
+        if (raw is! List) return const <DmLinkPreview>[];
+        return raw
+            .whereType<Map>()
+            .map((e) => DmLinkPreview.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }(),
       reactions: reactionsRaw is List
           ? reactionsRaw
                 .whereType<Map>()

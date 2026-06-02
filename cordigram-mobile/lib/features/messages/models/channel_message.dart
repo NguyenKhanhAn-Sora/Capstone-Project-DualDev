@@ -1,4 +1,5 @@
 import 'message_reaction.dart';
+import 'dm_message.dart' show DmLinkPreview;
 
 class ChannelMessage {
   const ChannelMessage({
@@ -20,6 +21,7 @@ class ChannelMessage {
     this.replyTo,
     this.senderAvatarUrl,
     this.stickerReplyWelcomeEnabled = true,
+    this.linkPreviews = const [],
   });
 
   final String id;
@@ -42,6 +44,9 @@ class ChannelMessage {
 
   /// Server interaction setting; only used when [type] is `welcome`.
   final bool stickerReplyWelcomeEnabled;
+
+  /// Pre-fetched link previews (fetched server-side on message send).
+  final List<DmLinkPreview> linkPreviews;
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
     final senderRaw = json['sender'] ?? json['senderId'];
@@ -103,6 +108,14 @@ class ChannelMessage {
             )
           : null,
       stickerReplyWelcomeEnabled: json['stickerReplyWelcomeEnabled'] != false,
+      linkPreviews: () {
+        final raw = json['linkPreviews'];
+        if (raw is! List) return const <DmLinkPreview>[];
+        return raw
+            .whereType<Map>()
+            .map((e) => DmLinkPreview.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }(),
     );
   }
 }

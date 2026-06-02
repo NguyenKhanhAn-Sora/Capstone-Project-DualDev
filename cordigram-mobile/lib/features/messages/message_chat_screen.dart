@@ -23,7 +23,7 @@ import 'widgets/dm_call_message_card.dart';
 import 'widgets/dm_giphy_message.dart';
 import 'widgets/conversation_details_sheet.dart';
 import 'widgets/dm_peer_profile_sheet.dart';
-import 'widgets/link_preview_card.dart';
+import 'widgets/chat_link_preview.dart';
 import 'widgets/report_dm_message_sheet.dart';
 import 'widgets/server_join_flow.dart';
 import 'widgets/messages_chrome_builder.dart';
@@ -1988,15 +1988,15 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       );
     }
 
-    // Plain text — show link preview if a URL is detected
-    final previewUrl = extractFirstUrl(text);
-    if (previewUrl != null) {
+    // Plain text — render pre-fetched link previews (fetched server-side on send)
+    if (message.linkPreviews.isNotEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildEmojiAwareText(text),
-          LinkPreviewCard(url: previewUrl),
+          const SizedBox(height: 6),
+          ChatLinkPreviewList(previews: message.linkPreviews),
         ],
       );
     }
@@ -3667,3 +3667,4 @@ class _MenuActionRow extends StatelessWidget {
     );
   }
 }
+

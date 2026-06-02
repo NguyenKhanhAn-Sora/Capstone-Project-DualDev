@@ -66,6 +66,32 @@ export class DirectMessage extends Document {
   @Prop({
     type: [
       {
+        url: String,
+        canonicalUrl: String,
+        domain: String,
+        siteName: { type: String, default: null },
+        title: { type: String, default: null },
+        description: { type: String, default: null },
+        image: { type: String, default: null },
+        favicon: { type: String, default: null },
+      },
+    ],
+    default: [],
+  })
+  linkPreviews: Array<{
+    url: string;
+    canonicalUrl: string;
+    domain: string;
+    siteName: string | null;
+    title: string | null;
+    description: string | null;
+    image: string | null;
+    favicon: string | null;
+  }>;
+
+  @Prop({
+    type: [
+      {
         userId: { type: Types.ObjectId, ref: 'User' },
         emoji: String,
       },

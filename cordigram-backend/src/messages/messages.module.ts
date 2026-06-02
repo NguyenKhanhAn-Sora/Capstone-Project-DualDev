@@ -20,6 +20,7 @@ import { UserServer, UserServerSchema } from '../access/user-server.schema';
 import { User, UserSchema } from '../users/user.schema';
 import { MediaModerationService } from '../posts/media-moderation.service';
 import { BoostModule } from '../boost/boost.module';
+import { LinkPreviewService } from '../comment/link-preview.service';
 
 @Module({
   imports: [
@@ -40,7 +41,7 @@ import { BoostModule } from '../boost/boost.module';
       secret: process.env.JWT_SECRET || 'your_secret_key',
     }),
   ],
-  providers: [MessagesService, ChannelMessagesGateway, MediaModerationService],
+  providers: [MessagesService, ChannelMessagesGateway, MediaModerationService, LinkPreviewService],
   controllers: [MessageSearchController, MessagesController],
   exports: [MessagesService, ChannelMessagesGateway],
 })

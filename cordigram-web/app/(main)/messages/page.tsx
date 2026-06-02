@@ -6,8 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
-import { LinkPreviewCard, extractFirstUrl } from "@/components/LinkPreviewCard/LinkPreviewCard";
-import { apiBaseUrl } from "@/lib/api";
+import { LinkPreviewCard } from "@/components/LinkPreviewCard/LinkPreviewCard";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
 import {
@@ -308,6 +307,17 @@ interface UIMessage {
   deletedAt?: string;
   /** Raw attachment URLs — kept for backward compat with messages sent before the emoji-prefix format. */
   attachments?: string[];
+  /** Pre-fetched link preview cards (same schema as social CommentLinkPreview). */
+  linkPreviews?: Array<{
+    url: string;
+    canonicalUrl?: string | null;
+    domain?: string | null;
+    siteName?: string | null;
+    title?: string | null;
+    description?: string | null;
+    image?: string | null;
+    favicon?: string | null;
+  }>;
 }
 
 type PendingMessageJump = {
@@ -4343,6 +4353,7 @@ export default function MessagesPage() {
         reactions: normalizeReactions(msg.reactions),
         replyTo: msg.replyTo?._id || undefined,
         replyToMessage: mapReplyToMessage(msg.replyTo),
+        linkPreviews: Array.isArray(msg.linkPreviews) ? msg.linkPreviews : [],
       };
 
       //  Replace optimistic message with real message from server
@@ -4435,6 +4446,7 @@ export default function MessagesPage() {
         isDeletedForEveryone: msg.isDeleted === true,
         deletedAt: msg.deletedAt || undefined,
         attachments: Array.isArray(msg.attachments) ? msg.attachments : undefined,
+        linkPreviews: Array.isArray(msg.linkPreviews) ? msg.linkPreviews : [],
       };
 
 
@@ -4892,6 +4904,7 @@ export default function MessagesPage() {
         isDeletedForEveryone: (msg as serversApi.Message).isDeleted === true,
         deletedAt: (msg as serversApi.Message).deletedAt || undefined,
         attachments: Array.isArray((msg as any).attachments) ? (msg as any).attachments : undefined,
+        linkPreviews: Array.isArray((msg as any).linkPreviews) ? (msg as any).linkPreviews : [],
       }));
 
       setMessages(sortServerMessagesAscending(uiMessages));
@@ -4978,6 +4991,7 @@ export default function MessagesPage() {
         isDeletedForEveryone: msg.isDeleted === true,
         deletedAt: msg.deletedAt || undefined,
         attachments: Array.isArray(msg.attachments) ? msg.attachments : undefined,
+        linkPreviews: Array.isArray(msg.linkPreviews) ? msg.linkPreviews : [],
       }));
 
       setConversations((prev) => {
@@ -5711,6 +5725,7 @@ export default function MessagesPage() {
               }
             : null),
         reactions: normalizeReactions((newMessage as any).reactions),
+        linkPreviews: Array.isArray((newMessage as any).linkPreviews) ? (newMessage as any).linkPreviews : [],
       };
 
       setMessages((prev) => appendServerMessage(prev, uiMessage));
@@ -7710,9 +7725,12 @@ export default function MessagesPage() {
       if (last < text.length) {
         nodes.push(<span key="tail">{text.slice(last)}</span>);
       }
-      const previewUrl = extractFirstUrl(text);
-      return (
-        <div style={{ display: "contents" }}>
+      const previews = Array.isArray(message.linkPreviews) && message.linkPreviews.length > 0
+        ? message.linkPreviews
+        : null;
+
+      if (!previews) {
+        return (
           <span
             style={{
               whiteSpace: "pre-wrap",
@@ -7729,9 +7747,28 @@ export default function MessagesPage() {
           >
             {nodes}
           </span>
-          {previewUrl && (
-            <LinkPreviewCard url={previewUrl} apiBase={apiBaseUrl} token={token} />
-          )}
+        );
+      }
+
+      return (
+        <div>
+          <span
+            style={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              ...(isJumboEmojiRow
+                ? {
+                    display: "inline-flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 6,
+                  }
+                : {}),
+            }}
+          >
+            {nodes}
+          </span>
+          <LinkPreviewCard previews={previews} />
         </div>
       );
     },

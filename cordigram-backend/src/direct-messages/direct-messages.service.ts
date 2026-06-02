@@ -27,6 +27,7 @@ import {
 import { MessagingProfilesService } from '../messaging-profiles/messaging-profiles.service';
 import { Server } from '../servers/server.schema';
 import { BoostService } from '../boost/boost.service';
+import { LinkPreviewService } from '../comment/link-preview.service';
 
 @Injectable()
 export class DirectMessagesService {
@@ -43,6 +44,7 @@ export class DirectMessagesService {
     private readonly messagingProfilesService: MessagingProfilesService,
     @Inject(forwardRef(() => BoostService))
     private readonly boostService: BoostService,
+    private readonly linkPreviewService: LinkPreviewService,
   ) {}
 
   /** Lần hoạt động gần nhất từ thiết bị đăng nhập (fallback khi không có socket presence). */
@@ -196,11 +198,20 @@ export class DirectMessagesService {
       resolvedServerStickerId = resolved.serverStickerId;
     }
 
+    // Pre-fetch link previews for plain-text messages only (skip media/call/voice)
+    const msgType = createDirectMessageDto.type || 'text';
+    const linkPreviews =
+      msgType === 'text' && createDirectMessageDto.content
+        ? await this.linkPreviewService.extractFromText(
+            createDirectMessageDto.content,
+          )
+        : [];
+
     const message = new this.directMessageModel({
       senderId: new Types.ObjectId(senderId),
       receiverId: new Types.ObjectId(receiverId),
       content: createDirectMessageDto.content,
-      type: createDirectMessageDto.type || 'text',
+      type: msgType,
       giphyId: createDirectMessageDto.giphyId || null,
       customStickerUrl: resolvedCustomStickerUrl,
       serverStickerId: resolvedServerStickerId,
@@ -210,6 +221,7 @@ export class DirectMessagesService {
       replyTo: createDirectMessageDto.replyTo
         ? new Types.ObjectId(createDirectMessageDto.replyTo)
         : null,
+      linkPreviews,
     });
 
     return message.save();
@@ -404,6 +416,9 @@ export class DirectMessagesService {
               : msg.attachments,
             voiceUrl: normalizeHttps(msg.voiceUrl),
             customStickerUrl: normalizeHttps(msg.customStickerUrl),
+            linkPreviews: Array.isArray(msg.linkPreviews)
+              ? msg.linkPreviews
+              : [],
             senderId: senderPart ?? {
               _id: msg.senderId._id,
               email: msg.senderId.email,
