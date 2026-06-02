@@ -13653,6 +13653,13 @@ export default function MessagesPage() {
           )}
         </div>
       )}
+      {mediaViewerState && (
+        <ChatMediaViewer
+          items={mediaViewerState.items}
+          initialIndex={mediaViewerState.index}
+          onClose={() => setMediaViewerState(null)}
+        />
+      )}
     </div>
   );
 }
@@ -13953,14 +13960,6 @@ function CommunityOverviewSection({
             </div>
           </div>
         </>
-      )}
-
-      {mediaViewerState && (
-        <ChatMediaViewer
-          items={mediaViewerState.items}
-          initialIndex={mediaViewerState.index}
-          onClose={() => setMediaViewerState(null)}
-        />
       )}
     </div>
   );
