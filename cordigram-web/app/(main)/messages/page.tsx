@@ -1396,6 +1396,12 @@ function normalizeReactions(
   }));
 }
 
+/** Force any media URL to HTTPS. Old records in DB may have http:// Cloudinary URLs. */
+function toHttps(url: string): string {
+  if (!url) return url;
+  return url.startsWith("http://") ? "https://" + url.slice(7) : url;
+}
+
 function mapReplyToMessage(raw: any): UIMessage["replyToMessage"] {
   if (!raw || !raw._id) return null;
   const sender = raw.senderId;
@@ -7060,10 +7066,12 @@ export default function MessagesPage() {
       let clickedIndex = 0;
 
       const pushMedia = (url: string, mediaType: "image" | "video", ts: Date, sender?: string) => {
-        // deduplicate
-        if (allMedia.some((m) => m.url === url)) return;
-        allMedia.push({ url, mediaType, timestamp: ts, senderName: sender });
-        if (url === clickedUrl) clickedIndex = allMedia.length - 1;
+        const safeUrl = toHttps(url);
+        // deduplicate (compare after normalizing to https)
+        if (allMedia.some((m) => m.url === safeUrl)) return;
+        allMedia.push({ url: safeUrl, mediaType, timestamp: ts, senderName: sender });
+        // match against both original and https-normalized clicked URL
+        if (safeUrl === toHttps(clickedUrl)) clickedIndex = allMedia.length - 1;
       };
 
       for (const msg of messages) {
@@ -7375,10 +7383,11 @@ export default function MessagesPage() {
       ) {
         const extraLines: string[] = [];
         for (const att of message.attachments) {
-          if (PLAIN_VIDEO_URL_RE.test(att.trim())) {
-            extraLines.push(`🎬 [Video]: ${att.trim()}`);
-          } else if (att.trim().startsWith("https://") || att.trim().startsWith("http://")) {
-            extraLines.push(`📷 [Image]: ${att.trim()}`);
+          const safeAtt = toHttps(att.trim());
+          if (PLAIN_VIDEO_URL_RE.test(safeAtt)) {
+            extraLines.push(`🎬 [Video]: ${safeAtt}`);
+          } else if (safeAtt.startsWith("https://")) {
+            extraLines.push(`📷 [Image]: ${safeAtt}`);
           }
         }
         if (extraLines.length > 0) {
@@ -7390,12 +7399,16 @@ export default function MessagesPage() {
         !resolvedText.includes("📷 [Image]:") &&
         !resolvedText.includes("🎬 [Video]:")
       ) {
-        const trimmed = resolvedText.trim();
+        const trimmed = toHttps(resolvedText.trim());
         if (PLAIN_IMAGE_URL_RE.test(trimmed)) {
           resolvedText = `📷 [Image]: ${trimmed}`;
         } else if (PLAIN_VIDEO_URL_RE.test(trimmed)) {
           resolvedText = `🎬 [Video]: ${trimmed}`;
         }
+      }
+      // Normalize any existing http:// URLs already embedded in resolvedText
+      if (resolvedText.includes("http://res.cloudinary.com/")) {
+        resolvedText = resolvedText.replace(/http:\/\/res\.cloudinary\.com\//g, "https://res.cloudinary.com/");
       }
 
       // Check if message contains media (single or multiple images)
@@ -7405,7 +7418,7 @@ export default function MessagesPage() {
       const gifMatch = resolvedText.match(/(https?:\/\/[^\s]+\.gif)/i);
 
       if (allImageMatches.length > 0) {
-        const imageUrls = allImageMatches.map((m) => m[1]);
+        const imageUrls = allImageMatches.map((m) => toHttps(m[1]));
         const modResult = message.contentModerationResult;
         const hasBlurred = imageUrls.some((u) => u.includes("e_blur:"));
 
@@ -7503,7 +7516,7 @@ export default function MessagesPage() {
       }
 
       if (videoMatch) {
-        const rawVideoUrl = videoMatch[1];
+        const rawVideoUrl = toHttps(videoMatch[1]);
         const videoUrl = optimizeHeavyVideoUrl(rawVideoUrl);
         return (
           <div className={styles.mediaMessage} style={{ position: "relative" }}>
@@ -7557,7 +7570,7 @@ export default function MessagesPage() {
       }
 
       if (gifMatch) {
-        const gifUrl = gifMatch[1];
+        const gifUrl = toHttps(gifMatch[1]);
         return (
           <div className={styles.mediaMessage}>
             <img src={gifUrl} alt="Ảnh GIF" className={styles.messageGif} />

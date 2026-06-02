@@ -1738,6 +1738,13 @@ export class MessagesService {
       ? await this.batchServerAvatars(serverIdForAvatars, uniqueSenderIds)
       : new Map<string, string>();
 
+    const normalizeHttps = (url: string | null | undefined): string =>
+      url && url.startsWith('http://') ? 'https://' + url.slice(7) : (url ?? '');
+    const normalizeContent = (content: string): string =>
+      content
+        ? content.replace(/http:\/\/res\.cloudinary\.com\//g, 'https://res.cloudinary.com/')
+        : content;
+
     return messages.map((msg: any) => {
       const senderId = msg.senderId?._id ?? msg.senderId;
       const senderUserIdStr =
@@ -1748,6 +1755,11 @@ export class MessagesService {
 
       return {
         ...msg,
+        content: normalizeContent(msg.content),
+        attachments: Array.isArray(msg.attachments)
+          ? msg.attachments.map((a: string) => normalizeHttps(a))
+          : msg.attachments,
+        voiceUrl: msg.voiceUrl ? normalizeHttps(msg.voiceUrl) : msg.voiceUrl,
         senderId: this.buildEnrichedSender(
           msg.senderId,
           senderProfile,

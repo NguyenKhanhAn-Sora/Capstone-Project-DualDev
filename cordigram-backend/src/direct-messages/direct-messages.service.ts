@@ -386,8 +386,24 @@ export class DirectMessagesService {
             };
           }
 
+          // Normalize http:// Cloudinary URLs to https:// before sending to client
+          const normalizeHttps = (url: string | null | undefined): string | null | undefined =>
+            url && typeof url === 'string' && url.startsWith('http://')
+              ? 'https://' + url.slice(7)
+              : url;
+          const normalizeContent = (content: string): string =>
+            content
+              ? content.replace(/http:\/\/res\.cloudinary\.com\//g, 'https://res.cloudinary.com/')
+              : content;
+
           return {
             ...msg,
+            content: normalizeContent(msg.content),
+            attachments: Array.isArray(msg.attachments)
+              ? msg.attachments.map((a: string) => normalizeHttps(a) ?? a)
+              : msg.attachments,
+            voiceUrl: normalizeHttps(msg.voiceUrl),
+            customStickerUrl: normalizeHttps(msg.customStickerUrl),
             senderId: senderPart ?? {
               _id: msg.senderId._id,
               email: msg.senderId.email,
