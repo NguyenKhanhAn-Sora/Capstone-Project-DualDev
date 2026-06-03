@@ -387,6 +387,8 @@
       "noMatches": "該当する結果はありません",
       "hashtags": "ハッシュタグ",
       "addHashtag": "ハッシュタグを追加",
+      "hashtagPlaceholder": "例: 旅行",
+      "hashtagHint": "EnterキーまたはSpaceキーを押してハッシュタグを追加",
       "removeHashtag": "{tag} を削除する",
       "location": {
         "label": "場所",
@@ -848,7 +850,10 @@
         "carouselLimit": "カルーセルは最大5枚まで。1枚削除してから追加してください。",
         "singleFileOnly": "このフォーマットはファイル1つのみ対応しています。",
         "uploadFailed": "アップロードに失敗しました。再試行してください。",
-        "prepareCreativeFailed": "チェックアウト用の広告クリエイティブを準備できませんでした。"
+        "prepareCreativeFailed": "チェックアウト用の広告クリエイティブを準備できませんでした。",
+        "ageRangeInvalid": "最低年齢は最高年齢より小さくなければなりません。",
+        "fileTooLarge": "ファイルが大きすぎます。画像は最大10MB、動画は最大200MBです。",
+        "formatChangeClearMedia": "広告フォーマットを変更すると、アップロード済みのメディアが削除されます。続行しますか？"
       },
       "audience": {
         "title": "ターゲット設定",
