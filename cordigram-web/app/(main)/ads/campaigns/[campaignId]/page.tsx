@@ -258,11 +258,29 @@ export default function CampaignDetailPage() {
   const [upgradeError, setUpgradeError] = useState("");
   const [isHideConfirmOpen, setIsHideConfirmOpen] = useState(false);
   const [isEditPrimaryEmojiOpen, setIsEditPrimaryEmojiOpen] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [editErrors, setEditErrors] = useState<{ primaryText?: string; headline?: string; destinationUrl?: string }>({});
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const editMediaInputRef = useRef<HTMLInputElement | null>(null);
   const editPrimaryEmojiRef = useRef<HTMLDivElement | null>(null);
   const editPrimaryTextRef = useRef<HTMLTextAreaElement | null>(null);
   const editPrimarySelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const upgradePanelRef = useRef<HTMLDivElement | null>(null);
+
+  const showToast = (msg: string, type: "success" | "error") => setToast({ msg, type });
+
+  const getObjectiveLabel = (obj: string) =>
+    objectiveOptions.find((o) => o.value === obj)?.label ?? obj;
+
+  const getFormatLabel = (fmt: string) =>
+    formatOptions.find((f) => f.value === fmt)?.label ?? fmt;
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    }).catch(() => {});
+  };
 
   const buildDraftFromDetail = (item: AdsCampaignDetail): EditDraft => ({
     campaignName: item.campaignName ?? "",
@@ -605,9 +623,32 @@ export default function CampaignDetailPage() {
 
   const saveEditedDetails = async () => {
     if (!token || !campaignId || !detail || !editDraft || !hasEditChanges) return;
+
+    // Validate required fields
+    const valErrors: typeof editErrors = {};
+    if (!editDraft.primaryText.trim()) valErrors.primaryText = "Primary text is required.";
+    if (!editDraft.headline.trim()) valErrors.headline = "Headline is required.";
+    const urlVal = editDraft.destinationUrl.trim();
+    if (!urlVal) {
+      valErrors.destinationUrl = "Destination URL is required.";
+    } else {
+      try {
+        const parsed = new URL(urlVal);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          valErrors.destinationUrl = "URL must start with http:// or https://";
+        }
+      } catch {
+        valErrors.destinationUrl = "Destination URL is invalid.";
+      }
+    }
+    if (Object.keys(valErrors).length > 0) {
+      setEditErrors(valErrors);
+      return;
+    }
+    setEditErrors({});
+
     setEditSaving(true);
     setEditError("");
-    setSuccess("");
     const normalized = normalizeDraft(editDraft);
     const originalNormalized = normalizeDraft(buildDraftFromDetail(detail));
     const effectiveMediaUrls = isMediaEditLocked ? originalNormalized.mediaUrls : normalized.mediaUrls;
@@ -629,7 +670,7 @@ export default function CampaignDetailPage() {
         mediaUrls: effectiveMediaUrls,
       });
       setDetail(updated);
-      setSuccess(t("detail.editModal.savedSuccess"));
+      showToast(t("detail.editModal.savedSuccess"), "success");
       setIsEditOpen(false);
     } catch (err) {
       setEditError(err instanceof Error ? err.message : t("detail.editModal.saveFailed"));
@@ -652,10 +693,10 @@ export default function CampaignDetailPage() {
     try {
       const updated = await performAdsCampaignAction({ token, campaignId, action });
       setDetail(updated);
-      setSuccess(action === "pause_campaign" ? t("detail.lifecycle.pauseSuccess") : t("detail.lifecycle.resumeSuccess"));
+      showToast(action === "pause_campaign" ? t("detail.lifecycle.pauseSuccess") : t("detail.lifecycle.resumeSuccess"), "success");
     } catch (err) {
       const message = err instanceof Error ? err.message : t("detail.lifecycle.updateFailed");
-      setError(message);
+      showToast(message, "error");
       if (/expired|extend/i.test(message) && action === "resume_campaign") {
         setUpgradeError(t("detail.lifecycle.requiresExtendHint"));
         scrollToUpgradePanel();
@@ -664,6 +705,12 @@ export default function CampaignDetailPage() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!activeMedia) return;
@@ -705,6 +752,26 @@ export default function CampaignDetailPage() {
 
   return (
     <div className={styles.page}>
+      {toast ? (
+        <div className={`${styles.toast} ${toast.type === "success" ? styles.toastSuccess : styles.toastError}`}>
+          {toast.type === "success" ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+              <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          )}
+          <span>{toast.msg}</span>
+          <button type="button" className={styles.toastClose} onClick={() => setToast(null)} aria-label="Dismiss">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      ) : null}
       <div className={styles.container}>
         <div className={styles.topRow}>
           <button type="button" className={styles.backBtn} onClick={() => router.push("/ads/campaigns")}>
@@ -717,13 +784,31 @@ export default function CampaignDetailPage() {
               style={{ marginLeft: "auto" }}
               onClick={() => router.push(`/post/${detail.promotedPostId}`)}
             >
-              {t("detail.goToAds")}
+              View ad post
             </button>
           ) : null}
         </div>
 
-        {loading ? <p className={styles.helper}>{t("detail.loading")}</p> : null}
-        {!loading && error ? <p className={styles.helper}>{error}</p> : null}
+        {loading ? (
+          <div className={styles.skeletonWrap}>
+            <div className={`${styles.skeletonHero} ${styles.skeletonPulse}`} />
+            <div className={styles.metricGrid}>
+              {[0,1,2,3,4].map((i) => (
+                <div key={i} className={`${styles.metricCard} ${styles.skeletonPulse}`} style={{ minHeight: 90 }} />
+              ))}
+            </div>
+            <div className={`${styles.infoCard} ${styles.skeletonPulse}`} style={{ minHeight: 200 }} />
+            <div className={`${styles.infoCard} ${styles.skeletonPulse}`} style={{ minHeight: 280 }} />
+          </div>
+        ) : null}
+        {!loading && error ? (
+          <div className={styles.errorCard}>
+            <p className={styles.errorMsg}>{error}</p>
+            <button type="button" className={styles.secondaryBtn} onClick={() => window.location.reload()}>
+              Retry
+            </button>
+          </div>
+        ) : null}
 
         {!loading && detail ? (
           <>
@@ -738,9 +823,28 @@ export default function CampaignDetailPage() {
             </section>
 
             <section className={styles.metricGrid}>
-              <article className={styles.metricCard}>
+              <article className={`${styles.metricCard} ${styles.metricCardBudget}`}>
                 <p>{t("detail.metrics.spent")}</p>
                 <strong>{money(detail.spent)}</strong>
+                {detail.budget > 0 ? (
+                  <>
+                    <div className={styles.budgetBarTrack}>
+                      <div
+                        className={styles.budgetBarFill}
+                        style={{
+                          width: `${Math.min((detail.spent / detail.budget) * 100, 100)}%`,
+                          background:
+                            detail.spent / detail.budget >= 0.9 ? "#ef4444"
+                            : detail.spent / detail.budget >= 0.7 ? "#f59e0b"
+                            : "#22c55e",
+                        }}
+                      />
+                    </div>
+                    <span className={styles.budgetMeta}>
+                      {Math.round((detail.spent / detail.budget) * 100)}% of {money(detail.budget)}
+                    </span>
+                  </>
+                ) : null}
               </article>
               <article className={styles.metricCard}>
                 <p>{t("detail.metrics.impressions")}</p>
@@ -753,6 +857,15 @@ export default function CampaignDetailPage() {
               <article className={styles.metricCard}>
                 <p>{t("detail.metrics.ctr")}</p>
                 <strong>{pct(detail.ctr)}</strong>
+              </article>
+              <article className={`${styles.metricCard} ${styles.metricCardDays}`}>
+                <p>Days remaining</p>
+                <strong>
+                  {detail.status === "completed" || detail.status === "canceled"
+                    ? "—"
+                    : Math.max(0, performance.totalDays - performance.elapsedDays)}
+                </strong>
+                <span className={styles.budgetMeta}>{performance.elapsedDays} / {performance.totalDays} days elapsed</span>
               </article>
             </section>
 
@@ -777,7 +890,9 @@ export default function CampaignDetailPage() {
                 </article>
                 <article className={styles.breakdownItem}>
                   <p>{t("detail.metrics.avgDwell")}</p>
-                  <strong>{integer(Math.round(detail.averageDwellMs))} ms</strong>
+                  <strong>
+                    {detail.dwellSamples === 0 ? "N/A" : `${integer(Math.round(detail.averageDwellMs))} ms`}
+                  </strong>
                 </article>
               </div>
             </section>
@@ -787,11 +902,11 @@ export default function CampaignDetailPage() {
               <div className={styles.detailGrid}>
                 <div className={styles.detailRow}>
                   <span>{t("detail.config.objective")}</span>
-                  <strong>{detail.objective || t("detail.config.notAvailable")}</strong>
+                  <strong>{detail.objective ? getObjectiveLabel(detail.objective) : t("detail.config.notAvailable")}</strong>
                 </div>
                 <div className={styles.detailRow}>
                   <span>{t("detail.config.adFormat")}</span>
-                  <strong>{detail.adFormat || t("detail.config.notAvailable")}</strong>
+                  <strong>{detail.adFormat ? getFormatLabel(detail.adFormat) : t("detail.config.notAvailable")}</strong>
                 </div>
                 <div className={styles.detailRow}>
                   <span>{t("detail.config.boostPackage")}</span>
@@ -867,7 +982,37 @@ export default function CampaignDetailPage() {
                 </div>
                 <div className={styles.detailRow}>
                   <span>{t("detail.creative.destinationUrl")}</span>
-                  <strong>{detail.destinationUrl?.trim() || t("detail.config.notAvailable")}</strong>
+                  {detail.destinationUrl?.trim() ? (
+                    <div className={styles.urlRow}>
+                      <a
+                        className={styles.urlLink}
+                        href={detail.destinationUrl.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {detail.destinationUrl.trim()}
+                      </a>
+                      <button
+                        type="button"
+                        className={styles.copyBtn}
+                        onClick={() => copyToClipboard(detail.destinationUrl!.trim())}
+                        title="Copy URL"
+                      >
+                        {copiedUrl ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="1.8"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <strong>{t("detail.config.notAvailable")}</strong>
+                  )}
                 </div>
                 <div className={styles.detailRow}>
                   <span>{t("detail.creative.locationTargeting")}</span>
@@ -883,11 +1028,15 @@ export default function CampaignDetailPage() {
                 </div>
                 <div className={styles.detailRow}>
                   <span>{t("detail.creative.interests")}</span>
-                  <strong>
-                    {detail.interests && detail.interests.length > 0
-                      ? detail.interests.join(" · ")
-                      : t("detail.config.notAvailable")}
-                  </strong>
+                  {detail.interests && detail.interests.length > 0 ? (
+                    <div className={styles.interestChips}>
+                      {detail.interests.map((item) => (
+                        <span key={item} className={styles.interestChip}>{item}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <strong>{t("detail.config.notAvailable")}</strong>
+                  )}
                 </div>
               </div>
 
@@ -925,8 +1074,10 @@ export default function CampaignDetailPage() {
                 <div className={styles.editModal} onClick={(event) => event.stopPropagation()}>
                   <div className={styles.editHead}>
                     <h3 className={styles.editTitle}>{t("detail.editModal.title")}</h3>
-                    <button type="button" className={styles.editCloseBtn} onClick={closeEditOverlay} disabled={editSaving}>
-                      x
+                    <button type="button" className={styles.editCloseBtn} onClick={closeEditOverlay} disabled={editSaving} aria-label="Close">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
                     </button>
                   </div>
 
@@ -995,7 +1146,7 @@ export default function CampaignDetailPage() {
                       </div>
                       <textarea
                         ref={editPrimaryTextRef}
-                        className={styles.textarea}
+                        className={`${styles.textarea} ${editErrors.primaryText ? styles.inputError : ""}`}
                         rows={4}
                         value={editDraft.primaryText}
                         onChange={(event) => {
@@ -1003,6 +1154,7 @@ export default function CampaignDetailPage() {
                           const end = event.target.selectionEnd ?? start;
                           editPrimarySelectionRef.current = { start, end };
                           setEditDraft({ ...editDraft, primaryText: event.target.value });
+                          if (editErrors.primaryText) setEditErrors((p) => ({ ...p, primaryText: undefined }));
                         }}
                         onSelect={(event) => {
                           const start = event.currentTarget.selectionStart ?? 0;
@@ -1191,6 +1343,9 @@ export default function CampaignDetailPage() {
                       </div>
                     </div>
 
+                    {editErrors.primaryText && <p className={styles.fieldError}>{editErrors.primaryText}</p>}
+                    {editErrors.headline && <p className={styles.fieldError}>{editErrors.headline}</p>}
+                    {editErrors.destinationUrl && <p className={styles.fieldError}>{editErrors.destinationUrl}</p>}
                     {editError ? <p className={styles.error}>{editError}</p> : null}
                   </div>
 
@@ -1220,7 +1375,9 @@ export default function CampaignDetailPage() {
                   onClick={() => setActiveMedia(null)}
                   aria-label="Close media preview"
                 >
-                  x
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
                 </button>
                 <div className={styles.mediaLightboxInner} onClick={(event) => event.stopPropagation()}>
                   {activeMedia.isVideo ? (
@@ -1372,8 +1529,6 @@ export default function CampaignDetailPage() {
                 </div>
               ) : null}
 
-              {success ? <p className={styles.success}>{success}</p> : null}
-              {error ? <p className={styles.error}>{error}</p> : null}
             </section>
 
             {/* Hide confirm dialog */}

@@ -567,6 +567,7 @@
       "statusOptions": {
         "all": "Tất cả trạng thái",
         "active": "Đang chạy",
+        "paused": "Tạm dừng",
         "hidden": "Đã ẩn",
         "canceled": "Đã hủy",
         "completed": "Hoàn thành"

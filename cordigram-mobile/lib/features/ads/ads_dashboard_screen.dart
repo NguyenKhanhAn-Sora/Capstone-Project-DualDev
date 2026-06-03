@@ -431,7 +431,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      'Quick view of your 5 latest active campaigns.',
+                                      'Quick view of your 5 latest campaigns.',
                                       style: TextStyle(
                                         color: textSecondary,
                                         fontSize: 12.5,

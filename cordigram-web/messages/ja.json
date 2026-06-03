@@ -648,6 +648,7 @@
       "statusOptions": {
         "all": "すべてのステータス",
         "active": "配信中",
+        "paused": "一時停止",
         "hidden": "非表示",
         "canceled": "キャンセル",
         "completed": "完了"
