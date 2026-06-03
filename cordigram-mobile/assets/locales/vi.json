@@ -1901,11 +1901,7 @@
       "replyVoice": "Tin nhắn thoại",
       "replyWelcomeFallback": "Lời chào mừng",
       "plusUploadFile": "Tải tệp lên",
-      "plusCreatePoll": "Tạo khảo sát",
-      "replying": "Đang trả lời",
-      "replyMessage": "Tin nhắn",
-      "channelPlaceholder": "Nhắn tin trong #{name}",
-      "channelBlockedPlaceholder": "Kênh đang bị giới hạn chat"
+      "plusCreatePoll": "Tạo khảo sát"
     },
     "createPoll": {
       "title": "Tạo khảo sát",
@@ -3613,32 +3609,6 @@
       "turnOnNotifications": "Bật thông báo trở lại",
       "blockUpdateError": "Không thể cập nhật chặn",
       "now": "vừa xong"
-    },
-    "channel": {
-      "searchTooltip": "Tìm tin nhắn",
-      "completeGate": "Hoàn thành",
-      "noMessages": "Chưa có tin nhắn nào"
-    },
-    "conversationDetails": {
-      "title": "Chi tiết cuộc trò chuyện",
-      "encrypted": "Mã hóa đầu cuối",
-      "search": "Tìm kiếm",
-      "pinnedMessages": "Tin nhắn đã ghim",
-      "sharedMedia": "File phương tiện",
-      "sharedFiles": "File",
-      "searchPlaceholder": "Tìm kiếm tin nhắn...",
-      "noResults": "Không tìm thấy kết quả",
-      "loading": "Đang tải...",
-      "noPinned": "Chưa có tin nhắn nào được ghim",
-      "noMedia": "Chưa có file phương tiện nào",
-      "loadMore": "Tải thêm",
-      "searchFiles": "Tìm kiếm file...",
-      "noFiles": "Chưa có file nào được chia sẻ",
-      "noFilesFound": "Không tìm thấy file nào",
-      "today": "Hôm nay",
-      "yesterday": "Hôm qua",
-      "download": "Tải xuống",
-      "close": "Đóng"
     }
   },
   "player": {

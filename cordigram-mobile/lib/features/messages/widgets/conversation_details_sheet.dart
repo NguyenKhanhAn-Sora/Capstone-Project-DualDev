@@ -339,7 +339,7 @@ class _SheetBodyState extends State<_SheetBody>
           const SizedBox(height: 4),
           // Tabs
           _buildTabBar(),
-          Divider(height: 1, thickness: 1, color: _c.border),
+          const Divider(height: 1, thickness: 1, color: Color(0xFF233358)),
           // Tab views
           Expanded(
             child: TabBarView(
@@ -372,7 +372,7 @@ class _SheetBodyState extends State<_SheetBody>
             height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _c.surface,
+              color: const Color(0xFF1B2A4A),
               image: (widget.peerAvatarUrl?.isNotEmpty == true)
                   ? DecorationImage(
                       image: NetworkImage(
@@ -469,9 +469,7 @@ class _SheetBodyState extends State<_SheetBody>
             hintText: _cd('searchPlaceholder'),
             textColor: _c.text,
             hintColor: _c.text.withValues(alpha: 0.4),
-            fillColor: _c.surfaceMuted,
-            borderColor: _c.border,
-            accentColor: _c.accent,
+            borderColor: const Color(0xFF233358),
           ),
         ),
         Expanded(
@@ -504,14 +502,13 @@ class _SheetBodyState extends State<_SheetBody>
                           ),
                           itemCount: _searchResults.length,
                           separatorBuilder: (_, __) =>
-                              Divider(height: 1, color: _c.border),
+                              const Divider(height: 1, color: Color(0xFF1E2D4B)),
                           itemBuilder: (ctx, i) {
                             final m = _searchResults[i];
                             return _SearchResultTile(
                               message: m,
                               query: _searchCtrl.text.trim(),
                               textColor: _c.text,
-                              accentColor: _c.accent,
                               onTap: () => widget.onJumpToMessage(m.id),
                             );
                           },
@@ -553,14 +550,13 @@ class _SheetBodyState extends State<_SheetBody>
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       itemCount: _pinnedMessages.length,
-      separatorBuilder: (_, __) => Divider(height: 1, color: _c.border),
+      separatorBuilder: (_, __) =>
+          const Divider(height: 1, color: Color(0xFF1E2D4B)),
       itemBuilder: (ctx, i) {
         final m = _pinnedMessages[i];
         return _PinnedMessageTile(
           message: m,
           textColor: _c.text,
-          accentColor: _c.accent,
-          mediaLabel: _cd('sharedMedia'),
           onTap: () => widget.onJumpToMessage(m.id),
         );
       },
@@ -617,7 +613,6 @@ class _SheetBodyState extends State<_SheetBody>
               final idx = allItems.indexOf(item);
               return _MediaThumb(
                 item: item,
-                bgColor: _c.surfaceMuted,
                 onTap: () => widget.onOpenMediaViewer(allItems, idx < 0 ? 0 : idx),
               );
             },
@@ -660,9 +655,7 @@ class _SheetBodyState extends State<_SheetBody>
             hintText: _cd('searchFiles'),
             textColor: _c.text,
             hintColor: _c.text.withValues(alpha: 0.4),
-            fillColor: _c.surfaceMuted,
-            borderColor: _c.border,
-            accentColor: _c.accent,
+            borderColor: const Color(0xFF233358),
           ),
         ),
         Expanded(
@@ -692,9 +685,9 @@ class _SheetBodyState extends State<_SheetBody>
                         vertical: 4,
                       ),
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) => Divider(
+                      separatorBuilder: (_, __) => const Divider(
                         height: 1,
-                        color: _c.border,
+                        color: Color(0xFF1E2D4B),
                       ),
                       itemBuilder: (ctx, i) {
                         final f = filtered[i];
@@ -719,18 +712,14 @@ class _SearchField extends StatelessWidget {
     required this.hintText,
     required this.textColor,
     required this.hintColor,
-    required this.fillColor,
     required this.borderColor,
-    required this.accentColor,
   });
 
   final TextEditingController controller;
   final String hintText;
   final Color textColor;
   final Color hintColor;
-  final Color fillColor;
   final Color borderColor;
-  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -743,7 +732,7 @@ class _SearchField extends StatelessWidget {
         prefixIcon: Icon(Icons.search_rounded, color: hintColor, size: 18),
         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         filled: true,
-        fillColor: fillColor,
+        fillColor: const Color(0xFF0E1E3F),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: borderColor),
@@ -754,7 +743,7 @@ class _SearchField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: accentColor, width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF3D63DD), width: 1.5),
         ),
       ),
     );
@@ -766,14 +755,12 @@ class _SearchResultTile extends StatelessWidget {
     required this.message,
     required this.query,
     required this.textColor,
-    required this.accentColor,
     required this.onTap,
   });
 
   final DmMessage message;
   final String query;
   final Color textColor;
-  final Color accentColor;
   final VoidCallback onTap;
 
   @override
@@ -824,7 +811,8 @@ class _SearchResultTile extends StatelessWidget {
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 13,
-                                  backgroundColor: accentColor.withValues(alpha: 0.35),
+                                  backgroundColor:
+                                      const Color(0xFF3D63DD).withValues(alpha: 0.35),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -860,15 +848,11 @@ class _PinnedMessageTile extends StatelessWidget {
   const _PinnedMessageTile({
     required this.message,
     required this.textColor,
-    required this.accentColor,
-    required this.mediaLabel,
     required this.onTap,
   });
 
   final DmMessage message;
   final Color textColor;
-  final Color accentColor;
-  final String mediaLabel;
   final VoidCallback onTap;
 
   @override
@@ -885,7 +869,8 @@ class _PinnedMessageTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.push_pin_rounded, size: 14, color: accentColor),
+            Icon(Icons.push_pin_rounded,
+                size: 14, color: const Color(0xFF3D63DD)),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -894,14 +879,14 @@ class _PinnedMessageTile extends StatelessWidget {
                   Text(
                     message.senderDisplayName ?? message.senderUsername ?? '—',
                     style: TextStyle(
-                      color: accentColor,
+                      color: const Color(0xFF3D63DD),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    message.content.isEmpty ? '📎 $mediaLabel' : message.content,
+                    message.content.isEmpty ? '📎 Media' : message.content,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: textColor, fontSize: 13),
@@ -927,14 +912,9 @@ class _PinnedMessageTile extends StatelessWidget {
 }
 
 class _MediaThumb extends StatelessWidget {
-  const _MediaThumb({
-    required this.item,
-    required this.bgColor,
-    required this.onTap,
-  });
+  const _MediaThumb({required this.item, required this.onTap});
 
   final CdsMediaItem item;
-  final Color bgColor;
   final VoidCallback onTap;
 
   @override
@@ -948,7 +928,7 @@ class _MediaThumb extends StatelessWidget {
           children: [
             item.isVideo
                 ? Container(
-                    color: bgColor,
+                    color: const Color(0xFF0E1E3F),
                     child: const Icon(
                       Icons.play_circle_filled_rounded,
                       color: Colors.white70,
@@ -959,7 +939,7 @@ class _MediaThumb extends StatelessWidget {
                     item.url,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
-                      color: bgColor,
+                      color: const Color(0xFF0E1E3F),
                       child: const Icon(
                         Icons.broken_image_rounded,
                         color: Colors.white38,

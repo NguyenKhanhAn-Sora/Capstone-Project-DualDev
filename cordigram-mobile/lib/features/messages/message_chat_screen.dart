@@ -101,9 +101,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   final Map<String, GlobalKey> _messageKeys = {};
   String? _highlightMessageId;
   String _lang = 'vi';
-  final ScrollController _scrollController = ScrollController();
-  bool _isAtBottom = true;
-  bool _showNewMsgBadge = false;
 
   GlobalKey _keyForMessage(String id) =>
       _messageKeys.putIfAbsent(id, () => GlobalKey());
@@ -135,76 +132,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     }
   }
 
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    // reverse: true list – position 0 is the newest (visual bottom).
-    final atBottom = _scrollController.offset < 80;
-    if (atBottom != _isAtBottom) {
-      setState(() {
-        _isAtBottom = atBottom;
-        if (atBottom) _showNewMsgBadge = false;
-      });
-    }
-  }
-
-  void _scrollToBottom() {
-    if (!_scrollController.hasClients) return;
-    _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOut,
-    );
-  }
-
-  Widget _buildNewMsgBadge() {
-    return Positioned(
-      bottom: 12,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: GestureDetector(
-          onTap: () {
-            _scrollToBottom();
-            setState(() => _showNewMsgBadge = false);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3D63DD),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  '↓ Tin nhắn mới',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _openDmConversationSearch() async {
     await MessageSearchSheet.present(
       context,
@@ -221,7 +148,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     super.initState();
     widget.controller.addListener(_onControllerChanged);
     _inputController.addListener(_onInputChanged);
-    _scrollController.addListener(_onScroll);
     _loadConversation();
     _loadLanguage();
     unawaited(MessagesMediaService.refreshBoostStatus());
@@ -249,7 +175,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     _inputController.removeListener(_onInputChanged);
     widget.controller.removeListener(_onControllerChanged);
     _inputController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -276,12 +201,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       if (!mounted) return;
       setState(() {
         _messages = widget.controller.liveMessages(widget.thread.id);
-      });
-      // Jump to newest messages (scroll position 0 in a reverse list)
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _scrollController.hasClients) {
-          _scrollController.jumpTo(0);
-        }
       });
     } finally {
       if (mounted) {
@@ -353,11 +272,8 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
 
   void _onControllerChanged() {
     if (!mounted) return;
-    final newList = widget.controller.liveMessages(widget.thread.id);
-    final hadNew = newList.length > _messages.length;
     setState(() {
-      _messages = newList;
-      if (hadNew && !_isAtBottom) _showNewMsgBadge = true;
+      _messages = widget.controller.liveMessages(widget.thread.id);
     });
   }
 
@@ -399,12 +315,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     final replyId = _replyingTo?.id;
     _inputController.clear();
     _flushTyping(false);
-    // Always scroll to the newest messages when the user sends.
-    setState(() {
-      _isAtBottom = true;
-      _showNewMsgBadge = false;
-    });
-    _scrollToBottom();
     await widget.controller.sendTextMessage(
       userId: widget.thread.id,
       content: text,
@@ -2285,7 +2195,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : ListView.builder(
                         reverse: true,
-                        controller: _scrollController,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 14,
@@ -2584,7 +2493,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
               ),
             ],
           ),
-          if (_showNewMsgBadge) _buildNewMsgBadge(),
         ],
       ),
       bottomNavigationBar: isBlocked
@@ -2613,9 +2521,9 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  MessagesI18n.t('chat.composer.replying'),
-                                  style: const TextStyle(
+                                const Text(
+                                  'Đang trả lời',
+                                  style: TextStyle(
                                     color: Color(0xFFB6C2DC),
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
@@ -2626,8 +2534,8 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                   _replyingTo!.content.isNotEmpty
                                       ? _replyingTo!.content
                                       : (_replyingTo!.type == 'voice'
-                                            ? '🔊 ${MessagesI18n.t('chat.composer.replyVoice')}'
-                                            : MessagesI18n.t('chat.composer.replyMessage')),
+                                            ? '🔊 Tin nhắn thoại'
+                                            : 'Tin nhắn'),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(

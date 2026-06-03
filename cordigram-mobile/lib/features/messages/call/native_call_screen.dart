@@ -90,19 +90,11 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   /// / manager-level hangup). When the manager clears its active call, we
   /// must tear down the LiveKit room and pop this screen — otherwise the UI
   /// would linger after the other side ended the call.
-  ///
-  /// Also triggers a rebuild when the minimized state changes so that
-  /// [_buildBody] can hide or show the [VideoTrackRenderer] appropriately,
-  /// avoiding the "Multiple widgets used the same GlobalKey" crash that occurs
-  /// when the same [VideoTrack] is rendered both here and in the PiP overlay.
   void _onManagerChanged() {
     if (!mounted || _hangupCalled) return;
     if (DmCallManager.instance.active == null) {
       _teardownAndPop();
-      return;
     }
-    // Rebuild so _buildBody() re-evaluates isCallMinimized.
-    setState(() {});
   }
 
   Future<void> _connect() async {
@@ -636,18 +628,6 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   }
 
   Widget _buildBody() {
-    // ── Minimized: hand off all VideoTrackRenderer ownership to the PiP overlay.
-    //
-    // When the call is minimized, NativeCallScreen stays mounted below the
-    // messages route. If we also render VideoTrackRenderer here, the same
-    // VideoTrack is painted by two widgets simultaneously, which triggers the
-    // "Multiple widgets used the same GlobalKey" crash loop from flutter_webrtc.
-    // Returning a plain black box releases track ownership so the GlobalCallOverlay
-    // can render the tracks without conflict.
-    if (DmCallManager.instance.isCallMinimized) {
-      return const ColoredBox(color: Colors.black);
-    }
-
     if (_connecting) {
       return const Center(
         child: Column(

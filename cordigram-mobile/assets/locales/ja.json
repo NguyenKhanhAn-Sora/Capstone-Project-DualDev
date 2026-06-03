@@ -1889,11 +1889,7 @@
       "replyVoice": "ボイスメッセージ",
       "replyWelcomeFallback": "ウェルカム",
       "plusUploadFile": "ファイルをアップロード",
-      "plusCreatePoll": "アンケートを作成",
-      "replying": "返信中",
-      "replyMessage": "メッセージ",
-      "channelPlaceholder": "#{name} にメッセージを送る",
-      "channelBlockedPlaceholder": "このチャンネルは制限されています"
+      "plusCreatePoll": "アンケートを作成"
     },
     "createPoll": {
       "title": "アンケートを作成",
@@ -3601,32 +3597,6 @@
       "turnOnNotifications": "通知を再開",
       "blockUpdateError": "ブロック状態を更新できませんでした",
       "now": "たった今"
-    },
-    "channel": {
-      "searchTooltip": "メッセージを検索",
-      "completeGate": "完了",
-      "noMessages": "まだメッセージがありません"
-    },
-    "conversationDetails": {
-      "title": "会話の詳細",
-      "encrypted": "エンドツーエンド暗号化",
-      "search": "検索",
-      "pinnedMessages": "ピン留めメッセージ",
-      "sharedMedia": "メディア",
-      "sharedFiles": "ファイル",
-      "searchPlaceholder": "メッセージを検索...",
-      "noResults": "結果が見つかりません",
-      "loading": "読み込み中...",
-      "noPinned": "ピン留めメッセージはありません",
-      "noMedia": "共有メディアはありません",
-      "loadMore": "さらに読み込む",
-      "searchFiles": "ファイルを検索...",
-      "noFiles": "共有ファイルはありません",
-      "noFilesFound": "ファイルが見つかりません",
-      "today": "今日",
-      "yesterday": "昨日",
-      "download": "ダウンロード",
-      "close": "閉じる"
     }
   },
   "player": {

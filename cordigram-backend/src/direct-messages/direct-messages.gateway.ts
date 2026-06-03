@@ -485,14 +485,9 @@ export class DirectMessagesGateway
       if (!stillOnline) {
         this.setPresence(userId, 'offline');
         this.dmPresenceSubs.delete(userId);
-
-        // Clean up ALL active call sessions for this user (handles both
-        // unanswered outgoing calls and connected/answered calls regardless
-        // of whether the user was initiator or callee).
-        const { unansweredCancelled, connectedEnded } =
-          await this.dmCallSessions.onUserFullyOffline(userId);
-
-        for (const session of unansweredCancelled) {
+        const endedSessions =
+          await this.dmCallSessions.onInitiatorFullyOffline(userId);
+        for (const session of endedSessions) {
           this.emitToAllUserSockets(session.calleeId, 'call-ended', {
             from: session.initiatorId,
             callId: session.callId,
@@ -503,17 +498,6 @@ export class DirectMessagesGateway
             session.initiatorId,
             'cancelled',
           );
-        }
-
-        if (connectedEnded) {
-          const { session, peerId } = connectedEnded;
-          // Notify the peer that the other side dropped the call.
-          this.emitToAllUserSockets(peerId, 'call-ended', {
-            from: userId,
-            callId: session.callId,
-            reason: 'disconnected',
-          });
-          await this.finalizeFromSession(session, userId);
         }
       }
     }

@@ -1,37 +1,14 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart';
 
 import '../models/server_models.dart';
 import 'voice_livekit_service.dart';
-
-/// Android/iOS system Picture-in-Picture helpers.
-class _PipService {
-  static const _channel = MethodChannel('com.example.cordigram_mobile/pip');
-
-  /// Tell Android that a call is in progress (enables auto-PiP on Home press).
-  static Future<void> setCallActive(bool active) async {
-    if (!Platform.isAndroid) return;
-    try {
-      await _channel.invokeMethod<void>('setCallActive', active);
-    } catch (_) {}
-  }
-
-  /// Programmatically enter system PiP (Android O+).
-  static Future<bool> enterPiP() async {
-    if (!Platform.isAndroid) return false;
-    try {
-      return await _channel.invokeMethod<bool>('enterPiP') ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-}
 
 class VoiceChannelSessionController extends ChangeNotifier {
   VoiceChannelSessionController._();
@@ -93,10 +70,6 @@ class VoiceChannelSessionController extends ChangeNotifier {
     _voiceTuckedToCorner = false;
     notifyListeners();
   }
-
-  /// Enters Android system Picture-in-Picture mode (Android O+).
-  /// Returns true if PiP was entered, false otherwise (iOS / old Android).
-  Future<bool> enterSystemPiP() => _PipService.enterPiP();
 
   void clearVoiceMinimized() {
     _voiceUiMinimized = false;
@@ -190,7 +163,6 @@ class VoiceChannelSessionController extends ChangeNotifier {
       _screenShareEnabled = false;
       _voiceJoinedAt = DateTime.now();
       _refreshParticipants();
-      unawaited(_PipService.setCallActive(true));
     } catch (e) {
       _error = 'Không vào được voice channel: $e';
       await _disposeRoomResources();
@@ -216,7 +188,6 @@ class VoiceChannelSessionController extends ChangeNotifier {
     _joinedChannel = null;
     _joinedParticipantName = '';
     _clearSessionMetadata();
-    unawaited(_PipService.setCallActive(false));
     await _disposeRoomResources(disconnect: true);
     notifyListeners();
   }

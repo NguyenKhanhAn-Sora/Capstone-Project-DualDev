@@ -369,35 +369,4 @@ export class DmCallSessionService implements OnModuleDestroy {
     ended.push(session);
     return ended;
   }
-
-  /**
-   * Called when a user's last socket disconnects.
-   * Handles ALL active sessions for this user — including connected/answered
-   * calls and cases where the user was the callee (not the initiator).
-   * Returns the peer ID and session if a connected call was cleaned up,
-   * so the gateway can notify the peer.
-   */
-  async onUserFullyOffline(userId: string): Promise<{
-    unansweredCancelled: DmCallSessionRecord[];
-    connectedEnded: { session: DmCallSessionRecord; peerId: string } | null;
-  }> {
-    // Step 1: cancel any unanswered outgoing (initiator-only, no answeredAt).
-    const unansweredCancelled = await this.onInitiatorFullyOffline(userId);
-
-    // Step 2: check if a connected (answered) session still exists for this user.
-    const callId = await this.getUserCallId(userId);
-    if (!callId) {
-      return { unansweredCancelled, connectedEnded: null };
-    }
-    const session = await this.getSession(callId);
-    if (!session || !ACTIVE_STATES.includes(session.state)) {
-      return { unansweredCancelled, connectedEnded: null };
-    }
-
-    // We have an active (likely connected/answered) session — clean it up.
-    const peerId =
-      session.initiatorId === userId ? session.calleeId : session.initiatorId;
-    await this.deleteSession(session);
-    return { unansweredCancelled, connectedEnded: { session, peerId } };
-  }
 }
