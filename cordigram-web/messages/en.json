@@ -532,7 +532,7 @@
     },
     "table": {
       "title": "Ad campaigns",
-      "subtitle": "Quick view of your 5 latest active campaigns.",
+      "subtitle": "Quick view of your 5 latest campaigns.",
       "viewAll": "View all",
       "campaign": "Campaign",
       "status": "Status",
@@ -567,6 +567,7 @@
       "statusOptions": {
         "all": "All status",
         "active": "Active",
+        "paused": "Paused",
         "hidden": "Hidden",
         "canceled": "Canceled",
         "completed": "Completed"

@@ -648,6 +648,7 @@
       "statusOptions": {
         "all": "所有状态",
         "active": "投放中",
+        "paused": "已暂停",
         "hidden": "已隐藏",
         "canceled": "已取消",
         "completed": "已完成"

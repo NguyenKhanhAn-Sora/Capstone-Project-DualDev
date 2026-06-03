@@ -153,10 +153,10 @@ export default function AdsPage() {
 
   const trendData = dashboard?.trend ?? [];
   const campaigns = dashboard?.campaigns ?? [];
-  const activeCampaignsPreview = useMemo(
+  const recentCampaignsPreview = useMemo(
     () =>
       campaigns
-        .filter((item) => item.status === "active")
+        .slice()
         .sort(
           (a, b) =>
             new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime(),
@@ -165,16 +165,66 @@ export default function AdsPage() {
     [campaigns],
   );
 
-  const maxTrendSpend = useMemo(
+  const maxTrendImpressions = useMemo(
     () => Math.max(...trendData.map((item) => item.impressions), 1),
     [trendData],
   );
 
+  const maxTrendClicks = useMemo(
+    () => Math.max(...trendData.map((item) => item.clicks), 1),
+    [trendData],
+  );
+
   if (!canRender) return null;
+
   if (loadingDashboard) {
     return (
       <div className={styles.page}>
         <div className={styles.backdropShape} aria-hidden />
+        <div className={styles.skeletonTop} />
+        <div className={styles.metricsGrid}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className={`${styles.metricCard} ${styles.skeletonCard}`}>
+              <div className={styles.skeletonLine} style={{ width: "50%" }} />
+              <div className={styles.skeletonLine} style={{ width: "70%", height: 32, marginTop: 8 }} />
+              <div className={styles.skeletonLine} style={{ width: "60%", marginTop: 4 }} />
+            </div>
+          ))}
+        </div>
+        <div className={styles.contentGrid}>
+          <div className={`${styles.chartCard} ${styles.skeletonCard}`} style={{ minHeight: 300 }} />
+          <div className={`${styles.tableCard} ${styles.skeletonCard}`} style={{ minHeight: 300 }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.backdropShape} aria-hidden />
+        <section className={styles.emptyWrap}>
+          <div className={styles.emptyCard}>
+            <div className={`${styles.emptyVisual} ${styles.emptyVisualError}`}>
+              <svg aria-hidden width="40" height="40" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M12 8v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="16" r="1" fill="currentColor" />
+              </svg>
+            </div>
+            <h2 className={styles.emptyTitle}>{t("dashboard.loadFailed")}</h2>
+            <p className={styles.emptyText}>{loadError}</p>
+            <div className={styles.emptyActions}>
+              <button
+                type="button"
+                className={styles.emptyCtaBtn}
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     );
   }
@@ -227,6 +277,14 @@ export default function AdsPage() {
       ) : (
         <>
           <section className={styles.dashboardTop}>
+            <div className={styles.dashboardHeader}>
+              <h1 className={styles.dashboardTitle}>Ads Manager</h1>
+              <p className={styles.dashboardSubtitle}>
+                {summary.activeCount > 0
+                  ? `${summary.activeCount} active campaign${summary.activeCount > 1 ? "s" : ""} running`
+                  : "Overview of all your ad campaigns"}
+              </p>
+            </div>
             <button
               type="button"
               className={`${styles.primaryBtn} ${styles.primaryBtnCompact}`}
@@ -273,20 +331,34 @@ export default function AdsPage() {
                 </div>
               </div>
 
-              <div className={styles.chartBars}>
-                {trendData.map((item) => (
-                  <div key={item.day} className={styles.barCol}>
-                    <div
-                      className={styles.bar}
-                      style={{
-                        height: `${Math.max((item.impressions / maxTrendSpend) * 100, 8)}%`,
-                      }}
-                      title={`${item.day}: ${integer(item.impressions)} impressions - ${integer(item.clicks)} clicks`}
-                    />
-                    <span className={styles.barLabel}>{item.day.slice(5)}</span>
-                  </div>
-                ))}
+              <div className={styles.chartLegend}>
+                <span className={styles.legendImpressions}>Impressions</span>
+                <span className={styles.legendClicks}>Clicks</span>
               </div>
+
+              {trendData.length === 0 ? (
+                <div className={styles.chartEmpty}>No trend data available yet.</div>
+              ) : (
+                <div className={styles.chartBars}>
+                  {trendData.map((item) => (
+                    <div key={item.day} className={styles.barCol}>
+                      <div className={styles.barPair}>
+                        <div
+                          className={styles.bar}
+                          style={{ height: `${Math.max((item.impressions / maxTrendImpressions) * 100, 4)}%` }}
+                          title={`${item.day}: ${integer(item.impressions)} impressions`}
+                        />
+                        <div
+                          className={`${styles.bar} ${styles.barClicks}`}
+                          style={{ height: `${Math.max((item.clicks / maxTrendClicks) * 100, 4)}%` }}
+                          title={`${item.day}: ${integer(item.clicks)} clicks`}
+                        />
+                      </div>
+                      <span className={styles.barLabel}>{item.day.slice(5)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </article>
 
             <article className={styles.tableCard}>
@@ -320,15 +392,20 @@ export default function AdsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {activeCampaignsPreview.map((item) => {
+                    {recentCampaignsPreview.map((item) => {
+                      const statusKey = (["active", "hidden", "paused", "canceled", "completed"] as CampaignStatus[]).includes(item.status as CampaignStatus)
+                        ? (item.status as CampaignStatus)
+                        : "paused";
                       return (
-                        <tr key={item.id}>
+                        <tr
+                          key={item.id}
+                          className={styles.tableRow}
+                          onClick={() => router.push(`/ads/campaigns/${item.id}`)}
+                        >
                           <td>{item.campaignName}</td>
                           <td>
-                            <span
-                              className={`${styles.status} ${styles[`status_${item.status === "active" ? "active" : item.status === "hidden" ? "hidden" : item.status === "canceled" ? "canceled" : "paused"}`]}`}
-                            >
-                              {t(`status.${item.status as CampaignStatus}`)}
+                            <span className={`${styles.status} ${styles[`status_${statusKey}`]}`}>
+                              {t(`status.${statusKey}`)}
                             </span>
                           </td>
                           <td>{money(item.spent)}</td>
@@ -339,7 +416,10 @@ export default function AdsPage() {
                             <button
                               type="button"
                               className={styles.secondaryBtn}
-                              onClick={() => router.push(`/ads/campaigns/${item.id}`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/ads/campaigns/${item.id}`);
+                              }}
                             >
                               {t("table.details")}
                             </button>
@@ -347,9 +427,9 @@ export default function AdsPage() {
                         </tr>
                       );
                     })}
-                    {activeCampaignsPreview.length === 0 ? (
+                    {recentCampaignsPreview.length === 0 ? (
                       <tr>
-                        <td colSpan={8}>{t("table.noActive")}</td>
+                        <td colSpan={7}>{t("table.noActive")}</td>
                       </tr>
                     ) : null}
                   </tbody>

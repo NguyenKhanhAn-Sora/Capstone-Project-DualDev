@@ -1605,6 +1605,25 @@ export class PostsService {
     return signals;
   }
 
+  private getAdFrequencyParams(boostWeight: number): {
+    cooldownMs: number;
+    maxImpressions: number;
+  } {
+    // strong (weight >= 0.5): 10 min cooldown, 8/day
+    if (boostWeight >= 0.5) {
+      return { cooldownMs: 10 * 60 * 1000, maxImpressions: 8 };
+    }
+    // standard (weight >= 0.25): 20 min cooldown, 5/day
+    if (boostWeight >= 0.25) {
+      return { cooldownMs: 20 * 60 * 1000, maxImpressions: 5 };
+    }
+    // light (default): 30 min cooldown, 3/day
+    return {
+      cooldownMs: ADS_FREQUENCY_COOLDOWN_MINUTES * 60 * 1000,
+      maxImpressions: ADS_FREQUENCY_MAX_IMPRESSIONS_24H,
+    };
+  }
+
   private applyAdFrequencyCap(
     scored: Array<{ post: Post; score: number }>,
     sponsoredPostIds: Set<string>,
@@ -1616,12 +1635,12 @@ export class PostsService {
       }
     >,
     now: Date,
+    boostByPostId: Map<string, number>,
   ) {
     if (!scored.length || !sponsoredPostIds.size) {
       return scored;
     }
 
-    const cooldownMs = ADS_FREQUENCY_COOLDOWN_MINUTES * 60 * 1000;
     const shownInThisResponse = new Map<string, number>();
 
     return scored.filter((item) => {
@@ -1637,10 +1656,13 @@ export class PostsService {
         return true;
       }
 
+      const boostWeight = boostByPostId.get(promotedId) ?? 0;
+      const { cooldownMs, maxImpressions } = this.getAdFrequencyParams(boostWeight);
+
       const signal = signals.get(promotedId);
       const alreadyShown = shownInThisResponse.get(promotedId) ?? 0;
       const dailyImpressions = (signal?.dailyImpressions ?? 0) + alreadyShown;
-      if (dailyImpressions >= ADS_FREQUENCY_MAX_IMPRESSIONS_24H) {
+      if (dailyImpressions >= maxImpressions) {
         return false;
       }
 
@@ -2296,6 +2318,7 @@ export class PostsService {
       sponsoredPlacementSet,
       impressionSignals,
       now,
+      sponsoredBoostByPostId,
     );
 
     let prioritized = this.applySponsoredSpacing(
