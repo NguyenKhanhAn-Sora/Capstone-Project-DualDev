@@ -43,6 +43,7 @@ type PublishValidationErrors = {
   headline?: string;
   destinationUrl?: string;
   media?: string;
+  ageRange?: string;
 };
 
 type BoostPackage = {
@@ -141,6 +142,10 @@ const DURATION_KEYS: Array<{ id: DurationPackage["id"]; days: number; price: num
   { id: "d14", days: 14, price: 99000 },
   { id: "d30", days: 30, price: 179000 },
 ];
+
+const PRIMARY_TEXT_MAX = 500;
+const HEADLINE_MAX = 100;
+const DESCRIPTION_MAX = 200;
 
 const toCurrency = (value: number) =>
   new Intl.NumberFormat("en-US", {
@@ -255,16 +260,12 @@ export default function AdsCreatePage() {
 
   const [objective, setObjective] = useState<Objective>("traffic");
   const [adFormat, setAdFormat] = useState<AdFormat>("single");
-  const [campaignName, setCampaignName] = useState("Student Promotion Campaign");
-  const [primaryText, setPrimaryText] = useState(
-    "Upgrade your setup with our newest collection. Limited launch offer available now.",
-  );
-  const [headline, setHeadline] = useState("Launch Offer - Save 30% Today");
-  const [description, setDescription] = useState(
-    "Premium quality products with fast nationwide shipping.",
-  );
-  const [destinationUrl, setDestinationUrl] = useState("https://example.com");
-  const [cta, setCta] = useState<Cta>("Shop Now");
+  const [campaignName, setCampaignName] = useState("");
+  const [primaryText, setPrimaryText] = useState("");
+  const [headline, setHeadline] = useState("");
+  const [description, setDescription] = useState("");
+  const [destinationUrl, setDestinationUrl] = useState("");
+  const [cta, setCta] = useState<Cta>("Learn More");
   const [selectedBoostId, setSelectedBoostId] = useState<BoostPackage["id"]>("standard");
   const [selectedDurationId, setSelectedDurationId] = useState<DurationPackage["id"]>("d7");
   const [ageMin, setAgeMin] = useState<number>(18);
@@ -283,7 +284,6 @@ export default function AdsCreatePage() {
   const [publishValidationErrors, setPublishValidationErrors] =
     useState<PublishValidationErrors>({});
   const [primaryEmojiOpen, setPrimaryEmojiOpen] = useState(false);
-  const [publishMessage, setPublishMessage] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
   const [paymentError, setPaymentError] = useState("");
@@ -300,6 +300,7 @@ export default function AdsCreatePage() {
   const headlineFieldRef = useRef<HTMLLabelElement | null>(null);
   const destinationUrlFieldRef = useRef<HTMLLabelElement | null>(null);
   const mediaFieldRef = useRef<HTMLDivElement | null>(null);
+  const ageFieldRef = useRef<HTMLDivElement | null>(null);
 
   // Build translated objective options
   const objectiveOptions = useMemo(
@@ -503,6 +504,16 @@ export default function AdsCreatePage() {
     [objective, objectiveOptions, t],
   );
 
+  const previewDomain = useMemo(() => {
+    const url = destinationUrl.trim();
+    if (!url) return "";
+    try {
+      return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      return url.replace(/^https?:\/\//i, "").split("/")[0];
+    }
+  }, [destinationUrl]);
+
   const mediaInputConfig = useMemo(() => {
     if (adFormat === "video") {
       return {
@@ -542,8 +553,21 @@ export default function AdsCreatePage() {
     });
   }, [adFormat]);
 
+  // Reset cached post ID whenever creative content changes to prevent stale creative being submitted
+  useEffect(() => {
+    setPreparedAdPostId(null);
+  }, [primaryText, headline, description, cta, destinationUrl, uploadedMedia]);
+
   const handleCancel = () => {
     router.push("/ads");
+  };
+
+  const handleFormatChange = (newFormat: AdFormat) => {
+    if (newFormat === adFormat) return;
+    if (uploadedMedia.length > 0) {
+      if (!window.confirm(t("validation.formatChangeClearMedia"))) return;
+    }
+    setAdFormat(newFormat);
   };
 
   const addInterest = (label: string) => {
@@ -641,6 +665,10 @@ export default function AdsCreatePage() {
       nextErrors.media = t("validation.mediaRequired");
     }
 
+    if (ageMin >= ageMax) {
+      nextErrors.ageRange = t("validation.ageRangeInvalid");
+    }
+
     setPublishValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       setPaymentError(t("validation.fillRequired"));
@@ -650,6 +678,7 @@ export default function AdsCreatePage() {
         "headline",
         "destinationUrl",
         "media",
+        "ageRange",
       ] as const).find((key) => Boolean(nextErrors[key]));
 
       if (firstErrorKey === "primaryText") {
@@ -660,6 +689,8 @@ export default function AdsCreatePage() {
         scrollFieldToCenter(destinationUrlFieldRef.current);
       } else if (firstErrorKey === "media") {
         scrollFieldToCenter(mediaFieldRef.current);
+      } else if (firstErrorKey === "ageRange") {
+        scrollFieldToCenter(ageFieldRef.current);
       }
 
       return;
@@ -846,6 +877,16 @@ export default function AdsCreatePage() {
       return;
     }
 
+    const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+    const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+    const oversized = validFiles.find((file) =>
+      file.size > (adFormat === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES),
+    );
+    if (oversized) {
+      setMediaUploadError(t("validation.fileTooLarge"));
+      return;
+    }
+
     const remainingSlots =
       adFormat === "carousel"
         ? Math.max(mediaInputConfig.maxFiles - uploadedMedia.length, 0)
@@ -963,7 +1004,7 @@ export default function AdsCreatePage() {
                   key={item.value}
                   type="button"
                   className={`${styles.tabBtn} ${adFormat === item.value ? styles.tabBtnActive : ""}`}
-                  onClick={() => setAdFormat(item.value as AdFormat)}
+                  onClick={() => handleFormatChange(item.value as AdFormat)}
                 >
                   {item.label}
                 </button>
@@ -1009,6 +1050,7 @@ export default function AdsCreatePage() {
                 ref={primaryTextInputRef}
                 className={styles.textarea}
                 value={primaryText}
+                maxLength={PRIMARY_TEXT_MAX}
                 onChange={(e) => {
                   setPrimaryText(e.target.value);
                   const start = e.target.selectionStart ?? e.target.value.length;
@@ -1043,6 +1085,11 @@ export default function AdsCreatePage() {
                 }}
                 rows={4}
               />
+              <span
+                className={`${styles.charCounter} ${primaryText.length >= PRIMARY_TEXT_MAX ? styles.charCounterOver : ""}`}
+              >
+                {primaryText.length} / {PRIMARY_TEXT_MAX}
+              </span>
             </div>
             {publishValidationErrors.primaryText ? (
               <p className={styles.uploadError}>{publishValidationErrors.primaryText}</p>
@@ -1054,11 +1101,17 @@ export default function AdsCreatePage() {
                 <input
                   className={styles.input}
                   value={headline}
+                  maxLength={HEADLINE_MAX}
                   onChange={(e) => {
                     setHeadline(e.target.value);
                     setPublishValidationErrors((prev) => ({ ...prev, headline: undefined }));
                   }}
                 />
+                <span
+                  className={`${styles.charCounter} ${headline.length >= HEADLINE_MAX ? styles.charCounterOver : ""}`}
+                >
+                  {headline.length} / {HEADLINE_MAX}
+                </span>
               </label>
 
               <label className={styles.fieldLabel}>
@@ -1071,14 +1124,23 @@ export default function AdsCreatePage() {
                 />
               </label>
             </div>
+            {publishValidationErrors.headline ? (
+              <p className={styles.uploadError}>{publishValidationErrors.headline}</p>
+            ) : null}
 
             <label className={styles.fieldLabel}>
               {t("creative.description")}
               <input
                 className={styles.input}
                 value={description}
+                maxLength={DESCRIPTION_MAX}
                 onChange={(e) => setDescription(e.target.value)}
               />
+              <span
+                className={`${styles.charCounter} ${description.length >= DESCRIPTION_MAX ? styles.charCounterOver : ""}`}
+              >
+                {description.length} / {DESCRIPTION_MAX}
+              </span>
             </label>
 
             <label className={styles.fieldLabel} ref={destinationUrlFieldRef}>
@@ -1093,9 +1155,6 @@ export default function AdsCreatePage() {
                 placeholder={t("creative.destinationUrlPlaceholder")}
               />
             </label>
-            {publishValidationErrors.headline ? (
-              <p className={styles.uploadError}>{publishValidationErrors.headline}</p>
-            ) : null}
             {publishValidationErrors.destinationUrl ? (
               <p className={styles.uploadError}>{publishValidationErrors.destinationUrl}</p>
             ) : null}
@@ -1170,7 +1229,7 @@ export default function AdsCreatePage() {
                 />
               </label>
 
-              <div className={styles.fieldLabel}>
+              <div className={styles.fieldLabel} ref={ageFieldRef}>
                 {t("audience.ageRange")}
                 <div className={styles.ageRow}>
                   <input
@@ -1179,7 +1238,10 @@ export default function AdsCreatePage() {
                     min={13}
                     max={65}
                     value={ageMin}
-                    onChange={(e) => setAgeMin(Number(e.target.value || 13))}
+                    onChange={(e) => {
+                      setAgeMin(Number(e.target.value || 13));
+                      setPublishValidationErrors((prev) => ({ ...prev, ageRange: undefined }));
+                    }}
                   />
                   <span className={styles.ageSep}>{t("audience.ageTo")}</span>
                   <input
@@ -1188,9 +1250,15 @@ export default function AdsCreatePage() {
                     min={13}
                     max={65}
                     value={ageMax}
-                    onChange={(e) => setAgeMax(Number(e.target.value || 65))}
+                    onChange={(e) => {
+                      setAgeMax(Number(e.target.value || 65));
+                      setPublishValidationErrors((prev) => ({ ...prev, ageRange: undefined }));
+                    }}
                   />
                 </div>
+                {publishValidationErrors.ageRange ? (
+                  <p className={styles.uploadError}>{publishValidationErrors.ageRange}</p>
+                ) : null}
               </div>
             </div>
 
@@ -1318,8 +1386,6 @@ export default function AdsCreatePage() {
             </div>
           </article>
 
-          {publishMessage ? <p className={styles.publishInfo}>{publishMessage}</p> : null}
-
           <footer className={styles.bottomActionBar}>
             <button type="button" className={styles.secondaryBtn} onClick={handleCancel}>
               {t("cancel")}
@@ -1339,33 +1405,35 @@ export default function AdsCreatePage() {
             </div>
 
             <div className={styles.previewPost}>
-              <div className={styles.previewAuthorRow}>
-                {currentProfile?.avatarUrl ? (
-                  <img
-                    className={styles.previewAvatar}
-                    src={currentProfile.avatarUrl}
-                    alt={currentProfile.displayName || currentProfile.username || "User avatar"}
-                  />
-                ) : (
-                  <span className={styles.previewAvatar}>
-                    {(currentProfile?.displayName || currentProfile?.username || "U")
-                      .charAt(0)
-                      .toUpperCase()}
-                  </span>
-                )}
-                <div>
-                  <p className={styles.previewName}>
-                    {currentProfile?.displayName || "Display name"}
-                  </p>
-                  <p className={styles.previewMeta}>
-                    @{currentProfile?.username || "username"} • {t("preview.sponsored")}
-                  </p>
+              <div className={styles.previewTopSection}>
+                <div className={styles.previewAuthorRow}>
+                  {currentProfile?.avatarUrl ? (
+                    <img
+                      className={styles.previewAvatar}
+                      src={currentProfile.avatarUrl}
+                      alt={currentProfile.displayName || currentProfile.username || "User avatar"}
+                    />
+                  ) : (
+                    <span className={styles.previewAvatar}>
+                      {(currentProfile?.displayName || currentProfile?.username || "U")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </span>
+                  )}
+                  <div>
+                    <p className={styles.previewName}>
+                      {currentProfile?.displayName || "Display name"}
+                    </p>
+                    <p className={styles.previewMeta}>
+                      @{currentProfile?.username || "username"} • {t("preview.sponsored")}
+                    </p>
+                  </div>
                 </div>
+
+                <p className={styles.previewText}>{primaryText || t("preview.primaryTextPlaceholder")}</p>
               </div>
 
-              <p className={styles.previewText}>{primaryText || t("preview.primaryTextPlaceholder")}</p>
-
-              <div className={styles.previewMedia}>
+              <div className={`${styles.previewMedia} ${uploadedMedia.length === 0 ? styles.previewMediaEmpty : ""}`}>
                 {uploadedMedia.length === 0 ? (
                   <span>{adFormat === "video" ? t("creative.videoPreview") : t("creative.creativePreview")}</span>
                 ) : null}
@@ -1425,7 +1493,10 @@ export default function AdsCreatePage() {
               </div>
 
               <div className={styles.previewFooter}>
-                <div>
+                <div style={{ minWidth: 0 }}>
+                  {previewDomain ? (
+                    <p className={styles.previewDomain}>{previewDomain}</p>
+                  ) : null}
                   <p className={styles.previewHeadline}>{headline || t("preview.headlinePlaceholder")}</p>
                   <p className={styles.previewDescription}>{description || t("preview.descriptionPlaceholder")}</p>
                 </div>
@@ -1461,7 +1532,7 @@ export default function AdsCreatePage() {
               </div>
               <div className={styles.paymentRow}>
                 <span>{t("payment.adFormat")}</span>
-                <strong>{adFormat}</strong>
+                <strong>{formatOptions.find((f) => f.value === adFormat)?.label ?? adFormat}</strong>
               </div>
               <div className={styles.paymentRow}>
                 <span>{t("payment.boostPackage")}</span>

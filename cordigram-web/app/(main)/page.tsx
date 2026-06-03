@@ -62,6 +62,7 @@ import {
   INTERACTION_MUTED_FALLBACK_MESSAGE,
 } from "@/lib/interaction-mute";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
+import ReelFeedCard from "@/ui/reel-feed-card/reel-feed-card";
 import LivestreamHub from "@/components/livestream/LivestreamHub";
 import CustomVideoPlayer, { VideoQuality } from "@/ui/custom-video-player/CustomVideoPlayer";
 import { videoVolumeStore } from "@/hooks/use-video-volume";
@@ -469,6 +470,8 @@ export default function HomePage({
   hideSidebar,
   hideLoadMore,
   cardClassName,
+  showReels,
+  extraReelItems,
 }: {
   scopeOverride?: "all" | "following";
   kindsOverride?: Array<"post" | "reel">;
@@ -480,6 +483,8 @@ export default function HomePage({
   hideSidebar?: boolean;
   hideLoadMore?: boolean;
   cardClassName?: string;
+  showReels?: boolean;
+  extraReelItems?: FeedItem[];
 } = {}) {
   const canRender = useRequireAuth({ guestAllowed: true });
   const { showLoginOverlay } = useGuestAuth();
@@ -552,10 +557,32 @@ export default function HomePage({
   const isSearchMode = Boolean((searchQueryOverride ?? "").trim());
   // Backend ranking already handles ordering (verified boost, relationship boost,
   // freshness decay). No re-sort on the client — preserves the server's intent.
-  const visibleItems = useMemo(
+  const baseItems = useMemo(
     () => (maxItems ? items.slice(0, maxItems) : items),
     [items, maxItems],
   );
+
+  // When showReels is true, merge injected reel items with post items and sort by time.
+  const visibleItems = useMemo(() => {
+    if (!showReels || !extraReelItems?.length) return baseItems;
+    const existingIds = new Set(baseItems.map((i) => i.item.id));
+    const reelViews = extraReelItems
+      .filter((r) => !existingIds.has(r.id))
+      .map((item) => ({
+        item,
+        flags: {
+          liked: item.liked ?? false,
+          saved: item.saved ?? false,
+          following: (item as any).following ?? false,
+        },
+      }));
+    return [...baseItems, ...reelViews].sort(
+      (a, b) =>
+        new Date(b.item.createdAt).getTime() -
+        new Date(a.item.createdAt).getTime(),
+    );
+  }, [baseItems, extraReelItems, showReels]);
+
   const livestreamInsertIndex = useMemo(() => {
     if (!visibleItems.length) return 0;
     // Insert livestream section inside the ranked feed, not pinned at the top.
@@ -1672,6 +1699,9 @@ export default function HomePage({
 
         {visibleItems.map(({ item, flags }, index) => (
           <Fragment key={item.id}>
+            {showReels && item.kind === "reel" ? (
+              <ReelFeedCard item={item} />
+            ) : (
             <FeedCard
               data={item}
               liked={Boolean(flags.liked)}
@@ -1707,6 +1737,7 @@ export default function HomePage({
               onPersistFeedCache={persistFeedCache}
               onLikesClick={setLikesOverlayPostId}
             />
+            )}
             {token && index + 1 === livestreamInsertIndex ? (
               <LivestreamHub viewerId={viewerId} />
             ) : null}
@@ -3671,33 +3702,35 @@ function FeedCard({
             <div className={styles.editLabelRow}>
               <span className={styles.editLabelText}>{t("edit.hashtags")}</span>
             </div>
-            <div className={styles.chipRow}>
-              {editHashtags.map((tag) => (
-                <span key={tag} className={styles.chip}>
-                  #{tag}
-                  <button
-                    type="button"
-                    className={styles.chipRemove}
-                    onClick={() => removeHashtag(tag)}
-                    aria-label={t("edit.removeHashtag", { tag })}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              <input
-                className={styles.editInput}
-                placeholder={t("edit.addHashtag")}
-                value={hashtagDraft}
-                onChange={(e) => setHashtagDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") {
-                    e.preventDefault();
-                    addHashtag();
-                  }
-                }}
-              />
+            <div className={styles.chipShell}>
+              <div className={styles.chips}>
+                {editHashtags.map((tag) => (
+                  <span key={tag} className={styles.chipTag}>
+                    #{tag}
+                    <button
+                      type="button"
+                      onClick={() => removeHashtag(tag)}
+                      aria-label={t("edit.removeHashtag", { tag })}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  className={styles.chipInput}
+                  placeholder={editHashtags.length ? t("edit.addHashtag") : t("edit.hashtagPlaceholder")}
+                  value={hashtagDraft}
+                  onChange={(e) => setHashtagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " " || e.key === ",") {
+                      e.preventDefault();
+                      addHashtag();
+                    }
+                  }}
+                />
+              </div>
             </div>
+            <p className={styles.fieldHint}>{t("edit.hashtagHint")}</p>
           </div>
 
           <div className={styles.editField}>

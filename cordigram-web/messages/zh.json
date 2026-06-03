@@ -387,6 +387,8 @@
       "noMatches": "没有匹配结果",
       "hashtags": "话题标签",
       "addHashtag": "添加话题标签",
+      "hashtagPlaceholder": "例如: 旅行",
+      "hashtagHint": "按Enter或Space添加话题标签",
       "removeHashtag": "卸载 {tag}",
       "location": {
         "label": "位置",
@@ -848,7 +850,10 @@
         "carouselLimit": "轮播最多支持5张图片，请先移除一张再上传。",
         "singleFileOnly": "此格式仅支持一个文件。",
         "uploadFailed": "上传失败，请重试。",
-        "prepareCreativeFailed": "无法准备广告创意以进行结账。"
+        "prepareCreativeFailed": "无法准备广告创意以进行结账。",
+        "ageRangeInvalid": "最低年龄必须小于最高年龄。",
+        "fileTooLarge": "文件过大。图片最大 10 MB，视频最大 200 MB。",
+        "formatChangeClearMedia": "更改广告格式将删除已上传的媒体文件，是否继续？"
       },
       "audience": {
         "title": "受众定向",

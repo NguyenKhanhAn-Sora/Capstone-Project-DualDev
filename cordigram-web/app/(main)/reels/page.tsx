@@ -4063,7 +4063,7 @@ export default function ReelPage({
                 <div className={feedStyles.chipShell}>
                   <div className={feedStyles.chips}>
                     {editHashtags.map((tag) => (
-                      <span key={tag} className={feedStyles.chip}>
+                      <span key={tag} className={feedStyles.chipTag}>
                         #{tag}
                         <button
                           type="button"
@@ -4080,7 +4080,7 @@ export default function ReelPage({
                       value={hashtagDraft}
                       onChange={(e) => setHashtagDraft(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === ",") {
+                        if (e.key === "Enter" || e.key === " " || e.key === ",") {
                           e.preventDefault();
                           addHashtag();
                         }
@@ -4088,6 +4088,7 @@ export default function ReelPage({
                     />
                   </div>
                 </div>
+                <p className={feedStyles.fieldHint}>{t("reelsPage.editModal.hashtagHint")}</p>
               </div>
 
               <div className={feedStyles.editField}>

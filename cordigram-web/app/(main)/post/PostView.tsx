@@ -4989,33 +4989,35 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             <div className={feedStyles.editLabelRow}>
               <span className={feedStyles.editLabelText}>Hashtags</span>
             </div>
-            <div className={feedStyles.chipRow}>
-              {editHashtags.map((tag) => (
-                <span key={tag} className={feedStyles.chip}>
-                  #{tag}
-                  <button
-                    type="button"
-                    className={feedStyles.chipRemove}
-                    onClick={() => removeHashtag(tag)}
-                    aria-label={`Remove ${tag}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              <input
-                className={feedStyles.editInput}
-                placeholder="Add hashtag"
-                value={hashtagDraft}
-                onChange={(e) => setHashtagDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") {
-                    e.preventDefault();
-                    addHashtag();
-                  }
-                }}
-              />
+            <div className={feedStyles.chipShell}>
+              <div className={feedStyles.chips}>
+                {editHashtags.map((tag) => (
+                  <span key={tag} className={feedStyles.chipTag}>
+                    #{tag}
+                    <button
+                      type="button"
+                      onClick={() => removeHashtag(tag)}
+                      aria-label={`Remove ${tag}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  className={feedStyles.chipInput}
+                  placeholder={editHashtags.length ? "Add hashtag" : "Add hashtag (e.g. travel)"}
+                  value={hashtagDraft}
+                  onChange={(e) => setHashtagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " " || e.key === ",") {
+                      e.preventDefault();
+                      addHashtag();
+                    }
+                  }}
+                />
+              </div>
             </div>
+            <p className={feedStyles.fieldHint}>Press Enter or Space to add a hashtag</p>
           </div>
 
           <div className={feedStyles.editField}>

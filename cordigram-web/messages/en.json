@@ -309,6 +309,8 @@
       "noMatches": "No matches",
       "hashtags": "Hashtags",
       "addHashtag": "Add hashtag",
+      "hashtagPlaceholder": "e.g. travel",
+      "hashtagHint": "Press Enter or Space to add a hashtag",
       "removeHashtag": "Remove {tag}",
       "location": {
         "label": "Location",
@@ -767,7 +769,10 @@
         "carouselLimit": "Carousel supports up to 5 images. Remove one to upload more.",
         "singleFileOnly": "This format only supports one file.",
         "uploadFailed": "Upload failed. Please try again.",
-        "prepareCreativeFailed": "Failed to prepare ad creative for checkout."
+        "prepareCreativeFailed": "Failed to prepare ad creative for checkout.",
+        "ageRangeInvalid": "Minimum age must be less than maximum age.",
+        "fileTooLarge": "File is too large. Images max 10 MB, videos max 200 MB.",
+        "formatChangeClearMedia": "Changing the ad format will remove your uploaded media. Continue?"
       },
       "audience": {
         "title": "Audience Targeting",
@@ -826,7 +831,7 @@
         "checkoutSessionFailed": "Unable to create Stripe checkout session."
       },
       "preview": {
-        "title": "Live preview",
+        "title": "Campaign preview",
         "sponsored": "Sponsored",
         "primaryTextPlaceholder": "Your primary text will appear here.",
         "headlinePlaceholder": "Headline",

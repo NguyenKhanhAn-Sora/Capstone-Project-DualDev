@@ -705,33 +705,35 @@ export default function PostEditOverlay({
             <div className={styles.editLabelRow}>
               <span className={styles.editLabelText}>{t("postEditOverlay.hashtagsLabel")}</span>
             </div>
-            <div className={styles.chipRow}>
-              {editHashtags.map((tag) => (
-                <span key={tag} className={styles.chip}>
-                  #{tag}
-                  <button
-                    type="button"
-                    className={styles.chipRemove}
-                    onClick={() => removeHashtag(tag)}
-                    aria-label={t("postEditOverlay.removeHashtag", { tag })}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              <input
-                className={styles.editInput}
-                placeholder={t("postEditOverlay.hashtagPlaceholder")}
-                value={hashtagDraft}
-                onChange={(e) => setHashtagDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") {
-                    e.preventDefault();
-                    addHashtag();
-                  }
-                }}
-              />
+            <div className={styles.chipShell}>
+              <div className={styles.chips}>
+                {editHashtags.map((tag) => (
+                  <span key={tag} className={styles.chipTag}>
+                    #{tag}
+                    <button
+                      type="button"
+                      onClick={() => removeHashtag(tag)}
+                      aria-label={t("postEditOverlay.removeHashtag", { tag })}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  className={styles.chipInput}
+                  placeholder={editHashtags.length ? t("postEditOverlay.addHashtag") : t("postEditOverlay.hashtagPlaceholder")}
+                  value={hashtagDraft}
+                  onChange={(e) => setHashtagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " " || e.key === ",") {
+                      e.preventDefault();
+                      addHashtag();
+                    }
+                  }}
+                />
+              </div>
             </div>
+            <p className={styles.fieldHint}>{t("postEditOverlay.hashtagHint")}</p>
           </div>
 
           <div className={styles.editField}>

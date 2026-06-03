@@ -309,6 +309,8 @@
       "noMatches": "Không có kết quả",
       "hashtags": "Hashtag",
       "addHashtag": "Thêm hashtag",
+      "hashtagPlaceholder": "Ví dụ: dulich",
+      "hashtagHint": "Nhấn Enter hoặc Space để thêm hashtag",
       "removeHashtag": "Xóa {tag}",
       "location": {
         "label": "Vị trí",
@@ -767,7 +769,10 @@
         "carouselLimit": "Carousel hỗ trợ tối đa 5 ảnh. Xóa một ảnh để tải thêm.",
         "singleFileOnly": "Định dạng này chỉ hỗ trợ một tệp.",
         "uploadFailed": "Tải lên thất bại. Vui lòng thử lại.",
-        "prepareCreativeFailed": "Không thể chuẩn bị nội dung quảng cáo để thanh toán."
+        "prepareCreativeFailed": "Không thể chuẩn bị nội dung quảng cáo để thanh toán.",
+        "ageRangeInvalid": "Độ tuổi tối thiểu phải nhỏ hơn độ tuổi tối đa.",
+        "fileTooLarge": "Tệp quá lớn. Ảnh tối đa 10 MB, video tối đa 200 MB.",
+        "formatChangeClearMedia": "Thay đổi định dạng quảng cáo sẽ xóa các tệp phương tiện đã tải lên. Tiếp tục?"
       },
       "audience": {
         "title": "Nhắm mục tiêu đối tượng",

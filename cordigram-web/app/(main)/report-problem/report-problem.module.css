@@ -5,17 +5,7 @@
   justify-content: center;
   align-items: center;
   padding: 48px 24px;
-  background: radial-gradient(
-      circle at 20% 20%,
-      rgba(255, 255, 255, 0.12),
-      transparent 40%
-    ),
-    radial-gradient(
-      circle at 80% 0%,
-      rgba(255, 255, 255, 0.08),
-      transparent 32%
-    ),
-    var(--color-bg);
+  background: var(--color-bg-home);
 }
 
 .card {
