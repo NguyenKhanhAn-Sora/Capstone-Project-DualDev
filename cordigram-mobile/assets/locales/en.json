@@ -1900,7 +1900,11 @@
       "replyVoice": "Voice message",
       "replyWelcomeFallback": "Welcome",
       "plusUploadFile": "Upload file",
-      "plusCreatePoll": "Create poll"
+      "plusCreatePoll": "Create poll",
+      "replying": "Replying to",
+      "replyMessage": "Message",
+      "channelPlaceholder": "Message #{name}",
+      "channelBlockedPlaceholder": "This channel is restricted"
     },
     "createPoll": {
       "title": "Create poll",
@@ -3608,6 +3612,32 @@
       "turnOnNotifications": "Turn notifications back on",
       "blockUpdateError": "Could not update block status",
       "now": "now"
+    },
+    "channel": {
+      "searchTooltip": "Search messages",
+      "completeGate": "Complete",
+      "noMessages": "No messages yet"
+    },
+    "conversationDetails": {
+      "title": "Conversation Details",
+      "encrypted": "End-to-end encrypted",
+      "search": "Search",
+      "pinnedMessages": "Pinned Messages",
+      "sharedMedia": "Media",
+      "sharedFiles": "Files",
+      "searchPlaceholder": "Search messages...",
+      "noResults": "No results found",
+      "loading": "Loading...",
+      "noPinned": "No pinned messages yet",
+      "noMedia": "No media shared yet",
+      "loadMore": "Load more",
+      "searchFiles": "Search files...",
+      "noFiles": "No files shared yet",
+      "noFilesFound": "No files found",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "download": "Download",
+      "close": "Close"
     }
   },
   "player": {

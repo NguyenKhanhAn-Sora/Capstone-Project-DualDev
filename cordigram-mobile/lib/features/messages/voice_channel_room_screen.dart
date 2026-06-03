@@ -55,8 +55,14 @@ class _VoiceChannelRoomScreenState extends State<VoiceChannelRoomScreen> {
 
   Future<void> _minimizeToPip() async {
     _session.markVoiceMinimized();
+    // Try to enter system PiP on Android; if it succeeds the app enters
+    // native PiP and the in-app floating overlay still keeps the session alive.
+    final enteredSystemPiP = await _session.enterSystemPiP();
     if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pop(true);
+    // Always pop the full-screen room: the GlobalCallOverlay PiP takes over.
+    if (!enteredSystemPiP) {
+      Navigator.of(context, rootNavigator: true).pop(true);
+    }
   }
 
   @override
@@ -72,24 +78,71 @@ class _VoiceChannelRoomScreenState extends State<VoiceChannelRoomScreen> {
       appBar: AppBar(
         backgroundColor: _pageColor,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.open_in_full_rounded, color: Colors.white),
-          tooltip: 'Thu nhỏ',
-          onPressed: _minimizeToPip,
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '🔊 ${widget.channel.name}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        leading: Tooltip(
+          message: 'Thu nhỏ',
+          child: InkWell(
+            onTap: _minimizeToPip,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.picture_in_picture_alt_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    'PiP',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Text(
-              widget.server.name,
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF9AAFD5),
-                fontWeight: FontWeight.w500,
+          ),
+        ),
+        title: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFF1EB980),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.channel.name,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    widget.server.name,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9AAFD5),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
           ],

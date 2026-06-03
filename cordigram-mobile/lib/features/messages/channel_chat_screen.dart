@@ -24,6 +24,7 @@ import 'widgets/channel_chat_gate_sheet.dart';
 import 'widgets/chat_link_preview.dart';
 import 'widgets/gif_toolbar_icon.dart';
 import 'widgets/sticker_toolbar_icon.dart';
+import 'utils/messages_i18n.dart';
 import 'widgets/messages_chrome_builder.dart';
 import '../../core/services/accent_color_controller.dart';
 import '../../core/theme/messages_chrome_palette.dart';
@@ -115,11 +116,76 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   StreamSubscription<ChannelMessage>? _newMessageSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
+  bool _isAtBottom = true;
+  bool _showNewMsgBadge = false;
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final atBottom =
+        _scrollController.offset >=
+        _scrollController.position.maxScrollExtent - 80;
+    if (atBottom != _isAtBottom) {
+      setState(() {
+        _isAtBottom = atBottom;
+        if (atBottom) _showNewMsgBadge = false;
+      });
+    }
+  }
+
+  Widget _buildNewMsgBadge() {
+    return Positioned(
+      bottom: 12,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: GestureDetector(
+          onTap: () {
+            _scrollToBottom();
+            setState(() => _showNewMsgBadge = false);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3D63DD),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  '↓ Tin nhắn mới',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     unawaited(MessagesMediaService.refreshBoostStatus());
+    _scrollController.addListener(_onScroll);
     _bootstrap();
   }
 
@@ -148,7 +214,11 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         if (!mounted || incoming.channelId != widget.channel.id) return;
         if (_messages.any((m) => m.id == incoming.id)) return;
         setState(() => _messages = [..._messages, incoming]);
-        _scrollToBottom();
+        if (_isAtBottom) {
+          _scrollToBottom();
+        } else {
+          setState(() => _showNewMsgBadge = true);
+        }
       });
       _reactionSub = ChannelMessagesRealtimeService.reactions.listen((payload) {
         if (!mounted) return;
@@ -499,6 +569,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             _messages = [..._messages, sent];
           }
           _replyingTo = null;
+          _isAtBottom = true;
+          _showNewMsgBadge = false;
         });
         _scrollToBottom();
       }
@@ -1581,7 +1653,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         titleSpacing: 0,
         actions: [
           IconButton(
-            tooltip: 'Tìm tin nhắn',
+            tooltip: MessagesI18n.t('chat.channel.searchTooltip'),
             onPressed: _openChannelMessageSearch,
             icon: const Icon(Icons.search_rounded, color: Colors.white),
           ),
@@ -1608,9 +1680,11 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           ],
         ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Divider(height: 1, color: chrome.border),
+          Column(
+            children: [
+              Divider(height: 1, color: chrome.border),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -1626,10 +1700,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                     ),
                   )
                 : _messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'Chưa có tin nhắn nào',
-                      style: TextStyle(
+                      MessagesI18n.t('chat.channel.noMessages'),
+                      style: const TextStyle(
                         color: Color(0xFFAFC0E2),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1799,239 +1873,235 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                       );
                     },
                   ),
-          ),
-          if (_chatBlocked)
+            ),
+          ],
+        ),
+        if (_showNewMsgBadge) _buildNewMsgBadge(),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_chatBlocked)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _chatBlockedBannerText(),
+                        style: const TextStyle(
+                          color: Color(0xFFFFB2BE),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (_canCompleteGateStepsInChannel()) ...[
+                      const SizedBox(width: 10),
+                      FilledButton(
+                        onPressed: _openChannelGateSheet,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF5865F2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(MessagesI18n.t('chat.channel.completeGate')),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            if (_replyingTo != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF17284A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF3A4F77)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            MessagesI18n.t('chat.composer.replying'),
+                            style: const TextStyle(
+                              color: Color(0xFFB6C2DC),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _replyingTo!.content.isNotEmpty
+                                ? _replyingTo!.content
+                                : (_replyingTo!.type == 'voice'
+                                      ? '🔊 ${MessagesI18n.t('chat.composer.replyVoice')}'
+                                      : MessagesI18n.t('chat.composer.replyMessage')),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() => _replyingTo = null),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _chatBlockedBannerText(),
-                          style: const TextStyle(
-                            color: Color(0xFFFFB2BE),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 44,
+                    ),
+                    onPressed: _showPlusSheet,
+                    icon: const Icon(
+                      Icons.add,
+                      color: Color(0xFFB6C2DC),
+                      size: 26,
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2C3A5A),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: TextField(
+                        controller: _inputController,
+                        minLines: 1,
+                        maxLines: 6,
+                        onSubmitted: (_) => _sendText(),
+                        enabled: !_chatBlocked,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          hintText: _chatBlocked
+                              ? MessagesI18n.t('chat.composer.channelBlockedPlaceholder')
+                              : MessagesI18n.t('chat.composer.channelPlaceholder', {'name': widget.channel.name}),
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF8A98B8),
+                            fontSize: 14,
+                          ),
+                          border: InputBorder.none,
+                          suffixIcon: IconButton(
+                            padding: const EdgeInsets.only(right: 4),
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(
+                              Icons.tag_faces_rounded,
+                              color: Color(0xFFB6C2DC),
+                              size: 22,
+                            ),
+                            onPressed: _showEmojiPicker,
                           ),
                         ),
                       ),
-                      if (_canCompleteGateStepsInChannel()) ...[
-                        const SizedBox(width: 10),
-                        FilledButton(
-                          onPressed: _openChannelGateSheet,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF5865F2),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('Hoàn thành'),
+                    ),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 44,
+                    ),
+                    onPressed: _openVoiceRecorder,
+                    icon: const Icon(
+                      Icons.mic_none_rounded,
+                      color: Color(0xFFB6C2DC),
+                      size: 24,
+                    ),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 44,
+                    ),
+                    tooltip: 'GIF',
+                    onPressed: () => _openGiphyPicker(stickers: false),
+                    icon: const GifToolbarIcon(size: 18),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 44,
+                    ),
+                    tooltip: 'Sticker',
+                    onPressed: _showStickerPickerMenu,
+                    icon: const StickerToolbarIcon(size: 20),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 2, bottom: 2),
+                    child: Material(
+                      color: const Color(0xFF6C5CE7),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: (!_chatBlocked && !_sending) ? _sendText : null,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: _sending
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.send_rounded,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
                         ),
-                      ],
-                    ],
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-          SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_replyingTo != null)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF17284A),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF3A4F77)),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Đang trả lời',
-                                style: TextStyle(
-                                  color: Color(0xFFB6C2DC),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _replyingTo!.content.isNotEmpty
-                                    ? _replyingTo!.content
-                                    : (_replyingTo!.type == 'voice'
-                                          ? '🔊 Tin nhắn thoại'
-                                          : 'Tin nhắn'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => setState(() => _replyingTo = null),
-                          icon: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 44,
-                        ),
-                        onPressed: _showPlusSheet,
-                        icon: const Icon(
-                          Icons.add,
-                          color: Color(0xFFB6C2DC),
-                          size: 26,
-                        ),
-                      ),
-                      Expanded(
-                        child: Container(
-                          constraints: const BoxConstraints(minHeight: 44),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2C3A5A),
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: TextField(
-                            controller: _inputController,
-                            minLines: 1,
-                            maxLines: 6,
-                            onSubmitted: (_) => _sendText(),
-                            enabled: !_chatBlocked,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              hintText: _chatBlocked
-                                  ? 'Kênh đang bị giới hạn chat'
-                                  : 'Nhắn tin trong #${widget.channel.name}',
-                              hintStyle: const TextStyle(
-                                color: Color(0xFF8A98B8),
-                                fontSize: 14,
-                              ),
-                              border: InputBorder.none,
-                              suffixIcon: IconButton(
-                                padding: const EdgeInsets.only(right: 4),
-                                constraints: const BoxConstraints(),
-                                icon: const Icon(
-                                  Icons.tag_faces_rounded,
-                                  color: Color(0xFFB6C2DC),
-                                  size: 22,
-                                ),
-                                onPressed: _showEmojiPicker,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 44,
-                        ),
-                        onPressed: _openVoiceRecorder,
-                        icon: const Icon(
-                          Icons.mic_none_rounded,
-                          color: Color(0xFFB6C2DC),
-                          size: 24,
-                        ),
-                      ),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 44,
-                        ),
-                        tooltip: 'GIF',
-                        onPressed: () => _openGiphyPicker(stickers: false),
-                        icon: const GifToolbarIcon(size: 18),
-                      ),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 44,
-                        ),
-                        tooltip: 'Sticker',
-                        onPressed: _showStickerPickerMenu,
-                        icon: const StickerToolbarIcon(size: 20),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 2, bottom: 2),
-                        child: Material(
-                          color: const Color(0xFF6C5CE7),
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: (!_chatBlocked && !_sending)
-                                ? _sendText
-                                : null,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: _sending
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.send_rounded,
-                                      size: 20,
-                                      color: Colors.white,
-                                    ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
     );

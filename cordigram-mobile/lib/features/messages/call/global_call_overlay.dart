@@ -308,10 +308,9 @@ const double _kMinimizedCallTotalHeight =
 /// Small floating chip when the user tucks the mini call UI into a corner.
 const double _kDockedChipSize = 56;
 
-/// Vertical voice-channel PiP: narrow strip + scrollable participant list.
-const double _kVoicePipWidth = 142;
-const double _kVoicePipHeaderH = 32;
-const double _kVoicePipFooterH = 38;
+/// Google Meet-style voice-channel PiP: portrait floating window with video.
+const double _kVoicePipWidth = 200;
+const double _kVoicePipHeight = 280;
 
 VideoTrack? _voicePipPickVideo(Participant p) {
   VideoTrack? camera;
@@ -338,6 +337,53 @@ List<Participant> _voicePipSortedParticipants(List<Participant> raw) {
   return copy;
 }
 
+/// Returns the best video track to feature in the minimized PiP window:
+/// active speaker with video first, then any participant with video, or null.
+VideoTrack? _voicePipMainVideo(List<Participant> participants) {
+  for (final p in participants) {
+    if (p.isSpeaking) {
+      final t = _voicePipPickVideo(p);
+      if (t != null) return t;
+    }
+  }
+  for (final p in participants) {
+    final t = _voicePipPickVideo(p);
+    if (t != null) return t;
+  }
+  return null;
+}
+
+class _PipIconBtn extends StatelessWidget {
+  const _PipIconBtn({
+    required this.icon,
+    required this.onTap,
+    this.danger = false,
+    this.tooltip,
+  });
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool danger;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = danger
+        ? const Color(0xFFED4245).withValues(alpha: 0.85)
+        : Colors.white.withValues(alpha: 0.18);
+    final btn = GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+        child: Icon(icon, color: Colors.white, size: 15),
+      ),
+    );
+    if (tooltip != null) return Tooltip(message: tooltip!, child: btn);
+    return btn;
+  }
+}
+
 /// Voice PiP lives in [MaterialApp.builder]'s [Stack], where the default
 /// texture [VideoTrackRenderer] can show Android's red "No overlay /
 /// RawTexture" debug strip. Platform views avoid that path.
@@ -354,82 +400,6 @@ Widget _voiceChannelPipVideoTrack(VideoTrack track) {
   );
 }
 
-class _VoicePipParticipantRow extends StatelessWidget {
-  const _VoicePipParticipantRow({required this.participant});
-
-  final Participant participant;
-
-  @override
-  Widget build(BuildContext context) {
-    final participantName = participant.name.trim();
-    final name =
-        participantName.isNotEmpty ? participantName : participant.identity;
-    final displayName =
-        participant is LocalParticipant ? '$name (Bạn)' : name;
-    final initial =
-        name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
-    final videoTrack = _voicePipPickVideo(participant);
-    final speaking = participant.isSpeaking;
-
-    return SizedBox(
-      height: 56,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: videoTrack != null
-                  ? _voiceChannelPipVideoTrack(videoTrack)
-                  : ColoredBox(
-                      color: const Color(0xFF1B2A4A),
-                      child: Center(
-                        child: Text(
-                          initial,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFE8F5E0),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Icon(
-                  speaking ? Icons.graphic_eq_rounded : Icons.hearing_rounded,
-                  size: 13,
-                  color: speaking
-                      ? const Color(0xFF00C48C)
-                      : const Color(0xFF8EA3CC),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _VoiceDockedChip extends StatefulWidget {
   const _VoiceDockedChip({
@@ -451,25 +421,10 @@ class _VoiceDockedChip extends StatefulWidget {
 }
 
 class _VoiceDockedChipState extends State<_VoiceDockedChip> {
-  Timer? _clock;
-
-  @override
-  void initState() {
-    super.initState();
-    _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _clock?.cancel();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (!widget.session.active) return const SizedBox.shrink();
+    final v = widget.session;
+    if (!v.active) return const SizedBox.shrink();
 
     final media = MediaQuery.sizeOf(context);
     final pad = MediaQuery.paddingOf(context);
@@ -483,6 +438,8 @@ class _VoiceDockedChipState extends State<_VoiceDockedChip> {
       (media.height - _kDockedChipSize - pad.bottom - 8)
           .clamp(8.0 + pad.top, double.infinity),
     );
+    final sorted = _voicePipSortedParticipants(v.participants);
+    final mainVideo = _voicePipMainVideo(sorted);
 
     return Positioned(
       left: nextX,
@@ -501,54 +458,83 @@ class _VoiceDockedChipState extends State<_VoiceDockedChip> {
           widget.onOffsetChanged(Offset(nx, ny));
         },
         child: Material(
-          elevation: 12,
-          shadowColor: Colors.black54,
+          elevation: 14,
+          shadowColor: Colors.black,
           borderRadius: BorderRadius.circular(18),
           clipBehavior: Clip.antiAlias,
-          color: const Color(0xFF1EB980),
+          color: mainVideo != null ? Colors.black : const Color(0xFF1EB980),
           child: SizedBox(
             width: _kDockedChipSize,
             height: _kDockedChipSize,
             child: Stack(
-              clipBehavior: Clip.none,
               children: [
+                if (mainVideo != null)
+                  Positioned.fill(
+                    child: _voiceChannelPipVideoTrack(mainVideo),
+                  ),
+                if (mainVideo != null)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.55),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 Positioned.fill(
                   child: InkWell(
                     onTap: widget.onExpandFromCorner,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.keyboard_arrow_up_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        Icon(
-                          Icons.headset_mic_rounded,
-                          color: Colors.white.withValues(alpha: 0.85),
-                          size: 16,
-                        ),
-                      ],
-                    ),
+                    child: mainVideo == null
+                        ? const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.keyboard_arrow_up_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              Icon(
+                                Icons.headset_mic_rounded,
+                                color: Colors.white70,
+                                size: 16,
+                              ),
+                            ],
+                          )
+                        : Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 5),
+                              child: Icon(
+                                Icons.keyboard_arrow_up_rounded,
+                                color: Colors.white.withValues(alpha: 0.85),
+                                size: 20,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
                 Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Material(
-                    color: Colors.black26,
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                    ),
-                    child: InkWell(
-                      onTap: widget.onLeave,
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(
-                          Icons.logout_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
+                  top: 2,
+                  right: 2,
+                  child: GestureDetector(
+                    onTap: widget.onLeave,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFED4245).withValues(alpha: 0.85),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 13,
                       ),
                     ),
                   ),
@@ -601,12 +587,11 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
     super.dispose();
   }
 
-  String _formatMmSs(DateTime? started) {
+  String _fmtTime(DateTime? started) {
     if (started == null) return '00:00';
-    final sec = DateTime.now().difference(started).inSeconds.clamp(0, 359999);
-    final m = sec ~/ 60;
-    final s = sec % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    final s = DateTime.now().difference(started).inSeconds.clamp(0, 359999);
+    final m = s ~/ 60;
+    return '${m.toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
   }
 
   @override
@@ -617,24 +602,12 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
     final media = MediaQuery.sizeOf(context);
     final pad = MediaQuery.paddingOf(context);
     final offset = widget.offset;
-    final maxCardH = (media.height * 0.52 - pad.vertical).clamp(220.0, 480.0);
-    final minCardH = 200.0;
-    const rowH = 56.0;
-    const sep = 5.0;
-    const listPadV = 10.0;
-    final pipList = _voicePipSortedParticipants(v.participants);
-    final listContentH = pipList.isEmpty
-        ? 72.0
-        : pipList.length * rowH +
-            (pipList.length - 1) * sep +
-            listPadV * 2;
-    final cardH =
-        (_kVoicePipHeaderH + listContentH + _kVoicePipFooterH)
-            .clamp(minCardH, maxCardH);
+    const cardW = _kVoicePipWidth;
+    const cardH = _kVoicePipHeight;
 
     final nextX = offset.dx.clamp(
       8.0,
-      (media.width - _kVoicePipWidth - 8).clamp(8.0, double.infinity),
+      (media.width - cardW - 8).clamp(8.0, double.infinity),
     );
     final nextY = offset.dy.clamp(
       8.0 + pad.top,
@@ -642,11 +615,13 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
           .clamp(8.0 + pad.top, double.infinity),
     );
 
+    final pipList = _voicePipSortedParticipants(v.participants);
+    final mainVideo = _voicePipMainVideo(pipList);
     final title = (v.channelName ?? '').trim().isNotEmpty
         ? v.channelName!.trim()
         : 'Kênh thoại';
-    final subtitle = (v.serverName ?? '').trim();
     final micOn = v.micEnabled;
+    final count = pipList.length;
 
     return Positioned(
       left: nextX,
@@ -655,10 +630,8 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
         onPointerMove: (PointerMoveEvent e) {
           if (e.buttons & kPrimaryButton != kPrimaryButton) return;
           final o = widget.session.voicePipOffset;
-          final nx = (o.dx + e.delta.dx).clamp(
-            8.0,
-            (media.width - _kVoicePipWidth - 8).clamp(8.0, double.infinity),
-          );
+          final nx = (o.dx + e.delta.dx)
+              .clamp(8.0, (media.width - cardW - 8).clamp(8.0, double.infinity));
           final ny = (o.dy + e.delta.dy).clamp(
             8.0 + pad.top,
             (media.height - cardH - pad.bottom - 8)
@@ -667,190 +640,248 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
           widget.onOffsetChanged(Offset(nx, ny));
         },
         child: Material(
-          elevation: 12,
-          shadowColor: Colors.black54,
-          borderRadius: BorderRadius.circular(22),
-          clipBehavior: Clip.none,
-          color: Colors.transparent,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            clipBehavior: Clip.antiAlias,
-            child: SizedBox(
-              width: _kVoicePipWidth,
-              height: cardH,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ColoredBox(
-                    color: const Color(0xFF1EB980),
-                    child: SizedBox(
-                      height: _kVoicePipHeaderH,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.headset_mic_rounded,
+          elevation: 16,
+          shadowColor: Colors.black87,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          color: Colors.black,
+          child: SizedBox(
+            width: cardW,
+            height: cardH,
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                // ── Background: video or dark avatar placeholder ──
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: widget.onRestore,
+                    child: mainVideo != null
+                        ? _voiceChannelPipVideoTrack(mainVideo)
+                        : Container(
+                            color: const Color(0xFF0C1528),
+                            alignment: Alignment.center,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1B2A4A),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(0xFF1EB980),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.headset_mic_rounded,
+                                    color: Colors.white54,
+                                    size: 30,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  pipList.isEmpty
+                                      ? 'Đang kết nối…'
+                                      : '$count thành viên',
+                                  style: const TextStyle(
+                                    color: Color(0xFF8EA3CC),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+
+                // ── Top gradient scrim ──
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 72,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.72),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ── Bottom gradient scrim ──
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 70,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.72),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ── Header: channel name + controls ──
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 9, 8, 0),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.headset_mic_rounded,
+                          color: Colors.white,
+                          size: 13,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
                               color: Colors.white,
-                              size: 15,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                              shadows: [
+                                Shadow(blurRadius: 4, color: Colors.black87),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 11,
-                                ),
-                              ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        _PipIconBtn(
+                          icon: Icons.open_in_new_rounded,
+                          onTap: widget.onTuckToCorner,
+                          tooltip: 'Thu nhỏ góc',
+                        ),
+                        const SizedBox(width: 4),
+                        _PipIconBtn(
+                          icon: Icons.logout_rounded,
+                          onTap: widget.onLeave,
+                          danger: true,
+                          tooltip: 'Rời phòng',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // ── Footer: timer + participants count + mic toggle ──
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 9),
+                    child: Row(
+                      children: [
+                        // Timer
+                        Text(
+                          _fmtTime(v.voiceJoinedAt),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        // Participants
+                        if (count > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            Semantics(
-                              label: 'Rời phòng',
-                              button: true,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: widget.onLeave,
-                                  borderRadius: BorderRadius.circular(999),
-                                  child: const SizedBox(
-                                    width: 26,
-                                    height: 26,
-                                    child: Icon(
-                                      Icons.logout_rounded,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.group_rounded,
+                                    size: 10, color: Colors.white70),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '$count',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                            Semantics(
-                              label: 'Thu nhỏ góc',
-                              button: true,
-                              child: Material(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(999),
-                                child: InkWell(
-                                  onTap: widget.onTuckToCorner,
-                                  borderRadius: BorderRadius.circular(999),
-                                  child: const SizedBox(
-                                    width: 26,
-                                    height: 26,
-                                    child: Icon(
-                                      Icons.south_east_rounded,
-                                      color: Colors.white,
-                                      size: 15,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                          ),
+                        const Spacer(),
+                        // Mic toggle
+                        GestureDetector(
+                          onTap: () => unawaited(v.toggleMic()),
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: micOn
+                                  ? Colors.white.withValues(alpha: 0.22)
+                                  : const Color(0xFFED4245)
+                                      .withValues(alpha: 0.85),
+                              shape: BoxShape.circle,
                             ),
-                          ],
+                            child: Icon(
+                              micOn
+                                  ? Icons.mic_rounded
+                                  : Icons.mic_off_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // ── Speaking indicator ring (when someone is speaking) ──
+                if (mainVideo != null && pipList.any((p) => p.isSpeaking))
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFF1EB980),
+                            width: 2.5,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: widget.onRestore,
-                      child: ColoredBox(
-                        color: const Color(0xFF0C1528),
-                        child: pipList.isEmpty
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Text(
-                                    subtitle.isNotEmpty
-                                        ? subtitle
-                                        : 'Đang chờ…',
-                                    textAlign: TextAlign.center,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFF8EA3CC),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : ListView.separated(
-                                padding: const EdgeInsets.fromLTRB(
-                                  8,
-                                  10,
-                                  8,
-                                  10,
-                                ),
-                                itemCount: pipList.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: sep),
-                                itemBuilder: (_, i) {
-                                  return _VoicePipParticipantRow(
-                                    participant: pipList[i],
-                                  );
-                                },
-                              ),
-                      ),
-                    ),
-                  ),
-                  ColoredBox(
-                    color: const Color(0xFF121C30),
-                    child: SizedBox(
-                      height: _kVoicePipFooterH,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: Row(
-                          children: [
-                            Text(
-                              _formatMmSs(v.voiceJoinedAt),
-                              style: const TextStyle(
-                                color: Color(0xFF6B7FA6),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                subtitle.isNotEmpty ? subtitle : 'Kênh thoại',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFF8EA3CC),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Icon(
-                                  micOn
-                                      ? Icons.mic_rounded
-                                      : Icons.mic_off_rounded,
-                                  size: 15,
-                                  color: micOn
-                                      ? const Color(0xFF1EB980)
-                                      : const Color(0xFFFF5770),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         ),

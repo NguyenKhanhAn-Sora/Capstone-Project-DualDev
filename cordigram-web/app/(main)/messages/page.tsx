@@ -2816,9 +2816,15 @@ export default function MessagesPage() {
         return next;
       });
     }
-    setError(
-      "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
+    const msg =
+      "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.";
+    setError(msg);
+    // Auto-clear after 5 s so the banner never sticks permanently.
+    const t = setTimeout(
+      () => setError((prev) => (prev === msg ? null : prev)),
+      5000,
     );
+    return () => clearTimeout(t);
   }, [callBusy]);
 
   // ✅ Handle incoming call & call events
