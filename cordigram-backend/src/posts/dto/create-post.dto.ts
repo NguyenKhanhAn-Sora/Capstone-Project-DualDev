@@ -12,8 +12,8 @@ import {
   ValidateNested,
   IsISO8601,
 } from 'class-validator';
+import { PostKind, Visibility } from '../post.schema';
 import { Type } from 'class-transformer';
-import { Visibility } from '../post.schema';
 
 class MediaDto {
   @IsEnum(['image', 'video'])
@@ -97,4 +97,8 @@ export class CreatePostDto {
   @IsOptional()
   @IsMongoId()
   pollId?: string;
+
+  @IsOptional()
+  @IsEnum(['ads'])
+  kind?: Extract<PostKind, 'ads'>;
 }

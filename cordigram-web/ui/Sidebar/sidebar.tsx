@@ -37,6 +37,7 @@ import { useTranslations } from "next-intl";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LANG_LABELS: Record<string, string> = { vi: "Tiếng Việt", en: "English", ja: "日本語", zh: "中文" };
+const LANG_SHORT: Record<string, string> = { vi: "VI", en: "EN", ja: "JA", zh: "ZH" };
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
     aria-hidden
@@ -102,6 +103,7 @@ export default function Sidebar() {
   const { language, setLanguage } = useLanguage();
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement | null>(null);
+  const [menuLangOpen, setMenuLangOpen] = useState(false);
   const { getGuard } = useNavigationGuard();
 
   const handleGuardedNav = useCallback(
@@ -431,6 +433,10 @@ export default function Sidebar() {
   const displayName = profile?.displayName;
   const username = profile?.username ? `@${profile.username}` : null;
 
+  useEffect(() => {
+    if (!menuOpen) setMenuLangOpen(false);
+  }, [menuOpen]);
+
   const handleLogout = useCallback(async () => {
     setMenuOpen(false);
 
@@ -671,6 +677,33 @@ export default function Sidebar() {
                   icon={<IconSaved />}
                   onClick={handleSavedClick}
                 />
+                <div onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className={styles.menuItem}
+                    onClick={() => setMenuLangOpen((v) => !v)}
+                  >
+                    <span className={styles.menuIcon}><IconLanguage /></span>
+                    <span className={styles.menuLabel}>{t("menu.language")}</span>
+                    <span className={styles.menuLangBadge}>{LANG_SHORT[language] ?? language.toUpperCase()}</span>
+                    <span className={`${styles.menuLangChevron}${menuLangOpen ? ` ${styles.menuLangChevronOpen}` : ""}`}>▾</span>
+                  </button>
+                  {menuLangOpen ? (
+                    <div className={styles.menuLangOptions}>
+                      {SUPPORTED_LANGUAGE_CODES.map((code) => (
+                        <button
+                          key={code}
+                          type="button"
+                          className={`${styles.menuLangOption} ${language === code ? styles.menuLangOptionActive : ""}`}
+                          onClick={() => { setLanguage(code); setMenuLangOpen(false); setMenuOpen(false); }}
+                        >
+                          <span>{LANG_LABELS[code]}</span>
+                          {language === code ? <span className={styles.menuLangCheck}>✓</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 <MenuItem
                   label={
                     theme === "dark"

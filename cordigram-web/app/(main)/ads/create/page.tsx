@@ -771,6 +771,7 @@ export default function AdsCreatePage() {
             allowComments: true,
             allowDownload: false,
             hideLikeCount: false,
+            kind: "ads",
           },
         });
         promotedPostId = created.id;

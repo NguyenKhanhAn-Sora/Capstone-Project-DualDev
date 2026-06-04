@@ -319,7 +319,6 @@ export default function ProfilePostsPage() {
           manageMode={manageMode}
           selectedIds={selectedIds}
           pinnedIds={pinnedIds}
-          pinnedBadgeLabel={t("profilePage.manage.pinnedBadge")}
           onSelect={(item) => {
             if (manageMode) {
               toggleSelect(item.id);
@@ -400,7 +399,6 @@ function PostGrid({
   manageMode,
   selectedIds,
   pinnedIds,
-  pinnedBadgeLabel,
   onSelect,
 }: {
   items: FeedItem[];
@@ -408,9 +406,10 @@ function PostGrid({
   manageMode: boolean;
   selectedIds: Set<string>;
   pinnedIds: Set<string>;
-  pinnedBadgeLabel: string;
   onSelect: (item: FeedItem) => void;
 }) {
+  const { t, language } = useLanguage();
+
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
     el.currentTime = 0;
@@ -459,7 +458,7 @@ function PostGrid({
                 <img
                   className={styles.tileMedia}
                   src={firstImg}
-                  alt={poll?.question ?? "Bình chọn"}
+                  alt={poll?.question ?? t("poll.fallback")}
                   loading="lazy"
                 />
               ) : (
@@ -470,12 +469,12 @@ function PostGrid({
                     <rect x="18" y="2" width="4" height="20" rx="1" />
                   </svg>
                   <span className={styles.pollTileQuestion}>
-                    {poll?.question ?? "Bình chọn"}
+                    {poll?.question ?? t("poll.fallback")}
                   </span>
                   <span className={styles.pollTileStats}>
                     {poll?.totalVotes
-                      ? `${poll.totalVotes.toLocaleString("vi-VN")} lượt bình chọn`
-                      : "Chưa có lượt bình chọn"}
+                      ? t("poll.votes", { count: poll.totalVotes.toLocaleString(language) })
+                      : t("poll.noVotes")}
                   </span>
                 </div>
               );
@@ -512,7 +511,7 @@ function PostGrid({
                   <rect x="10" y="8" width="4" height="14" rx="1" />
                   <rect x="18" y="2" width="4" height="20" rx="1" />
                 </svg>
-                Bình chọn
+                {t("poll.badge")}
               </div>
             )}
             {isPinned && (
@@ -520,7 +519,7 @@ function PostGrid({
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <path d="M16 2a1 1 0 0 1 .707 1.707L15.414 5l3.293 3.293a1 1 0 0 1-1.414 1.414L16 8.414l-2.586 2.586.707.707a1 1 0 0 1-1.414 1.414L12 12.414l-3.293 3.293V19a1 1 0 0 1-1.707.707l-4-4A1 1 0 0 1 4 14h3.293L10.586 10.707l-.707-.707a1 1 0 0 1 1.414-1.414l.707.707L14.586 6.7 13.293 5.41a1 1 0 0 1 1.414-1.414L16 5.293 17.293 4A1 1 0 0 1 16 2z" />
                 </svg>
-                {pinnedBadgeLabel}
+                {t("profilePage.manage.pinnedBadge")}
               </div>
             )}
             {!manageMode && (

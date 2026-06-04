@@ -406,7 +406,7 @@ export class PostsService {
         : Math.max(0, Math.round(primaryVideoDuration * 1000));
 
     const doc = await this.postModel.create({
-      kind: 'post',
+      kind: dto.kind ?? 'post',
       authorId: new Types.ObjectId(authorId),
       serverId: dto.serverId ? new Types.ObjectId(dto.serverId) : null,
       channelId: dto.channelId ? new Types.ObjectId(dto.channelId) : null,
@@ -3906,21 +3906,23 @@ export class PostsService {
         moderationState: { $in: ['normal', 'restricted', null] },
         deletedAt: null,
         publishedAt: { $ne: null },
+        // Exclude legacy ad creatives identifiable by their content marker
+        content: { $not: /^\[\[AD_PRIMARY_TEXT\]\]/ },
       })
       .sort({ pinnedAt: -1, createdAt: -1 })
       .limit(limit)
       .lean();
 
-    // Filter out posts that have ever been used as an ad (any status)
+    // Backward compat: exclude old ad posts (kind='post') that have a PaymentTransaction
     const allPostIds = docs.map((d) => d._id?.toString?.() ?? '').filter(Boolean);
     let adPostIdSet = new Set<string>();
     if (allPostIds.length) {
-      const adPostIds = await this.paymentTransactionModel
+      const adTxs = await this.paymentTransactionModel
         .find({ promotedPostId: { $in: allPostIds } })
         .select('promotedPostId')
         .lean();
       adPostIdSet = new Set(
-        adPostIds.map((t) => t.promotedPostId?.toString?.() ?? '').filter(Boolean),
+        adTxs.map((t) => t.promotedPostId?.toString?.() ?? '').filter(Boolean),
       );
     }
     const filteredDocs = docs.filter(

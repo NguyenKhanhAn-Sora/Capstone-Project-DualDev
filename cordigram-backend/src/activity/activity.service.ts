@@ -19,7 +19,7 @@ export class ActivityLogService {
     postId?: string | Types.ObjectId | null;
     commentId?: string | Types.ObjectId | null;
     targetUserId?: string | Types.ObjectId | null;
-    postKind?: 'post' | 'reel' | null;
+    postKind?: 'post' | 'reel' | 'ads' | null;
     meta?: ActivityMeta | null;
   }) {
     if (!params.userId) return null;

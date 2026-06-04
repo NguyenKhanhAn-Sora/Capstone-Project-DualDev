@@ -1,47 +1,61 @@
+/* CSS Houdini property for animatable conic-gradient ring */
+@property --ring-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 180deg;
+}
+
+@keyframes ringRotate {
+  to { --ring-angle: 540deg; }
+}
+
+@keyframes sectionFadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .page {
   min-height: 100vh;
   display: flex;
   justify-content: center;
   padding: 48px 16px 64px;
   background:
-    radial-gradient(
-      circle at 20% 20%,
-      rgba(120, 149, 255, 0.08),
-      transparent 30%
-    ),
-    radial-gradient(
-      circle at 80% 10%,
-      rgba(255, 186, 120, 0.08),
-      transparent 28%
-    ),
+    radial-gradient(ellipse at 80% -5%, rgba(124, 58, 237, 0.09) 0%, transparent 46%),
+    radial-gradient(ellipse at 15% 90%, rgba(14, 165, 233, 0.07) 0%, transparent 46%),
+    radial-gradient(ellipse at 50% 50%, rgba(75, 0, 130, 0.04) 0%, transparent 60%),
     var(--color-bg-home);
   color: var(--color-text);
 }
 
 .card {
   width: min(880px, 100%);
-  background: linear-gradient(
-    145deg,
-    rgba(18, 24, 45, 0.88),
-    rgba(18, 26, 52, 0.96)
-  );
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 22px;
+  background:
+    radial-gradient(ellipse at 88% -8%, rgba(124, 58, 237, 0.14) 0%, transparent 48%),
+    radial-gradient(ellipse at 8% 96%, rgba(14, 165, 233, 0.1) 0%, transparent 48%),
+    rgba(11, 17, 34, 0.97);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: 24px;
   padding: 28px;
   box-shadow:
-    0 25px 70px rgba(0, 0, 0, 0.28),
-    0 2px 10px rgba(0, 0, 0, 0.18);
+    0 1px 0 rgba(124, 58, 237, 0.12) inset,
+    0 25px 70px rgba(0, 0, 0, 0.35),
+    0 2px 10px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   gap: 18px;
+  animation: sectionFadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 :global([data-theme="light"]) .card {
-  background: linear-gradient(160deg, #ffffff, #f5f7fb);
-  border: 1px solid var(--color-border);
+  background:
+    radial-gradient(ellipse at 88% -8%, rgba(124, 58, 237, 0.04) 0%, transparent 48%),
+    radial-gradient(ellipse at 8% 96%, rgba(14, 165, 233, 0.03) 0%, transparent 48%),
+    #ffffff;
+  border: 1px solid rgba(124, 58, 237, 0.12);
   box-shadow:
-    0 18px 50px rgba(15, 22, 41, 0.12),
-    0 2px 10px rgba(15, 22, 41, 0.08);
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 50px rgba(15, 22, 41, 0.1),
+    0 2px 8px rgba(15, 22, 41, 0.06);
 }
 
 .header {
@@ -55,17 +69,25 @@
 .avatarRing {
   width: 160px;
   height: 160px;
-  padding: 5px;
+  padding: 4px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: conic-gradient(from 180deg, #7bd8ff, #cba6ff, #7bd8ff);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  /* Animating conic-gradient via @property — ring rotates, image stays still */
+  background: conic-gradient(from var(--ring-angle), #7bd8ff, #a78bfa, #7c3aed, #cba6ff, #0284c7, #7bd8ff);
+  animation: ringRotate 8s linear infinite;
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.3),
+    0 12px 32px rgba(124, 58, 237, 0.25),
+    0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 :global([data-theme="light"]) .avatarRing {
-  box-shadow: 0 12px 28px rgba(15, 22, 41, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.2),
+    0 12px 28px rgba(124, 58, 237, 0.15),
+    0 4px 10px rgba(15, 22, 41, 0.1);
 }
 
 .avatarImg {
@@ -122,12 +144,16 @@
 
 .displayName {
   margin: 0;
-  font-size: 30px;
+  font-size: 32px;
   line-height: 1.1;
-  color: var(--color-title-primary);
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   width: 100%;
   text-align: left;
+  background: linear-gradient(135deg, var(--color-title-primary) 50%, #a78bfa 75%, #7bd8ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .username {
@@ -191,10 +217,9 @@
   overflow-wrap: anywhere;
 }
 
+/* bioSection — hidden on desktop (replaced by profileInfoPanel below the header) */
 .bioSection {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: none;
 }
 
 .bioCollapsible {
@@ -265,6 +290,23 @@
   background: linear-gradient(120deg, #6ddcff, #7f9bff);
   color: #0a0f1c;
   font-size: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shimmer sweep on primary button */
+.primaryButton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.4s ease;
+  pointer-events: none;
+}
+
+.primaryButton:hover:not(:disabled)::after {
+  transform: translateX(120%);
 }
 
 :global([data-theme="light"]) .primaryButton {
@@ -355,7 +397,12 @@
 
 .viewerActions .primaryButton:not(.ghostButton) {
   color: #fff;
-  /* box-shadow: 0 14px 30px rgba(122, 240, 198, 0.28); */
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee);
+  box-shadow: 0 10px 28px rgba(124, 58, 237, 0.3);
+}
+
+.viewerActions .primaryButton:not(.ghostButton):hover:not(:disabled) {
+  box-shadow: 0 14px 36px rgba(124, 58, 237, 0.42);
 }
 
 :global([data-theme="light"]) .viewerActions .primaryButton:not(.ghostButton) {
@@ -483,32 +530,58 @@
 
 .aboutCard {
   width: min(860px, 94vw);
-  padding: 22px;
-  max-height: min(550px, 85vh);
+  padding: 0;
+  max-height: min(600px, 88vh);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background:
+    radial-gradient(ellipse at 90% -5%, rgba(124, 58, 237, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 5% 95%, rgba(14, 165, 233, 0.08) 0%, transparent 50%),
+    var(--color-surface);
+  position: relative;
+}
+
+/* Galaxy top accent bar */
+.aboutCard::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #7c3aed 30%, #0284c7 60%, #22d3ee, transparent);
+  z-index: 1;
 }
 
 .aboutHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.12);
+  position: relative;
+  z-index: 1;
+}
+
+:global([data-theme="light"]) .aboutHeader {
+  border-bottom-color: rgba(124, 58, 237, 0.08);
 }
 
 .aboutTitle {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
-  color: var(--color-title-primary);
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--color-title-primary) 55%, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .aboutSubtitle {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .aboutClose {
@@ -555,9 +628,10 @@
 .aboutGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  gap: 14px;
   flex: 1;
   min-height: 0;
+  padding: 16px 22px 20px;
 }
 
 @media (max-width: 820px) {
@@ -578,11 +652,18 @@
 
 .aboutLeft,
 .aboutRight {
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(124, 58, 237, 0.14);
   background: var(--color-surface-muted);
   border-radius: 16px;
-  padding: 14px;
+  padding: 16px;
   min-height: 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+:global([data-theme="light"]) .aboutLeft,
+:global([data-theme="light"]) .aboutRight {
+  border-color: rgba(124, 58, 237, 0.1);
+  background: rgba(124, 58, 237, 0.02);
 }
 
 .aboutLeft {
@@ -592,6 +673,9 @@
 
 .aboutRight {
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .aboutIdentityRow {
@@ -602,14 +686,17 @@
 }
 
 .aboutAvatarRing {
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   padding: 3px;
   border-radius: 50%;
-  background: conic-gradient(from 180deg, #7bd8ff, #cba6ff, #7bd8ff);
+  background: conic-gradient(from var(--ring-angle), #7bd8ff, #a78bfa, #7c3aed, #cba6ff, #0284c7, #7bd8ff);
+  animation: ringRotate 8s linear infinite;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.25), 0 6px 16px rgba(124, 58, 237, 0.2);
 }
 
 .aboutAvatar {
@@ -661,29 +748,53 @@
 
 .aboutSectionTitle {
   font-weight: 800;
-  color: var(--color-title-primary);
-  font-size: 13px;
-  letter-spacing: 0.02em;
+  color: var(--color-primary);
+  font-size: 10px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  margin: 2px 0 10px;
+  margin: 0 0 10px;
 }
 
 .aboutRows {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
   margin-bottom: 14px;
+  border: 1px solid rgba(124, 58, 237, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .aboutRow {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.07);
+  transition: background 0.12s ease;
+}
+
+.aboutRow:last-child { border-bottom: none; }
+
+.aboutRow:hover {
+  background: rgba(124, 58, 237, 0.04);
 }
 
 .aboutLabel {
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.aboutLabelIcon {
+  color: rgba(124, 58, 237, 0.7);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .aboutValue {
@@ -691,7 +802,7 @@
   font-weight: 700;
   font-size: 13px;
   text-align: right;
-  max-width: 62%;
+  max-width: 60%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -699,7 +810,7 @@
 
 .aboutValueMuted {
   color: var(--color-text-muted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 @media (max-width: 420px) {
@@ -716,53 +827,90 @@
 .aboutStatsGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .aboutStat {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.15);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 10px 12px;
+  background: rgba(124, 58, 237, 0.05);
+  padding: 12px 10px;
   text-align: center;
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s ease,
+    border-color 0.2s ease;
+  cursor: default;
+}
+
+.aboutStat:hover {
+  transform: perspective(500px) rotateX(-4deg) translateY(-3px);
+  border-color: rgba(124, 58, 237, 0.32);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.1);
 }
 
 :global([data-theme="light"]) .aboutStat {
-  background: var(--color-surface);
-  border-color: var(--color-border);
+  background: rgba(124, 58, 237, 0.03);
+  border-color: rgba(124, 58, 237, 0.12);
 }
 
 .aboutStatValue {
   font-weight: 900;
-  color: var(--color-title-primary);
-  font-size: 16px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--color-title-primary) 50%, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .aboutStatLabel {
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .aboutActions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 14px;
+  padding: 14px 22px;
+  border-top: 1px solid rgba(124, 58, 237, 0.1);
 }
 
 .aboutPrimary {
   border: none;
-  border-radius: 14px;
-  padding: 10px 14px;
+  border-radius: 12px;
+  padding: 10px 20px;
   font-weight: 800;
+  font-size: 13px;
   cursor: pointer;
-  background: linear-gradient(120deg, #6ddcff, #7f9bff);
-  color: #0a0f1c;
-  transition: transform 120ms ease;
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.28);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.aboutPrimary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.14) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.4s ease;
 }
 
 .aboutPrimary:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(124, 58, 237, 0.38);
+}
+
+.aboutPrimary:hover::after {
+  transform: translateX(120%);
 }
 
 .modalPrimaryAccent:hover {
@@ -1351,32 +1499,53 @@
 
 .statsRow {
   display: flex;
-  gap: 20px;
+  gap: 8px;
   width: 100%;
   margin-top: 10px;
 }
 
 .statCard {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
   justify-content: center;
-  padding: 10px 14px;
+  padding: 10px 16px;
 }
 
 .statCardClickable {
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(124, 58, 237, 0.1);
+  background: rgba(124, 58, 237, 0.04);
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.28s ease;
 }
 
 .statCardClickable:hover {
-  background: rgba(109, 220, 255, 0.08);
+  transform: perspective(600px) rotateX(-4deg) translateY(-4px);
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.28);
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.12);
+}
+
+:global([data-theme="light"]) .statCardClickable {
+  background: rgba(124, 58, 237, 0.03);
+  border-color: rgba(124, 58, 237, 0.1);
+}
+
+:global([data-theme="light"]) .statCardClickable:hover {
+  background: rgba(124, 58, 237, 0.07);
+  border-color: rgba(124, 58, 237, 0.22);
 }
 
 .statValue {
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 900;
   color: var(--color-title-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .statLabel {
@@ -1422,8 +1591,31 @@
 .navRow {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 8px;
+  gap: 4px;
   margin-top: 16px;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.12);
+  padding-bottom: 0;
+  position: relative; /* required for navIndicator absolute positioning */
+}
+
+:global([data-theme="light"]) .navRow {
+  border-bottom-color: rgba(124, 58, 237, 0.1);
+}
+
+/* Single sliding galaxy indicator — driven by JS measureActive() */
+.navIndicator {
+  position: absolute;
+  bottom: -1px; /* sit on top of the border-bottom */
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7c3aed, #0284c7 50%, #22d3ee);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+  pointer-events: none;
+  transition:
+    left 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s ease;
+  z-index: 1;
 }
 
 .navItemWrap {
@@ -1474,14 +1666,16 @@
 .navItem {
   position: relative;
   background: transparent;
-  padding: 14px 8px 10px;
+  padding: 14px 8px 12px;
   color: var(--color-text-muted);
   font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   cursor: pointer;
   transition:
-    color 120ms ease,
-    transform 120ms ease;
+    color 180ms ease,
+    transform 180ms ease;
   border-radius: 12px;
   text-align: center;
 }
@@ -1521,11 +1715,11 @@
   text-align: center;
 }
 
+/* ::before hidden — replaced by the single sliding .navIndicator */
 .navItemActive::before {
-  background: var(--color-title-primary);
-  width: 50%;
-  left: 50%;
-  transform: translateX(-50%);
+  background: transparent;
+  box-shadow: none;
+  width: 0;
 }
 
 .navLabel {
@@ -1547,13 +1741,31 @@
   width: 100%;
   aspect-ratio: 3/4;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #0b1020;
   cursor: pointer;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease;
+  will-change: transform;
+}
+
+.tile:hover {
+  transform: perspective(600px) rotateX(-5deg) translateY(-6px) scale(1.02);
+  box-shadow:
+    -6px 18px 36px rgba(0, 0, 0, 0.3),
+    0 4px 12px rgba(124, 58, 237, 0.15);
+  z-index: 1;
 }
 
 :global([data-theme="light"]) .tile {
   background: var(--color-surface-muted);
+}
+
+:global([data-theme="light"]) .tile:hover {
+  box-shadow:
+    -6px 18px 36px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(124, 58, 237, 0.1);
 }
 
 .tileMedia {
@@ -1569,22 +1781,21 @@
   bottom: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 5px;
+  padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(8, 12, 24, 0.6);
+  background: rgba(8, 12, 24, 0.65);
+  backdrop-filter: blur(8px);
   color: #e2e8f0;
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.01em;
-  /* backdrop-filter: blur(10px); */
-  /* box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18); */
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 :global([data-theme="light"]) .viewBadge {
-  background: transparent;
+  background: rgba(8, 12, 24, 0.58);
   color: #fff;
-  /* box-shadow: 0 10px 24px rgba(15, 22, 41, 0.12); */
 }
 
 @keyframes shimmer {
@@ -1630,14 +1841,15 @@
   margin-top: 16px;
   padding: 10px 14px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(124, 58, 237, 0.05);
+  border: 1px solid rgba(124, 58, 237, 0.18);
   flex-wrap: wrap;
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.06) inset;
 }
 
 :global([data-theme="light"]) .manageBar {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border);
+  background: rgba(124, 58, 237, 0.03);
+  border-color: rgba(124, 58, 237, 0.12);
 }
 
 .manageBarLeft {
@@ -1780,70 +1992,132 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 4px 9px;
   border-radius: 999px;
   background: rgba(8, 12, 24, 0.72);
-  color: #6ddcff;
+  backdrop-filter: blur(8px);
+  color: #a78bfa;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
   pointer-events: none;
+  border: 1px solid rgba(167, 139, 250, 0.3);
 }
 
 :global([data-theme="light"]) .pinnedBadge {
-  background: rgba(15, 22, 41, 0.7);
+  background: rgba(15, 22, 41, 0.72);
+  color: #a78bfa;
 }
 
 
-/* ── Mobile inline info section — giống Flutter's info card ── */
-/* Desktop: hidden */
-.mobileInfoCard {
-  display: none;
+/* ── Profile info panel — bio + info chips ── */
+.profileInfoPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-@media (max-width: 767px) {
-  .mobileInfoCard {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    background: var(--color-surface);
-    overflow: hidden;
-    margin-top: 6px;
-    margin-bottom: 2px;
-  }
-
-  .mobileInfoRow {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--color-border);
-    min-height: 0;
-  }
-
-  .mobileInfoRow:last-child {
-    border-bottom: none;
-  }
-
-  .mobileInfoIcon {
-    color: var(--color-text-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    opacity: 0.8;
-  }
-
-  .mobileInfoText {
-    font-size: 14px;
-    color: var(--color-text);
-    font-weight: 400;
-    line-height: 1.4;
-  }
+/* Bio inside the panel */
+.panelBio {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
+
+.panelBioText {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.panelBioCollapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Info chips — flex-wrap, each chip is self-sized */
+.panelInfoRows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panelInfoRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px 6px 10px;
+  border-radius: 999px;
+  /* Base — dark mode default (galaxy: violet glow) */
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(124, 58, 237, 0.12);
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: default;
+}
+
+.panelInfoRow:hover {
+  border-color: rgba(167, 139, 250, 0.6);
+  background: rgba(124, 58, 237, 0.2);
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Light mode — softer, less saturated */
+:global([data-theme="light"]) .panelInfoRow {
+  background: rgba(124, 58, 237, 0.05);
+  border-color: rgba(124, 58, 237, 0.18);
+  box-shadow: none;
+}
+
+:global([data-theme="light"]) .panelInfoRow:hover {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.35);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
+}
+
+.panelInfoIcon {
+  /* Dark: bright lavender for contrast */
+  color: #a78bfa;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+:global([data-theme="light"]) .panelInfoIcon {
+  color: #7c3aed;
+}
+
+.panelInfoText {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+  /* Dark: off-white for readability */
+  color: #e2e8f0;
+}
+
+:global([data-theme="light"]) .panelInfoText {
+  color: var(--color-text);
+}
+
+/* Keep mobileInfoCard hidden (replaced by profileInfoPanel) */
+.mobileInfoCard { display: none; }
+.mobileInfoRow  { display: none; }
+.mobileInfoIcon { display: none; }
+.mobileInfoText { display: none; }
 
 /* ── Poll badge — mobile: chỉ hiện icon, ẩn text ── */
 @media (max-width: 767px) {
@@ -2116,25 +2390,10 @@
     width: 44px !important;
   }
 
-  /* ── Bio section: reset desktop indent, hiện inline giống Flutter ── */
-  .bioSection {
-    margin-left: 0 !important;
-    padding: 6px 0 4px !important;
-    width: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 4px !important;
-  }
+  /* ── Bio: hide old bioSection on mobile (replaced by profileInfoPanel) ── */
+  .bioSection { display: none !important; }
 
-  .bio {
-    text-align: left !important;
-    max-width: 100% !important;
-    font-size: 14px !important;
-    line-height: 1.55 !important;
-    margin: 0 !important;
-  }
-
-  /* "See more" — màu cyan như Flutter's _accent color */
+  /* bioToggle in profileInfoPanel */
   .bioToggle {
     color: var(--color-primary) !important;
     font-size: 13px !important;

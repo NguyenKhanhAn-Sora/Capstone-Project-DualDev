@@ -2718,6 +2718,15 @@
       "currentStrikes": "現在の違反合計",
       "loading": "違反履歴を読み込み中...",
       "noViolations": "違反は見つかりませんでした。",
+      "noViolationsDesc": "記録はクリーンです。この調子で！",
+      "statusClean": "クリーン",
+      "statusLow": "低リスク",
+      "statusHigh": "高リスク",
+      "strikeHint": "良い行動を続けると違反ポイントはリセットされます。",
+      "noStrikeAdded": "ストライクなし",
+      "total": "合計",
+      "strike": "ストライク",
+      "remaining": "残り",
       "refreshBtn": "更新",
       "refreshing": "更新中...",
       "interactionMuted": "インタラクションをミュート",
@@ -2818,5 +2827,11 @@
     "captionLangEn": "英語",
     "captionLangZh": "中国語",
     "captionLangJa": "日本語"
+  },
+  "poll": {
+    "badge": "投票",
+    "fallback": "投票",
+    "votes": "{count} 票",
+    "noVotes": "まだ投票がありません"
   }
 }

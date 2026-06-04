@@ -2729,6 +2729,15 @@
       "currentStrikes": "Current strike total",
       "loading": "Loading violation history...",
       "noViolations": "No violations found.",
+      "noViolationsDesc": "Your record is clean. Keep it up!",
+      "statusClean": "Clean record",
+      "statusLow": "Moderate",
+      "statusHigh": "High risk",
+      "strikeHint": "Strikes reset over time with good behavior.",
+      "noStrikeAdded": "No strike added",
+      "total": "Total",
+      "strike": "Strike",
+      "remaining": "Remaining",
       "refreshBtn": "Refresh",
       "refreshing": "Refreshing...",
       "interactionMuted": "Interaction muted",
@@ -2844,5 +2853,11 @@
     "sessionExpired": "Session expired.",
     "failedToLoad": "Failed to load likes",
     "failedToLoadMore": "Failed to load more"
+  },
+  "poll": {
+    "badge": "Poll",
+    "fallback": "Poll",
+    "votes": "{count} votes",
+    "noVotes": "No votes yet"
   }
 }

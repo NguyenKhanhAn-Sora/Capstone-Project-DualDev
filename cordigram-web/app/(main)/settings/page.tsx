@@ -277,6 +277,43 @@ const getCreatorRequestStatusClassName = (status?: string | null) => {
 
 const CONTENT_PAGE_SIZE = 10;
 
+const isVideoUrl = (url: string) =>
+  /\.(mp4|webm|mov|ogg|m4v)(\?|$)/i.test(url);
+
+const notifCategoryIcon = (key: string) => {
+  if (key === "follow") return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 12.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 19a6.8 6.8 0 0 1 13.6 0" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M18 7.2h4M20 5.2v4" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (key === "comment") return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M5.5 5.5h13a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-3.6 2.8a.6.6 0 0 1-.96-.48V7.5a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (key === "like") return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M6 10h3.2V6.6a2.1 2.1 0 0 1 2.1-2.1c.94 0 1.78.62 1.78 1.52V10h3.6a2 2 0 0 1 1.97 2.35l-1 5.3A2.2 2.2 0 0 1 15.43 20H8.2A2.2 2.2 0 0 1 6 17.8Z" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 10h2v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (key === "mentions") return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth={1.8} />
+      <path d="M20 12a8 8 0 1 0-3 6.26" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20 12v3a3 3 0 0 0 3-3" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+};
+
 type IconProps = { size?: number; filled?: boolean };
 
 const IconLike = ({ size = 18, filled }: IconProps) => (
@@ -436,6 +473,21 @@ const ActivityIcon = ({ type }: { type: ActivityType }) => {
   }
   return <IconComment />;
 };
+
+function VideoThumb({ src }: { src: string }) {
+  return (
+    <video
+      src={src}
+      preload="metadata"
+      muted
+      playsInline
+      onLoadedMetadata={(e) => {
+        const v = e.currentTarget;
+        v.currentTime = Math.min(1, v.duration * 0.1);
+      }}
+    />
+  );
+}
 
 function EyeToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
   const { t: tEye } = useLanguage();
@@ -3054,88 +3106,168 @@ export default function SettingsPage() {
                               ) : null}
                             </div>
                           ) : null}
-                          <div className={styles.creatorVerifiedNotice}>
-                            {t("settingsPage.verification.alreadyVerified")}
+                          <div className={styles.verifyApprovedBadge}>
+                            <div className={styles.verifyApprovedIconWrap}>
+                              <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                                <path d="m9 12 2 2 4-4" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M12 3 4 6v6.1c0 5 3.3 9.5 8 10.9 4.7-1.4 8-5.9 8-10.9V6Z" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </div>
+                            <div className={styles.verifyApprovedText}>
+                              <p className={styles.verifyApprovedTitle}>{t("settingsPage.verification.alreadyVerified")}</p>
+                              <p className={styles.verifyApprovedSub}>Your creator account is verified</p>
+                            </div>
                           </div>
                         </div>
                       ) : (
                         <>
                           <div className={styles.verificationScoreCard}>
-                            <p className={styles.infoTitle}>{t("settingsPage.verification.creatorScore")}</p>
-                            <p className={styles.verificationScoreValue}>
-                              {creatorStatus.eligibility.score} /{" "}
-                              {creatorStatus.eligibility.minimumScore}
-                            </p>
+                            {(() => {
+                              const score = creatorStatus.eligibility.score;
+                              const min = Math.max(creatorStatus.eligibility.minimumScore, 1);
+                              const pct = Math.min(1, score / min);
+                              const r = 38;
+                              const circ = 2 * Math.PI * r;
+                              const offset = circ * (1 - pct);
+                              const pass = score >= creatorStatus.eligibility.minimumScore;
+                              return (
+                                <div className={styles.verifyScoreRingWrap}>
+                                  <svg
+                                    className={styles.verifyScoreRingSvg}
+                                    width="96"
+                                    height="96"
+                                    viewBox="0 0 96 96"
+                                    aria-hidden
+                                  >
+                                    <defs>
+                                      <linearGradient id="scoreRingGrad" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#7c3aed" />
+                                        <stop offset="50%" stopColor="#0284c7" />
+                                        <stop offset="100%" stopColor="#22d3ee" />
+                                      </linearGradient>
+                                    </defs>
+                                    <circle cx="48" cy="48" r={r} fill="none" stroke="rgba(167,139,250,0.13)" strokeWidth="10" />
+                                    <circle
+                                      cx="48"
+                                      cy="48"
+                                      r={r}
+                                      fill="none"
+                                      stroke={pass ? "url(#scoreRingGrad)" : "#ef4444"}
+                                      strokeWidth="10"
+                                      strokeLinecap="round"
+                                      strokeDasharray={circ}
+                                      strokeDashoffset={offset}
+                                      transform="rotate(-90 48 48)"
+                                      style={{ transition: "stroke-dashoffset 1s cubic-bezier(0.16,1,0.3,1)" }}
+                                    />
+                                    <text x="48" y="46" textAnchor="middle" fontSize="17" fontWeight="800" fill="currentColor" dominantBaseline="middle">
+                                      {score}
+                                    </text>
+                                    <text x="48" y="62" textAnchor="middle" fontSize="9.5" fill="rgba(148,163,184,0.8)" dominantBaseline="middle">
+                                      / {creatorStatus.eligibility.minimumScore}
+                                    </text>
+                                  </svg>
+                                  <div className={styles.verifyScoreTextGroup}>
+                                    <p className={styles.verifyScoreLabel}>{t("settingsPage.verification.creatorScore")}</p>
+                                    <p className={styles.verifyScoreDisplay}>{score}</p>
+                                    <p className={styles.verifyScoreReq}>
+                                      of {creatorStatus.eligibility.minimumScore} required
+                                    </p>
+                                    <span className={`${styles.verifyScoreCaption} ${pass ? styles.verifyScoreCaptionPass : styles.verifyScoreCaptionFail}`}>
+                                      {pass ? "Score met" : "Score not met"}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
 
-                          <ul className={styles.infoList}>
-                            <li className={styles.infoItem}>
-                              <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>{t("settingsPage.verification.accountAge")}</p>
-                                <p className={styles.infoValue}>
-                                  {creatorStatus.eligibility.accountAgeDays} days
-                                </p>
+                          {(() => {
+                            const failed = creatorStatus.eligibility.failedRequirements;
+                            const metrics = [
+                              {
+                                key: "account_age",
+                                label: t("settingsPage.verification.accountAge"),
+                                current: creatorStatus.eligibility.accountAgeDays,
+                                reqLabel: t("settingsPage.verification.minDays", { value: creatorStatus.criteria.minAccountAgeDays }),
+                                threshold: Math.max(creatorStatus.criteria.minAccountAgeDays, 1),
+                                isMax: false,
+                              },
+                              {
+                                key: "followers_count",
+                                label: t("settingsPage.verification.followers"),
+                                current: creatorStatus.eligibility.followersCount,
+                                reqLabel: t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minFollowersCount }),
+                                threshold: Math.max(creatorStatus.criteria.minFollowersCount, 1),
+                                isMax: false,
+                              },
+                              {
+                                key: "posts_count",
+                                label: t("settingsPage.verification.publishedPosts"),
+                                current: creatorStatus.eligibility.postsCount,
+                                reqLabel: t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minPostsCount }),
+                                threshold: Math.max(creatorStatus.criteria.minPostsCount, 1),
+                                isMax: false,
+                              },
+                              {
+                                key: "active_posting_days_30d",
+                                label: t("settingsPage.verification.activeDays"),
+                                current: creatorStatus.eligibility.activePostingDays30d,
+                                reqLabel: t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minActivePostingDays30d }),
+                                threshold: Math.max(creatorStatus.criteria.minActivePostingDays30d, 1),
+                                isMax: false,
+                              },
+                              {
+                                key: "engagement_per_post_30d",
+                                label: t("settingsPage.verification.avgEngagement"),
+                                current: creatorStatus.eligibility.engagementPerPost30d,
+                                reqLabel: t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minEngagementPerPost30d }),
+                                threshold: Math.max(creatorStatus.criteria.minEngagementPerPost30d, 1),
+                                isMax: false,
+                              },
+                              {
+                                key: "recent_violations_90d",
+                                label: t("settingsPage.verification.recentViolations"),
+                                current: creatorStatus.eligibility.recentViolations90d,
+                                reqLabel: t("settingsPage.verification.maximum", { value: creatorStatus.criteria.maxRecentViolations90d }),
+                                threshold: creatorStatus.criteria.maxRecentViolations90d,
+                                isMax: true,
+                              },
+                            ];
+                            return (
+                              <div className={styles.verifyMetricGrid}>
+                                {metrics.map((m) => {
+                                  const met = !failed.includes(m.key);
+                                  const pct = m.isMax
+                                    ? (m.current <= m.threshold ? 1 : m.threshold / Math.max(m.current, 1))
+                                    : Math.min(1, m.current / m.threshold);
+                                  return (
+                                    <div
+                                      key={m.key}
+                                      className={`${styles.verifyMetricCard} ${met ? styles.verifyMetricCardMet : styles.verifyMetricCardUnmet}`}
+                                    >
+                                      <div className={styles.verifyMetricHeader}>
+                                        <p className={styles.verifyMetricName}>{m.label}</p>
+                                        <div className={`${styles.verifyMetricCheckIcon} ${met ? styles.verifyMetricCheckMet : styles.verifyMetricCheckUnmet}`}>
+                                          {met ? "✓" : "✗"}
+                                        </div>
+                                      </div>
+                                      <div className={styles.verifyMetricValueRow}>
+                                        <span className={styles.verifyMetricCurrent}>{m.current}</span>
+                                        <span className={styles.verifyMetricReqLabel}>{m.reqLabel}</span>
+                                      </div>
+                                      <div className={styles.verifyMetricBarTrack}>
+                                        <div
+                                          className={`${styles.verifyMetricBarFill} ${met ? styles.verifyMetricBarMet : styles.verifyMetricBarUnmet}`}
+                                          style={{ width: `${pct * 100}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                              <p className={styles.hint}>
-                                {t("settingsPage.verification.minDays", { value: creatorStatus.criteria.minAccountAgeDays })}
-                              </p>
-                            </li>
-                            <li className={styles.infoItem}>
-                              <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>{t("settingsPage.verification.followers")}</p>
-                                <p className={styles.infoValue}>
-                                  {creatorStatus.eligibility.followersCount}
-                                </p>
-                              </div>
-                              <p className={styles.hint}>
-                                {t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minFollowersCount })}
-                              </p>
-                            </li>
-                            <li className={styles.infoItem}>
-                              <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>{t("settingsPage.verification.publishedPosts")}</p>
-                                <p className={styles.infoValue}>
-                                  {creatorStatus.eligibility.postsCount}
-                                </p>
-                              </div>
-                              <p className={styles.hint}>
-                                {t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minPostsCount })}
-                              </p>
-                            </li>
-                            <li className={styles.infoItem}>
-                              <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>{t("settingsPage.verification.activeDays")}</p>
-                                <p className={styles.infoValue}>
-                                  {creatorStatus.eligibility.activePostingDays30d}
-                                </p>
-                              </div>
-                              <p className={styles.hint}>
-                                {t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minActivePostingDays30d })}
-                              </p>
-                            </li>
-                            <li className={styles.infoItem}>
-                              <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>{t("settingsPage.verification.avgEngagement")}</p>
-                                <p className={styles.infoValue}>
-                                  {creatorStatus.eligibility.engagementPerPost30d}
-                                </p>
-                              </div>
-                              <p className={styles.hint}>
-                                {t("settingsPage.verification.minimum", { value: creatorStatus.criteria.minEngagementPerPost30d })}
-                              </p>
-                            </li>
-                            <li className={styles.infoItem}>
-                              <div className={styles.infoText}>
-                                <p className={styles.infoTitle}>{t("settingsPage.verification.recentViolations")}</p>
-                                <p className={styles.infoValue}>
-                                  {creatorStatus.eligibility.recentViolations90d}
-                                </p>
-                              </div>
-                              <p className={styles.hint}>
-                                {t("settingsPage.verification.maximum", { value: creatorStatus.criteria.maxRecentViolations90d })}
-                              </p>
-                            </li>
-                          </ul>
+                            );
+                          })()}
 
                           {creatorStatus.eligibility.failedRequirements.length ? (
                             <p className={styles.error}>
@@ -3791,80 +3923,87 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
-                <div className={styles.sectionCard}>
-                  <div className={styles.notificationRow}>
-                    <div className={styles.notificationMeta}>
-                      <p className={styles.infoTitle}>{t("settingsPage.notifications.title")}</p>
-                      <p className={styles.infoValue}>
+                <div className={styles.notifGlobalCard}>
+                  <div className={styles.notifGlobalLeft}>
+                    <div className={styles.notifGlobalIconWrap}>
+                      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div className={styles.notifGlobalText}>
+                      <p className={styles.notifGlobalTitle}>{t("settingsPage.notifications.title")}</p>
+                      <p className={styles.notifGlobalSubtitle}>
                         {notificationLoading
                           ? t("settingsPage.common.loading")
                           : notificationStatusLabel || t("settingsPage.notifications.statusEnabled")}
                       </p>
+                      <p className={styles.hint}>{t("settingsPage.notifications.mutedDesc")}</p>
                     </div>
-                    <div className={styles.notificationActions}>
-                      {notificationSettings?.enabled !== false ? (
+                  </div>
+                  <div className={styles.notifGlobalActions}>
+                    {notificationSettings?.enabled !== false ? (
+                      <button
+                        type="button"
+                        className={styles.primary}
+                        onClick={openNotificationOverlay}
+                        disabled={notificationLoading || notificationSaving}
+                      >
+                        {t("settingsPage.notifications.muteBtn")}
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className={styles.secondary}
+                          onClick={openNotificationOverlay}
+                          disabled={notificationSaving}
+                        >
+                          {t("settingsPage.notifications.editBtn")}
+                        </button>
                         <button
                           type="button"
                           className={styles.primary}
-                          onClick={openNotificationOverlay}
-                          disabled={notificationLoading || notificationSaving}
+                          onClick={handleEnableNotifications}
+                          disabled={notificationSaving}
                         >
-                          {t("settingsPage.notifications.muteBtn")}
+                          {t("settingsPage.notifications.enableBtn")}
                         </button>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className={styles.secondary}
-                            onClick={openNotificationOverlay}
-                            disabled={notificationSaving}
-                          >
-                            {t("settingsPage.notifications.editBtn")}
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.primary}
-                            onClick={handleEnableNotifications}
-                            disabled={notificationSaving}
-                          >
-                            {t("settingsPage.notifications.enableBtn")}
-                          </button>
-                        </>
-                      )}
-                    </div>
+                      </>
+                    )}
                   </div>
-                  <p className={styles.hint}>
-                    {t("settingsPage.notifications.mutedDesc")}
-                  </p>
                   {notificationError ? (
                     <p className={styles.error}>{notificationError}</p>
                   ) : null}
                 </div>
 
-                <div className={styles.sectionCard}>
-                  {notificationCategories.map((category) => {
-                    const settings =
-                      notificationSettings?.categories?.[category.key];
+                <div className={styles.notifCategoryList}>
+                  {notificationCategories.map((category, idx) => {
+                    const settings = notificationSettings?.categories?.[category.key];
                     const enabled = settings?.enabled !== false;
                     return (
                       <div
                         key={category.key}
-                        className={styles.notificationRow}
+                        className={styles.notifCategoryCard}
+                        style={{ animationDelay: `${idx * 0.06}s` }}
                       >
-                        <div className={styles.notificationMeta}>
-                          <p className={styles.infoTitle}>{category.label}</p>
-                          <p className={styles.infoValue}>
-                            {notificationLoading
-                              ? "Loading..."
-                              : getCategoryStatusLabel(category.key)}
-                          </p>
-                          <p className={styles.hint}>{category.description}</p>
+                        <div className={styles.notifCategoryIconWrap}>
+                          {notifCategoryIcon(category.key)}
                         </div>
-                        <div className={styles.notificationActions}>
+                        <div className={styles.notifCategoryInfo}>
+                          <p className={styles.notifCategoryName}>{category.label}</p>
+                          <p className={styles.notifCategoryDesc}>{category.description}</p>
+                          <span className={`${styles.notifStatusChip} ${enabled ? styles.notifStatusChipEnabled : styles.notifStatusChipMuted}`}>
+                            {notificationLoading
+                              ? t("settingsPage.common.loading")
+                              : getCategoryStatusLabel(category.key)}
+                          </span>
+                        </div>
+                        <div className={styles.notifCategoryActions}>
                           {enabled ? (
                             <button
                               type="button"
-                              className={styles.primary}
+                              className={`${styles.notifBtnSmall} ${styles.notifBtnSmallPrimary}`}
                               onClick={() => openCategoryOverlay(category.key)}
                               disabled={notificationLoading || categorySaving}
                             >
@@ -3874,22 +4013,16 @@ export default function SettingsPage() {
                             <>
                               <button
                                 type="button"
-                                className={styles.secondary}
-                                onClick={() =>
-                                  openCategoryOverlay(category.key)
-                                }
+                                className={`${styles.notifBtnSmall} ${styles.notifBtnSmallSecondary}`}
+                                onClick={() => openCategoryOverlay(category.key)}
                                 disabled={categorySaving}
                               >
                                 {t("settingsPage.notifications.editBtn")}
                               </button>
                               <button
                                 type="button"
-                                className={styles.primary}
-                                onClick={() =>
-                                  handleEnableCategoryNotifications(
-                                    category.key,
-                                  )
-                                }
+                                className={`${styles.notifBtnSmall} ${styles.notifBtnSmallPrimary}`}
+                                onClick={() => handleEnableCategoryNotifications(category.key)}
                                 disabled={categorySaving}
                               >
                                 {t("settingsPage.notifications.enableBtn")}
@@ -4060,7 +4193,11 @@ export default function SettingsPage() {
                               </div>
                               <div className={styles.activityThumb}>
                                 {thumbUrl ? (
-                                  <img src={thumbUrl} alt="" />
+                                  isVideoUrl(thumbUrl) ? (
+                                    <VideoThumb src={thumbUrl} />
+                                  ) : (
+                                    <img src={thumbUrl} alt="" />
+                                  )
                                 ) : (
                                   <span
                                     className={styles.activityThumbPlaceholder}
@@ -4186,13 +4323,17 @@ export default function SettingsPage() {
                               }}
                             >
                               <div className={styles.contentThumb}>
-                                {thumbUrl ? (
-                                  <img src={thumbUrl} alt="" />
+                                {media ? (
+                                  media.type === "video" ? (
+                                    <VideoThumb src={media.url} />
+                                  ) : (
+                                    <img src={media.url} alt="" />
+                                  )
                                 ) : (
                                   <span
                                     className={styles.contentThumbPlaceholder}
                                   >
-                                    
+
                                   </span>
                                 )}
                               </div>
@@ -4347,13 +4488,39 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
-                <div className={styles.sectionCard}>
-                  <div className={styles.notificationRow}>
-                    <div className={styles.notificationMeta}>
-                      <p className={styles.infoTitle}>{t("settingsPage.violations.currentStrikes")}</p>
-                      <p className={styles.infoValue}>{currentStrikeTotal}</p>
-                    </div>
-                    <div className={styles.notificationActions}>
+                {/* ── Strike summary card ── */}
+                {(() => {
+                  const n = currentStrikeTotal;
+                  const barPct = Math.min(100, n * 10);
+                  const statusClass = n === 0
+                    ? styles.violationStatusClean
+                    : n <= 3 ? styles.violationStatusLow : styles.violationStatusHigh;
+                  const barClass = n === 0
+                    ? styles.violationBarClean
+                    : n <= 3 ? styles.violationBarLow : styles.violationBarHigh;
+                  const statusLabel = n === 0
+                    ? t("settingsPage.violations.statusClean")
+                    : n <= 3
+                      ? t("settingsPage.violations.statusLow")
+                      : t("settingsPage.violations.statusHigh");
+                  return (
+                    <div className={styles.violationSummaryCard}>
+                      <div className={styles.violationSummaryLeft}>
+                        <p className={styles.violationSummaryLabel}>{t("settingsPage.violations.currentStrikes")}</p>
+                        <div className={styles.violationStrikeRow}>
+                          <span className={styles.violationStrikeCount}>{n}</span>
+                          <span className={`${styles.violationStrikeStatus} ${statusClass}`}>{statusLabel}</span>
+                        </div>
+                        <div className={styles.violationStrikeBarTrack}>
+                          <div
+                            className={`${styles.violationStrikeBarFill} ${barClass}`}
+                            style={{ width: n === 0 ? "4px" : `${barPct}%` }}
+                          />
+                        </div>
+                        <p className={styles.violationSummaryHint}>
+                          {t("settingsPage.violations.strikeHint")}
+                        </p>
+                      </div>
                       <button
                         type="button"
                         className={styles.secondary}
@@ -4363,9 +4530,10 @@ export default function SettingsPage() {
                         {violationLoading ? t("settingsPage.violations.refreshing") : t("settingsPage.violations.refreshBtn")}
                       </button>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
+                {/* ── Violation list ── */}
                 <div className={styles.sectionCard}>
                   {violationLoading ? (
                     <p className={styles.hint}>{t("settingsPage.violations.loading")}</p>
@@ -4375,89 +4543,92 @@ export default function SettingsPage() {
                   ) : null}
 
                   {violationItems.length ? (
-                    <div className={styles.activityList}>
-                      {violationItems.map((item) => {
+                    <div className={styles.violationList}>
+                      {violationItems.map((item, idx) => {
                         const timeLabel = item.createdAt
-                          ? formatDistanceToNow(new Date(item.createdAt), {
-                              addSuffix: true,
-                            })
+                          ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })
                           : "";
                         const isWarn = isWarnAction(item.action);
                         const canOpenDetail = item.targetType !== "user";
-                        const isMuteInteraction =
-                          item.action === "mute_interaction";
+                        const isMuteInteraction = item.action === "mute_interaction";
                         const remainingMute = isMuteInteraction
-                          ? formatRemainingHourMinute(
-                              item.actionExpiresAt,
-                              violationNowMs,
-                            )
+                          ? formatRemainingHourMinute(item.actionExpiresAt, violationNowMs)
                           : null;
+                        const isDecay = item.strikeDelta < 0 && item.severity == null;
+
+                        const actionKeyMap: Record<string, string> = {
+                          remove_post: "removePost",
+                          restrict_post: "restrictPost",
+                          delete_comment: "deleteComment",
+                          warn: "warnUser",
+                          warn_user: "warnUser",
+                          mute_interaction: "muteInteraction",
+                          suspend_user: "suspendUser",
+                          limit_account: "limitAccount",
+                        };
+                        const actionLabel = t(`settingsPage.violations.actions.${actionKeyMap[item.action] ?? "policyAction"}`);
+
+                        const sevCardClass = isDecay ? styles.violationSevDecay
+                          : item.severity === "high" ? styles.violationSevHigh
+                          : item.severity === "medium" ? styles.violationSevMedium
+                          : item.severity === "low" ? styles.violationSevLow
+                          : styles.violationSevNa;
+
+                        const sevBadgeClass = item.severity === "high" ? styles.violationSevBadgeHigh
+                          : item.severity === "medium" ? styles.violationSevBadgeMedium
+                          : item.severity === "low" ? styles.violationSevBadgeLow
+                          : styles.violationSevBadgeNa;
+
+                        const strikeBadgeClass = item.strikeDelta < 0 ? styles.violationStrikeBadgeNeg
+                          : item.strikeDelta > 0 ? styles.violationStrikeBadgePos
+                          : styles.violationStrikeBadgeZero;
+
+                        const strikeLabel = isWarn
+                          ? t("settingsPage.violations.noStrikeAdded")
+                          : `${item.strikeDelta > 0 ? "+" : ""}${item.strikeDelta} (${t("settingsPage.violations.total")} ${item.strikeTotalAfter})`;
+
                         return (
                           <div
                             key={item.id}
-                            className={`${styles.activityRow} ${
-                              canOpenDetail ? styles.activityRowClickable : ""
-                            }`}
+                            className={`${styles.violationCard} ${sevCardClass} ${canOpenDetail ? styles.violationCardClickable : ""}`}
+                            style={{ animationDelay: `${idx * 0.04}s` }}
                             role={canOpenDetail ? "button" : undefined}
                             tabIndex={canOpenDetail ? 0 : -1}
-                            onClick={() => {
+                            onClick={() => { if (canOpenDetail) setSelectedViolation(item); }}
+                            onKeyDown={(e) => {
                               if (!canOpenDetail) return;
-                              setSelectedViolation(item);
-                            }}
-                            onKeyDown={(event) => {
-                              if (!canOpenDetail) return;
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                setSelectedViolation(item);
-                              }
+                              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedViolation(item); }
                             }}
                           >
-                            <div className={styles.activityIcon}>
-                              <IconReport />
-                            </div>
-                            <div className={styles.activityBody}>
-                              <div className={styles.activityHeader}>
-                                <p className={styles.activityTitle}>
-                                  {(() => {
-                                    const actionKeyMap: Record<string, string> = {
-                                      remove_post: "removePost",
-                                      restrict_post: "restrictPost",
-                                      delete_comment: "deleteComment",
-                                      warn: "warnUser",
-                                      warn_user: "warnUser",
-                                      mute_interaction: "muteInteraction",
-                                      suspend_user: "suspendUser",
-                                      limit_account: "limitAccount",
-                                    };
-                                    const key = actionKeyMap[item.action] ?? "policyAction";
-                                    return t(`settingsPage.violations.actions.${key}`);
-                                  })()} ·{" "}
-                                  {item.targetType.toUpperCase()}
-                                </p>
-                                <span className={styles.activityTime}>
-                                  {timeLabel}
-                                </span>
+                            <div className={styles.violationCardTop}>
+                              <div className={styles.violationCardTopLeft}>
+                                <span className={styles.violationActionTag}>{actionLabel}</span>
+                                <span className={styles.violationTargetChip}>{item.targetType}</span>
                               </div>
-                              <p className={styles.activitySubtitle}>
-                                {isMuteInteraction
-                                  ? `${t("settingsPage.violations.interactionMuted")}${
-                                      remainingMute
-                                        ? ` · Remaining ${remainingMute}`
-                                        : ` · ${t("settingsPage.violations.untilTurnOn")}`
-                                    }`
-                                  : `Severity ${t(`settingsPage.violations.severity.${item.severity ?? "na"}`)} · ${
-                                      isWarn
-                                        ? "No strike added"
-                                        : `Strike ${item.strikeDelta > 0 ? "+" : ""}${item.strikeDelta} (Total ${item.strikeTotalAfter})`
-                                    }`}
-                              </p>
-                              <p className={styles.contentSub}>
-                                Reason: {item.reason}
-                              </p>
+                              <span className={styles.violationTimestamp}>{timeLabel}</span>
+                            </div>
+
+                            <p className={styles.violationReason}>{item.reason}</p>
+
+                            <div className={styles.violationBadgeRow}>
+                              <span className={`${styles.violationSevBadge} ${sevBadgeClass}`}>
+                                {t(`settingsPage.violations.severity.${item.severity ?? "na"}`)}
+                              </span>
+                              {isMuteInteraction ? (
+                                <span className={`${styles.violationStrikeBadge} ${styles.violationStrikeBadgeZero}`}>
+                                  {remainingMute
+                                    ? `${t("settingsPage.violations.remaining")} ${remainingMute}`
+                                    : t("settingsPage.violations.untilTurnOn")}
+                                </span>
+                              ) : (
+                                <span className={`${styles.violationStrikeBadge} ${strikeBadgeClass}`}>
+                                  {t("settingsPage.violations.strike")} {strikeLabel}
+                                </span>
+                              )}
                               {canOpenDetail ? (
-                                <p className={styles.hint}>
-                                  {t("settingsPage.violations.detail.violatedContent")}
-                                </p>
+                                <span className={styles.violationDetailHint}>
+                                  {t("settingsPage.violations.detail.violatedContent")} &rsaquo;
+                                </span>
                               ) : null}
                             </div>
                           </div>
@@ -4465,7 +4636,16 @@ export default function SettingsPage() {
                       })}
                     </div>
                   ) : !violationLoading ? (
-                    <p className={styles.hint}>{t("settingsPage.violations.noViolations")}</p>
+                    <div className={styles.violationEmpty}>
+                      <div className={styles.violationEmptyIcon}>
+                        <svg viewBox="0 0 24 24" aria-hidden>
+                          <path d="m9 12 2 2 4-4" />
+                          <path d="M12 3 4 6v6.1c0 5 3.3 9.5 8 10.9 4.7-1.4 8-5.9 8-10.9V6Z" />
+                        </svg>
+                      </div>
+                      <p className={styles.violationEmptyTitle}>{t("settingsPage.violations.noViolations")}</p>
+                      <p className={styles.violationEmptySub}>{t("settingsPage.violations.noViolationsDesc")}</p>
+                    </div>
                   ) : null}
                 </div>
               </>

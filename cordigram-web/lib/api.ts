@@ -346,6 +346,7 @@ export type CreatePostRequest = {
   repostOf?: string;
   scheduledAt?: string;
   pollId?: string;
+  kind?: "ads";
 };
 
 export type UpdatePostRequest = {
@@ -361,7 +362,7 @@ export type UpdatePostRequest = {
 };
 
 export type CreatePostResponse = {
-  kind: "post" | "reel";
+  kind: "post" | "reel" | "ads";
   id: string;
   repostOf?: string | null;
   content: string;

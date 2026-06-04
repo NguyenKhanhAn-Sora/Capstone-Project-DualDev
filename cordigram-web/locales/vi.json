@@ -2727,6 +2727,15 @@
       "currentStrikes": "Tổng số điểm vi phạm hiện tại",
       "loading": "Đang tải lịch sử vi phạm...",
       "noViolations": "Không tìm thấy vi phạm nào.",
+      "noViolationsDesc": "Hồ sơ của bạn sạch sẽ. Tiếp tục duy trì nhé!",
+      "statusClean": "Sạch sẽ",
+      "statusLow": "Mức thấp",
+      "statusHigh": "Nguy cơ cao",
+      "strikeHint": "Điểm vi phạm sẽ giảm theo thời gian khi hành vi tốt.",
+      "noStrikeAdded": "Không cộng điểm vi phạm",
+      "total": "Tổng",
+      "strike": "Vi phạm",
+      "remaining": "Còn lại",
       "refreshBtn": "Làm mới",
       "refreshing": "Đang làm mới...",
       "interactionMuted": "Đã tắt tương tác",
@@ -2842,5 +2851,11 @@
     "sessionExpired": "Phiên đăng nhập đã hết hạn.",
     "failedToLoad": "Không thể tải danh sách thích",
     "failedToLoadMore": "Không thể tải thêm"
+  },
+  "poll": {
+    "badge": "Bình chọn",
+    "fallback": "Bình chọn",
+    "votes": "{count} lượt bình chọn",
+    "noVotes": "Chưa có lượt bình chọn"
   }
 }

@@ -3,7 +3,7 @@ import { Document, SchemaTypes, Types } from 'mongoose';
 
 export type Visibility = 'public' | 'followers' | 'private';
 export type PostStatus = 'published' | 'scheduled';
-export type PostKind = 'post' | 'reel';
+export type PostKind = 'post' | 'reel' | 'ads';
 export type ModerationState = 'normal' | 'restricted' | 'hidden' | 'removed';
 
 @Schema({ _id: false })
@@ -60,7 +60,7 @@ export type PostStats = {
 
 @Schema({ timestamps: true })
 export class Post extends Document {
-  @Prop({ type: String, enum: ['post', 'reel'], default: 'post', index: true })
+  @Prop({ type: String, enum: ['post', 'reel', 'ads'], default: 'post', index: true })
   kind: PostKind;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })

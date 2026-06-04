@@ -5,6 +5,7 @@ import React, {
   ChangeEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -263,6 +264,8 @@ export default function ProfileLayoutClient({
   const [avatarError, setAvatarError] = useState("");
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [activeStream, setActiveStream] = useState<LivestreamItem | null>(null);
+  const navRowRef = useRef<HTMLDivElement | null>(null);
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
   const isAdminPreviewMode = Boolean(searchParams.get("admin_preview"));
   const isOwner = profile && viewerId && profile.userId === viewerId;
   const isFollower = Boolean(profile?.isFollowing);
@@ -1228,6 +1231,30 @@ export default function ProfileLayoutClient({
     return "posts";
   }, [pathname]);
 
+  // Sliding tab indicator — measure after activeKey changes OR after profile loads
+  useLayoutEffect(() => {
+    const row = navRowRef.current;
+    if (!row) return;
+
+    // Use rAF to ensure layout is complete before measuring
+    const raf = requestAnimationFrame(() => {
+      const activeLink = row.querySelector(`.${styles.navItemActive}`) as HTMLElement | null;
+      if (!activeLink) {
+        setIndicatorStyle((prev) => ({ ...prev, opacity: 0 }));
+        return;
+      }
+
+      const rowRect = row.getBoundingClientRect();
+      const linkRect = activeLink.getBoundingClientRect();
+      const indicatorWidth = linkRect.width * 0.55;
+      const indicatorLeft = linkRect.left - rowRect.left + (linkRect.width - indicatorWidth) / 2;
+
+      setIndicatorStyle({ left: indicatorLeft, width: indicatorWidth, opacity: 1 });
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [activeKey, profile]); // profile — re-fires when navRow appears after data loads
+
   if (!canRender) return null;
 
   const shouldShowPrivate = privateView || Boolean(profile && !canViewProfile);
@@ -1444,96 +1471,118 @@ export default function ProfileLayoutClient({
                   </div>
                 </div>
               </div>
-              {profile.bio ? (
-                <div className={`${styles.bioSection} ml-[188px]`}>
-                  <p
-                    ref={bioRef}
-                    className={`${styles.bio} ${styles.bioCollapsible} ${
-                      bioCollapsed && bioCanExpand ? styles.bioCollapsed : ""
-                    }`}
-                  >
-                    {profile.bio}
-                  </p>
-                  {bioCanExpand ? (
-                    <button
-                      type="button"
-                      className={styles.bioToggle}
-                      onClick={() => setBioCollapsed((prev) => !prev)}
-                    >
-                      {bioCollapsed ? t("profilePage.bioSeeMore") : t("profilePage.bioCollapse")}
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+              {/* ── Profile info panel — bio + personal details, all screen sizes ── */}
+              {(() => {
+                const hasBio = Boolean(profile.bio?.trim());
 
-              {/* ── Mobile inline info section — giống Flutter profile_screen ── */}
-              {canViewAbout && (
-                <div className={styles.mobileInfoCard}>
-                  {[
-                    profile.location?.trim() ? {
-                      key: "location",
-                      value: profile.location.trim(),
-                      icon: (
-                        <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11Z" />
-                          <circle cx="12" cy="10" r="2.5" />
-                        </svg>
-                      ),
-                    } : null,
-                    (profile as any).workplace?.companyName?.trim() ? {
-                      key: "workplace",
-                      value: (profile as any).workplace.companyName.trim(),
-                      icon: (
-                        <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="7" width="20" height="14" rx="2" />
-                          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-                          <line x1="12" y1="12" x2="12" y2="12.01" strokeWidth={3} />
-                          <path d="M2 13c6 2 14 2 20 0" />
-                        </svg>
-                      ),
-                    } : null,
-                    (profile as any).birthdate?.trim() ? {
-                      key: "birthdate",
-                      value: (() => {
-                        try {
-                          const d = new Date((profile as any).birthdate);
-                          return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-                        } catch { return (profile as any).birthdate; }
-                      })(),
-                      icon: (
-                        <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" />
-                          <path d="M4 16.5s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" />
-                          <path d="M2 21h20" />
-                          <path d="M7 11V7M12 11V7M17 11V7" />
-                          <path d="M7 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM12 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" fill="currentColor" stroke="none" />
-                        </svg>
-                      ),
-                    } : null,
-                    (profile as any).gender?.trim() ? {
-                      key: "gender",
-                      value: (() => {
-                        const g = (profile as any).gender.trim();
-                        const map: Record<string, string> = { male: "Male", female: "Female", other: "Other", prefer_not_to_say: "Prefer not to say" };
-                        return map[g] ?? g.charAt(0).toUpperCase() + g.slice(1);
-                      })(),
-                      icon: (
-                        <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="8" r="4" />
-                          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                        </svg>
-                      ),
-                    } : null,
-                  ].filter(Boolean).map((row, idx, arr) => (
-                    <div key={(row as any).key} className={styles.mobileInfoRow}>
-                      <span className={styles.mobileInfoIcon}>{(row as any).icon}</span>
-                      <span className={styles.mobileInfoText}>{(row as any).value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+                const infoRows = canViewAbout ? [
+                  canViewByVisibility(
+                    (profile as any).visibility?.location,
+                    Boolean(isOwner), isFollower
+                  ) && profile.location?.trim() ? {
+                    key: "location",
+                    value: profile.location.trim(),
+                    icon: (
+                      <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11Z" />
+                        <circle cx="12" cy="10" r="2.5" />
+                      </svg>
+                    ),
+                  } : null,
+                  canViewByVisibility(
+                    (profile as any).visibility?.workplace,
+                    Boolean(isOwner), isFollower
+                  ) && (profile as any).workplace?.companyName?.trim() ? {
+                    key: "workplace",
+                    value: (profile as any).workplace.companyName.trim(),
+                    icon: (
+                      <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="2" />
+                        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                        <path d="M2 13c6 2 14 2 20 0" />
+                      </svg>
+                    ),
+                  } : null,
+                  canViewByVisibility(
+                    (profile as any).visibility?.birthdate,
+                    Boolean(isOwner), isFollower
+                  ) && (profile as any).birthdate?.trim() ? {
+                    key: "birthdate",
+                    value: (() => {
+                      try {
+                        const d = new Date((profile as any).birthdate);
+                        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                      } catch { return (profile as any).birthdate; }
+                    })(),
+                    icon: (
+                      <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <path d="M16 2v4M8 2v4M3 10h18" />
+                      </svg>
+                    ),
+                  } : null,
+                  canViewByVisibility(
+                    (profile as any).visibility?.gender,
+                    Boolean(isOwner), isFollower
+                  ) && (profile as any).gender?.trim() ? {
+                    key: "gender",
+                    value: (() => {
+                      const g = (profile as any).gender.trim();
+                      const map: Record<string, string> = { male: "Male", female: "Female", other: "Other", prefer_not_to_say: "Prefer not to say" };
+                      return map[g] ?? g.charAt(0).toUpperCase() + g.slice(1);
+                    })(),
+                    icon: (
+                      <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                      </svg>
+                    ),
+                  } : null,
+                ].filter(Boolean) as Array<{ key: string; value: string; icon: React.ReactNode }> : [];
 
-              <div className={styles.navRow}>
+                if (!hasBio && infoRows.length === 0) return null;
+
+                return (
+                  <div className={styles.profileInfoPanel}>
+                    {/* Bio with see more / collapse */}
+                    {hasBio ? (
+                      <div className={styles.panelBio}>
+                        <p
+                          ref={bioRef}
+                          className={`${styles.panelBioText} ${
+                            bioCollapsed && bioCanExpand ? styles.panelBioCollapsed : ""
+                          }`}
+                        >
+                          {profile.bio}
+                        </p>
+                        {bioCanExpand ? (
+                          <button
+                            type="button"
+                            className={styles.bioToggle}
+                            onClick={() => setBioCollapsed((prev) => !prev)}
+                          >
+                            {bioCollapsed ? t("profilePage.bioSeeMore") : t("profilePage.bioCollapse")}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {/* Personal info rows */}
+                    {infoRows.length > 0 ? (
+                      <div className={styles.panelInfoRows}>
+                        {infoRows.map((row) => (
+                          <div key={row.key} className={styles.panelInfoRow}>
+                            <span className={styles.panelInfoIcon}>{row.icon}</span>
+                            <span className={styles.panelInfoText}>{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })()}
+
+              <div className={styles.navRow} ref={navRowRef}>
                 {navItems.map((item) => {
                   const isActive = activeKey === item.key;
                   return (
@@ -1557,6 +1606,16 @@ export default function ProfileLayoutClient({
                     </div>
                   );
                 })}
+                {/* Sliding galaxy indicator */}
+                <div
+                  className={styles.navIndicator}
+                  style={{
+                    left: indicatorStyle.left,
+                    width: indicatorStyle.width,
+                    opacity: indicatorStyle.opacity,
+                  }}
+                  aria-hidden
+                />
               </div>
 
               {children}
@@ -1882,7 +1941,7 @@ export default function ProfileLayoutClient({
                       </div>
                       <div className={styles.aboutRows}>
                         <div className={styles.aboutRow}>
-                          <div className={styles.aboutLabel}>{t("profilePage.aboutWorkplace")}</div>
+                          <div className={styles.aboutLabel}><span className={styles.aboutLabelIcon}><AboutIconBriefcase /></span>{t("profilePage.aboutWorkplace")}</div>
                           {(() => {
                             const display = getFieldDisplay(
                               p.workplace?.companyName ?? "",
@@ -1900,7 +1959,7 @@ export default function ProfileLayoutClient({
                           })()}
                         </div>
                         <div className={styles.aboutRow}>
-                          <div className={styles.aboutLabel}>{t("profilePage.aboutLocation")}</div>
+                          <div className={styles.aboutLabel}><span className={styles.aboutLabelIcon}><AboutIconLocation /></span>{t("profilePage.aboutLocation")}</div>
                           {(() => {
                             const display = getFieldDisplay(
                               p.location ?? "",
@@ -1918,7 +1977,7 @@ export default function ProfileLayoutClient({
                           })()}
                         </div>
                         <div className={styles.aboutRow}>
-                          <div className={styles.aboutLabel}>{t("profilePage.aboutGender")}</div>
+                          <div className={styles.aboutLabel}><span className={styles.aboutLabelIcon}><AboutIconGender /></span>{t("profilePage.aboutGender")}</div>
                           {(() => {
                             const display = getFieldDisplay(
                               p.gender?.trim()
@@ -1938,7 +1997,7 @@ export default function ProfileLayoutClient({
                           })()}
                         </div>
                         <div className={styles.aboutRow}>
-                          <div className={styles.aboutLabel}>{t("profilePage.aboutBirthdate")}</div>
+                          <div className={styles.aboutLabel}><span className={styles.aboutLabelIcon}><AboutIconCalendar /></span>{t("profilePage.aboutBirthdate")}</div>
                           {(() => {
                             const display = getFieldDisplay(
                               p.birthdate ?? "",
@@ -2262,6 +2321,40 @@ function IconRepeat() {
         strokeLinejoin="round"
         d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
       />
+    </svg>
+  );
+}
+
+/* ── About row icons ───────────────────────────────────── */
+function AboutIconBriefcase() {
+  return (
+    <svg aria-hidden width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+    </svg>
+  );
+}
+function AboutIconLocation() {
+  return (
+    <svg aria-hidden width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21s-6-5.5-6-10a6 6 0 1 1 12 0c0 4.5-6 10-6 10Z" />
+      <circle cx="12" cy="11" r="2.5" />
+    </svg>
+  );
+}
+function AboutIconGender() {
+  return (
+    <svg aria-hidden width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="14" r="5" />
+      <path d="M19 5l-5.4 5.4M19 5h-5M19 5v5" />
+    </svg>
+  );
+}
+function AboutIconCalendar() {
+  return (
+    <svg aria-hidden width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
     </svg>
   );
 }

@@ -1585,7 +1585,7 @@ export class CommentsService {
     actorId: string;
     postId: string;
     commentId: string;
-    postKind: 'post' | 'reel';
+    postKind: 'post' | 'reel' | 'ads';
     mentions: Array<{ userId?: Types.ObjectId; username: string }>;
   }): Promise<void> {
     const { actorId, postId, commentId, postKind, mentions } = params;

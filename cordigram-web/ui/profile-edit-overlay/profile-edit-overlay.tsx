@@ -48,19 +48,65 @@ const IconClose = ({ size = 18 }: { size?: number }) => (
 
 function LocationIcon() {
   return (
-    <svg
-      aria-hidden
-      width={18}
-      height={18}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg aria-hidden width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 21s-6-5.5-6-10a6 6 0 1 1 12 0c0 4.5-6 10-6 10Z" />
       <circle cx="12" cy="11" r="2.5" />
+    </svg>
+  );
+}
+
+const I = { size: 14 };
+
+function IconUser() {
+  return (
+    <svg aria-hidden width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  );
+}
+
+function IconAt() {
+  return (
+    <svg aria-hidden width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.4 7" />
+    </svg>
+  );
+}
+
+function IconCalendar() {
+  return (
+    <svg aria-hidden width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+
+function IconGender() {
+  return (
+    <svg aria-hidden width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="14" r="5" />
+      <path d="M19 5l-5.4 5.4M19 5h-5M19 5v5" />
+    </svg>
+  );
+}
+
+function IconBriefcase() {
+  return (
+    <svg aria-hidden width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+    </svg>
+  );
+}
+
+function IconPen() {
+  return (
+    <svg aria-hidden width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </svg>
   );
 }
@@ -768,7 +814,7 @@ export default function ProfileEditOverlay({
         <div className={styles.body}>
           <div className={styles.gridTwoCols}>
             <div>
-              <label className={styles.label}>{t("profilePage.editOverlay.displayNameLabel")}</label>
+              <label className={styles.label}><span className={styles.labelIcon}><IconUser /></span>{t("profilePage.editOverlay.displayNameLabel")}</label>
               <input
                 className={styles.input}
                 value={displayName}
@@ -787,9 +833,7 @@ export default function ProfileEditOverlay({
             </div>
 
             <div>
-              <label className={styles.label}>
-                {t("profilePage.editOverlay.usernameLabel")}
-              </label>
+              <label className={styles.label}><span className={styles.labelIcon}><IconAt /></span>{t("profilePage.editOverlay.usernameLabel")}</label>
               <input
                 className={styles.input}
                 value={username}
@@ -829,7 +873,7 @@ export default function ProfileEditOverlay({
 
           <div className={styles.gridTwoCols} style={{ marginTop: 12 }}>
             <div>
-              <label className={styles.label}>{t("profilePage.editOverlay.birthdateLabel")}</label>
+              <label className={styles.label}><span className={styles.labelIcon}><IconCalendar /></span>{t("profilePage.editOverlay.birthdateLabel")}</label>
               <DateSelect
                 value={birthdate}
                 onChange={(next) => {
@@ -846,7 +890,7 @@ export default function ProfileEditOverlay({
             </div>
 
             <div>
-              <label className={styles.label}>{t("profilePage.editOverlay.genderLabel")}</label>
+              <label className={styles.label}><span className={styles.labelIcon}><IconGender /></span>{t("profilePage.editOverlay.genderLabel")}</label>
               <div className={styles.selectShell} ref={genderRef}>
                 <button
                   type="button"
@@ -895,7 +939,7 @@ export default function ProfileEditOverlay({
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <label className={styles.label}>{t("profilePage.editOverlay.locationLabel")}</label>
+            <label className={styles.label}><span className={styles.labelIcon}><LocationIcon /></span>{t("profilePage.editOverlay.locationLabel")}</label>
             <div className={styles.locationCombo}>
               <div className={styles.locationInputShell}>
                 <input
@@ -964,7 +1008,7 @@ export default function ProfileEditOverlay({
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <label className={styles.label}>{t("profilePage.editOverlay.workplaceLabel")}</label>
+            <label className={styles.label}><span className={styles.labelIcon}><IconBriefcase /></span>{t("profilePage.editOverlay.workplaceLabel")}</label>
             <div className={styles.selectShell}>
               <input
                 className={styles.input}
@@ -1053,7 +1097,7 @@ export default function ProfileEditOverlay({
 
           <div style={{ marginTop: 12 }}>
             <div className={styles.labelRow}>
-              <label className={styles.label}>{t("profilePage.editOverlay.bioLabel")}</label>
+              <label className={styles.label}><span className={styles.labelIcon}><IconPen /></span>{t("profilePage.editOverlay.bioLabel")}</label>
               <span className={styles.counter}>
                 {bioCharCount}/{BIO_CHAR_LIMIT}
               </span>

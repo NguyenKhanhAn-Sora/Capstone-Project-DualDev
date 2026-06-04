@@ -2718,6 +2718,15 @@
       "currentStrikes": "当前违规总计",
       "loading": "加载违规历史中...",
       "noViolations": "未发现违规。",
+      "noViolationsDesc": "您的记录清白，继续保持！",
+      "statusClean": "记录清白",
+      "statusLow": "中等",
+      "statusHigh": "高风险",
+      "strikeHint": "良好行为后违规分数会随时间重置。",
+      "noStrikeAdded": "未增加违规分",
+      "total": "总计",
+      "strike": "违规",
+      "remaining": "剩余",
       "refreshBtn": "刷新",
       "refreshing": "刷新中...",
       "interactionMuted": "互动已静音",
@@ -2818,5 +2827,11 @@
     "captionLangEn": "英语",
     "captionLangZh": "中文",
     "captionLangJa": "日语"
+  },
+  "poll": {
+    "badge": "投票",
+    "fallback": "投票",
+    "votes": "{count} 票",
+    "noVotes": "暂无投票"
   }
 }

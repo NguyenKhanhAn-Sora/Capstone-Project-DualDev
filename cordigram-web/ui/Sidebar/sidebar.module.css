@@ -160,6 +160,28 @@
   text-overflow: ellipsis;
 }
 
+@keyframes menuSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes langSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .userMenu {
   position: absolute;
   left: 0;
@@ -174,6 +196,8 @@
   gap: 6px;
   z-index: 10;
   border: 1px solid var(--color-border);
+  animation: menuSlideUp 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: bottom center;
 }
 
 .menuItem {
@@ -215,6 +239,74 @@
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.1px;
+  white-space: nowrap;
+}
+
+.menuLangBadge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  background: var(--color-border);
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.menuLangChevron {
+  font-size: 9px;
+  color: var(--color-text-secondary, #6b7280);
+  margin-left: 4px;
+  flex-shrink: 0;
+  display: inline-block;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.menuLangChevronOpen {
+  transform: rotate(180deg);
+}
+
+.menuLangOptions {
+  display: grid;
+  gap: 2px;
+  padding: 4px 8px 4px 46px;
+  animation: langSlideDown 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+
+.menuLangOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s ease;
+}
+
+.menuLangOption:hover {
+  background: #e5ebf3;
+}
+
+:global([data-theme="dark"]) .menuLangOption:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.menuLangOptionActive {
+  color: var(--color-primary, #3b82f6);
+  font-weight: 600;
+}
+
+.menuLangCheck {
+  font-size: 12px;
+  color: var(--color-primary, #3b82f6);
 }
 
 .switchOverlay {
