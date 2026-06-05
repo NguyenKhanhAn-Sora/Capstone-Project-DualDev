@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation";
 import styles from "./resolved.module.css";
 import { getApiBaseUrl } from "@/lib/api";
 
-type AdminPayload = {
-  roles?: string[];
-  exp?: number;
-};
+type AdminPayload = { roles?: string[]; exp?: number };
 
 type ResolvedItem = {
   actionId: string;
@@ -33,56 +30,66 @@ type ResolvedItem = {
 const decodeJwt = (token: string): AdminPayload | null => {
   try {
     const payload = token.split(".")[1];
-    const json = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
-    );
-    return json as AdminPayload;
-  } catch {
-    return null;
-  }
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+  } catch { return null; }
 };
 
-const formatAction = (value: string) =>
-  value
-    .replace(/[_-]+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+const fmtKey = (v: string) =>
+  v.replace(/[_-]+/g, " ").trim().replace(/\b\w/g, (c) => c.toUpperCase());
 
-const formatReason = (value: string) => {
-  const cleaned = value.replace(/[_-]+/g, " ").trim().toLowerCase();
-  if (!cleaned) return "--";
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+const fmtTime = (v?: string | null) => {
+  if (!v) return "--";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "--";
+  return d.toLocaleString();
+};
+
+const truncId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…` : id);
+
+const getModName = (item: ResolvedItem) =>
+  item.moderatorDisplayName ||
+  (item.moderatorUsername ? `@${item.moderatorUsername}` : item.moderatorEmail || "--");
+
+const getModInitial = (item: ResolvedItem) =>
+  getModName(item).replace("@", "").charAt(0).toUpperCase();
+
+const getActionClass = (action: string, s: typeof styles): string => {
+  if (["remove_post", "delete_comment", "suspend_user", "restrict_post"].some((k) => action.includes(k)))
+    return s.actionPillRed;
+  if (["warn", "mute_interaction", "limit_account"].some((k) => action.includes(k)))
+    return s.actionPillOrange;
+  if (action === "no_violation") return s.actionPillGreen;
+  return s.actionPillDefault;
+};
+
+const getSevClass = (sev: string | null, s: typeof styles): string => {
+  if (sev === "high") return s.sevHigh;
+  if (sev === "medium") return s.sevMed;
+  if (sev === "low") return s.sevLow;
+  return s.sevNa;
 };
 
 export default function ResolvedReportsPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [submittingActionId, setSubmittingActionId] = useState<string | null>(null);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [items, setItems] = useState<ResolvedItem[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "post" | "comment" | "user">("all");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "penalty_active" | "rollbackable"
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "penalty_active" | "rollbackable">("all");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const token = localStorage.getItem("adminAccessToken") || "";
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-
+    if (!token) { router.replace("/login"); return; }
     const payload = decodeJwt(token);
     const roles = payload?.roles || [];
     const exp = payload?.exp ? payload.exp * 1000 : 0;
     if (!roles.includes("admin") || (exp && Date.now() > exp)) {
-      router.replace("/login");
-      return;
+      router.replace("/login"); return;
     }
-
     setReady(true);
   }, [router]);
 
@@ -90,116 +97,62 @@ export default function ResolvedReportsPage() {
     if (typeof window === "undefined") return;
     const token = localStorage.getItem("adminAccessToken") || "";
     if (!token) return;
-
     try {
       setLoading(true);
-      const response = await fetch(`${getApiBaseUrl()}/admin/reports-resolved?limit=120`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const r = await fetch(`${getApiBaseUrl()}/admin/reports-resolved?limit=120`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to load resolved reports");
-      }
-
-      const payload = (await response.json()) as { items: ResolvedItem[] };
+      if (!r.ok) throw new Error();
+      const payload = (await r.json()) as { items: ResolvedItem[] };
       setItems(payload.items ?? []);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (!ready) return;
-    loadResolved();
-  }, [ready]);
+  useEffect(() => { if (ready) loadResolved(); }, [ready]);
 
   const filteredItems = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
     return items.filter((item) => {
-      const typeMatched = typeFilter === "all" || item.type === typeFilter;
-      if (!typeMatched) return false;
-
-      const searchMatched =
-        !normalizedQuery ||
-        item.targetId.toLowerCase().includes(normalizedQuery) ||
-        item.targetLabel.toLowerCase().includes(normalizedQuery);
-      if (!searchMatched) return false;
-
-      if (statusFilter === "all") return true;
+      if (typeFilter !== "all" && item.type !== typeFilter) return false;
+      if (q && !item.targetId.toLowerCase().includes(q) && !item.targetLabel.toLowerCase().includes(q)) return false;
       if (statusFilter === "penalty_active") return item.penaltyActive;
       if (statusFilter === "rollbackable") return item.rollbackSupported;
       return true;
     });
   }, [items, searchQuery, statusFilter, typeFilter]);
 
-  const formatTime = (value?: string | null) => {
-    if (!value) return "--";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "--";
-    return date.toLocaleString();
-  };
-
   const handleRollback = async (actionId: string) => {
-    if (typeof window === "undefined") return;
-    const token = localStorage.getItem("adminAccessToken") || "";
+    const token = typeof window !== "undefined" ? localStorage.getItem("adminAccessToken") || "" : "";
     if (!token) return;
-
     try {
-      setSubmittingActionId(actionId);
-      const response = await fetch(
-        `${getApiBaseUrl()}/admin/reports-resolved/${actionId}/rollback`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            note: "Rollback from resolved reports center after internal review/appeal",
-          }),
-        },
-      );
-      if (!response.ok) {
-        throw new Error("Rollback failed");
-      }
+      setSubmittingId(actionId);
+      const r = await fetch(`${getApiBaseUrl()}/admin/reports-resolved/${actionId}/rollback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ note: "Rollback from resolved reports center after internal review/appeal" }),
+      });
+      if (!r.ok) throw new Error();
       setToast("Penalty rolled back successfully.");
       await loadResolved();
-    } finally {
-      setSubmittingActionId(null);
-    }
+    } finally { setSubmittingId(null); }
   };
 
   const handleReopen = async (type: "post" | "comment" | "user", targetId: string) => {
-    if (typeof window === "undefined") return;
-    const token = localStorage.getItem("adminAccessToken") || "";
+    const token = typeof window !== "undefined" ? localStorage.getItem("adminAccessToken") || "" : "";
     if (!token) return;
-
     try {
-      setSubmittingActionId(`${type}:${targetId}`);
-      const response = await fetch(
-        `${getApiBaseUrl()}/admin/reports/${type}/${targetId}/reopen`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            note: "Reopened from resolved reports center for re-review",
-          }),
-        },
-      );
-      if (!response.ok) {
-        throw new Error("Reopen failed");
-      }
+      setSubmittingId(`${type}:${targetId}`);
+      const r = await fetch(`${getApiBaseUrl()}/admin/reports/${type}/${targetId}/reopen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ note: "Reopened from resolved reports center for re-review" }),
+      });
+      if (!r.ok) throw new Error();
       setToast("Case reopened. Redirecting to review...");
       router.push(`/report/review/${type}/${targetId}`);
-    } finally {
-      setSubmittingActionId(null);
-    }
+    } finally { setSubmittingId(null); }
   };
 
   if (!ready) return null;
@@ -207,191 +160,196 @@ export default function ResolvedReportsPage() {
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
+
+        {/* ---- Header ---- */}
         <header className={styles.topbar}>
           <div>
-            <span className={styles.eyebrow}>Moderation</span>
             <h1 className={styles.title}>Resolved Reports</h1>
             <p className={styles.subtitle}>
-              Review previous decisions, rollback incorrect penalties, or reopen cases for deeper review.
+              Review past decisions, rollback incorrect penalties, or reopen cases.
             </p>
           </div>
-          <div className={styles.actions}>
-            <Link href="/report" className={styles.ghostButton}>
+          <div className={styles.headerActions}>
+            <Link href="/report" className={styles.ghostBtn}>
               Back to report center
             </Link>
           </div>
         </header>
 
+        {/* ---- Queue panel ---- */}
         <section className={styles.panel}>
+
+          {/* Search */}
           <div className={styles.searchRow}>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Search by target ID or @username"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
+            <div className={styles.searchWrap}>
+              <svg className={styles.searchIcon} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Search by target ID or @username…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className={styles.filters}>
-            <button
-              type="button"
-              className={`${styles.filterChip} ${typeFilter === "all" ? styles.filterChipActive : ""}`}
-              onClick={() => setTypeFilter("all")}
-            >
-              All types
-            </button>
-            <button
-              type="button"
-              className={`${styles.filterChip} ${typeFilter === "post" ? styles.filterChipActive : ""}`}
-              onClick={() => setTypeFilter("post")}
-            >
-              Posts
-            </button>
-            <button
-              type="button"
-              className={`${styles.filterChip} ${typeFilter === "comment" ? styles.filterChipActive : ""}`}
-              onClick={() => setTypeFilter("comment")}
-            >
-              Comments
-            </button>
-            <button
-              type="button"
-              className={`${styles.filterChip} ${typeFilter === "user" ? styles.filterChipActive : ""}`}
-              onClick={() => setTypeFilter("user")}
-            >
-              Users
-            </button>
-            <button
-              type="button"
-              className={`${styles.filterChip} ${statusFilter === "all" ? styles.filterChipActive : ""}`}
-              onClick={() => setStatusFilter("all")}
-            >
-              All status
-            </button>
-            <button
-              type="button"
-              className={`${styles.filterChip} ${statusFilter === "penalty_active" ? styles.filterChipActive : ""}`}
-              onClick={() => setStatusFilter("penalty_active")}
-            >
-              Penalty active
-            </button>
-            <button
-              type="button"
-              className={`${styles.filterChip} ${statusFilter === "rollbackable" ? styles.filterChipActive : ""}`}
-              onClick={() => setStatusFilter("rollbackable")}
-            >
-              Rollbackable
-            </button>
+          {/* Filters */}
+          <div className={styles.filterSection}>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>Type</span>
+              <div className={styles.filterChips}>
+                {(["all", "post", "comment", "user"] as const).map((v) => (
+                  <button key={v} type="button"
+                    className={`${styles.chip} ${typeFilter === v ? styles.chipActive : ""}`}
+                    onClick={() => setTypeFilter(v)}>
+                    {v === "all" ? "All" : v === "post" ? "Posts" : v === "comment" ? "Comments" : "Users"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>Status</span>
+              <div className={styles.filterChips}>
+                {(["all", "penalty_active", "rollbackable"] as const).map((v) => (
+                  <button key={v} type="button"
+                    className={`${styles.chip} ${statusFilter === v ? styles.chipActive : ""}`}
+                    onClick={() => setStatusFilter(v)}>
+                    {v === "all" ? "All" : v === "penalty_active" ? "Penalty active" : "Rollbackable"}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className={styles.summary}>Showing {filteredItems.length} / {items.length} cases</div>
+          {/* Count */}
+          <div className={styles.countRow}>
+            <span className={styles.countBadge}>{filteredItems.length}</span>
+            <span className={styles.countOf}>/ {items.length} cases</span>
+          </div>
 
-          <div className={styles.tableHeader}>
-            <span>Type</span>
-            <span>Target</span>
+          {/* Table */}
+          <div className={styles.tableHead}>
+            <span>Content</span>
             <span>Decision</span>
-            <span className={styles.centerHeader}>Moderator</span>
-            <span className={styles.centerHeader}>Resolved at</span>
-            <span className={styles.centerHeader}>Status</span>
-            <span className={styles.centerHeader}>Actions</span>
+            <span>Resolved by</span>
+            <span className={styles.thCenter}>Status</span>
+            <span className={styles.thEnd}>Actions</span>
           </div>
 
           <div className={styles.tableBody}>
-            {loading ? <div className={styles.emptyState}>Loading resolved reports...</div> : null}
-            {!loading && filteredItems.length === 0 ? (
-              <div className={styles.emptyState}>No resolved reports match the current filters.</div>
-            ) : null}
-            {!loading
-              ? filteredItems.map((item) => {
-                  const rowKey = `${item.actionId}`;
-                  const rowBusy =
-                    submittingActionId === item.actionId ||
-                    submittingActionId === `${item.type}:${item.targetId}`;
+            {loading ? (
+              <div className={styles.emptyState}>
+                <div className={styles.loader} />
+                <p>Loading resolved reports…</p>
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <div className={styles.emptyState}>
+                <p>No resolved reports match the current filters.</p>
+              </div>
+            ) : (
+              filteredItems.map((item, i) => {
+                const key = item.actionId;
+                const busy =
+                  submittingId === item.actionId ||
+                  submittingId === `${item.type}:${item.targetId}`;
+                const modName = getModName(item);
 
-                  return (
-                    <div className={styles.tableRow} key={rowKey}>
-                      <div className={styles.typeCell}>
-                        <span
-                          className={`${styles.typeBadge} ${
-                            item.type === "post"
-                              ? styles.typeBadgePost
-                              : item.type === "comment"
-                                ? styles.typeBadgeComment
-                                : styles.typeBadgeUser
-                          }`}
-                        >
-                          {item.type.toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <p className={styles.targetTitle}>{item.targetLabel || "--"}</p>
-                        <p className={styles.meta}>
-                          {item.targetId}
-                        </p>
-                        <p className={styles.meta}>
-                          Category: {formatReason(item.category)} · Reason: {formatReason(item.reason)}
-                        </p>
-                      </div>
-                      <div>
-                        <span className={styles.actionPill}>{formatAction(item.action)}</span>
-                        <p className={styles.meta}>
-                          Severity: {item.severity ? item.severity.toUpperCase() : "N/A"}
-                        </p>
-                        <p className={styles.meta}>{item.note?.trim() || "No note"}</p>
-                      </div>
-                      <div className={styles.centerCell}>
-                        <p className={styles.targetTitle}>
-                          {item.moderatorDisplayName ||
-                            (item.moderatorUsername
-                              ? `@${item.moderatorUsername}`
-                              : item.moderatorEmail || "--")}
-                        </p>
-                      </div>
-                      <div className={styles.centerCell}>
-                        <p className={styles.targetTitle}>{formatTime(item.resolvedAt)}</p>
-                        <p className={styles.meta}>
-                          Expires: {item.expiresAt ? formatTime(item.expiresAt) : "--"}
-                        </p>
-                      </div>
-                      <div className={styles.centerCell}>
-                        {item.penaltyActive ? (
-                          <span className={styles.statusHigh}>Penalty active</span>
-                        ) : (
-                          <span className={styles.statusLow}>Penalty inactive</span>
-                        )}
-                      </div>
-                      <div className={`${styles.rowActions} ${styles.rowActionsCentered}`}>
-                        <Link
-                          href={`/report/review/${item.type}/${item.targetId}`}
-                          className={styles.inlineButton}
-                        >
-                          Review
-                        </Link>
-                        <button
-                          type="button"
-                          className={styles.secondaryButton}
-                          onClick={() => handleReopen(item.type, item.targetId)}
-                          disabled={rowBusy}
-                        >
-                          Re-open
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.warningButton}
-                          onClick={() => handleRollback(item.actionId)}
-                          disabled={rowBusy || !item.rollbackSupported}
-                        >
-                          Rollback
-                        </button>
+                return (
+                  <div className={styles.tableRow} key={key} style={{ animationDelay: `${i * 40}ms` }}>
+
+                    {/* Content */}
+                    <div className={styles.contentCell}>
+                      <span className={`${styles.typeTag}
+                        ${item.type === "user" ? styles.typeTagUser : item.type === "comment" ? styles.typeTagComment : ""}`}>
+                        {item.type}
+                      </span>
+                      <div className={styles.targetInfo}>
+                        <p className={styles.targetLabel}>{item.targetLabel || "--"}</p>
+                        <p className={styles.targetId}>{truncId(item.targetId)}</p>
+                        <div className={styles.reasonRow}>
+                          <span className={styles.reasonTag}>{fmtKey(item.category)}</span>
+                          <span className={styles.reasonSep}>·</span>
+                          <span className={styles.reasonText}>{fmtKey(item.reason)}</span>
+                        </div>
                       </div>
                     </div>
-                  );
-                })
-              : null}
+
+                    {/* Decision */}
+                    <div className={styles.decisionCell}>
+                      <span className={`${styles.actionPill} ${getActionClass(item.action, styles)}`}>
+                        {fmtKey(item.action)}
+                      </span>
+                      {item.severity ? (
+                        <span className={`${styles.sevBadge} ${getSevClass(item.severity, styles)}`}>
+                          {item.severity.toUpperCase()}
+                        </span>
+                      ) : null}
+                      {item.note?.trim() ? (
+                        <p className={styles.noteSnippet} title={item.note.trim()}>
+                          {item.note.trim().slice(0, 50)}{item.note.trim().length > 50 ? "…" : ""}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {/* Resolved by */}
+                    <div className={styles.resolvedCell}>
+                      <div className={styles.modRow}>
+                        <div className={styles.modAvatar}>{getModInitial(item)}</div>
+                        <div>
+                          <p className={styles.modName}>{modName}</p>
+                          <p className={styles.resolvedTime}>{fmtTime(item.resolvedAt)}</p>
+                          {item.expiresAt ? (
+                            <p className={styles.expiresTime}>Expires {fmtTime(item.expiresAt)}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status */}
+                    <div className={styles.statusCell}>
+                      {item.penaltyActive ? (
+                        <span className={styles.statusActive}>Active</span>
+                      ) : (
+                        <span className={styles.statusInactive}>Inactive</span>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className={styles.actionsCell}>
+                      <Link
+                        href={`/report/review/${item.type}/${item.targetId}`}
+                        className={styles.btnReview}
+                      >
+                        Review
+                      </Link>
+                      <button
+                        type="button"
+                        className={styles.btnReopen}
+                        onClick={() => handleReopen(item.type, item.targetId)}
+                        disabled={busy}
+                      >
+                        Re-open
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.btnRollback}
+                        onClick={() => handleRollback(item.actionId)}
+                        disabled={busy || !item.rollbackSupported}
+                      >
+                        Rollback
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </section>
       </div>
+
       {toast ? <div className={styles.toast}>{toast}</div> : null}
     </div>
   );

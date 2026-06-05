@@ -78,7 +78,7 @@ export default function AdminDashboardPage() {
       postId: string;
       authorDisplayName: string | null;
       authorUsername: string | null;
-      moderationDecision: 'approve' | 'blur' | 'reject';
+      moderationDecision: "approve" | "blur" | "reject";
       reasons: string[];
       createdAt: string | null;
     }>
@@ -120,63 +120,13 @@ export default function AdminDashboardPage() {
         const response = await fetch(`${getApiBaseUrl()}/admin/stats`, {
           method: "GET",
           cache: "no-store",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!response.ok) {
-          throw new Error("Failed to load stats");
-        }
-
-        const payload = (await response.json()) as {
-          totalUsers: number;
-          newUsers24h: number;
-          newUsersPrev24h: number;
-          newUsersDeltaPct: number | null;
-          postsCreated7d: number;
-          postsCreatedPrev7d: number;
-          postsCreatedDeltaPct: number | null;
-          storageUsedBytes: number;
-          storageLimitBytes: number | null;
-          storageUsedPct: number | null;
-          realtimeRooms: number | null;
-          realtimeParticipants: number | null;
-          onlineUsersRealtime: number;
-          onlineUsersPeakAllTime: number;
-          apiStatus: "Operational" | "Degraded" | "Down";
-          apiUptimeSeconds: number;
-          openReportsCount: number;
-          highRiskReportsCount: number;
-          adsGrossRevenue30d?: number | null;
-          adsSpend30d?: number | null;
-          adsGrossRevenue24h?: number | null;
-          adsSpend24h?: number | null;
-          adsActiveCampaigns?: number | null;
-          adsImpressions30d?: number | null;
-          adsClicks30d?: number | null;
-          adsCtr30dPct?: number | null;
-          adsImpressions24h?: number | null;
-          adsClicks24h?: number | null;
-          adsCtr24hPct?: number | null;
-          reportQueue: Array<{
-            type: "post" | "comment" | "user";
-            targetId: string;
-            title: string;
-            topCategory: string;
-            totalReports: number;
-            uniqueReporters: number;
-            score: number;
-            severity: "low" | "medium" | "high";
-            autoHideSuggested: boolean;
-            autoHiddenPendingReview?: boolean;
-            escalatedPriority?: boolean;
-            lastReportedAt: string;
-          }>;
-        };
+        if (!response.ok) throw new Error("Failed to load stats");
+        const payload = await response.json();
         setStats(payload);
-      } catch (_err) {
-        // Keep previous snapshot to avoid KPI flicker on transient failures.
+      } catch {
+        // Keep previous snapshot on transient failures
       }
     };
 
@@ -201,71 +151,53 @@ export default function AdminDashboardPage() {
       }) => {
         setStats((prev) => {
           if (!prev) return prev;
-
-          const nextOnlineRealtime =
-            typeof payload.onlineUsersRealtime === "number"
-              ? payload.onlineUsersRealtime
-              : prev.onlineUsersRealtime;
-          const nextOnlinePeak =
-            typeof payload.onlineUsersPeakAllTime === "number"
-              ? payload.onlineUsersPeakAllTime
-              : prev.onlineUsersPeakAllTime;
-
           return {
             ...prev,
-            onlineUsersRealtime: nextOnlineRealtime,
-            onlineUsersPeakAllTime: nextOnlinePeak,
+            onlineUsersRealtime:
+              typeof payload.onlineUsersRealtime === "number"
+                ? payload.onlineUsersRealtime
+                : prev.onlineUsersRealtime,
+            onlineUsersPeakAllTime:
+              typeof payload.onlineUsersPeakAllTime === "number"
+                ? payload.onlineUsersPeakAllTime
+                : prev.onlineUsersPeakAllTime,
           };
         });
       },
     );
 
-    return () => {
-      socket.disconnect();
-    };
+    return () => { socket.disconnect(); };
   }, [ready]);
 
   useEffect(() => {
     if (!quickActionToast) return;
-    const timer = window.setTimeout(() => {
-      setQuickActionToast(null);
-    }, 2800);
+    const timer = window.setTimeout(() => setQuickActionToast(null), 2800);
     return () => window.clearTimeout(timer);
   }, [quickActionToast]);
 
   useEffect(() => {
-    if (!ready || typeof window === 'undefined') return;
-    const token = localStorage.getItem('adminAccessToken') || '';
+    if (!ready || typeof window === "undefined") return;
+    const token = localStorage.getItem("adminAccessToken") || "";
     if (!token) return;
 
     const loadModeration = async () => {
       try {
-        const response = await fetch(
-          `${getApiBaseUrl()}/admin/moderation/media`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to load moderation queue');
-        }
-
-        const payload = (await response.json()) as {
+        const response = await fetch(`${getApiBaseUrl()}/admin/moderation/media`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error("Failed to load moderation queue");
+        const payload = await response.json() as {
           items: Array<{
             postId: string;
             authorDisplayName: string | null;
             authorUsername: string | null;
-            moderationDecision: 'approve' | 'blur' | 'reject';
+            moderationDecision: "approve" | "blur" | "reject";
             reasons: string[];
             createdAt: string | null;
           }>;
         };
-
-        setModerationItems((payload.items ?? []).slice(0, 3));
+        setModerationItems((payload.items ?? []).slice(0, 4));
       } catch {
         setModerationItems([]);
       }
@@ -299,69 +231,26 @@ export default function AdminDashboardPage() {
         limit_account: "Limited account",
         violation: "Applied violation to",
       };
-
       return items.slice(0, 5).map((item) => ({
         actor:
           item.moderatorDisplayName?.trim() ||
           (item.moderatorUsername?.trim()
             ? `@${item.moderatorUsername.trim()}`
             : item.moderatorEmail?.trim() || "admin"),
-        action: `${actionMap[item.action] ?? "Updated"} ${
-          item.type
-        } ${item.targetLabel || item.type}`,
+        action: `${actionMap[item.action] ?? "Updated"} ${item.type} ${item.targetLabel || item.type}`,
         occurredAt: item.resolvedAt ?? null,
       }));
     };
 
-    const loadRecentActivityFallback = async () => {
-      const response = await fetch(`${getApiBaseUrl()}/admin/reports-resolved?limit=5`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to load fallback recent activity");
-      }
-
-      const payload = (await response.json()) as {
-        items?: Array<{
-          action: string;
-          type: "post" | "comment" | "user";
-          targetLabel: string;
-          resolvedAt: string | null;
-          moderatorDisplayName: string | null;
-          moderatorUsername: string | null;
-          moderatorEmail: string | null;
-        }>;
-      };
-
-      return mapResolvedToActivity(payload.items ?? []);
-    };
-
     const loadRecentActivity = async () => {
       try {
-        const response = await fetch(
-          `${getApiBaseUrl()}/admin/activity/recent?limit=5`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to load recent activity");
-        }
-
-        const payload = (await response.json()) as {
-          items?: Array<{
-            actor: string;
-            action: string;
-            occurredAt: string | null;
-          }>;
+        const response = await fetch(`${getApiBaseUrl()}/admin/activity/recent?limit=5`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error("Failed");
+        const payload = await response.json() as {
+          items?: Array<{ actor: string; action: string; occurredAt: string | null }>;
         };
 
         let normalized = (payload.items ?? []).slice(0, 5).map((item) => ({
@@ -371,17 +260,29 @@ export default function AdminDashboardPage() {
         }));
 
         if (normalized.length === 0) {
-          normalized = await loadRecentActivityFallback();
+          const fallbackRes = await fetch(`${getApiBaseUrl()}/admin/reports-resolved?limit=5`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (fallbackRes.ok) {
+            const fallbackPayload = await fallbackRes.json() as {
+              items?: Array<{
+                action: string;
+                type: "post" | "comment" | "user";
+                targetLabel: string;
+                resolvedAt: string | null;
+                moderatorDisplayName: string | null;
+                moderatorUsername: string | null;
+                moderatorEmail: string | null;
+              }>;
+            };
+            normalized = mapResolvedToActivity(fallbackPayload.items ?? []);
+          }
         }
 
         setRecentActivities(normalized);
       } catch {
-        try {
-          const fallback = await loadRecentActivityFallback();
-          setRecentActivities(fallback);
-        } catch {
-          setRecentActivities([]);
-        }
+        setRecentActivities([]);
       }
     };
 
@@ -390,6 +291,7 @@ export default function AdminDashboardPage() {
 
   if (!ready) return null;
 
+  /* ---- Formatters ---- */
   const formatNumber = (value?: number) =>
     typeof value === "number" ? value.toLocaleString() : "--";
 
@@ -401,9 +303,11 @@ export default function AdminDashboardPage() {
 
   const formatCurrencyCompact = (value?: number | null) => {
     if (typeof value !== "number") return "--";
-    return `${new Intl.NumberFormat("vi-VN", {
-      maximumFractionDigits: 0,
-    }).format(Math.round(value))} VND`;
+    if (value >= 1_000_000)
+      return `${(value / 1_000_000).toFixed(1)}M VND`;
+    if (value >= 1_000)
+      return `${(value / 1_000).toFixed(0)}K VND`;
+    return `${Math.round(value)} VND`;
   };
 
   const formatPercentCompact = (value?: number | null) => {
@@ -411,29 +315,11 @@ export default function AdminDashboardPage() {
     return `${value.toFixed(2)}%`;
   };
 
-  const formatStorage = (
-    usedBytes?: number,
-    limitBytes?: number | null,
-    usedPct?: number | null,
-  ) => {
+  const formatStorageShort = (usedBytes?: number, usedPct?: number | null) => {
     if (typeof usedBytes !== "number") return "--";
-    const gb = (value: number) => value / 1024 / 1024 / 1024;
-    const usedLabel = `${gb(usedBytes).toFixed(1)} GB`;
-    const limitLabel =
-      typeof limitBytes === "number" ? `${gb(limitBytes).toFixed(1)} GB` : "--";
-    const pctLabel =
-      typeof usedPct === "number" ? `${usedPct.toFixed(0)}%` : "--";
-    return `${usedLabel} / ${limitLabel} (${pctLabel})`;
-  };
-
-  const formatRealtime = (
-    rooms?: number | null,
-    participants?: number | null,
-  ) => {
-    if (typeof rooms !== "number" || typeof participants !== "number") {
-      return "Unavailable";
-    }
-    return `${rooms} rooms / ${participants} participants`;
+    const gb = usedBytes / 1024 / 1024 / 1024;
+    const pct = typeof usedPct === "number" ? ` (${usedPct.toFixed(0)}%)` : "";
+    return `${gb.toFixed(1)} GB${pct}`;
   };
 
   const formatUptime = (seconds?: number) => {
@@ -446,53 +332,27 @@ export default function AdminDashboardPage() {
     return `${mins}m`;
   };
 
-  const formatApiStatus = (
-    status?: "Operational" | "Degraded" | "Down",
-    uptimeSeconds?: number,
-  ) => {
-    if (!status) return "Unavailable";
-    return `${status} · Uptime ${formatUptime(uptimeSeconds)}`;
-  };
-
   const formatRelativeTime = (value?: string) => {
     if (!value) return "--";
     const diffMs = Date.now() - new Date(value).getTime();
     if (Number.isNaN(diffMs)) return "--";
     const mins = Math.max(0, Math.floor(diffMs / 60000));
-    if (mins < 60) return `${mins} mins ago`;
+    if (mins < 60) return `${mins}m ago`;
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} hours ago`;
+    if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
-    return `${days} days ago`;
+    return `${days}d ago`;
   };
 
-  const formatReportStatus = (
-    autoHideSuggested: boolean,
-    severity: "low" | "medium" | "high",
-  ) => {
-    if (autoHideSuggested) return "Auto-hide suggested";
-    if (severity === "high") return "High priority";
-    if (severity === "medium") return "Review";
-    return "Low priority";
+  const getTodayLabel = () => {
+    return new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
   };
 
-  const getModerationDecisionClass = (
-    decision: "approve" | "blur" | "reject",
-  ) => {
-    if (decision === "reject") return styles.tagReject;
-    if (decision === "blur") return styles.tagBlur;
-    return styles.tagApprove;
-  };
-
-  const getReportStatusClass = (
-    autoHideSuggested: boolean,
-    severity: "low" | "medium" | "high",
-  ) => {
-    if (autoHideSuggested || severity === "high") return styles.statusHigh;
-    if (severity === "medium") return styles.statusMedium;
-    return styles.statusLow;
-  };
-
+  /* ---- Derived values ---- */
   const isPostDeltaNegative =
     typeof stats?.postsCreatedDeltaPct === "number" &&
     stats.postsCreatedDeltaPct < 0;
@@ -529,242 +389,224 @@ export default function AdminDashboardPage() {
             typeof adsImpressions === "number" &&
             adsImpressions > 0
           ? (adsClicks / adsImpressions) * 100
-        : null;
+          : null;
 
-  const handleReviewContentQuickAction = () => {
+  const apiStatusColor =
+    stats?.apiStatus === "Operational"
+      ? styles.healthOk
+      : stats?.apiStatus === "Degraded"
+        ? styles.healthWarn
+        : styles.healthDown;
+
+  const storageIsHigh =
+    typeof stats?.storageUsedPct === "number" && stats.storageUsedPct >= 80;
+
+  const getModerationDecisionClass = (decision: "approve" | "blur" | "reject") => {
+    if (decision === "reject") return styles.tagReject;
+    if (decision === "blur") return styles.tagBlur;
+    return styles.tagApprove;
+  };
+
+  const getSeverityClass = (
+    autoHideSuggested: boolean,
+    severity: "low" | "medium" | "high",
+  ) => {
+    if (autoHideSuggested || severity === "high") return styles.statusHigh;
+    if (severity === "medium") return styles.statusMedium;
+    return styles.statusLow;
+  };
+
+  /* ---- Activity parser ---- */
+  type ParsedActivity = {
+    actionType: string;
+    entity: string;
+    target: string;
+    strike: string | null;
+    isRaw: boolean;
+  };
+
+  const parseActivity = (action: string): ParsedActivity => {
+    // Raw API format: "Action: VIOLATION · Strike: +1 · Target: post @ttt (id: uuid)"
+    if (action.startsWith("Action:")) {
+      const typeMatch = action.match(/Action:\s*([^·\n]+)/);
+      const strikeMatch = action.match(/Strike:\s*([^·\n]+)/);
+      const targetMatch = action.match(/Target:\s*(\w+)\s+(@\S+)/);
+      const strikeVal = strikeMatch ? strikeMatch[1].trim() : null;
+      return {
+        actionType: typeMatch ? typeMatch[1].trim() : action,
+        entity: targetMatch ? targetMatch[1] : "",
+        target: targetMatch ? targetMatch[2] : "",
+        strike: strikeVal && strikeVal !== "+0" ? strikeVal : null,
+        isRaw: true,
+      };
+    }
+    // Pre-formatted: "Removed post @username"
+    return { actionType: action, entity: "", target: "", strike: null, isRaw: false };
+  };
+
+  const getActionBadgeClass = (actionType: string) => {
+    const t = actionType.toUpperCase();
+    if (t.includes("VIOLATION") || t.includes("SUSPEND") || t.includes("REMOVE") || t.includes("DELETE") || t.includes("REJECT"))
+      return styles.actBadgeRed;
+    if (t.includes("CANCEL") || t.includes("WARN") || t.includes("MUTE") || t.includes("LIMIT") || t.includes("RESTRICT"))
+      return styles.actBadgeOrange;
+    if (t.includes("REOPEN") || t.includes("APPROVE") || t.includes("NO_VIOLATION") || t.includes("NO VIOLATION"))
+      return styles.actBadgeGreen;
+    return styles.actBadgeDefault;
+  };
+
+  const shortenActor = (actor: string) => {
+    // Show only the part before @ for emails
+    if (actor.includes("@")) return actor.split("@")[0];
+    return actor.replace(/^@/, "");
+  };
+
+  const handleReviewContent = () => {
     const queue = stats?.reportQueue ?? [];
     if (!queue.length) {
       setQuickActionToast("No open reports to review right now.");
       return;
     }
-
-    const severeCandidates = queue.filter(
-      (item) =>
-        Boolean(item.autoHiddenPendingReview) ||
-        Boolean(item.escalatedPriority) ||
-        Boolean(item.autoHideSuggested) ||
-        item.severity === "high",
+    const severe = queue.filter(
+      (r) =>
+        r.autoHiddenPendingReview ||
+        r.escalatedPriority ||
+        r.autoHideSuggested ||
+        r.severity === "high",
     );
-
-    if (!severeCandidates.length) {
-      setQuickActionToast("No critical report found right now.");
-      return;
-    }
-
-    const priorityRank = (item: {
-      autoHiddenPendingReview?: boolean;
-      escalatedPriority?: boolean;
-      autoHideSuggested: boolean;
-      severity: "low" | "medium" | "high";
-    }) => {
-      if (item.autoHiddenPendingReview || item.escalatedPriority) return 0;
-      if (item.autoHideSuggested) return 1;
-      if (item.severity === "high") return 2;
-      return 3;
-    };
-
-    const target = [...severeCandidates].sort((a, b) => {
-      const rankDiff = priorityRank(a) - priorityRank(b);
-      if (rankDiff !== 0) return rankDiff;
-      const aTime = new Date(a.lastReportedAt).getTime();
-      const bTime = new Date(b.lastReportedAt).getTime();
-      return bTime - aTime;
+    const candidates = severe.length ? severe : queue;
+    const target = [...candidates].sort((a, b) => {
+      const rank = (r: typeof a) =>
+        r.autoHiddenPendingReview || r.escalatedPriority
+          ? 0
+          : r.autoHideSuggested
+            ? 1
+            : r.severity === "high"
+              ? 2
+              : 3;
+      const diff = rank(a) - rank(b);
+      if (diff !== 0) return diff;
+      return new Date(b.lastReportedAt).getTime() - new Date(a.lastReportedAt).getTime();
     })[0];
-
     if (!target) {
-      setQuickActionToast("No critical report found right now.");
+      setQuickActionToast("No critical report found.");
       return;
     }
-
     router.push(`/report/review/${target.type}/${target.targetId}`);
   };
 
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
+
+        {/* ---- Header ---- */}
         <div className={styles.topbar}>
           <div className={styles.titleGroup}>
-            <span className={styles.eyebrow}>Admin Dashboard</span>
-            <h1 className={styles.title}>Welcome back, Admin</h1>
+            <h1 className={styles.title}>Overview</h1>
+            <span className={styles.dateLabel}>{getTodayLabel()}</span>
+          </div>
+          <div className={styles.headerActions}>
+            <Link href="/content-moderation?tab=user" className={styles.headerBtn}>
+              Find User
+            </Link>
+            <button
+              type="button"
+              className={`${styles.headerBtn} ${styles.headerBtnPrimary}`}
+              onClick={handleReviewContent}
+            >
+              Review Reports
+            </button>
+            <Link href="/broadcast-notice" className={styles.headerBtn}>
+              Broadcast
+            </Link>
           </div>
         </div>
 
+        {/* ---- KPI Row (5 cards) ---- */}
         <section className={styles.kpiGrid}>
           <div className={styles.kpiCard}>
             <span className={styles.kpiLabel}>Total Users</span>
-            <span className={styles.kpiValue}>
-              {formatNumber(stats?.totalUsers)}
-            </span>
+            <span className={styles.kpiValue}>{formatNumber(stats?.totalUsers)}</span>
             <span className={styles.kpiDelta}>All time</span>
           </div>
+
           <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>New Users (24h)</span>
-            <span className={styles.kpiValue}>
-              {formatNumber(stats?.newUsers24h)}
-            </span>
-            <span
-              className={`${styles.kpiDelta} ${
-                isNewUsersDeltaNegative ? styles.kpiDeltaNegative : ""
-              }`}
-            >
-              {formatDelta(stats?.newUsersDeltaPct)}
+            <span className={styles.kpiLabel}>New Users</span>
+            <span className={styles.kpiValue}>{formatNumber(stats?.newUsers24h)}</span>
+            <span className={`${styles.kpiDelta} ${isNewUsersDeltaNegative ? styles.kpiDeltaNeg : styles.kpiDeltaPos}`}>
+              {formatDelta(stats?.newUsersDeltaPct)} vs prev 24h
             </span>
           </div>
+
           <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Posts Created (7 days)</span>
-            <span className={styles.kpiValue}>
-              {formatNumber(stats?.postsCreated7d)}
-            </span>
-            <span
-              className={`${styles.kpiDelta} ${
-                isPostDeltaNegative ? styles.kpiDeltaNegative : ""
-              }`}
-            >
-              {formatDelta(stats?.postsCreatedDeltaPct)}
+            <span className={styles.kpiLabel}>Posts (7 days)</span>
+            <span className={styles.kpiValue}>{formatNumber(stats?.postsCreated7d)}</span>
+            <span className={`${styles.kpiDelta} ${isPostDeltaNegative ? styles.kpiDeltaNeg : styles.kpiDeltaPos}`}>
+              {formatDelta(stats?.postsCreatedDeltaPct)} vs prev 7d
             </span>
           </div>
-          <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Online Users (Realtime)</span>
-            <span className={styles.kpiValue}>
-              {formatNumber(stats?.onlineUsersRealtime)}
+
+          <div className={`${styles.kpiCard} ${styles.kpiCardLive}`}>
+            <span className={styles.kpiLabel}>
+              <span className={styles.liveDot} aria-hidden="true" />
+              Online Now
             </span>
-            <span className={styles.kpiDelta}>Live sockets</span>
+            <span className={styles.kpiValue}>{formatNumber(stats?.onlineUsersRealtime)}</span>
+            <span className={styles.kpiDelta}>Live via websocket</span>
           </div>
-          <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Peak Concurrent Online Users</span>
-            <span className={styles.kpiValue}>
-              {formatNumber(stats?.onlineUsersPeakAllTime)}
-            </span>
-            <span className={styles.kpiDelta}>All-time high</span>
-          </div>
-          <div className={styles.kpiCard}>
+
+          <div className={`${styles.kpiCard} ${reportQueue.length > 0 ? styles.kpiCardAlert : ""}`}>
             <span className={styles.kpiLabel}>Open Reports</span>
-            <span className={styles.kpiValue}>
-              {formatNumber(stats?.openReportsCount)}
-            </span>
-            <span className={`${styles.kpiDelta} ${styles.kpiDeltaNegative}`}>
-              High risk: {formatNumber(stats?.highRiskReportsCount)}
+            <span className={styles.kpiValue}>{formatNumber(stats?.openReportsCount)}</span>
+            <span className={`${styles.kpiDelta} ${(stats?.highRiskReportsCount ?? 0) > 0 ? styles.kpiDeltaNeg : ""}`}>
+              {(stats?.highRiskReportsCount ?? 0) > 0
+                ? `${stats?.highRiskReportsCount} high risk`
+                : "No high-risk"}
             </span>
           </div>
         </section>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Auto Moderation</h2>
-            <Link href="/moderation" className={styles.panelAction}>
-              Open details
-            </Link>
-          </div>
-          <div className={styles.queueList}>
-            {moderationItems.length === 0 ? (
-              <p className={styles.emptyState}>No moderated media yet.</p>
-            ) : (
-              moderationItems.map((item) => (
-                <div className={styles.queueItem} key={item.postId}>
-                  <span className={styles.queueTitle}>
-                    {item.authorDisplayName || 'Unknown'}
-                    {item.authorUsername ? ` (@${item.authorUsername})` : ''}
-                  </span>
-                  <div className={styles.queueMeta}>
-                    <span
-                      className={`${styles.tag} ${getModerationDecisionClass(
-                        item.moderationDecision,
-                      )}`}
-                    >
-                      {item.moderationDecision.toUpperCase()}
-                    </span>
-                    {item.reasons?.[0] ? <span>{item.reasons[0]}</span> : null}
-                    <Link
-                      href={`/moderation/${item.postId}`}
-                      className={styles.panelAction}
-                    >
-                      View
-                    </Link>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+        {/* ---- Row 1: Report Queue (priority) + Auto Moderation ---- */}
+        <section className={styles.grid62}>
 
-        <section className={styles.grid}>
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
               <h2 className={styles.panelTitle}>Report Queue</h2>
-              <Link href="/report" className={styles.panelAction}>
-                View all
-              </Link>
+              <Link href="/report" className={styles.panelAction}>View all</Link>
             </div>
-            <div
-              className={`${styles.queueList} ${
-                reportQueue.length === 0 ? styles.queueListEmpty : ""
-              }`}
-            >
+            <div className={`${styles.queueList} ${reportQueue.length === 0 ? styles.queueListEmpty : ""}`}>
               {reportQueue.length === 0 ? (
-                <div className={styles.reportQueueEmpty}>
-                  <span className={styles.reportQueueEmptyIcon} aria-hidden="true">
-                    <svg
-                      viewBox="0 0 24 24"
-                      focusable="false"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M9.75 12.75l1.5 1.5 3-3"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M6 19h12a2 2 0 002-2V8.8a2 2 0 00-.66-1.48l-5-4.5A2 2 0 0013 3H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                <div className={styles.emptyBox}>
+                  <span className={styles.emptyIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M9.75 12.75l1.5 1.5 3-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M6 19h12a2 2 0 002-2V8.8a2 2 0 00-.66-1.48l-5-4.5A2 2 0 0013 3H6a2 2 0 00-2 2v12a2 2 0 002 2z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </span>
-                  <p className={`${styles.emptyState} ${styles.reportQueueEmptyText}`}>
-                    Report queue is clear. No reports need review right now.
-                  </p>
+                  <p className={styles.emptyText}>Report queue is clear.</p>
                 </div>
               ) : (
                 reportQueue.map((item) => (
-                  <div
+                  <Link
+                    href={`/report/review/${item.type}/${item.targetId}`}
                     className={styles.queueItem}
                     key={`${item.type}:${item.targetId}`}
                   >
-                    <span className={styles.queueTitle}>{item.title}</span>
+                    <div className={styles.queueItemTop}>
+                      <span className={styles.queueTitle}>{item.title}</span>
+                      <span className={`${styles.severityBadge} ${getSeverityClass(item.autoHideSuggested, item.severity)}`}>
+                        {item.autoHideSuggested ? "Auto-hide" : item.severity === "high" ? "High" : item.severity === "medium" ? "Medium" : "Low"}
+                      </span>
+                    </div>
                     <div className={styles.queueMeta}>
                       <span className={styles.tag}>
-                        {item.type === "post"
-                          ? "Post"
-                          : item.type === "comment"
-                            ? "Comment"
-                            : "User"}
+                        {item.type === "post" ? "Post" : item.type === "comment" ? "Comment" : "User"}
                       </span>
-                      <span
-                        className={`${styles.status} ${
-                          getReportStatusClass(
-                            item.autoHideSuggested,
-                            item.severity,
-                          )
-                        }`}
-                      >
-                        {formatReportStatus(
-                          item.autoHideSuggested,
-                          item.severity,
-                        )}
-                      </span>
-                      <span>
-                        Score {item.score.toFixed(1)} · {item.uniqueReporters}{" "}
-                        reporters
-                      </span>
-                      <span>{formatRelativeTime(item.lastReportedAt)}</span>
+                      <span>{item.topCategory}</span>
+                      <span>{item.uniqueReporters} reporter{item.uniqueReporters !== 1 ? "s" : ""}</span>
+                      <span className={styles.queueTime}>{formatRelativeTime(item.lastReportedAt)}</span>
                     </div>
-                  </div>
+                  </Link>
                 ))
               )}
             </div>
@@ -772,147 +614,181 @@ export default function AdminDashboardPage() {
 
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>Ads & Revenue</h2>
-              <Link href="/ads-management" className={styles.panelAction}>
-                Monitor
-              </Link>
+              <h2 className={styles.panelTitle}>Auto Moderation</h2>
+              <Link href="/moderation" className={styles.panelAction}>View all</Link>
             </div>
-            <div className={styles.adsMetricGrid}>
-              <div className={styles.adsMetricCard}>
-                <span className={styles.adsMetricLabel}>Gross Revenue (Last 30 Days)</span>
-                <span className={styles.adsMetricValue}>{formatCurrencyCompact(adsGrossRevenue)}</span>
-                <span className={styles.adsMetricHint}>All completed ad charges</span>
-              </div>
-
-              <div className={styles.adsMetricCard}>
-                <span className={styles.adsMetricLabel}>Ad Spend (Last 30 Days)</span>
-                <span className={styles.adsMetricValue}>{formatCurrencyCompact(adsSpend)}</span>
-                <span className={styles.adsMetricHint}>Running campaign burn</span>
-              </div>
-
-              <div className={styles.adsMetricCard}>
-                <span className={styles.adsMetricLabel}>Active Campaigns</span>
-                <span className={styles.adsMetricValue}>{formatNumber(stats?.adsActiveCampaigns ?? undefined)}</span>
-                <span className={styles.adsMetricHint}>Currently delivering</span>
-              </div>
-
-              <div className={styles.adsMetricCard}>
-                <span className={styles.adsMetricLabel}>CTR (Last 30 Days)</span>
-                <span className={styles.adsMetricValue}>{formatPercentCompact(adsCtr)}</span>
-                <span className={styles.adsMetricHint}>
-                  {typeof adsClicks === "number" && typeof adsImpressions === "number"
-                    ? `${formatNumber(adsClicks)} clicks / ${formatNumber(adsImpressions)} impressions`
-                    : "No campaign telemetry yet"}
-                </span>
-              </div>
+            <div className={styles.queueList}>
+              {moderationItems.length === 0 ? (
+                <p className={styles.emptyText}>No flagged media.</p>
+              ) : (
+                moderationItems.map((item) => (
+                  <Link
+                    href={`/moderation/${item.postId}`}
+                    className={styles.queueItem}
+                    key={item.postId}
+                  >
+                    <div className={styles.queueItemTop}>
+                      <span className={styles.queueTitle}>
+                        {item.authorDisplayName || "Unknown"}
+                        {item.authorUsername ? ` (@${item.authorUsername})` : ""}
+                      </span>
+                      <span className={`${styles.tag} ${getModerationDecisionClass(item.moderationDecision)}`}>
+                        {item.moderationDecision.toUpperCase()}
+                      </span>
+                    </div>
+                    {item.reasons?.[0] ? (
+                      <p className={styles.moderationReason}>{item.reasons[0]}</p>
+                    ) : null}
+                  </Link>
+                ))
+              )}
             </div>
           </div>
         </section>
 
-        <section className={styles.grid}>
+        {/* ---- Row 2: Ads & Revenue + System Health ---- */}
+        <section className={styles.grid55}>
+
+          <div className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <h2 className={styles.panelTitle}>Ads & Revenue</h2>
+              <Link href="/ads-management" className={styles.panelAction}>Monitor</Link>
+            </div>
+            <div className={styles.adsGrid}>
+              <div className={styles.adsCard}>
+                <span className={styles.adsLabel}>Revenue (30d)</span>
+                <span className={styles.adsValue}>{formatCurrencyCompact(adsGrossRevenue)}</span>
+                <span className={styles.adsHint}>Gross ad charges</span>
+              </div>
+              <div className={styles.adsCard}>
+                <span className={styles.adsLabel}>Spend (30d)</span>
+                <span className={styles.adsValue}>{formatCurrencyCompact(adsSpend)}</span>
+                <span className={styles.adsHint}>Campaign burn</span>
+              </div>
+              <div className={styles.adsCard}>
+                <span className={styles.adsLabel}>Active Campaigns</span>
+                <span className={styles.adsValue}>{formatNumber(stats?.adsActiveCampaigns ?? undefined)}</span>
+                <span className={styles.adsHint}>Delivering now</span>
+              </div>
+              <div className={styles.adsCard}>
+                <span className={styles.adsLabel}>CTR (30d)</span>
+                <span className={styles.adsValue}>{formatPercentCompact(adsCtr)}</span>
+                <span className={styles.adsHint}>
+                  {typeof adsClicks === "number" && typeof adsImpressions === "number"
+                    ? `${formatNumber(adsClicks)} clicks / ${formatNumber(adsImpressions)} impressions`
+                    : "No telemetry yet"}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
               <h2 className={styles.panelTitle}>System Health</h2>
-              <Link href="/system" className={styles.panelAction}>
-                Details
-              </Link>
             </div>
-            <div className={styles.healthGrid}>
-              <div className={styles.healthItem}>
-                <span className={styles.healthLabel}>API</span>
-                <span className={styles.healthValue}>
-                  {formatApiStatus(stats?.apiStatus, stats?.apiUptimeSeconds)}
+            <div className={styles.healthList}>
+              <div className={styles.healthRow}>
+                <div className={styles.healthInfo}>
+                  <span className={styles.healthLabel}>API</span>
+                  <span className={`${styles.healthStatus} ${apiStatusColor}`}>
+                    {stats?.apiStatus ?? "Unavailable"}
+                  </span>
+                </div>
+                <span className={styles.healthMeta}>
+                  Uptime {formatUptime(stats?.apiUptimeSeconds)}
                 </span>
               </div>
-              <div className={styles.healthItem}>
-                <span className={styles.healthLabel}>Realtime</span>
-                <span className={styles.healthValue}>
-                  {formatRealtime(
-                    stats?.realtimeRooms,
-                    stats?.realtimeParticipants,
-                  )}
+              <div className={styles.healthRow}>
+                <div className={styles.healthInfo}>
+                  <span className={styles.healthLabel}>Realtime</span>
+                  <span className={`${styles.healthStatus} ${styles.healthOk}`}>
+                    {typeof stats?.realtimeRooms === "number" ? "Active" : "Unavailable"}
+                  </span>
+                </div>
+                <span className={styles.healthMeta}>
+                  {typeof stats?.realtimeRooms === "number" && typeof stats?.realtimeParticipants === "number"
+                    ? `${stats.realtimeRooms} rooms · ${stats.realtimeParticipants} participants`
+                    : "No data"}
                 </span>
               </div>
-              <div className={styles.healthItem}>
-                <span className={styles.healthLabel}>Storage</span>
-                <span className={styles.healthValue}>
-                  {formatStorage(
-                    stats?.storageUsedBytes,
-                    stats?.storageLimitBytes,
-                    stats?.storageUsedPct,
-                  )}
+              <div className={styles.healthRow}>
+                <div className={styles.healthInfo}>
+                  <span className={styles.healthLabel}>Storage</span>
+                  <span className={`${styles.healthStatus} ${storageIsHigh ? styles.healthWarn : styles.healthOk}`}>
+                    {storageIsHigh ? "High usage" : "Normal"}
+                  </span>
+                </div>
+                <span className={styles.healthMeta}>
+                  {formatStorageShort(stats?.storageUsedBytes, stats?.storageUsedPct)}
                 </span>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.panel}>
-            <div className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>Quick Actions</h2>
-            </div>
-            <div className={styles.quickActions}>
-              <div className={styles.quickCard}>
-                <span className={styles.quickTitle}>Find User</span>
-                <span className={styles.quickDesc}>
-                  Locate a user to review profile or reports.
-                </span>
-                <Link href="/content-moderation?tab=user" className={styles.quickButton}>
-                  Search
-                </Link>
-              </div>
-              <div className={styles.quickCard}>
-                <span className={styles.quickTitle}>Review Content</span>
-                <span className={styles.quickDesc}>
-                  Jump into the latest flagged posts.
-                </span>
-                <button
-                  type="button"
-                  className={styles.quickButton}
-                  onClick={handleReviewContentQuickAction}
-                >
-                  Review
-                </button>
-              </div>
-              <div className={styles.quickCard}>
-                <span className={styles.quickTitle}>Broadcast Notice</span>
-                <span className={styles.quickDesc}>
-                  Send a system notice to all users.
-                </span>
-                <Link href="/broadcast-notice" className={styles.quickButton}>
-                  Draft
-                </Link>
               </div>
             </div>
           </div>
         </section>
 
+        {/* ---- Recent Activity ---- */}
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Recent Admin Activity</h2>
-            <Link href="/audit" className={styles.panelAction}>
-              View logs
-            </Link>
+            <Link href="/audit" className={styles.panelAction}>View full log</Link>
           </div>
           <div className={styles.activityTable}>
             {recentActivities.length === 0 ? (
-              <div className={styles.activityRow}>
-                <span className={styles.activityActor}>--</span>
-                <span className={styles.activityAction}>No recent admin actions.</span>
-                <span>--</span>
-              </div>
+              <p className={styles.emptyText}>No recent admin actions.</p>
             ) : (
-              recentActivities.map((item, index) => (
-                <div className={styles.activityRow} key={`${item.actor}-${item.occurredAt ?? index}`}>
-                  <span className={styles.activityActor}>{item.actor}</span>
-                  <span className={styles.activityAction}>{item.action}</span>
-                  <span>{formatRelativeTime(item.occurredAt ?? undefined)}</span>
-                </div>
-              ))
+              recentActivities.map((item, index) => {
+                const parsed = parseActivity(item.action);
+                return (
+                  <div
+                    className={styles.activityRow}
+                    key={`${item.actor}-${item.occurredAt ?? index}`}
+                  >
+                    {/* Actor */}
+                    <div className={styles.activityActorWrap}>
+                      <span className={styles.activityAvatar}>
+                        {(item.actor[0] || "A").toUpperCase()}
+                      </span>
+                      <span className={styles.activityActor} title={item.actor}>
+                        {shortenActor(item.actor)}
+                      </span>
+                    </div>
+
+                    {/* Action */}
+                    <div className={styles.activityBody}>
+                      <div className={styles.activityTop}>
+                        <span className={`${styles.actBadge} ${getActionBadgeClass(parsed.actionType)}`}>
+                          {parsed.actionType}
+                        </span>
+                        {parsed.strike ? (
+                          <span className={styles.actStrike}>Strike {parsed.strike}</span>
+                        ) : null}
+                      </div>
+                      {(parsed.entity || parsed.target) ? (
+                        <p className={styles.activityTarget}>
+                          {parsed.entity && <span className={styles.actEntity}>{parsed.entity}</span>}
+                          {parsed.target && <span>{parsed.target}</span>}
+                        </p>
+                      ) : !parsed.isRaw ? (
+                        <p className={styles.activityTarget}>{parsed.actionType}</p>
+                      ) : null}
+                    </div>
+
+                    {/* Time */}
+                    <span className={styles.activityTime}>
+                      {formatRelativeTime(item.occurredAt ?? undefined)}
+                    </span>
+                  </div>
+                );
+              })
             )}
           </div>
         </section>
+
       </div>
-      {quickActionToast ? <div className={styles.quickToast}>{quickActionToast}</div> : null}
+
+      {quickActionToast ? (
+        <div className={styles.toast} role="status">{quickActionToast}</div>
+      ) : null}
     </div>
   );
 }

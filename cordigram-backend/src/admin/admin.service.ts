@@ -1041,6 +1041,7 @@ export class AdminService implements OnModuleInit {
       reporterId: string;
       reporterDisplayName: string | null;
       reporterUsername: string | null;
+      reporterAvatarUrl: string | null;
       reporterEmail: string | null;
       description: string;
       attachments: Array<{
@@ -1172,7 +1173,7 @@ export class AdminService implements OnModuleInit {
       ? await Promise.all([
           this.profileModel
             .find({ userId: { $in: allUserIds } })
-            .select('userId displayName username')
+            .select('userId displayName username avatarUrl')
             .lean(),
           this.userModel
             .find({ _id: { $in: allUserIds } })
@@ -1201,6 +1202,7 @@ export class AdminService implements OnModuleInit {
         reporterId,
         reporterDisplayName: reporterProfile?.displayName ?? null,
         reporterUsername: reporterProfile?.username ?? null,
+        reporterAvatarUrl: (reporterProfile as any)?.avatarUrl ?? null,
         reporterEmail: reporterUser?.email ?? null,
         description: doc.description,
         attachments: (doc.attachments ?? []).map((attachment) => ({
@@ -4744,6 +4746,7 @@ export class AdminService implements OnModuleInit {
       postId: string;
       authorDisplayName: string | null;
       authorUsername: string | null;
+      authorAvatarUrl: string | null;
       createdAt: Date | null;
       visibility: string;
       kind: 'post' | 'reel';
@@ -4867,7 +4870,7 @@ export class AdminService implements OnModuleInit {
     const profiles = authorObjectIds.length
       ? await this.profileModel
           .find({ userId: { $in: authorObjectIds } })
-          .select('userId displayName username')
+          .select('userId displayName username avatarUrl')
           .lean()
       : [];
 
@@ -4906,6 +4909,7 @@ export class AdminService implements OnModuleInit {
       postId: string;
       authorDisplayName: string | null;
       authorUsername: string | null;
+      authorAvatarUrl: string | null;
       createdAt: Date | null;
       visibility: string;
       kind: 'post' | 'reel';
@@ -4927,6 +4931,7 @@ export class AdminService implements OnModuleInit {
         postId: doc._id.toString(),
         authorDisplayName: profile?.displayName ?? null,
         authorUsername: profile?.username ?? null,
+        authorAvatarUrl: (profile as any)?.avatarUrl ?? null,
         createdAt: doc.createdAt ?? null,
         visibility: doc.visibility ?? 'public',
         kind: (doc.kind ?? 'post') as 'post' | 'reel',

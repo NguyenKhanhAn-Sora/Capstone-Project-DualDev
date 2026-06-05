@@ -172,6 +172,37 @@ const formatModerationKey = (value: string | null | undefined): string => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+/* Render notes that may contain raw system pipe-separated data */
+function NoteBlock({ note, className }: { note: string; className?: string }) {
+  if (!note.includes("|")) {
+    return <p className={`${className ?? ""} ${styles.noteText}`}>{note}</p>;
+  }
+  const [header, ...rest] = note.split("|").map((s) => s.trim());
+  const pairs = rest
+    .map((part) => {
+      const eq = part.indexOf("=");
+      return eq > -1
+        ? { key: part.slice(0, eq).trim(), val: part.slice(eq + 1).trim() }
+        : { key: null, val: part };
+    })
+    .filter((p) => p.val);
+  return (
+    <div className={`${className ?? ""} ${styles.systemNote}`}>
+      {header ? <span className={styles.systemNoteHeader}>{header}</span> : null}
+      {pairs.length > 0 ? (
+        <div className={styles.systemNotePairs}>
+          {pairs.map((p, i) => (
+            <div key={i} className={styles.systemNotePair}>
+              {p.key ? <span className={styles.systemNoteKey}>{p.key}</span> : null}
+              <span className={styles.systemNoteVal}>{p.val}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CollapsibleCaption({
   text,
   className,
@@ -379,6 +410,14 @@ export default function ReportReviewPage() {
     if (trustWeight >= 0.8) return "high";
     if (trustWeight >= 0.6) return "medium";
     return "low";
+  };
+  const getHistoryActionClass = (action: string): string => {
+    const redKeys = ["remove_post", "delete_comment", "suspend_user", "restrict_post", "violation"];
+    const orangeKeys = ["warn", "mute_interaction", "limit_account"];
+    if (redKeys.some((k) => action.includes(k))) return styles.historyActionRed;
+    if (orangeKeys.some((k) => action.includes(k))) return styles.historyActionOrange;
+    if (action === "no_violation") return styles.historyActionGreen;
+    return styles.historyActionDefault;
   };
   const severeHistoryActions = new Set([
     "suspend_user",
@@ -1142,30 +1181,90 @@ export default function ReportReviewPage() {
                 <span className={styles.panelTag}>Weighted</span>
               </div>
               <div className={styles.signalGrid}>
+                {/* Categories */}
                 <div className={styles.signalCard}>
-                  <span className={styles.signalLabel}>Categories</span>
-                  <span className={styles.signalValue}>{categorySignal}</span>
+                  <span className={styles.signalLabel}>Top category</span>
+                  {topCategoryBreakdown ? (
+                    <>
+                      <span className={styles.signalValueLg}>
+                        {formatModerationKey(topCategoryBreakdown.category)}
+                      </span>
+                      <span className={styles.signalBadgeRow}>
+                        <span className={styles.signalPct}>{formatPercent(topCategoryBreakdown.percent)}</span>
+                        <span className={styles.signalMeta}>of reports</span>
+                      </span>
+                    </>
+                  ) : (
+                    <span className={styles.signalValueLg}>--</span>
+                  )}
                   <span className={styles.signalMeta}>
                     {detail?.categoryBreakdown?.length
-                      ? `${formatNumber(detail.categoryBreakdown[0].count)} / ${formatNumber(detail.totalReports)} open reports`
-                      : "No open reports in the last 30 days"}
+                      ? `${formatNumber(detail.categoryBreakdown[0].count)} / ${formatNumber(detail.totalReports)} total`
+                      : "No open reports"}
                   </span>
                 </div>
+
+                {/* Reporter mix */}
                 <div className={styles.signalCard}>
                   <span className={styles.signalLabel}>Reporter mix</span>
-                  <span className={styles.signalValue}>{reporterSignal}</span>
-                  <span className={styles.signalMeta}>
-                    {formatNumber(detail?.uniqueReporters)} unique reporters
-                  </span>
+                  {detail?.reporterMix ? (
+                    <>
+                      <div className={styles.signalStatRow}>
+                        <div className={styles.signalStat}>
+                          <span className={styles.signalStatNum}>
+                            {detail.reporterMix.weightedAverage !== null
+                              ? detail.reporterMix.weightedAverage.toFixed(2)
+                              : "--"}
+                          </span>
+                          <span className={styles.signalStatUnit}>W.avg</span>
+                        </div>
+                        <div className={styles.signalDivider} />
+                        <div className={styles.signalStat}>
+                          <span className={styles.signalStatNum}>
+                            {formatPercent(detail.reporterMix.highTrustRatio)}
+                          </span>
+                          <span className={styles.signalStatUnit}>high-trust</span>
+                        </div>
+                      </div>
+                      <span className={styles.signalMeta}>
+                        {formatNumber(detail.uniqueReporters)} unique reporters
+                        {detail.reporterMix.highTrustCount > 0
+                          ? ` · ${detail.reporterMix.highTrustCount} high-trust`
+                          : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <span className={styles.signalValueLg}>{reporterSignal}</span>
+                  )}
                 </div>
+
+                {/* Velocity */}
                 <div className={styles.signalCard}>
                   <span className={styles.signalLabel}>Velocity</span>
-                  <span className={styles.signalValue}>{velocitySignal}</span>
-                  <span className={styles.signalMeta}>
-                    {detail?.velocity
-                      ? `${formatNumber(detail.velocity.reportsLast24h)} reports / 24h · ${detail.velocity.perHourLast24h.toFixed(2)} avg per hour`
-                      : "No open reports in the last 24 hours"}
-                  </span>
+                  {detail?.velocity ? (
+                    <>
+                      <div className={styles.signalStatRow}>
+                        <div className={styles.signalStat}>
+                          <span className={styles.signalStatNum}>
+                            {formatNumber(detail.velocity.reportsLast1h)}
+                          </span>
+                          <span className={styles.signalStatUnit}>/ 1h</span>
+                        </div>
+                        <div className={styles.signalDivider} />
+                        <div className={styles.signalStat}>
+                          <span className={styles.signalStatNum}>
+                            {formatNumber(detail.velocity.reportsLast24h)}
+                          </span>
+                          <span className={styles.signalStatUnit}>/ 24h</span>
+                        </div>
+                      </div>
+                      <span className={styles.signalMeta}>
+                        {detail.velocity.perHourLast24h.toFixed(2)} avg reports / hr
+                      </span>
+                    </>
+                  ) : (
+                    <span className={styles.signalValueLg}>--</span>
+                  )}
                 </div>
               </div>
             </section>
@@ -1203,24 +1302,43 @@ export default function ReportReviewPage() {
               </div>
               <div className={styles.historyList}>
                 {filteredHistoryItems.length > 0 ? (
-                  filteredHistoryItems.map((item, index) => (
-                    <div className={styles.historyItem} key={`${item.action}-${item.resolvedAt ?? index}`}>
-                      <span className={styles.historyActor}>
-                        {item.moderatorDisplayName ||
-                          (item.moderatorUsername
-                            ? `@${item.moderatorUsername}`
-                            : item.moderatorEmail || "--")}
-                      </span>
-                      <span>
-                        {formatModerationKey(item.action)}
-                        {item.severity ? ` (${item.severity.toUpperCase()})` : ""}
-                        {item.note?.trim() ? ` · ${item.note.trim()}` : ""}
-                      </span>
-                      <span className={styles.historyTime}>
-                        {formatTime(item.resolvedAt)}
-                      </span>
-                    </div>
-                  ))
+                  filteredHistoryItems.map((item, index) => {
+                    const actorName =
+                      item.moderatorDisplayName ||
+                      (item.moderatorUsername
+                        ? `@${item.moderatorUsername}`
+                        : item.moderatorEmail || "--");
+                    return (
+                      <div className={styles.historyItem} key={`${item.action}-${item.resolvedAt ?? index}`}>
+                        <div className={styles.historyAvatar}>
+                          {actorName.replace("@", "").charAt(0).toUpperCase()}
+                        </div>
+                        <div className={styles.historyContent}>
+                          <div className={styles.historyTopRow}>
+                            <span className={styles.historyActor}>{actorName}</span>
+                            <div className={styles.historyBadges}>
+                              <span className={`${styles.historyActionBadge} ${getHistoryActionClass(item.action)}`}>
+                                {formatModerationKey(item.action)}
+                              </span>
+                              {item.severity ? (
+                                <span className={`${styles.historySeverityBadge} ${
+                                  item.severity === "high" ? styles.historySevHigh :
+                                  item.severity === "medium" ? styles.historySevMed :
+                                  styles.historySevLow
+                                }`}>
+                                  {item.severity.toUpperCase()}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          {item.note?.trim() ? (
+                            <NoteBlock note={item.note.trim()} className={styles.historyNote} />
+                          ) : null}
+                        </div>
+                        <span className={styles.historyTime}>{formatTime(item.resolvedAt)}</span>
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className={styles.noteHint}>
                     {historyFilter === "severe"
@@ -1342,10 +1460,11 @@ export default function ReportReviewPage() {
                       {formatTime(detail.latestModeration.resolvedAt)}
                     </span>
                   </div>
-                  <div className={styles.noteHint}>
-                    {detail.latestModeration.note?.trim() ||
-                      "No internal moderation note was added."}
-                  </div>
+                  {detail.latestModeration.note?.trim() ? (
+                    <NoteBlock note={detail.latestModeration.note.trim()} />
+                  ) : (
+                    <div className={styles.noteHint}>No internal moderation note was added.</div>
+                  )}
                 </div>
               ) : (
                 <div className={styles.noteHint}>

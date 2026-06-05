@@ -5,16 +5,9 @@ import { useRouter } from "next/navigation";
 import styles from "./community-discovery.module.css";
 import { getApiBaseUrl } from "@/lib/api";
 
-type AdminPayload = {
-  roles?: string[];
-  exp?: number;
-};
+type AdminPayload = { roles?: string[]; exp?: number };
 
-type ChannelInfo = {
-  id: string;
-  name: string;
-  type: string;
-};
+type ChannelInfo = { id: string; name: string; type: string };
 
 type CategoryGroup = {
   categoryId: string;
@@ -70,25 +63,17 @@ type HistoryItem = {
 const decodeJwt = (token: string): AdminPayload | null => {
   try {
     const payload = token.split(".")[1];
-    const json = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
-    );
-    return json as AdminPayload;
-  } catch {
-    return null;
-  }
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as AdminPayload;
+  } catch { return null; }
 };
 
-const formatDate = (value: string | null | undefined) => {
+const fmtDate = (value: string | null | undefined) => {
   if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--";
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "--";
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric", month: "long", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
   });
 };
 
@@ -107,40 +92,21 @@ export default function CommunityDiscoveryPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-  const [historyActionFilter, setHistoryActionFilter] = useState<
-    "all" | "approve" | "reject" | "remove" | "restore"
-  >("all");
+  const [historyActionFilter, setHistoryActionFilter] = useState<"all" | "approve" | "reject" | "remove" | "restore">("all");
   const [historySearch, setHistorySearch] = useState("");
   const [historySort, setHistorySort] = useState<"action_desc" | "action_asc" | "activated_desc" | "activated_asc">("action_desc");
-  const [historyDetail, setHistoryDetail] = useState<{
-    serverId: string;
-    serverName: string;
-  } | null>(null);
+  const [historyDetail, setHistoryDetail] = useState<{ serverId: string; serverName: string } | null>(null);
 
   useEffect(() => {
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("adminAccessToken")
-        : null;
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
+    const token = typeof window !== "undefined" ? localStorage.getItem("adminAccessToken") : null;
+    if (!token) { router.replace("/login"); return; }
     const decoded = decodeJwt(token);
-    if (!decoded?.roles?.includes("admin")) {
-      router.replace("/login");
-      return;
-    }
-    if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-      router.replace("/login");
-      return;
-    }
-
-    // Tab 1: list only pending servers
-    loadServers(token, "pending");
+    if (!decoded?.roles?.includes("admin")) { router.replace("/login"); return; }
+    if (decoded.exp && decoded.exp * 1000 < Date.now()) { router.replace("/login"); return; }
+    void loadServers(token, "pending");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  // Auto-refresh counts/list so memberCount stays up to date
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("adminAccessToken") : null;
     if (!token) return;
@@ -150,12 +116,10 @@ export default function CommunityDiscoveryPage() {
       void loadServers(token, status);
     }, 12000);
     return () => clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  const loadServers = async (
-    token: string,
-    status: "all" | "pending" | "approved" | "rejected" | "removed",
-  ) => {
+  const loadServers = async (token: string, status: "all" | "pending" | "approved" | "rejected" | "removed") => {
     setLoading(true);
     setError(null);
     try {
@@ -163,18 +127,12 @@ export default function CommunityDiscoveryPage() {
       url.searchParams.set("status", status);
       if (search.trim()) url.searchParams.set("q", search.trim());
       if (sort) url.searchParams.set("sort", sort);
-      const res = await fetch(
-        url.toString(),
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: CommunityServer[] = await res.json();
-      setServers(data);
+      setServers(await res.json() as CommunityServer[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const loadHistory = async (opts?: { serverId?: string }) => {
@@ -187,27 +145,14 @@ export default function CommunityDiscoveryPage() {
       if (opts?.serverId) url.searchParams.set("serverId", opts.serverId);
       if (historySearch.trim()) url.searchParams.set("q", historySearch.trim());
       if (historySort) url.searchParams.set("sort", historySort);
-      const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw new Error(t || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
+      const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(t || `HTTP ${res.status}`); }
+      const data = await res.json() as { items?: HistoryItem[] };
       setHistoryItems(Array.isArray(data.items) ? data.items : []);
     } catch (e) {
       setHistoryError(e instanceof Error ? e.message : "Failed");
       setHistoryItems([]);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  const handleJoinConfirm = () => {
-    if (!joinConfirm) return;
-    router.push(`/community-discovery/server-view/${joinConfirm.id}`);
-    setJoinConfirm(null);
+    } finally { setHistoryLoading(false); }
   };
 
   const updateApproval = async (srv: CommunityServer, status: "approved" | "rejected") => {
@@ -222,25 +167,15 @@ export default function CommunityDiscoveryPage() {
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         let msg = `HTTP ${res.status}`;
-        try {
-          const parsed = text ? JSON.parse(text) : null;
-          msg = parsed?.message ? String(parsed.message) : msg;
-        } catch {
-          if (text) msg = text;
-        }
+        try { const p = text ? JSON.parse(text) : null; msg = p?.message ? String(p.message) : msg; } catch { if (text) msg = text; }
         throw new Error(msg);
       }
-      setServers((prev) =>
-        prev.map((s) => (s.id === srv.id ? { ...s, communityDiscoveryStatus: status } : s)),
-      );
-      setToast({ type: "success", message: status === "approved" ? "Approved." : "Rejected." });
-      // After review/reject, remove from review tab and keep in history.
+      setServers((prev) => prev.map((s) => (s.id === srv.id ? { ...s, communityDiscoveryStatus: status } : s)));
+      showToast("success", status === "approved" ? "Approved." : "Rejected.");
       void loadServers(token, "pending");
     } catch (err) {
-      setToast({ type: "error", message: err instanceof Error ? err.message : "Could not update." });
-    } finally {
-      setApprovalLoadingId((cur) => (cur === srv.id ? null : cur));
-    }
+      showToast("error", err instanceof Error ? err.message : "Could not update.");
+    } finally { setApprovalLoadingId((c) => (c === srv.id ? null : c)); }
   };
 
   const removeFromDiscovery = async (srv: CommunityServer) => {
@@ -248,25 +183,14 @@ export default function CommunityDiscoveryPage() {
     if (!token) return;
     try {
       setApprovalLoadingId(srv.id);
-      const res = await fetch(
-        `${getApiBaseUrl()}/admin/community-discovery/${srv.id}/remove`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `HTTP ${res.status}`);
-      }
-      setServers((prev) =>
-        prev.map((s) => (s.id === srv.id ? { ...s, communityDiscoveryStatus: "removed" } : s)),
-      );
-      setToast({ type: "success", message: "Removed from Discovery." });
-      // After removal, server returns to normal and leaves this tab.
+      const res = await fetch(`${getApiBaseUrl()}/admin/community-discovery/${srv.id}/remove`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { const text = await res.text().catch(() => ""); throw new Error(text || `HTTP ${res.status}`); }
+      setServers((prev) => prev.map((s) => (s.id === srv.id ? { ...s, communityDiscoveryStatus: "removed" } : s)));
+      showToast("success", "Removed from Discovery.");
       void loadServers(token, "approved");
-    } catch (e) {
-      setToast({ type: "error", message: e instanceof Error ? e.message : "Could not remove." });
-    } finally {
-      setApprovalLoadingId((cur) => (cur === srv.id ? null : cur));
-    }
+    } catch (e) { showToast("error", e instanceof Error ? e.message : "Could not remove."); }
+    finally { setApprovalLoadingId((c) => (c === srv.id ? null : c)); }
   };
 
   const restoreDiscovery = async (serverId: string) => {
@@ -274,510 +198,347 @@ export default function CommunityDiscoveryPage() {
     if (!token) return;
     try {
       setApprovalLoadingId(serverId);
-      const res = await fetch(
-        `${getApiBaseUrl()}/admin/community-discovery/${serverId}/restore`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `HTTP ${res.status}`);
-      }
-      setToast({ type: "success", message: "Discovery restored." });
-      // refresh both servers and history snapshot
+      const res = await fetch(`${getApiBaseUrl()}/admin/community-discovery/${serverId}/restore`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { const text = await res.text().catch(() => ""); throw new Error(text || `HTTP ${res.status}`); }
+      showToast("success", "Discovery restored.");
       await loadServers(token, "all");
       await loadHistory({ serverId });
-    } catch (e) {
-      setToast({ type: "error", message: e instanceof Error ? e.message : "Could not restore." });
-    } finally {
-      setApprovalLoadingId((cur) => (cur === serverId ? null : cur));
-    }
+    } catch (e) { showToast("error", e instanceof Error ? e.message : "Could not restore."); }
+    finally { setApprovalLoadingId((c) => (c === serverId ? null : c)); }
+  };
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
   };
 
   const totalMembers = servers.reduce((s, srv) => s + srv.memberCount, 0);
-  const fullyConfigured = servers.filter(
-    (s) => s.safety.hasSafetyFullyConfigured,
-  ).length;
+  const fullyConfigured = servers.filter((s) => s.safety.hasSafetyFullyConfigured).length;
+
+  const TABS = [
+    { value: "review",  label: "Review (Pending)" },
+    { value: "remove",  label: "Remove from Discovery" },
+    { value: "history", label: "History" },
+  ] as const;
+
+  const ACTION_BADGE: Record<HistoryItem["action"], string> = {
+    approve: "Approve",
+    reject:  "Reject",
+    remove:  "Remove",
+    restore: "Restore",
+  };
 
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
-        {toast && (
-          <div
-            style={{
-              position: "sticky",
-              top: 12,
-              zIndex: 50,
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              role="status"
-              style={{
-                maxWidth: 820,
-                width: "100%",
-                borderRadius: 14,
-                padding: "10px 12px",
-                border: "1px solid var(--color-border)",
-                background:
-                  toast.type === "success"
-                    ? "rgba(16, 185, 129, 0.12)"
-                    : "rgba(220, 38, 38, 0.10)",
-                color: toast.type === "success" ? "#047857" : "#b91c1c",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 700 }}>{toast.message}</span>
-              <button
-                type="button"
-                className={styles.expandBtn}
-                onClick={() => setToast(null)}
-                style={{ padding: "4px 10px" }}
-              >
-                Close
+
+        {/* ── Toast ── */}
+        {toast ? (
+          <div className={styles.toastWrap}>
+            <div className={`${styles.toast} ${toast.type === "success" ? styles.toastSuccess : styles.toastError}`}
+              role="status">
+              <span>{toast.message}</span>
+              <button type="button" className={styles.toastClose} onClick={() => setToast(null)}>
+                <svg viewBox="0 0 16 16" fill="none" aria-label="Close">
+                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
               </button>
             </div>
           </div>
-        )}
-        <div className={styles.topbar}>
+        ) : null}
+
+        {/* ── Header ── */}
+        <header className={styles.topbar}>
           <div>
-            <p className={styles.eyebrow}>Admin</p>
             <h1 className={styles.title}>Community Discovery</h1>
             <p className={styles.subtitle}>
-              Manage and review servers with Community enabled. Check details
-              and join as an observer in read-only mode.
+              Manage and review servers with Community enabled. Check details and join as an observer in read-only mode.
             </p>
           </div>
+        </header>
+
+        {/* ── Tab chips ── */}
+        <div className={styles.tabRow}>
+          {TABS.map(({ value, label }) => (
+            <button key={value} type="button"
+              className={`${styles.tab} ${tab === value ? styles.tabActive : ""} ${
+                value === "review"  && tab === value ? styles.tabPending  :
+                value === "remove"  && tab === value ? styles.tabRemove   :
+                value === "history" && tab === value ? styles.tabHistory  : ""
+              }`}
+              onClick={() => {
+                setTab(value);
+                const token = localStorage.getItem("adminAccessToken") || "";
+                if (value === "history") { void loadHistory(); }
+                else if (token) { void loadServers(token, value === "review" ? "pending" : "approved"); }
+              }}>
+              {label}
+            </button>
+          ))}
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className={styles.expandBtn}
-            onClick={() => {
-              setTab("review");
-              const token = localStorage.getItem("adminAccessToken") || "";
-              if (token) void loadServers(token, "pending");
-            }}
-            style={tab === "review" ? { outline: "2px solid var(--color-primary)", outlineOffset: 2 } : undefined}
-          >
-            Review (Pending)
-          </button>
-          <button
-            type="button"
-            className={styles.expandBtn}
-            onClick={() => {
-              setTab("remove");
-              const token = localStorage.getItem("adminAccessToken") || "";
-              if (token) void loadServers(token, "approved");
-            }}
-            style={tab === "remove" ? { outline: "2px solid var(--color-primary)", outlineOffset: 2 } : undefined}
-          >
-            Remove from Discovery
-          </button>
-          <button
-            type="button"
-            className={styles.expandBtn}
-            onClick={() => {
-              setTab("history");
-              void loadHistory();
-            }}
-            style={tab === "history" ? { outline: "2px solid var(--color-primary)", outlineOffset: 2 } : undefined}
-          >
-            History
-          </button>
-        </div>
+        {/* ── KPI strip ── */}
+        <section className={styles.kpiRow}>
+          <article className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>Community servers</span>
+            <span className={styles.kpiValue}>{servers.length}</span>
+          </article>
+          <article className={`${styles.kpiCard} ${styles.kpiMembers}`}>
+            <span className={styles.kpiLabel}>Total members</span>
+            <span className={styles.kpiValue}>{totalMembers}</span>
+          </article>
+          <article className={`${styles.kpiCard} ${styles.kpiSafety}`}>
+            <span className={styles.kpiLabel}>Safety configured</span>
+            <span className={styles.kpiValue}>{fullyConfigured}</span>
+          </article>
+          <article className={`${styles.kpiCard} ${styles.kpiAutomod}`}>
+            <span className={styles.kpiLabel}>AutoMod enabled</span>
+            <span className={styles.kpiValue}>{servers.filter((s) => s.safety.hasAutoMod).length}</span>
+          </article>
+        </section>
 
-        <div className={styles.statRow}>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>{servers.length}</div>
-            <div className={styles.statLabel}>Community Servers</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>{totalMembers}</div>
-            <div className={styles.statLabel}>Total Members</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>{fullyConfigured}</div>
-            <div className={styles.statLabel}>Safety Configured</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statValue}>
-              {servers.filter((s) => s.safety.hasAutoMod).length}
-            </div>
-            <div className={styles.statLabel}>AutoMod Enabled</div>
-          </div>
-        </div>
+        {error ? <div className={styles.errorBanner}>{error}</div> : null}
 
-        {error && <p className={styles.error}>{error}</p>}
-
-        <div className={styles.panel}>
-          {(tab === "review" || tab === "remove") && (
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        {/* ── Main panel: review / remove tabs ── */}
+        {(tab === "review" || tab === "remove") ? (
+          <section className={styles.panel}>
+            {/* Controls */}
+            <div className={styles.controlsRow}>
               <input
+                className={styles.searchInput}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by server name or ID..."
-                style={{
-                  flex: "1 1 260px",
-                  minWidth: 220,
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  fontSize: 13,
+                placeholder="Search by server name or ID…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const token = localStorage.getItem("adminAccessToken") || "";
+                    if (token) void loadServers(token, tab === "review" ? "pending" : "approved");
+                  }
                 }}
               />
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as typeof sort)}
-                style={{
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  fontSize: 13,
-                }}
-                title="Sort by time"
-              >
+              <select className={styles.nativeSelect} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} title="Sort">
                 <option value="activated_desc">Activated: Newest</option>
                 <option value="activated_asc">Activated: Oldest</option>
                 <option value="created_desc">Created: Newest</option>
                 <option value="created_asc">Created: Oldest</option>
               </select>
-              <button
-                type="button"
-                className={styles.expandBtn}
+              <button type="button" className={styles.searchBtn}
                 onClick={() => {
                   const token = localStorage.getItem("adminAccessToken") || "";
-                  const status = tab === "review" ? "pending" : "approved";
-                  if (token) void loadServers(token, status);
-                }}
-              >
+                  if (token) void loadServers(token, tab === "review" ? "pending" : "approved");
+                }}>
                 Search
               </button>
             </div>
-          )}
-          {loading ? (
-            <div className={styles.emptyState}>Loading...</div>
-          ) : servers.length === 0 ? (
-            <div className={styles.emptyState}>
-              {tab === "review"
-                ? "No servers are pending review."
-                : tab === "remove"
-                  ? "No approved servers available for removal."
-                  : "No data available."}
-            </div>
-          ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Server</th>
-                    <th>Members</th>
-                    <th>Channels</th>
-                    <th>Safety</th>
-                    <th>AutoMod</th>
-                    <th>Activity</th>
-                    <th>Activated</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {servers.map((srv) => (
-                    <React.Fragment key={srv.id}>
-                      <tr>
-                        <td>
-                          <div className={styles.serverName}>
-                            {srv.avatarUrl ? (
-                              <img
-                                className={styles.serverAvatar}
-                                src={srv.avatarUrl}
-                                alt=""
-                              />
-                            ) : (
-                              <div className={styles.serverAvatarPlaceholder}>
-                                {srv.name.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <div>
-                              <p className={styles.main}>{srv.name}</p>
-                              <p className={styles.sub}>
-                                Owner: {srv.owner.displayName || srv.owner.username || "N/A"}
-                              </p>
-                              <p className={styles.sub}>Server ID: {srv.id}</p>
-                              <p className={styles.sub}>
-                                Mode: {srv.accessMode}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <p className={styles.main}>{srv.memberCount}</p>
-                        </td>
-                        <td style={{display: "flex", alignItems: "center", gap: 10}}>
-                          <p className={styles.main}>{srv.totalChannels}</p>
-                          <button
-                            type="button"
-                            className={styles.expandBtn}
-                            onClick={() =>
-                              setExpandedId(
-                                expandedId === srv.id ? null : srv.id,
-                              )
-                            }
-                          >
-                            {expandedId === srv.id ? "Hide" : "Details"}
-                          </button>
-                        </td>
-                        <td>
-                          {srv.safety.hasSafetyFullyConfigured ? (
-                            <span className={styles.badgeOk}>Complete</span>
-                          ) : (
-                            <span className={styles.badgeWarn}>Incomplete</span>
-                          )}
-                          <p className={styles.sub}>
-                            Verify: {srv.safety.verificationLevel}
-                          </p>
-                        </td>
-                        <td>
-                          {srv.safety.hasAutoMod ? (
-                            <span className={styles.badgeOk}>Enabled</span>
-                          ) : (
-                            <span className={styles.badgeDanger}>Disabled</span>
-                          )}
-                          {srv.safety.bannedWordsCount > 0 && (
-                            <p className={styles.sub}>
-                              {srv.safety.bannedWordsCount} banned words
-                            </p>
-                          )}
-                        </td>
-                        <td>
-                          {srv.hasAbnormalActivity ? (
-                            <span className={styles.badgeDanger}>
-                              Abnormal
-                            </span>
-                          ) : (
-                            <span className={styles.badgeOk}>Normal</span>
-                          )}
-                        </td>
-                        <td>
-                          <p className={styles.sub}>
-                            {formatDate(srv.communityActivatedAt)}
-                          </p>
-                        </td>
-                        <td>
 
-                          {tab === "review" && (
-                            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                                        <button
-                            type="button"
-                            className={styles.joinBtn}
-                            onClick={() => setJoinConfirm(srv)}
-                          >
-                            View
-                          </button>
-                              <button
-                                type="button"
-                                className={styles.expandBtn}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  void updateApproval(srv, "approved");
-                                }}
-                                disabled={srv.communityDiscoveryStatus === "approved"}
-                                title="Approve to show in Discovery"
-                              >
-                                {approvalLoadingId === srv.id && srv.communityDiscoveryStatus !== "approved"
-                                  ? "Processing..."
-                                  : "Approve"}
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.expandBtn}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  void updateApproval(srv, "rejected");
-                                }}
-                                disabled={srv.communityDiscoveryStatus === "rejected"}
-                                title="Reject and keep hidden from Discovery"
-                                style={{ color: "#b42318", borderColor: "rgba(180,35,24,0.25)" }}
-                              >
-                                {approvalLoadingId === srv.id && srv.communityDiscoveryStatus !== "rejected"
-                                  ? "Processing..."
-                                  : "Reject"}
-                              </button>
-                            </div>
-                          )}
-
-                          {tab === "remove" && (
-                            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              <button
-                                type="button"
-                                className={styles.expandBtn}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  void removeFromDiscovery(srv);
-                                }}
-                                disabled={srv.communityDiscoveryStatus !== "approved"}
-                                title={
-                                  srv.communityDiscoveryStatus !== "approved"
-                                    ? "Only approved servers can be removed"
-                                    : "Remove from Discovery"
-                                }
-                                style={{ color: "#b42318", borderColor: "rgba(180,35,24,0.25)" }}
-                              >
-                                {approvalLoadingId === srv.id ? "Processing..." : "Remove"}
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                      {expandedId === srv.id && (
-                        <tr>
-                          <td colSpan={8}>
-                            <div className={styles.channelDetail}>
-                              {srv.uncategorizedChannels.length > 0 && (
-                                <div className={styles.channelCategory}>
-                                  <div className={styles.channelCategoryTitle}>
-                                    Uncategorized
-                                  </div>
-                                  <ul className={styles.channelList}>
-                                    {srv.uncategorizedChannels.map((ch) => (
-                                      <li
-                                        key={ch.id}
-                                        className={styles.channelItem}
-                                      >
-                                        <span className={styles.channelIcon}>
-                                          {ch.type === "voice" ? "🔊" : "#"}
-                                        </span>
-                                        {ch.name}
-                                      </li>
-                                    ))}
-                                  </ul>
+            {loading ? (
+              <div className={styles.emptyState}><div className={styles.loader} /><p>Loading servers…</p></div>
+            ) : servers.length === 0 ? (
+              <div className={styles.emptyState}>
+                <p>{tab === "review" ? "No servers pending review." : "No approved servers available for removal."}</p>
+              </div>
+            ) : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Server</th>
+                      <th>Members · Channels</th>
+                      <th>Safety</th>
+                      <th>Activity</th>
+                      <th>Activated</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {servers.map((srv) => (
+                      <React.Fragment key={srv.id}>
+                        <tr className={expandedId === srv.id ? styles.rowExpanded : ""}>
+                          {/* Server */}
+                          <td>
+                            <div className={styles.serverCell}>
+                              {srv.avatarUrl ? (
+                                <img className={styles.serverAvatar} src={srv.avatarUrl} alt="" />
+                              ) : (
+                                <div className={styles.serverAvatarPlaceholder}>
+                                  {srv.name.charAt(0).toUpperCase()}
                                 </div>
                               )}
-                              {srv.channelsByCategory.map((cat) => (
-                                <div
-                                  key={cat.categoryId}
-                                  className={styles.channelCategory}
-                                >
-                                  <div className={styles.channelCategoryTitle}>
-                                    {cat.categoryName} ({cat.channels.length})
-                                  </div>
-                                  <ul className={styles.channelList}>
-                                    {cat.channels.map((ch) => (
-                                      <li
-                                        key={ch.id}
-                                        className={styles.channelItem}
-                                      >
-                                        <span className={styles.channelIcon}>
-                                          {ch.type === "voice" ? "🔊" : "#"}
-                                        </span>
-                                        {ch.name}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              ))}
-                              {srv.channelsByCategory.length === 0 &&
-                                srv.uncategorizedChannels.length === 0 && (
-                                  <p className={styles.sub}>
-                                    No channels.
-                                  </p>
-                                )}
+                              <div>
+                                <p className={styles.serverName}>{srv.name}</p>
+                                <p className={styles.serverMeta}>
+                                  Owner: {srv.owner.displayName || srv.owner.username || "N/A"}
+                                </p>
+                                <p className={styles.serverMeta}>Mode: {srv.accessMode}</p>
+                                <p className={`${styles.serverMeta} ${styles.serverId}`}>{srv.id}</p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Members · Channels */}
+                          <td>
+                            <div className={styles.statsCell}>
+                              <span className={styles.statNum}>{srv.memberCount}</span>
+                              <span className={styles.statHint}>members</span>
+                              <span className={styles.statDivider}>·</span>
+                              <span className={styles.statNum}>{srv.totalChannels}</span>
+                              <span className={styles.statHint}>channels</span>
+                              <button type="button" className={styles.detailsToggle}
+                                onClick={() => setExpandedId(expandedId === srv.id ? null : srv.id)}>
+                                {expandedId === srv.id ? "Hide" : "Details"}
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* Safety (safety + automod merged) */}
+                          <td>
+                            <div className={styles.safetyCell}>
+                              {srv.safety.hasSafetyFullyConfigured ? (
+                                <span className={styles.badgeOk}>Complete</span>
+                              ) : (
+                                <span className={styles.badgeWarn}>Incomplete</span>
+                              )}
+                              {srv.safety.hasAutoMod ? (
+                                <span className={styles.badgeOk}>AutoMod</span>
+                              ) : (
+                                <span className={styles.badgeDanger}>No AutoMod</span>
+                              )}
+                              <span className={styles.serverMeta}>Verify: {srv.safety.verificationLevel}</span>
+                              {srv.safety.bannedWordsCount > 0 ? (
+                                <span className={styles.serverMeta}>{srv.safety.bannedWordsCount} banned words</span>
+                              ) : null}
+                            </div>
+                          </td>
+
+                          {/* Activity */}
+                          <td>
+                            {srv.hasAbnormalActivity ? (
+                              <span className={styles.badgeDanger}>Abnormal</span>
+                            ) : (
+                              <span className={styles.badgeOk}>Normal</span>
+                            )}
+                          </td>
+
+                          {/* Activated */}
+                          <td>
+                            <span className={styles.serverMeta}>{fmtDate(srv.communityActivatedAt)}</span>
+                          </td>
+
+                          {/* Actions */}
+                          <td>
+                            <div className={styles.actionGroup}>
+                              {tab === "review" ? (
+                                <>
+                                  <button type="button" className={styles.btnView} onClick={() => setJoinConfirm(srv)}>
+                                    View
+                                  </button>
+                                  <button type="button" className={styles.btnApprove}
+                                    disabled={approvalLoadingId === srv.id || srv.communityDiscoveryStatus === "approved"}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); void updateApproval(srv, "approved"); }}>
+                                    {approvalLoadingId === srv.id ? "…" : "Approve"}
+                                  </button>
+                                  <button type="button" className={styles.btnReject}
+                                    disabled={approvalLoadingId === srv.id || srv.communityDiscoveryStatus === "rejected"}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); void updateApproval(srv, "rejected"); }}>
+                                    {approvalLoadingId === srv.id ? "…" : "Reject"}
+                                  </button>
+                                </>
+                              ) : (
+                                <button type="button" className={styles.btnReject}
+                                  disabled={approvalLoadingId === srv.id || srv.communityDiscoveryStatus !== "approved"}
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); void removeFromDiscovery(srv); }}>
+                                  {approvalLoadingId === srv.id ? "…" : "Remove"}
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
 
-        {tab === "history" && (
-          <div className={styles.panel}>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <input
-                value={historySearch}
+                        {/* Expanded channel detail */}
+                        {expandedId === srv.id ? (
+                          <tr>
+                            <td colSpan={6} className={styles.expandedCell}>
+                              <div className={styles.channelDetail}>
+                                {srv.uncategorizedChannels.length > 0 ? (
+                                  <div className={styles.channelGroup}>
+                                    <div className={styles.channelGroupTitle}>Uncategorized</div>
+                                    <ul className={styles.channelList}>
+                                      {srv.uncategorizedChannels.map((ch) => (
+                                        <li key={ch.id} className={styles.channelItem}>
+                                          <span className={styles.channelIcon}>{ch.type === "voice" ? "♪" : "#"}</span>
+                                          {ch.name}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                ) : null}
+                                {srv.channelsByCategory.map((cat) => (
+                                  <div key={cat.categoryId} className={styles.channelGroup}>
+                                    <div className={styles.channelGroupTitle}>{cat.categoryName} ({cat.channels.length})</div>
+                                    <ul className={styles.channelList}>
+                                      {cat.channels.map((ch) => (
+                                        <li key={ch.id} className={styles.channelItem}>
+                                          <span className={styles.channelIcon}>{ch.type === "voice" ? "♪" : "#"}</span>
+                                          {ch.name}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                ))}
+                                {srv.channelsByCategory.length === 0 && srv.uncategorizedChannels.length === 0 ? (
+                                  <p className={styles.serverMeta}>No channels available.</p>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {/* ── History panel ── */}
+        {tab === "history" ? (
+          <section className={styles.panel}>
+            <div className={styles.controlsRow}>
+              <input className={styles.searchInput} value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="Search by server name or ID..."
-                style={{
-                  flex: "1 1 260px",
-                  minWidth: 220,
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  fontSize: 13,
-                }}
+                placeholder="Search by server name or ID…"
+                onKeyDown={(e) => { if (e.key === "Enter") void loadHistory(); }}
               />
-              <select
-                value={historyActionFilter}
-                onChange={(e) =>
-                  setHistoryActionFilter(
-                    e.target.value as typeof historyActionFilter
-                  )
-                }
-                style={{
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  fontSize: 13,
-                }}
-                title="History filter"
-              >
-                <option value="all">All</option>
+              <select className={styles.nativeSelect} value={historyActionFilter}
+                onChange={(e) => setHistoryActionFilter(e.target.value as typeof historyActionFilter)}
+                title="Filter by action">
+                <option value="all">All actions</option>
                 <option value="approve">Approve</option>
                 <option value="reject">Reject</option>
-                <option value="remove">Remove from Discovery</option>
+                <option value="remove">Remove</option>
                 <option value="restore">Restore</option>
               </select>
-              <select
-                value={historySort}
+              <select className={styles.nativeSelect} value={historySort}
                 onChange={(e) => setHistorySort(e.target.value as typeof historySort)}
-                style={{
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  fontSize: 13,
-                }}
-                title="Sort by time"
-              >
+                title="Sort">
                 <option value="action_desc">Action: Newest</option>
                 <option value="action_asc">Action: Oldest</option>
                 <option value="activated_desc">Activated: Newest</option>
                 <option value="activated_asc">Activated: Oldest</option>
               </select>
-              <button
-                type="button"
-                className={styles.expandBtn}
-                onClick={() => void loadHistory()}
-              >
+              <button type="button" className={styles.searchBtn} onClick={() => void loadHistory()}>
                 Search
               </button>
             </div>
 
             {historyLoading ? (
-              <div className={styles.emptyState}>Loading history...</div>
+              <div className={styles.emptyState}><div className={styles.loader} /><p>Loading history…</p></div>
             ) : historyError ? (
-              <div className={styles.emptyState}>{historyError}</div>
+              <div className={styles.errorBanner}>{historyError}</div>
             ) : historyItems.length === 0 ? (
-              <div className={styles.emptyState}>No history yet.</div>
+              <div className={styles.emptyState}><p>No history yet.</p></div>
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -791,229 +552,145 @@ export default function CommunityDiscoveryPage() {
                   </thead>
                   <tbody>
                     {historyItems
-                      .filter((it: HistoryItem) => {
+                      .filter((it) => {
                         if (historyActionFilter !== "all" && it.action !== historyActionFilter) return false;
-                        const name = String(it.serverSnapshot?.name || "").toLowerCase();
-                        const id = String(it.serverId || "").toLowerCase();
                         const q = historySearch.trim().toLowerCase();
                         if (!q) return true;
-                        return name.includes(q) || id.includes(q);
+                        return (
+                          String(it.serverSnapshot?.name ?? "").toLowerCase().includes(q) ||
+                          String(it.serverId ?? "").toLowerCase().includes(q)
+                        );
                       })
-                      .map((it: HistoryItem) => (
-                      <tr key={it._id}>
-                        <td>
-                          <p className={styles.main}>{it.serverSnapshot?.name || it.serverId}</p>
-                          <p className={styles.sub}>Server ID: {it.serverId}</p>
-                        </td>
-                        <td>
-                          {it.serverDeleted ? (
-                            <div style={{ display: "grid", gap: 6 }}>
-                              <span className={styles.badgeDanger}>
-                                Server deleted
+                      .map((it) => (
+                        <tr key={it._id}>
+                          <td>
+                            <p className={styles.serverName}>{it.serverSnapshot?.name || it.serverId}</p>
+                            <p className={styles.serverId}>{it.serverId}</p>
+                          </td>
+                          <td>
+                            {it.serverDeleted ? (
+                              <div className={styles.deletedCell}>
+                                <span className={styles.badgeDanger}>Server deleted</span>
+                                <span className={styles.serverMeta}>By: {it.deletedBy?.email || it.deletedBy?.id || "--"}</span>
+                                <button type="button" className={styles.btnApprove}
+                                  disabled={approvalLoadingId === String(it.serverId) || it.canRestoreServer === false}
+                                  title={it.canRestoreServer === false ? "Server was hard-deleted and cannot be restored." : undefined}
+                                  onClick={async () => {
+                                    const token = localStorage.getItem("adminAccessToken") || "";
+                                    if (!token) return;
+                                    try {
+                                      setApprovalLoadingId(String(it.serverId));
+                                      const res = await fetch(
+                                        `${getApiBaseUrl()}/admin/community-discovery/${encodeURIComponent(String(it.serverId))}/restore-server`,
+                                        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+                                      );
+                                      if (!res.ok) { const text = await res.text().catch(() => ""); throw new Error(text || `HTTP ${res.status}`); }
+                                      showToast("success", "Server restored.");
+                                      await loadHistory();
+                                    } catch (e) {
+                                      showToast("error", (e as { message?: string })?.message ?? "Could not restore.");
+                                    } finally { setApprovalLoadingId((c) => (c === String(it.serverId) ? null : c)); }
+                                  }}>
+                                  {approvalLoadingId === String(it.serverId) ? "…" : "Restore server"}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className={
+                                it.action === "approve" ? styles.badgeOk :
+                                it.action === "reject"  ? styles.badgeDanger :
+                                it.action === "remove"  ? styles.badgeWarn :
+                                styles.badgeIndigo
+                              }>
+                                {ACTION_BADGE[it.action]}
                               </span>
-                              <span className={styles.sub}>
-                                Deleted by: {it.deletedBy?.email || it.deletedBy?.id || "--"}
-                              </span>
-                              <button
-                                type="button"
-                                className={styles.expandBtn}
-                                onClick={async () => {
-                                  const token = localStorage.getItem("adminAccessToken") || "";
-                                  if (!token) return;
-                                  try {
-                                    setApprovalLoadingId(String(it.serverId));
-                                    const res = await fetch(
-                                      `${getApiBaseUrl()}/admin/community-discovery/${encodeURIComponent(
-                                        String(it.serverId),
-                                      )}/restore-server`,
-                                      {
-                                        method: "POST",
-                                        headers: { Authorization: `Bearer ${token}` },
-                                      },
-                                    );
-                                    if (!res.ok) {
-                                      const text = await res.text().catch(() => "");
-                                      throw new Error(text || `HTTP ${res.status}`);
-                                    }
-                                    setToast({ type: "success", message: "Server restored." });
-                                    await loadHistory();
-                                  } catch (e) {
-                                    const err = e as { message?: string } | null;
-                                    setToast({ type: "error", message: err?.message || "Could not restore." });
-                                  } finally {
-                                    setApprovalLoadingId((cur) =>
-                                      cur === String(it.serverId) ? null : cur,
-                                    );
-                                  }
-                                }}
-                                disabled={approvalLoadingId === String(it.serverId) || it.canRestoreServer === false}
-                                title={
-                                  it.canRestoreServer === false
-                                    ? "Server was hard-deleted and cannot be restored."
-                                    : undefined
-                                }
-                              >
-                                {approvalLoadingId === String(it.serverId) ? "Processing..." : "Restore server"}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className={styles.badgeOk} style={{ background: "rgba(99,102,241,0.12)", color: "#3730a3" }}>
-                              {it.action === "approve"
-                                ? "Approve"
-                                : it.action === "reject"
-                                  ? "Reject"
-                                  : it.action === "remove"
-                                    ? "Remove from Discovery"
-                                    : "Restore"}
-                            </span>
-                          )}
-                        </td>
-                        <td className={styles.sub}>{formatDate(it.createdAt)}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className={styles.expandBtn}
-                            onClick={() => {
-                              setHistoryDetail({
-                                serverId: String(it.serverId),
-                                serverName: it.serverSnapshot?.name || "Server",
-                              });
-                              void loadHistory({ serverId: String(it.serverId) });
-                            }}
-                          >
-                            View details
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                            )}
+                          </td>
+                          <td><span className={styles.serverMeta}>{fmtDate(it.createdAt)}</span></td>
+                          <td>
+                            <button type="button" className={styles.detailsToggle}
+                              onClick={() => {
+                                setHistoryDetail({ serverId: String(it.serverId), serverName: it.serverSnapshot?.name || "Server" });
+                                void loadHistory({ serverId: String(it.serverId) });
+                              }}>
+                              View details
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
             )}
-          </div>
-        )}
+          </section>
+        ) : null}
 
-        {historyDetail && (
-          <div
-            className={styles.modalOverlay}
-            onClick={() => {
-              setHistoryDetail(null);
-              void loadHistory(); // back to global history
-            }}
-          >
+        {/* ── History detail modal ── */}
+        {historyDetail ? (
+          <div className={styles.modalOverlay} onClick={() => { setHistoryDetail(null); void loadHistory(); }}>
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
               <h2 className={styles.modalTitle}>History — {historyDetail.serverName}</h2>
-              <p className={styles.modalDesc}>
-                Displays events: approve, reject, remove from Discovery, and restore.
-              </p>
-
-              <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-                <div className={styles.sub}>
-                  <b>Server ID:</b> {historyDetail.serverId}
-                </div>
-                <div className={styles.sub}>
-                  <b>Members:</b> {historyItems?.[0]?.serverSnapshot?.memberCount ?? "--"}
-                </div>
-                <div className={styles.sub}>
-                  <b>Mode:</b> {historyItems?.[0]?.serverSnapshot?.accessMode ?? "--"}
-                </div>
-                <div className={styles.sub}>
-                  <b>Community activated:</b>{" "}
-                  {formatDate(historyItems?.[0]?.serverSnapshot?.communityActivatedAt ?? null)}
-                </div>
+              <p className={styles.modalDesc}>Events: approve, reject, remove, and restore.</p>
+              <div className={styles.modalMeta}>
+                <span><b>Server ID:</b> {historyDetail.serverId}</span>
+                <span><b>Members:</b> {historyItems?.[0]?.serverSnapshot?.memberCount ?? "--"}</span>
+                <span><b>Mode:</b> {historyItems?.[0]?.serverSnapshot?.accessMode ?? "--"}</span>
+                <span><b>Community activated:</b> {fmtDate(historyItems?.[0]?.serverSnapshot?.communityActivatedAt ?? null)}</span>
               </div>
-              <div style={{ maxHeight: 360, overflow: "auto", border: "1px solid var(--color-border)", borderRadius: 10 }}>
-                <table className={styles.table} style={{ minWidth: 0 }}>
+              <div className={styles.tableWrap} style={{ maxHeight: 320 }}>
+                <table className={styles.table}>
                   <thead>
-                    <tr>
-                      <th>Action</th>
-                      <th>Time</th>
-                      <th>Note</th>
-                    </tr>
+                    <tr><th>Action</th><th>Time</th><th>Note</th></tr>
                   </thead>
                   <tbody>
-                    {historyItems.map((it: HistoryItem) => (
+                    {historyItems.map((it) => (
                       <tr key={it._id}>
-                        <td className={styles.main}>
-                          {it.action === "approve"
-                            ? "Approve"
-                            : it.action === "reject"
-                              ? "Reject"
-                              : it.action === "remove"
-                                ? "Remove from Discovery"
-                                : "Restore"}
-                        </td>
-                        <td className={styles.sub}>{formatDate(it.createdAt)}</td>
-                        <td className={styles.sub}>{it.note || "--"}</td>
+                        <td className={styles.serverName}>{ACTION_BADGE[it.action]}</td>
+                        <td><span className={styles.serverMeta}>{fmtDate(it.createdAt)}</span></td>
+                        <td><span className={styles.serverMeta}>{it.note || "--"}</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              {/* Restore button only if latest snapshot indicates removed */}
-              {historyItems[0]?.action === "remove" && (
-                <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                  <button
-                    type="button"
-                    className={styles.joinBtn}
-                    onClick={() => void restoreDiscovery(historyDetail.serverId)}
+              {historyItems[0]?.action === "remove" ? (
+                <div className={styles.modalRestoreRow}>
+                  <button type="button" className={styles.btnView}
                     disabled={approvalLoadingId === historyDetail.serverId}
-                  >
-                    {approvalLoadingId === historyDetail.serverId ? "Processing..." : "Restore Discovery"}
+                    onClick={() => void restoreDiscovery(historyDetail.serverId)}>
+                    {approvalLoadingId === historyDetail.serverId ? "Processing…" : "Restore Discovery"}
                   </button>
                 </div>
-              )}
-
+              ) : null}
               <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.modalCancel}
-                  onClick={() => {
-                    setHistoryDetail(null);
-                    void loadHistory();
-                  }}
-                >
+                <button type="button" className={styles.modalCancel}
+                  onClick={() => { setHistoryDetail(null); void loadHistory(); }}>
                   Close
                 </button>
               </div>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {joinConfirm && (
-        <div
-          className={styles.modalOverlay}
-          onClick={() => setJoinConfirm(null)}
-        >
+      {/* ── Join confirm modal ── */}
+      {joinConfirm ? (
+        <div className={styles.modalOverlay} onClick={() => setJoinConfirm(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>View server</h2>
             <p className={styles.modalDesc}>
-              You will open the internal viewer for &ldquo;{joinConfirm.name}&rdquo;
-              (same admin portal, authenticated) in <strong>read-only</strong>
-              mode: channel list and messages only, no chat or reactions. This
-              does not open the user web app.
+              You will open the internal viewer for &ldquo;{joinConfirm.name}&rdquo; in{" "}
+              <strong>read-only</strong> mode — channel list and messages only, no chat or reactions.
             </p>
             <div className={styles.modalActions}>
-              <button
-                type="button"
-                className={styles.modalCancel}
-                onClick={() => setJoinConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={styles.modalConfirm}
-                onClick={handleJoinConfirm}
-              >
+              <button type="button" className={styles.modalCancel} onClick={() => setJoinConfirm(null)}>Cancel</button>
+              <button type="button" className={styles.modalConfirm}
+                onClick={() => { router.push(`/community-discovery/server-view/${joinConfirm.id}`); setJoinConfirm(null); }}>
                 Open view
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

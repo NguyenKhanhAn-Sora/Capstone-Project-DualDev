@@ -1,161 +1,268 @@
+/* ======================================================
+   Admin Shell - Galaxy / Deep Space
+   Accent:  electric cyan  #22d3ee
+   Nebula:  violet #7c3aed + indigo #6366f1 + sky #0ea5e9
+   Base:    deep space     #020817
+   ====================================================== */
+
+/* ---- Full shell layout ---- */
 .shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   background:
-    radial-gradient(circle at 10% -10%, rgba(74, 163, 228, 0.14), transparent 38%),
-    radial-gradient(circle at 95% 0%, rgba(34, 211, 238, 0.12), transparent 32%),
-    var(--color-bg);
+    radial-gradient(ellipse at 0% 0%,   rgba(124, 58, 237, 0.18) 0%, transparent 45%),
+    radial-gradient(ellipse at 100% 100%, rgba(14, 165, 233, 0.14) 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 30%,  rgba(99, 102, 241, 0.1)  0%, transparent 50%),
+    #020817;
 }
 
+/* Star field behind content area */
+.shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.75) 1px, transparent 1px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.45) 1px, transparent 1px),
+    radial-gradient(circle, rgba(180, 210, 255, 0.38) 1px, transparent 1px);
+  background-size: 360px 360px, 220px 220px, 148px 148px;
+  background-position: 0 0, 118px 70px, 62px 138px;
+  opacity: 0.4;
+}
+
+/* ================================================
+   SIDEBAR
+   ================================================ */
 .sidebar {
   position: sticky;
   top: 0;
-  height: 100vh;
-  padding: 28px 18px 20px;
-  border-right: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-surface) 92%, #cde6fb 8%);
-  box-shadow: 12px 0 28px rgba(13, 34, 68, 0.08);
+  height: 100dvh;
+  padding: 22px 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   overflow: hidden;
   z-index: 20;
+
+  /* Galaxy glass sidebar */
+  background:
+    radial-gradient(ellipse at 20% 5%,  rgba(124, 58, 237, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 90%, rgba(14, 165, 233, 0.2)  0%, transparent 50%),
+    rgba(4, 6, 20, 0.92);
+  border-right: 1px solid rgba(124, 58, 237, 0.2);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    inset -1px 0 0 rgba(34, 211, 238, 0.06),
+    12px 0 48px rgba(2, 8, 23, 0.5);
 }
 
+/* Animated nebula orb inside sidebar */
+.sidebar::before {
+  content: "";
+  position: absolute;
+  top: -80px;
+  left: -60px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.18), transparent 68%);
+  pointer-events: none;
+  animation: sidebarNebula 10s ease-in-out infinite;
+}
+
+@keyframes sidebarNebula {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.15); }
+}
+
+/* ---- Brand row ---- */
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 10px 14px;
-  border-bottom: 1px dashed var(--color-border);
+  gap: 11px;
+  padding: 8px 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  z-index: 1;
 }
 
 .brandMark {
   width: 36px;
   height: 36px;
-  border-radius: 12px;
+  border-radius: 11px;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 16px;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #3879ad 0%, #4aa3e4 72%, #3dc5df 100%);
-  box-shadow: 0 10px 20px rgba(50, 113, 164, 0.3);
+  background: linear-gradient(135deg, #7c3aed 0%, #0ea5e9 80%, #22d3ee 100%);
+  box-shadow:
+    0 0 16px rgba(34, 211, 238, 0.3),
+    0 8px 20px rgba(124, 58, 237, 0.35);
 }
 
 .brandTitle {
   margin: 0;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
-  color: var(--color-text);
+  color: #e2e8f0;
+  letter-spacing: 0.01em;
 }
 
 .brandSubtitle {
   margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--color-text-muted);
+  font-size: 11px;
+  color: rgba(100, 116, 139, 0.8);
 }
 
+/* ---- Nav list ---- */
 .nav {
   display: grid;
-  gap: 10px;
+  gap: 4px;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 2px;
+  padding-bottom: 4px;
+  position: relative;
+  z-index: 1;
+
+  /* Subtle scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 58, 237, 0.3) transparent;
 }
 
+.nav::-webkit-scrollbar { width: 4px; }
+.nav::-webkit-scrollbar-track { background: transparent; }
+.nav::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.3);
+  border-radius: 4px;
+}
+
+/* ---- Nav item ---- */
 .navItem {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 12px;
-  border-radius: 14px;
+  padding: 9px 11px;
+  border-radius: 12px;
   border: 1px solid transparent;
   background: transparent;
   text-decoration: none;
   transition:
-    transform 0.18s ease,
+    background 0.18s ease,
     border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    background 0.18s ease;
-}
-
-.navIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
-  color: color-mix(in srgb, var(--color-primary-strong) 75%, var(--color-text));
-  flex: 0 0 32px;
-}
-
-.navIcon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.navText {
-  min-width: 0;
-  display: block;
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .navItem:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border));
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  transform: translateX(2px);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Active nav item */
 .navItemActive {
-  border-color: color-mix(in srgb, var(--color-primary) 52%, var(--color-border));
   background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)) 0%,
-    color-mix(in srgb, var(--color-primary-accent) 14%, var(--color-surface)) 100%
+    120deg,
+    rgba(34, 211, 238, 0.1) 0%,
+    rgba(99, 102, 241, 0.1) 100%
   );
-  box-shadow: 0 10px 22px rgba(51, 113, 164, 0.16);
+  border-color: rgba(34, 211, 238, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 211, 238, 0.06),
+    0 8px 24px rgba(34, 211, 238, 0.08);
+}
+
+.navItemActive:hover {
+  transform: none;
+}
+
+/* ---- Nav icon container ---- */
+.navIcon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(148, 163, 184, 0.75);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.navIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.navItem:hover .navIcon {
+  background: rgba(34, 211, 238, 0.08);
+  color: #7dd3fc;
 }
 
 .navItemActive .navIcon {
-  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
-  color: var(--color-primary-strong);
+  background: rgba(34, 211, 238, 0.12);
+  color: #22d3ee;
+}
+
+/* ---- Nav label ---- */
+.navText {
+  min-width: 0;
 }
 
 .navLabel {
   display: block;
-  margin: 0;
-  color: var(--color-text);
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.18s ease;
+}
+
+.navItem:hover .navLabel {
+  color: #e2e8f0;
+}
+
+.navItemActive .navLabel {
+  color: #e2e8f0;
   font-weight: 700;
 }
 
+/* ---- Footer: sign out ---- */
 .footer {
   margin-top: auto;
-  padding: 12px 10px 8px;
-  border-top: 1px dashed var(--color-border);
+  padding: 14px 8px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  z-index: 1;
 }
 
 .footerMeta {
   margin: 0 0 10px;
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: rgba(100, 116, 139, 0.7);
 }
 
 .signOutButton {
   width: 100%;
-  height: 44px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, #dc2626 38%, var(--color-border));
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, #ef4444 18%, var(--color-surface)) 0%,
-    color-mix(in srgb, #b91c1c 18%, var(--color-surface)) 100%
-  );
-  color: color-mix(in srgb, #7f1d1d 72%, var(--color-text));
+  height: 42px;
+  border-radius: 11px;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -164,50 +271,49 @@
   justify-content: center;
   gap: 8px;
   transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
     background 0.18s ease,
-    color 0.18s ease;
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .signOutButton:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, #dc2626 64%, var(--color-border));
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, #ef4444 25%, var(--color-surface)) 0%,
-    color-mix(in srgb, #b91c1c 25%, var(--color-surface)) 100%
-  );
-  box-shadow: 0 10px 20px rgba(127, 29, 29, 0.18);
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.38);
+  box-shadow: 0 8px 22px rgba(239, 68, 68, 0.15);
 }
 
 .signOutButton:focus-visible {
   outline: none;
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, #fff 72%, transparent),
-    0 0 0 4px rgba(220, 38, 38, 0.45);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
 }
 
 .signOutIcon {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(239, 68, 68, 0.15);
 }
 
 .signOutIcon svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
+/* ---- Main content area ---- */
 .content {
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
+/* ================================================
+   SIGN OUT DIALOG
+   ================================================ */
 .signOutOverlay {
   position: fixed;
   inset: 0;
@@ -215,35 +321,42 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(9, 16, 32, 0.48);
-  backdrop-filter: blur(2px);
+  background: rgba(2, 8, 23, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .signOutDialog {
   width: min(420px, 100%);
-  border-radius: 18px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
-  padding: 20px;
+  border-radius: 20px;
+  background: rgba(7, 10, 28, 0.92);
+  border: 1px solid rgba(34, 211, 238, 0.14);
+  border-top-color: rgba(34, 211, 238, 0.3);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 32px 80px rgba(2, 8, 23, 0.7);
+  padding: 24px;
 }
 
 .signOutDialogTitle {
   margin: 0;
-  font-size: 21px;
+  font-size: 20px;
+  font-weight: 800;
   line-height: 1.2;
-  color: var(--color-text);
+  color: #f1f5f9;
 }
 
 .signOutDialogText {
   margin: 10px 0 0;
-  color: var(--color-text-muted);
+  color: rgba(148, 163, 184, 0.8);
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .signOutDialogActions {
-  margin-top: 16px;
+  margin-top: 20px;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -253,47 +366,52 @@
 .signOutConfirmButton {
   height: 40px;
   border-radius: 11px;
-  padding: 0 14px;
+  padding: 0 16px;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
-    border-color 0.18s ease;
+    background 0.18s ease;
 }
 
 .signOutCancelButton {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
 }
 
 .signOutCancelButton:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--color-primary) 44%, var(--color-border));
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .signOutConfirmButton {
-  border: 1px solid color-mix(in srgb, #dc2626 55%, var(--color-border));
-  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: linear-gradient(120deg, #ef4444 0%, #b91c1c 100%);
   color: #fff;
-  box-shadow: 0 10px 20px rgba(185, 28, 28, 0.25);
+  box-shadow: 0 8px 20px rgba(185, 28, 28, 0.3);
 }
 
 .signOutConfirmButton:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 24px rgba(185, 28, 28, 0.32);
+  box-shadow: 0 12px 26px rgba(185, 28, 28, 0.4);
+  filter: brightness(1.08);
 }
 
 .signOutCancelButton:disabled,
 .signOutConfirmButton:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
+/* ================================================
+   RESPONSIVE
+   ================================================ */
 @media (max-width: 1024px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
@@ -304,25 +422,36 @@
     top: 0;
     height: auto;
     border-right: none;
-    border-bottom: 1px solid var(--color-border);
-    box-shadow: 0 10px 24px rgba(16, 38, 72, 0.08);
-    gap: 12px;
+    border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+    box-shadow: 0 10px 40px rgba(2, 8, 23, 0.5);
+    gap: 10px;
+  }
+
+  .sidebar::before {
+    display: none;
   }
 
   .nav {
     display: flex;
     flex: none;
     min-height: auto;
-    gap: 8px;
+    gap: 6px;
     overflow-y: visible;
     overflow-x: auto;
     padding-bottom: 2px;
     padding-right: 0;
+    scrollbar-width: none;
   }
 
+  .nav::-webkit-scrollbar { display: none; }
+
   .navItem {
-    min-width: 180px;
+    min-width: 170px;
     flex: 0 0 auto;
+  }
+
+  .navItem:hover {
+    transform: none;
   }
 
   .footer {
@@ -339,40 +468,42 @@
 
   .signOutButton {
     width: auto;
-    padding: 0 12px;
+    padding: 0 14px;
   }
 }
 
 @media (max-width: 720px) {
   .sidebar {
-    padding: 14px 12px 12px;
+    padding: 12px 10px 10px;
   }
 
   .brand {
-    padding: 6px 4px 10px;
-  }
-
-  .brandSubtitle,
-  .footerMeta {
-    font-size: 11px;
+    padding: 4px 4px 10px;
   }
 
   .navItem {
-    min-width: 162px;
-    padding: 9px 10px;
+    min-width: 150px;
+    padding: 8px 9px;
   }
 
   .navLabel {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .signOutDialog {
     border-radius: 16px;
-    padding: 16px;
+    padding: 18px;
   }
 
   .signOutDialogActions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar::before {
+    animation: none;
   }
 }
