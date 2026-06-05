@@ -2461,3 +2461,7 @@
     grid-template-columns: repeat(3, 1fr) !important;
   }
 }
+
+:global([data-appearance="galaxy"]) .page {
+  background: transparent;
+}

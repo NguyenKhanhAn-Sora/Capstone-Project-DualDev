@@ -7,6 +7,9 @@ import GlobalDmIncomingCalls from "@/components/GlobalDmIncomingCalls";
 import { PostUploadProvider } from "@/context/post-upload-context";
 import { GuestAuthProvider } from "@/context/guest-auth-context";
 import { NavigationGuardProvider } from "@/context/navigation-guard-context";
+import { useEffect, useState } from "react";
+import { useTheme } from "@/component/theme-provider";
+import GalaxyBackground from "@/component/galaxy-background";
 
 export default function MainLayout({
   children,
@@ -16,12 +19,17 @@ export default function MainLayout({
   modal: React.ReactNode;
 }>) {
   const pathname = usePathname();
+  const { appearancePreset } = useTheme();
   const isMessagesPage = pathname?.startsWith("/messages");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isGalaxy = mounted && appearancePreset === "galaxy";
 
   return (
     <NavigationGuardProvider>
     <PostUploadProvider>
       <GuestAuthProvider>
+        {isGalaxy && <GalaxyBackground />}
         <GlobalDmIncomingCalls />
         {isMessagesPage ? (
           <>

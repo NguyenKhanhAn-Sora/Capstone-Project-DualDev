@@ -1849,7 +1849,7 @@ export type UserSettingsResponse = {
   theme: "light" | "dark";
   language?: "vi" | "en" | "ja" | "zh";
   appearanceBackground?: string | null;
-  appearancePreset?: "default" | "graphite" | "charcoal" | "indigo";
+  appearancePreset?: "default" | "graphite" | "charcoal" | "indigo" | "galaxy";
   appearanceSync?: boolean;
   dmListFrom?: "everyone" | "followers_only";
   dmCallFrom?: "everyone" | "followers_only";
@@ -2131,7 +2131,7 @@ export async function updateUserSettings(opts: {
   theme?: "light" | "dark";
   language?: "vi" | "en" | "ja" | "zh";
   appearanceBackground?: string | null;
-  appearancePreset?: "default" | "graphite" | "charcoal" | "indigo";
+  appearancePreset?: "default" | "graphite" | "charcoal" | "indigo" | "galaxy";
   appearanceSync?: boolean;
   dmListFrom?: "everyone" | "followers_only";
   dmCallFrom?: "everyone" | "followers_only";

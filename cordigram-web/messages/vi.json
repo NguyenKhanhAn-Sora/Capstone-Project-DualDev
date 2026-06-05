@@ -53,6 +53,8 @@
       "language": "Ngôn ngữ",
       "switchToLight": "Chuyển sang sáng",
       "switchToDark": "Chuyển sang tối",
+      "switchToGalaxy": "Chế độ Galaxy",
+      "exitGalaxy": "Thoát Galaxy Mode",
       "reportProblem": "Báo lỗi",
       "switchAccount": "Chuyển tài khoản",
       "logout": "Đăng xuất"

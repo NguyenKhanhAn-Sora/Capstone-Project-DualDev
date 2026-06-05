@@ -53,6 +53,8 @@
       "language": "Language",
       "switchToLight": "Switch to light",
       "switchToDark": "Switch to dark",
+      "switchToGalaxy": "Galaxy Mode",
+      "exitGalaxy": "Exit Galaxy Mode",
       "reportProblem": "Report a problem",
       "switchAccount": "Switch account",
       "logout": "Log out"

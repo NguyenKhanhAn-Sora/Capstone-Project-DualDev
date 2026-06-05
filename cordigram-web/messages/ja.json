@@ -107,6 +107,8 @@
       "language": "言語",
       "switchToLight": "ライトに切り替える",
       "switchToDark": "ダークモードに切り替える",
+      "switchToGalaxy": "ギャラクシーモード",
+      "exitGalaxy": "ギャラクシーモードを終了",
       "reportProblem": "問題を報告する",
       "switchAccount": "アカウントを切り替える",
       "logout": "ログアウト"

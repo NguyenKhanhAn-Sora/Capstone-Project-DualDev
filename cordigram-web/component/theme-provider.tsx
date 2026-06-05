@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { fetchUserSettings, updateUserSettings } from "@/lib/api";
 
 export type ThemeMode = "light" | "dark";
-export type AppearancePreset = "default" | "graphite" | "charcoal" | "indigo";
+export type AppearancePreset = "default" | "graphite" | "charcoal" | "indigo" | "galaxy";
 export type AccentPayload = { accentColor: string };
 
 type ThemeContextValue = {
@@ -305,6 +305,16 @@ function applyTheme(mode: ThemeMode) {
 
 function applyAppearancePreset(value: AppearancePreset) {
   if (typeof document === "undefined") return;
+
+  if (value === "galaxy") {
+    // Galaxy mode: remove inline --user-appearance-bg so CSS rule takes over (transparent)
+    document.documentElement.style.removeProperty("--user-appearance-bg");
+    document.body.style.removeProperty("--user-appearance-bg");
+    document.documentElement.dataset.appearance = "galaxy";
+    document.body.dataset.appearance = "galaxy";
+    return;
+  }
+
   document.documentElement.style.setProperty(
     "--user-appearance-bg",
     "linear-gradient(transparent, transparent)",
@@ -403,7 +413,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const res = await fetchUserSettings({ token });
         if (!cancelled) {
           const sync = res.appearanceSync === true;
-          const nextPreset = res.appearancePreset ?? "default";
+          // localStorage is source of truth for appearancePreset —
+          // server may not persist all presets (e.g. "galaxy"), so we
+          // never let the server response override a locally saved value.
+          const localPreset =
+            typeof window !== "undefined"
+              ? (localStorage.getItem(APPEARANCE_PRESET_KEY) as AppearancePreset | null)
+              : null;
+          const nextPreset: AppearancePreset =
+            localPreset ?? (res.appearancePreset as AppearancePreset | undefined) ?? "default";
           setAppearanceSyncState(sync);
           setAppearancePresetState(nextPreset);
           if (sync && typeof window !== "undefined") {

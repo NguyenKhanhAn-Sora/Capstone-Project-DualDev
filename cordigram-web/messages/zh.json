@@ -107,6 +107,8 @@
       "language": "语言",
       "switchToLight": "切换至亮色模式",
       "switchToDark": "切换为深色模式",
+      "switchToGalaxy": "银河模式",
+      "exitGalaxy": "退出银河模式",
       "reportProblem": "报告问题",
       "switchAccount": "切换账户",
       "logout": "退出"

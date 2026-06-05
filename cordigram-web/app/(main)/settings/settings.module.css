@@ -2914,3 +2914,7 @@
     margin-top: 0;
   }
 }
+
+:global([data-appearance="galaxy"]) .container {
+  background: transparent;
+}

@@ -2244,3 +2244,7 @@
   opacity: 0;
   pointer-events: none;
 }
+
+:global([data-appearance="galaxy"]) .screen {
+  background: transparent;
+}

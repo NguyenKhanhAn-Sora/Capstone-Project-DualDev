@@ -100,7 +100,7 @@ export default function Sidebar() {
   const notificationOpenRef = useRef(false);
   const socketRef = useRef<Socket | null>(null);
   const dmSocketRef = useRef<Socket | null>(null);
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, appearancePreset, setAppearancePreset } = useTheme();
   const { language, setLanguage } = useLanguage();
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement | null>(null);
@@ -708,18 +708,39 @@ export default function Sidebar() {
                     </div>
                   ) : null}
                 </div>
-                <MenuItem
-                  label={
-                    theme === "dark"
-                      ? t("menu.switchToLight")
-                      : t("menu.switchToDark")
-                  }
-                  icon={<IconTheme />}
-                  onClick={() => {
-                    toggleTheme();
-                    setMenuOpen(false);
-                  }}
-                />
+                {appearancePreset === "galaxy" ? (
+                  <MenuItem
+                    label={t("menu.exitGalaxy")}
+                    icon={<IconTheme />}
+                    onClick={() => {
+                      setAppearancePreset("default");
+                      setMenuOpen(false);
+                    }}
+                  />
+                ) : (
+                  <>
+                    <MenuItem
+                      label={
+                        theme === "dark"
+                          ? t("menu.switchToLight")
+                          : t("menu.switchToDark")
+                      }
+                      icon={<IconTheme />}
+                      onClick={() => {
+                        toggleTheme();
+                        setMenuOpen(false);
+                      }}
+                    />
+                    <MenuItem
+                      label={t("menu.switchToGalaxy")}
+                      icon={<IconGalaxy />}
+                      onClick={() => {
+                        setAppearancePreset("galaxy");
+                        setMenuOpen(false);
+                      }}
+                    />
+                  </>
+                )}
                 <MenuItem
                   label={t("menu.reportProblem")}
                   icon={<IconReport />}
@@ -1261,6 +1282,20 @@ function IconLanguage() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" />
       <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z" />
+    </svg>
+  );
+}
+
+function IconGalaxy() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
+      <ellipse cx="12" cy="12" rx="10" ry="4" />
+      <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)" />
+      <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)" />
+      <circle cx="5.5" cy="8" r="1" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="15.5" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="5" r="0.8" fill="currentColor" stroke="none" />
     </svg>
   );
 }
