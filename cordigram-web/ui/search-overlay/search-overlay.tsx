@@ -317,8 +317,8 @@ export default function SearchOverlay(props: {
             }),
           ]);
           setSuggestItems(s.items ?? []);
-          setPostItems(p.items ?? []);
-          setReelItems(r.items ?? []);
+          setPostItems((p.items ?? []).filter((item) => item.kind !== "ads"));
+          setReelItems((r.items ?? []).filter((item) => item.kind !== "ads"));
         } else if (tab === "people") {
           const res = await searchProfiles({
             token,
@@ -343,7 +343,7 @@ export default function SearchOverlay(props: {
             kinds: ["post"],
             signal: controller.signal,
           });
-          setPostItems(res.items ?? []);
+          setPostItems((res.items ?? []).filter((item) => item.kind !== "ads"));
         } else if (tab === "reels") {
           const res = await searchPosts({
             token,
@@ -353,7 +353,7 @@ export default function SearchOverlay(props: {
             kinds: ["reel"],
             signal: controller.signal,
           });
-          setReelItems(res.items ?? []);
+          setReelItems((res.items ?? []).filter((item) => item.kind !== "ads"));
         }
       } catch (err: any) {
         if (err?.name === "AbortError") return;

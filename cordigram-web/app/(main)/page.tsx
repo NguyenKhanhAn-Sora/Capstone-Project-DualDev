@@ -1716,6 +1716,7 @@ export default function HomePage({
               onLike={onLike}
               onSave={onSave}
               onShare={(id, anchor) =>
+                item.kind !== "ads" &&
                 onRepostIntent(
                   id,
                   item.authorUsername || item.author?.username || "this user",
@@ -1813,7 +1814,7 @@ export default function HomePage({
         note={reportNote}
         submitting={reportSubmitting}
         error={reportError}
-        onSelectCategory={(key) => { setReportCategory(key || null); setReportReason(null); }}
+        onSelectCategory={(key) => { setReportCategory((key || null) as ReportCategory["key"] | null); setReportReason(null); }}
         onSelectReason={(key) => setReportReason(key || null)}
         onNoteChange={setReportNote}
         onSubmit={submitReport}
@@ -3765,7 +3766,7 @@ function FeedCard({
       subtitle={t("visibility.description")}
       options={visibilityOptions}
       selected={visibilitySelected}
-      onChange={setVisibilitySelected}
+      onChange={(v) => setVisibilitySelected(v as "public" | "followers" | "private")}
       onSave={submitVisibilityUpdate}
       submitting={visibilitySaving}
       error={visibilityError}

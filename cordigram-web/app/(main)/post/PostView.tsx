@@ -5216,7 +5216,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       subtitle="Choose who can see this post."
       options={visibilityOptions}
       selected={visibilitySelected}
-      onChange={setVisibilitySelected}
+      onChange={(v) => setVisibilitySelected(v as "public" | "followers" | "private")}
       onSave={submitVisibilityUpdate}
       submitting={visibilitySaving}
       error={visibilityError}

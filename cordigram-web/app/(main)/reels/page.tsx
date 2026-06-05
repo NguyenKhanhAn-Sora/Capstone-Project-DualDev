@@ -4257,7 +4257,7 @@ export default function ReelPage({
         subtitle="Choose who can view this reel."
         options={visibilityOptions}
         selected={visibilitySelected}
-        onChange={setVisibilitySelected}
+        onChange={(v) => setVisibilitySelected(v as "public" | "followers" | "private")}
         onSave={submitVisibilityUpdate}
         submitting={visibilitySaving}
         error={visibilityError}
