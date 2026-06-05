@@ -1,33 +1,89 @@
+/* ═══════════════════════════════════════════════════
+   Poll Widget — Galaxy UI
+   Home feed + Post route, dark & light mode
+   ═══════════════════════════════════════════════════ */
+
+/* ── Container ── */
 .wrap {
-  border: 1px solid var(--color-border);
+  border: 1px solid transparent;
   border-radius: 16px;
   overflow: hidden;
-  background: var(--color-surface-muted);
   margin: 4px 0 2px;
+  position: relative;
+  background:
+    radial-gradient(ellipse at 90% 5%,  rgba(124, 58, 237, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse at 10% 95%, rgba(14, 165, 233, 0.07) 0%, transparent 55%),
+    var(--color-surface-muted) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.35) 0%,
+      rgba(56, 189, 248, 0.22) 50%,
+      rgba(34, 211, 238, 0.14) 100%
+    ) border-box;
+  box-shadow:
+    0 4px 18px rgba(124, 58, 237, 0.08),
+    0 2px 8px rgba(14, 165, 233, 0.05);
+  transition: box-shadow 0.25s ease;
 }
 
-/* ── Header ────────────────────────────────────────────── */
+:global([data-theme="dark"]) .wrap {
+  background:
+    radial-gradient(ellipse at 90% 5%,  rgba(124, 58, 237, 0.14) 0%, transparent 55%),
+    radial-gradient(ellipse at 10% 95%, rgba(14, 165, 233, 0.09) 0%, transparent 55%),
+    var(--color-surface-muted) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.45) 0%,
+      rgba(56, 189, 248, 0.28) 50%,
+      rgba(34, 211, 238, 0.18) 100%
+    ) border-box;
+  box-shadow:
+    0 6px 24px rgba(124, 58, 237, 0.12),
+    0 3px 10px rgba(14, 165, 233, 0.07);
+}
+
+/* ── Header ── */
 .header {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--color-border);
+  position: relative;
 }
 
+.header::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.28) 25%,
+    rgba(56, 189, 248, 0.18) 65%,
+    transparent
+  );
+}
+
+/* ── Poll badge ── */
 .pollBadge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-primary);
-  background: rgba(74, 163, 228, 0.1);
-  border: 1px solid rgba(74, 163, 228, 0.22);
+  color: #a78bfa;
+  background: rgba(124, 58, 237, 0.12);
+  border: 1px solid rgba(124, 58, 237, 0.28);
   border-radius: 999px;
   padding: 3px 9px;
+  transition: background 0.18s ease;
+}
+
+:global([data-theme="light"]) .pollBadge {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.25);
 }
 
 .question {
@@ -38,14 +94,14 @@
   line-height: 1.35;
 }
 
-/* ── Options ────────────────────────────────────────────── */
+/* ── Options container ── */
 .options {
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-/* Vote mode (buttons) */
+/* ── Vote mode buttons ── */
 .optionVoteBtn {
   display: flex;
   align-items: center;
@@ -54,32 +110,54 @@
   padding: 11px 14px;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s ease;
+  position: relative;
+  transition: background 0.18s ease;
 }
 
-.optionVoteBtn:last-child {
-  border-bottom: none;
+.optionVoteBtn::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 14px; right: 14px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.16) 40%,
+    rgba(56, 189, 248, 0.1) 70%,
+    transparent
+  );
+}
+
+.optionVoteBtn:last-child::after {
+  display: none;
 }
 
 .optionVoteBtn:hover {
-  background: var(--color-surface);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.07),
+    rgba(56, 189, 248, 0.04)
+  );
 }
 
 .optionVoteBtn:disabled {
   cursor: not-allowed;
-  opacity: 0.65;
+  opacity: 0.6;
 }
 
+/* ── Thumbnail ── */
 .optionThumbWrap {
   flex-shrink: 0;
   width: 44px;
   height: 44px;
   border-radius: 10px;
   overflow: hidden;
-  background: var(--color-border);
+  background: rgba(124, 58, 237, 0.12);
+  box-shadow:
+    0 0 0 1.5px rgba(124, 58, 237, 0.25),
+    0 0 8px rgba(124, 58, 237, 0.12);
 }
 
 .optionThumb {
@@ -88,17 +166,18 @@
   object-fit: cover;
 }
 
+/* ── Radio / Checkbox indicators ── */
 .optionRadio {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid var(--color-border);
-  background: var(--color-surface);
+  border: 2px solid rgba(124, 58, 237, 0.3);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.12s, background 0.12s;
+  transition: border-color 0.18s ease, background 0.18s ease;
 }
 
 .optionCheckbox {
@@ -106,18 +185,19 @@
   width: 18px;
   height: 18px;
   border-radius: 5px;
-  border: 2px solid var(--color-border);
-  background: var(--color-surface);
+  border: 2px solid rgba(124, 58, 237, 0.3);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.12s, background 0.12s;
+  transition: border-color 0.18s ease, background 0.18s ease;
 }
 
 .optionRadioSelected,
 .optionCheckboxSelected {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
+  border-color: #a78bfa;
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee);
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
 }
 
 .optionRadioSelected::after {
@@ -141,31 +221,55 @@
   flex: 1;
 }
 
-/* Result mode (bars) */
+/* ── Result mode bars ── */
 .optionResult {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border);
   position: relative;
+  overflow: hidden;
 }
 
-.optionResult:last-child {
-  border-bottom: none;
+.optionResult::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 14px; right: 14px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.14) 40%,
+    rgba(56, 189, 248, 0.09) 70%,
+    transparent
+  );
 }
 
+.optionResult:last-child::after {
+  display: none;
+}
+
+/* Base bar — galaxy tint */
 .optionResultBar {
   position: absolute;
   inset: 0 0 0 0;
   border-radius: 0;
-  background: rgba(74, 163, 228, 0.09);
+  background: linear-gradient(
+    90deg,
+    rgba(124, 58, 237, 0.08),
+    rgba(56, 189, 248, 0.05)
+  );
   transform-origin: left;
-  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Voted option bar — stronger galaxy */
 .optionResultBarVoted {
-  background: rgba(74, 163, 228, 0.16);
+  background: linear-gradient(
+    90deg,
+    rgba(124, 58, 237, 0.22),
+    rgba(14, 165, 233, 0.14)
+  );
 }
 
 .optionResultContent {
@@ -183,7 +287,10 @@
   height: 44px;
   border-radius: 10px;
   overflow: hidden;
-  background: var(--color-border);
+  background: rgba(124, 58, 237, 0.12);
+  box-shadow:
+    0 0 0 1.5px rgba(124, 58, 237, 0.25),
+    0 0 8px rgba(124, 58, 237, 0.12);
 }
 
 .optionResultThumb {
@@ -199,31 +306,58 @@
   color: var(--color-text);
 }
 
+/* Voted indicator dot — galaxy gradient */
 .optionResultVotedDot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--color-primary);
+  background: linear-gradient(135deg, #a78bfa, #38bdf8);
   flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(124, 58, 237, 0.5);
 }
 
+/* Percentage text */
 .optionResultPct {
   font-size: 13px;
   font-weight: 700;
-  color: var(--color-primary);
   min-width: 36px;
   text-align: right;
+  background: linear-gradient(135deg, #a78bfa, #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* ── Footer ────────────────────────────────────────────── */
+:global([data-theme="light"]) .optionResultPct {
+  background: linear-gradient(135deg, #7c3aed, #0284c7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Footer ── */
 .footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 9px 14px;
-  border-top: 1px solid var(--color-border);
+  position: relative;
   flex-wrap: wrap;
+}
+
+.footer::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.22) 30%,
+    rgba(56, 189, 248, 0.14) 65%,
+    transparent
+  );
 }
 
 .footerMeta {
@@ -234,14 +368,25 @@
 .footerMetaClickable {
   cursor: pointer;
   text-underline-offset: 2px;
-  transition: color 120ms ease;
+  transition: color 0.18s ease;
+  color: #a78bfa;
+  font-weight: 600;
 }
 
 .footerMetaClickable:hover {
-  color: var(--color-title-primary);
+  color: #c4b5fd;
   text-decoration: underline;
 }
 
+:global([data-theme="light"]) .footerMetaClickable {
+  color: #7c3aed;
+}
+
+:global([data-theme="light"]) .footerMetaClickable:hover {
+  color: #5b21b6;
+}
+
+/* Closed badge */
 .footerBadgeClosed {
   display: inline-flex;
   align-items: center;
@@ -251,20 +396,22 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-text-muted);
-  background: var(--color-border);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.18);
   border-radius: 999px;
   padding: 3px 9px;
 }
 
+/* Live badge */
 .footerBadgeLive {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: 11px;
   font-weight: 700;
-  color: #22c55e;
+  color: #4ade80;
   background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.25);
   border-radius: 999px;
   padding: 3px 9px;
 }
@@ -273,27 +420,48 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #22c55e;
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.55);
   animation: livePulse 1.6s ease-in-out infinite;
 }
 
 @keyframes livePulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.85); }
 }
 
-/* Multi-vote submit button */
+/* ── Multi-vote submit button ── */
 .submitBtn {
   border: none;
   border-radius: 10px;
-  padding: 8px 16px;
+  padding: 8px 18px;
   font-size: 13px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
-  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.22);
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
   cursor: pointer;
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  position: relative;
+  overflow: hidden;
+  transition: filter 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.submitBtn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.38s ease;
+  pointer-events: none;
+}
+
+.submitBtn:not(:disabled):hover::after { transform: translateX(120%); }
+
+.submitBtn:not(:disabled):hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.44);
+  transform: translateY(-1px);
 }
 
 .submitBtn:disabled {
@@ -301,14 +469,45 @@
   cursor: not-allowed;
 }
 
-.submitBtn:not(:disabled):hover {
-  transform: translateY(-1px);
-}
-
-/* Loading state */
+/* ── Loading ── */
 .loadingWrap {
   padding: 18px 14px;
   text-align: center;
   font-size: 13px;
   color: var(--color-text-muted);
+}
+
+/* ── Light mode overrides ── */
+:global([data-theme="light"]) .wrap {
+  background:
+    radial-gradient(ellipse at 90% 5%,  rgba(124, 58, 237, 0.05) 0%, transparent 55%),
+    radial-gradient(ellipse at 10% 95%, rgba(14, 165, 233, 0.04) 0%, transparent 55%),
+    var(--color-surface-muted) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.22) 0%,
+      rgba(56, 189, 248, 0.14) 50%,
+      rgba(34, 211, 238, 0.09) 100%
+    ) border-box;
+  box-shadow:
+    0 2px 12px rgba(124, 58, 237, 0.07),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+:global([data-theme="light"]) .optionResultBar {
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.07), rgba(56, 189, 248, 0.04));
+}
+
+:global([data-theme="light"]) .optionResultBarVoted {
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.15), rgba(14, 165, 233, 0.09));
+}
+
+:global([data-theme="light"]) .footerBadgeClosed {
+  background: rgba(124, 58, 237, 0.06);
+  border-color: rgba(124, 58, 237, 0.16);
+  color: #5b6378;
+}
+
+:global([data-theme="light"]) .optionRadio,
+:global([data-theme="light"]) .optionCheckbox {
+  border-color: rgba(124, 58, 237, 0.25);
 }

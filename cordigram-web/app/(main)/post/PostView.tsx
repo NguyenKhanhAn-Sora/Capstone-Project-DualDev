@@ -57,6 +57,10 @@ import {
 } from "@/lib/blocked-users";
 import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
 import CommentLikesOverlay from "@/ui/comment-likes-overlay/comment-likes-overlay";
+import ReportOverlay from "@/ui/report-overlay/report-overlay";
+import ConfirmActionOverlay from "@/ui/confirm-action-overlay/confirm-action-overlay";
+import VisibilityPickerOverlay from "@/ui/visibility-picker-overlay/visibility-picker-overlay";
+import MutePickerOverlay from "@/ui/mute-picker-overlay/mute-picker-overlay";
 import RepostOverlay, {
   type RepostTarget,
   type QuoteInput,
@@ -4849,7 +4853,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
       role="dialog"
       aria-modal="true"
-      onClick={closeEditModal}
+      onClick={(e) => { e.stopPropagation(); closeEditModal(); }}
     >
       <div
         className={`${feedStyles.modalCard} ${feedStyles.editCard}`}
@@ -5205,167 +5209,38 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   );
 
   const visibilityModal = (
-    <div
-      className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
-      role="dialog"
-      aria-modal="true"
-      onClick={closeVisibilityModal}
-    >
-      <div
-        className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={feedStyles.modalHeader}>
-          <div>
-            <h3 className={feedStyles.modalTitle}>Edit visibility</h3>
-            <p className={feedStyles.modalBody}>
-              Choose who can see this post.
-            </p>
-          </div>
-          <button
-            className={feedStyles.closeBtn}
-            aria-label="Close"
-            onClick={closeVisibilityModal}
-          >
-            <IconClose size={18} />
-          </button>
-        </div>
-
-        <div className={feedStyles.visibilityList}>
-          {visibilityOptions.map((opt) => {
-            const active = visibilitySelected === opt.value;
-            return (
-              <button
-                key={opt.value}
-                className={`${feedStyles.visibilityOption} ${
-                  active ? feedStyles.visibilityOptionActive : ""
-                }`}
-                onClick={() => setVisibilitySelected(opt.value)}
-              >
-                <span className={feedStyles.visibilityRadio}>
-                  {active ? "✓" : ""}
-                </span>
-                <span className={feedStyles.visibilityCopy}>
-                  <span className={feedStyles.visibilityTitle}>
-                    {opt.title}
-                  </span>
-                  <span className={feedStyles.visibilityDesc}>
-                    {opt.description}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {visibilityError ? (
-          <div className={feedStyles.inlineError}>{visibilityError}</div>
-        ) : null}
-
-        <div className={feedStyles.modalActions}>
-          <button
-            className={feedStyles.modalSecondary}
-            onClick={closeVisibilityModal}
-            disabled={visibilitySaving}
-          >
-            Cancel
-          </button>
-          <button
-            className={feedStyles.modalPrimary}
-            onClick={submitVisibilityUpdate}
-            disabled={disableVisibilityUpdate}
-          >
-            {visibilitySaving ? "Updating..." : "Update visibility"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <VisibilityPickerOverlay
+      open
+      onClose={closeVisibilityModal}
+      title="Edit visibility"
+      subtitle="Choose who can see this post."
+      options={visibilityOptions}
+      selected={visibilitySelected}
+      onChange={setVisibilitySelected}
+      onSave={submitVisibilityUpdate}
+      submitting={visibilitySaving}
+      error={visibilityError}
+      labelSave="Update visibility"
+      labelSaving="Updating..."
+      labelCancel="Cancel"
+    />
   );
 
   const muteModal = (
-    <div
-      className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
-      role="dialog"
-      aria-modal="true"
-      onClick={closeMuteModal}
-    >
-      <div
-        className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={feedStyles.modalHeader}>
-          <div>
-            <h3 className={feedStyles.modalTitle}>Mute notifications</h3>
-            <p className={feedStyles.modalBody}>
-              Choose how long to pause alerts for this post.
-            </p>
-          </div>
-          <button
-            className={feedStyles.closeBtn}
-            aria-label="Close"
-            onClick={closeMuteModal}
-          >
-            <IconClose size={18} />
-          </button>
-        </div>
-
-        <div className={feedStyles.muteOptionGrid}>
-          {muteOptions.map((option) => (
-            <button
-              key={option.key}
-              className={`${feedStyles.muteOption} ${
-                muteOption === option.key ? feedStyles.muteOptionActive : ""
-              }`}
-              onClick={() => setMuteOption(option.key)}
-              type="button"
-            >
-              <span className={feedStyles.muteOptionTitle}>{option.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {muteOption === "custom" ? (
-          <div className={feedStyles.muteCustomRow}>
-            <div className={feedStyles.mutePicker}>
-              <label className={feedStyles.editLabel}>Date</label>
-              <DateSelect
-                value={muteCustomDate}
-                onChange={setMuteCustomDate}
-                minDate={new Date()}
-                maxDate={null}
-                placeholder="yyyy-mm-dd"
-              />
-            </div>
-            <div className={feedStyles.mutePicker}>
-              <label className={feedStyles.editLabel}>Time</label>
-              <TimeSelect
-                value={muteCustomTime}
-                onChange={setMuteCustomTime}
-                selectedDate={muteCustomDate}
-                minDateTime={new Date()}
-                disabled={!muteCustomDate}
-                placeholder="hh:mm"
-              />
-            </div>
-          </div>
-        ) : null}
-
-        {muteError ? (
-          <div className={feedStyles.inlineError}>{muteError}</div>
-        ) : null}
-
-        <div className={feedStyles.modalActions}>
-          <button
-            type="button"
-            className={feedStyles.modalPrimary}
-            onClick={handleSavePostMute}
-            disabled={muteSaving}
-          >
-            {muteSaving ? "Saving..." : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <MutePickerOverlay
+      open
+      onClose={closeMuteModal}
+      options={muteOptions}
+      selected={muteOption}
+      onSelect={setMuteOption}
+      customDate={muteCustomDate}
+      onCustomDateChange={setMuteCustomDate}
+      customTime={muteCustomTime}
+      onCustomTimeChange={setMuteCustomTime}
+      onSave={handleSavePostMute}
+      submitting={muteSaving}
+      error={muteError}
+    />
   );
 
   const authorProfileId = post?.authorId || post?.author?.id;
@@ -6839,440 +6714,82 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           : muteModal
         : null}
 
-      {reportOpen ? (
-        <div
-          className={`${styles.reportOverlay} ${
-            reportClosing
-              ? styles.reportOverlayClosing
-              : styles.reportOverlayOpen
-          }`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeReportModal}
-        >
-          <div
-            className={`${styles.reportCard} ${
-              reportClosing ? styles.reportCardClosing : styles.reportCardOpen
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.reportHeader}>
-              <div>
-                <h3 className={styles.reportTitle}>Report this post</h3>
-                <p className={styles.reportBody}>
-                  Help us understand what is wrong with this content.
-                </p>
-              </div>
-              <button
-                className={styles.reportClose}
-                aria-label="Close"
-                onClick={closeReportModal}
-              >
-                ×
-              </button>
-            </div>
+      <ReportOverlay
+        open={reportOpen}
+        closing={reportClosing}
+        onClose={closeReportModal}
+        title="Report this post"
+        subtitle="Help us understand what is wrong with this content."
+        groups={REPORT_GROUPS}
+        category={reportCategory}
+        reason={reportReason}
+        note={reportNote}
+        submitting={reportSubmitting}
+        error={reportError}
+        onSelectCategory={(key) => setReportCategory((key || null) as ReportCategory["key"] | null)}
+        onSelectReason={(key) => setReportReason(key || null)}
+        onNoteChange={setReportNote}
+        onSubmit={submitReport}
+      />
 
-            <div className={styles.reportGrid}>
-              <div className={styles.reportCategoryGrid}>
-                {REPORT_GROUPS.map((group) => {
-                  const isActive = reportCategory === group.key;
-                  return (
-                    <button
-                      key={group.key}
-                      className={`${styles.reportCategoryCard} ${
-                        isActive ? styles.reportCategoryCardActive : ""
-                      }`}
-                      style={{
-                        borderColor: isActive ? group.accent : undefined,
-                        boxShadow: isActive
-                          ? `0 0 0 1px ${group.accent}`
-                          : undefined,
-                      }}
-                      onClick={() => {
-                        setReportCategory(group.key);
-                        setReportReason(
-                          group.reasons.length === 1
-                            ? group.reasons[0].key
-                            : null,
-                        );
-                      }}
-                    >
-                      <span
-                        style={{ background: group.accent }}
-                      />
-                      <span className={styles.reportCategoryLabel}>
-                        {group.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+      <ReportOverlay
+        open={reportCommentOpen}
+        closing={reportCommentClosing}
+        onClose={closeCommentReportModal}
+        title="Report this comment"
+        subtitle="Help us understand what is wrong with this comment."
+        groups={REPORT_GROUPS}
+        category={reportCommentCategory}
+        reason={reportCommentReason}
+        note={reportCommentNote}
+        submitting={reportCommentSubmitting}
+        error={reportCommentError}
+        onSelectCategory={(key) => setReportCommentCategory((key || null) as ReportCategory["key"] | null)}
+        onSelectReason={(key) => setReportCommentReason(key || null)}
+        onNoteChange={setReportCommentNote}
+        onSubmit={submitCommentReport}
+      />
 
-              <div className={styles.reportReasonPanel}>
-                <div className={styles.reportReasonHeader}>
-                  Select a specific reason
-                </div>
-                {selectedReportGroup ? (
-                  <div className={styles.reportReasonList}>
-                    {selectedReportGroup.reasons.map((reason) => {
-                      const checked = reportReason === reason.key;
-                      return (
-                        <button
-                          key={reason.key}
-                          className={`${styles.reportReasonRow} ${
-                            checked ? styles.reportReasonRowActive : ""
-                          }`}
-                          onClick={() => setReportReason(reason.key)}
-                        >
-                          <span
-                            className={styles.reportReasonRadio}
-                            aria-checked={checked}
-                          >
-                            {checked ? (
-                              <span className={styles.reportReasonRadioDot} />
-                            ) : null}
-                          </span>
-                          <span>{reason.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={styles.reportReasonPlaceholder}>
-                    Pick a category first.
-                  </div>
-                )}
+      <ConfirmActionOverlay
+        open={deletePostOpen}
+        onClose={closeDeletePostConfirm}
+        variant="danger"
+        title="Delete this post?"
+        body="Removing this post will delete it for everyone. This action cannot be undone."
+        error={deletePostError}
+        submitting={deletePostSubmitting}
+        onConfirm={confirmDeletePost}
+        labelConfirm="Delete"
+        labelConfirming="Deleting..."
+        labelCancel="Cancel"
+      />
 
-                <label className={styles.reportNoteLabel}>
-                  Additional notes (optional)
-                  <textarea
-                    className={styles.reportNoteInput}
-                    placeholder="Add brief context if needed..."
-                    value={reportNote}
-                    onChange={(e) => setReportNote(e.target.value)}
-                    maxLength={500}
-                  />
-                </label>
-                {reportError ? (
-                  <div className={styles.reportInlineError}>{reportError}</div>
-                ) : null}
-              </div>
-            </div>
+      <ConfirmActionOverlay
+        open={Boolean(deleteTarget)}
+        onClose={closeDeleteConfirm}
+        variant="danger"
+        title="Delete this comment?"
+        body="Removing this comment will also delete its replies. This action cannot be undone."
+        error={deleteError}
+        submitting={deleteSubmitting}
+        onConfirm={confirmDeleteComment}
+        labelConfirm="Delete"
+        labelConfirming="Deleting..."
+        labelCancel="Cancel"
+      />
 
-            <div className={styles.reportActions}>
-              <button
-                className={styles.reportSecondary}
-                onClick={closeReportModal}
-                disabled={reportSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.reportPrimary}
-                onClick={submitReport}
-                disabled={!reportReason || reportSubmitting}
-              >
-                {reportSubmitting ? "Submitting..." : "Submit report"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {reportCommentOpen ? (
-        <div
-          className={`${styles.reportOverlay} ${
-            reportCommentClosing
-              ? styles.reportOverlayClosing
-              : styles.reportOverlayOpen
-          }`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeCommentReportModal}
-        >
-          <div
-            className={`${styles.reportCard} ${
-              reportCommentClosing
-                ? styles.reportCardClosing
-                : styles.reportCardOpen
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.reportHeader}>
-              <div>
-                <h3 className={styles.reportTitle}>Report this comment</h3>
-                <p className={styles.reportBody}>
-                  Help us understand what is wrong with this comment.
-                </p>
-              </div>
-              <button
-                className={styles.reportClose}
-                aria-label="Close"
-                onClick={closeCommentReportModal}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className={styles.reportGrid}>
-              <div className={styles.reportCategoryGrid}>
-                {REPORT_GROUPS.map((group) => {
-                  const isActive = reportCommentCategory === group.key;
-                  return (
-                    <button
-                      key={group.key}
-                      className={`${styles.reportCategoryCard} ${
-                        isActive ? styles.reportCategoryCardActive : ""
-                      }`}
-                      style={{
-                        borderColor: isActive ? group.accent : undefined,
-                        boxShadow: isActive
-                          ? `0 0 0 1px ${group.accent}`
-                          : undefined,
-                      }}
-                      onClick={() => {
-                        setReportCommentCategory(group.key);
-                        setReportCommentReason(
-                          group.reasons.length === 1
-                            ? group.reasons[0].key
-                            : null,
-                        );
-                      }}
-                    >
-                      <span
-                        className={styles.reportCategoryDot}
-                        style={{ background: group.accent }}
-                      />
-                      <span className={styles.reportCategoryLabel}>
-                        {group.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={styles.reportReasonPanel}>
-                <div className={styles.reportReasonHeader}>
-                  Select a specific reason
-                </div>
-                {selectedReportCommentGroup ? (
-                  <div className={styles.reportReasonList}>
-                    {selectedReportCommentGroup.reasons.map((reason) => {
-                      const checked = reportCommentReason === reason.key;
-                      return (
-                        <button
-                          key={reason.key}
-                          className={`${styles.reportReasonRow} ${
-                            checked ? styles.reportReasonRowActive : ""
-                          }`}
-                          onClick={() => setReportCommentReason(reason.key)}
-                        >
-                          <span
-                            className={styles.reportReasonRadio}
-                            aria-checked={checked}
-                          >
-                            {checked ? (
-                              <span className={styles.reportReasonRadioDot} />
-                            ) : null}
-                          </span>
-                          <span>{reason.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={styles.reportReasonPlaceholder}>
-                    Pick a category first.
-                  </div>
-                )}
-
-                <label className={styles.reportNoteLabel}>
-                  Additional notes (optional)
-                  <textarea
-                    className={styles.reportNoteInput}
-                    placeholder="Add brief context if needed..."
-                    value={reportCommentNote}
-                    onChange={(e) => setReportCommentNote(e.target.value)}
-                    maxLength={500}
-                  />
-                </label>
-                {reportCommentError ? (
-                  <div className={styles.reportInlineError}>
-                    {reportCommentError}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className={styles.reportActions}>
-              <button
-                className={styles.reportSecondary}
-                onClick={closeCommentReportModal}
-                disabled={reportCommentSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.reportPrimary}
-                onClick={submitCommentReport}
-                disabled={
-                  !reportCommentReason ||
-                  reportCommentSubmitting ||
-                  !reportingCommentId
-                }
-              >
-                {reportCommentSubmitting ? "Submitting..." : "Submit report"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {deletePostOpen ? (
-        <div
-          className={`${styles.reportOverlay} ${styles.reportOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeDeletePostConfirm}
-        >
-          <div
-            className={styles.reportCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.reportHeader}>
-              <div>
-                <h3 className={styles.reportTitle}>Delete this post?</h3>
-                <p className={styles.reportBody}>
-                  Removing this post will delete it for everyone. This action
-                  cannot be undone.
-                </p>
-              </div>
-              <button
-                className={styles.reportClose}
-                aria-label="Close"
-                onClick={closeDeletePostConfirm}
-                disabled={deletePostSubmitting}
-              >
-                ×
-              </button>
-            </div>
-
-            {deletePostError ? (
-              <div className={styles.reportInlineError}>{deletePostError}</div>
-            ) : null}
-
-            <div className={styles.reportActions}>
-              <button
-                className={styles.reportSecondary}
-                onClick={closeDeletePostConfirm}
-                disabled={deletePostSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className={`${styles.reportPrimary} ${styles.blockDanger}`}
-                onClick={confirmDeletePost}
-                disabled={deletePostSubmitting}
-              >
-                {deletePostSubmitting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {deleteTarget ? (
-        <div
-          className={`${styles.reportOverlay} ${styles.reportOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeDeleteConfirm}
-        >
-          <div
-            className={styles.reportCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.reportHeader}>
-              <div>
-                <h3 className={styles.reportTitle}>Delete this comment?</h3>
-                <p className={styles.reportBody}>
-                  Removing this comment will also delete its replies. This
-                  action cannot be undone.
-                </p>
-              </div>
-              <button
-                className={styles.reportClose}
-                aria-label="Close"
-                onClick={closeDeleteConfirm}
-                disabled={deleteSubmitting}
-              >
-                ×
-              </button>
-            </div>
-
-            {deleteError ? (
-              <div className={styles.reportInlineError}>{deleteError}</div>
-            ) : null}
-
-            <div className={styles.reportActions}>
-              <button
-                className={styles.reportSecondary}
-                onClick={closeDeleteConfirm}
-                disabled={deleteSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className={`${styles.reportPrimary} ${styles.blockDanger}`}
-                onClick={confirmDeleteComment}
-                disabled={deleteSubmitting}
-              >
-                {deleteSubmitting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {blockTarget ? (
-        <div
-          className={`${styles.reportOverlay} ${styles.reportOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeBlockUserModal}
-        >
-          <div
-            className={styles.reportCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.reportHeader}>
-              <div>
-                <h3 className={styles.reportTitle}>Block this account?</h3>
-                <p className={styles.reportBody}>
-                  {`You are about to block @${blockTarget.label}. They will no longer be able to interact with you.`}
-                </p>
-              </div>
-            </div>
-
-            <div className={styles.reportActions}>
-              <button
-                className={styles.reportSecondary}
-                onClick={closeBlockUserModal}
-                disabled={blocking}
-              >
-                Cancel
-              </button>
-              <button
-                className={`${styles.reportPrimary} ${styles.blockDanger}`}
-                onClick={confirmBlockUser}
-                disabled={blocking}
-              >
-                {blocking ? "Blocking..." : "Block"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmActionOverlay
+        open={Boolean(blockTarget)}
+        onClose={closeBlockUserModal}
+        variant="danger"
+        title="Block this account?"
+        body={blockTarget ? `You are about to block @${blockTarget.label}. They will no longer be able to interact with you.` : undefined}
+        submitting={blocking}
+        onConfirm={confirmBlockUser}
+        labelConfirm="Block"
+        labelConfirming="Blocking..."
+        labelCancel="Cancel"
+      />
 
       {postId ? (
         <PostLikesOverlay

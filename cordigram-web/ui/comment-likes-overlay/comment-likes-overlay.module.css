@@ -1,39 +1,96 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(3, 6, 14, 0.65);
+  background: rgba(4, 7, 18, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 200;
   padding: 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: likesBackdropIn 200ms ease forwards;
+}
+
+@keyframes likesBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .card {
   width: min(520px, 100%);
   max-height: min(76vh, 620px);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border: 1px solid transparent;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
+  position: relative;
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(14, 165, 233, 0.09) 0%, transparent 55%),
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.45) 0%,
+      rgba(56, 189, 248, 0.28) 55%,
+      rgba(34, 211, 238, 0.18) 100%
+    ) border-box;
+  box-shadow:
+    0 2px 0 rgba(124, 58, 237, 0.08) inset,
+    0 24px 64px rgba(4, 7, 18, 0.48),
+    0 6px 22px rgba(124, 58, 237, 0.18);
   transform: translateY(0) scale(1);
   opacity: 1;
   transition:
-    transform 180ms ease,
-    opacity 180ms ease;
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 220ms ease;
+  animation: likesCardIn 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes likesCardIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #7c3aed 22%, #0ea5e9 55%, #22d3ee 80%, transparent);
+  z-index: 2;
+  pointer-events: none;
 }
 
 .card[data-closing="1"] {
   opacity: 0;
-  transform: translateY(10px) scale(0.985);
+  transform: translateY(12px) scale(0.97);
 }
 
 :global([data-theme="dark"]) .card {
-  background: rgba(13, 19, 34, 0.94);
-  border-color: rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.16) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(14, 165, 233, 0.12) 0%, transparent 55%),
+    rgba(8, 12, 28, 0.94) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.5) 0%,
+      rgba(56, 189, 248, 0.32) 55%,
+      rgba(34, 211, 238, 0.2) 100%
+    ) border-box;
+}
+
+:global([data-theme="light"]) .card {
+  background:
+    #ffffff padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.28) 0%,
+      rgba(56, 189, 248, 0.18) 50%,
+      rgba(34, 211, 238, 0.12) 100%
+    ) border-box;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 16px 48px rgba(0, 0, 0, 0.18),
+    0 4px 16px rgba(124, 58, 237, 0.1);
 }
 
 .header {
@@ -215,4 +272,121 @@
   padding: 10px 14px;
   color: #f87171;
   font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════
+   Galaxy UI upgrades
+   ═══════════════════════════════════════════ */
+
+.header {
+  border-bottom: 1px solid rgba(124, 58, 237, 0.2) !important;
+  position: relative;
+}
+
+.header::after {
+  content: "";
+  position: absolute;
+  bottom: -1px; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.35) 30%,
+    rgba(56, 189, 248, 0.22) 65%,
+    transparent
+  );
+}
+
+.title {
+  background: linear-gradient(135deg, var(--color-text) 20%, #a78bfa 60%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+:global([data-theme="light"]) .title {
+  background: linear-gradient(135deg, #0f1629 20%, #7c3aed 60%, #0284c7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.close {
+  transition: background 0.18s ease, color 0.18s ease, transform 0.2s ease !important;
+}
+
+.close:hover {
+  background: rgba(124, 58, 237, 0.12) !important;
+  color: #a78bfa !important;
+  transform: rotate(90deg) !important;
+}
+
+.searchInput {
+  border-color: rgba(124, 58, 237, 0.2) !important;
+  background: rgba(124, 58, 237, 0.04) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.searchInput:focus {
+  border-color: rgba(124, 58, 237, 0.52) !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12) !important;
+}
+
+:global([data-theme="light"]) .searchInput {
+  background: rgba(124, 58, 237, 0.04) !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+  color: #0f1629 !important;
+}
+
+.row {
+  border-radius: 12px;
+  transition: background 0.18s ease !important;
+}
+
+.row:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.08),
+    rgba(56, 189, 248, 0.05)
+  ) !important;
+}
+
+.followBtn {
+  border: 1px solid rgba(124, 58, 237, 0.3) !important;
+  background: transparent !important;
+  color: #a78bfa !important;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.followBtn:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.1) !important;
+  border-color: rgba(124, 58, 237, 0.55) !important;
+  transform: translateY(-1px) !important;
+}
+
+:global([data-theme="light"]) .followBtn {
+  border-color: rgba(124, 58, 237, 0.35) !important;
+  color: #7c3aed !important;
+}
+
+.followBtnPrimary {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3) !important;
+}
+
+.followBtnPrimary:hover:not(:disabled) {
+  filter: brightness(1.1) !important;
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.44) !important;
+}
+
+.avatar {
+  box-shadow:
+    0 0 0 2px rgba(124, 58, 237, 0.3),
+    0 0 8px rgba(124, 58, 237, 0.15) !important;
+  border: none !important;
 }

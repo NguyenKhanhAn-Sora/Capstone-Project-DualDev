@@ -11,6 +11,10 @@ import RepostOverlay, {
   type QuoteInput,
   type RepostTarget,
 } from "@/ui/repost-overlay/repost-overlay";
+import ReportOverlay from "@/ui/report-overlay/report-overlay";
+import ConfirmActionOverlay from "@/ui/confirm-action-overlay/confirm-action-overlay";
+import VisibilityPickerOverlay from "@/ui/visibility-picker-overlay/visibility-picker-overlay";
+import MutePickerOverlay from "@/ui/mute-picker-overlay/mute-picker-overlay";
 import {
   fetchFeed,
   getAdsDashboard,
@@ -1770,224 +1774,57 @@ export default function HomePage({
         </aside>
       ) : null}
 
-      {deleteTarget ? (
-        <div
-          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeDeleteModal}
-        >
-          <div
-            className={styles.modalCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className={styles.modalTitle}>{t("delete.title")}</h3>
-            <p className={styles.modalBody}>
-              {t("delete.body", { name: deleteTarget.label })}
-            </p>
-            {deleteError ? (
-              <div className={styles.inlineError}>{deleteError}</div>
-            ) : null}
-            <div className={styles.modalActions}>
-              <button
-                className={styles.modalSecondary}
-                onClick={closeDeleteModal}
-                disabled={deleteSubmitting}
-              >
-                {t("delete.cancel")}
-              </button>
-              <button
-                className={styles.modalDanger}
-                onClick={confirmDelete}
-                disabled={deleteSubmitting}
-              >
-                {deleteSubmitting ? t("delete.deleting") : t("delete.confirm")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmActionOverlay
+        open={Boolean(deleteTarget)}
+        onClose={closeDeleteModal}
+        variant="danger"
+        title={t("delete.title")}
+        body={deleteTarget ? t("delete.body", { name: deleteTarget.label }) : undefined}
+        error={deleteError}
+        submitting={deleteSubmitting}
+        onConfirm={confirmDelete}
+        labelConfirm={t("delete.confirm")}
+        labelConfirming={t("delete.deleting")}
+        labelCancel={t("delete.cancel")}
+      />
 
-      {blockTarget ? (
-        <div className={styles.modalOverlay} role="dialog" aria-modal="true">
-          <div className={styles.modalCard}>
-            <h3 className={styles.modalTitle}>{t("block.title")}</h3>
-            <p className={styles.modalBody}>
-              {t("block.body", { name: blockTarget.label })}
-            </p>
-            <div className={styles.modalActions}>
-              <button
-                className={styles.modalSecondary}
-                onClick={() => setBlockTarget(undefined)}
-                disabled={blocking}
-              >
-                {t("block.cancel")}
-              </button>
-              <button
-                className={styles.modalDanger}
-                onClick={confirmBlock}
-                disabled={blocking}
-              >
-                {blocking ? t("block.blocking") : t("block.confirm")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmActionOverlay
+        open={Boolean(blockTarget)}
+        onClose={() => setBlockTarget(undefined)}
+        variant="danger"
+        title={t("block.title")}
+        body={blockTarget ? t("block.body", { name: blockTarget.label }) : undefined}
+        submitting={blocking}
+        onConfirm={confirmBlock}
+        labelConfirm={t("block.confirm")}
+        labelConfirming={t("block.blocking")}
+        labelCancel={t("block.cancel")}
+      />
 
-      {reportTarget ? (
-        <div
-          className={`${styles.modalOverlay} ${styles.reportOverlay} ${
-            reportClosing ? styles.modalOverlayClosing : styles.modalOverlayOpen
-          }`}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className={`${styles.modalCard} ${styles.reportCard} ${
-              reportClosing ? styles.modalCardClosing : styles.modalCardOpen
-            }`}
-            data-mobile-step={reportCategory ? "reasons" : "categories"}
-          >
-            <div className={styles.modalHeader}>
-              {/* Back button — chỉ hiện trên mobile khi đang ở bước reasons */}
-              {reportCategory && (
-                <button
-                  className={styles.reportBackBtn}
-                  aria-label="Back"
-                  onClick={() => {
-                    setReportCategory(null);
-                    setReportReason(null);
-                  }}
-                >
-                  <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                </button>
-              )}
-              <div>
-                <h3 className={styles.modalTitle}>{t("report.title")}</h3>
-                <p className={styles.modalBody}>
-                  {t("report.description", { name: reportTarget.label })}
-                </p>
-              </div>
-              <button
-                className={styles.closeBtn}
-                aria-label={tCommon("close")}
-                onClick={closeReportModal}
-              >
-                <IconClose size={24} />
-              </button>
-            </div>
-
-            <div className={styles.reportGrid}>
-              <div className={styles.categoryGrid}>
-                {reportGroups.map((group) => {
-                  const isActive = reportCategory === group.key;
-                  return (
-                    <button
-                      key={group.key}
-                      className={`${styles.categoryCard} ${
-                        isActive ? styles.categoryCardActive : ""
-                      }`}
-                      style={{
-                        borderColor: isActive ? group.accent : undefined,
-                        boxShadow: isActive
-                          ? `0 0 0 1px ${group.accent}`
-                          : undefined,
-                      }}
-                      onClick={() => {
-                        setReportCategory(group.key);
-                        setReportReason(
-                          group.reasons.length === 1
-                            ? group.reasons[0].key
-                            : null,
-                        );
-                      }}
-                    >
-                      <span
-                        className={styles.categoryDot}
-                        style={{ background: group.accent }}
-                      />
-                      <span className={styles.categoryLabel}>
-                        {group.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={styles.reasonPanel}>
-                <div className={styles.reasonHeader}>
-                  {t("report.selectReason")}
-                </div>
-                {selectedReportGroup ? (
-                  <div className={styles.reasonList}>
-                    {selectedReportGroup.reasons.map((r) => {
-                      const checked = reportReason === r.key;
-                      return (
-                        <button
-                          key={r.key}
-                          className={`${styles.reasonRow} ${
-                            checked ? styles.reasonRowActive : ""
-                          }`}
-                          onClick={() => setReportReason(r.key)}
-                        >
-                          <span
-                            className={styles.reasonRadio}
-                            aria-checked={checked}
-                          >
-                            {checked ? (
-                              <span className={styles.reasonRadioDot} />
-                            ) : null}
-                          </span>
-                          <span>{r.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={styles.reasonPlaceholder}>
-                    {t("report.pickCategory")}
-                  </div>
-                )}
-
-                <label className={styles.noteLabel}>
-                  {t("report.notes.label")}
-                  <textarea
-                    className={styles.noteInput}
-                    placeholder={t("report.notes.placeholder")}
-                    value={reportNote}
-                    onChange={(e) => setReportNote(e.target.value)}
-                    maxLength={500}
-                  />
-                </label>
-                {reportError ? (
-                  <div className={styles.inlineError}>{reportError}</div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className={styles.modalActions}>
-              <button
-                className={styles.modalSecondary}
-                onClick={closeReportModal}
-                disabled={reportSubmitting}
-              >
-                {t("report.cancel")}
-              </button>
-              <button
-                className={styles.modalPrimary}
-                disabled={!reportReason || reportSubmitting}
-                onClick={submitReport}
-              >
-                {reportSubmitting ? t("report.submitting") : t("report.submit")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ReportOverlay
+        open={Boolean(reportTarget)}
+        closing={reportClosing}
+        onClose={closeReportModal}
+        title={t("report.title")}
+        subtitle={reportTarget ? t("report.description", { name: reportTarget.label }) : undefined}
+        groups={reportGroups}
+        category={reportCategory}
+        reason={reportReason}
+        note={reportNote}
+        submitting={reportSubmitting}
+        error={reportError}
+        onSelectCategory={(key) => { setReportCategory(key || null); setReportReason(null); }}
+        onSelectReason={(key) => setReportReason(key || null)}
+        onNoteChange={setReportNote}
+        onSubmit={submitReport}
+        labelCancel={t("report.cancel")}
+        labelSubmit={t("report.submit")}
+        labelSubmitting={t("report.submitting")}
+        labelSelectReason={t("report.selectReason")}
+        labelPickCategory={t("report.pickCategory")}
+        labelNotes={t("report.notes.label")}
+        labelNotesPlaceholder={t("report.notes.placeholder")}
+      />
 
       <RepostOverlay
         target={repostTarget}
@@ -3921,165 +3758,38 @@ function FeedCard({
   );
 
   const visibilityModal = (
-    <div
-      className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
-      role="dialog"
-      aria-modal="true"
-      onClick={closeVisibilityModal}
-    >
-      <div
-        className={`${styles.modalCard} ${styles.modalCardOpen}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.modalHeader}>
-          <div>
-            <h3 className={styles.modalTitle}>{t("visibility.title")}</h3>
-            <p className={styles.modalBody}>{t("visibility.description")}</p>
-          </div>
-          <button
-            className={styles.closeBtn}
-            aria-label={tCommon("close")}
-            onClick={closeVisibilityModal}
-          >
-            <IconClose size={18} />
-          </button>
-        </div>
-
-        <div className={styles.visibilityList}>
-          {visibilityOptions.map((opt) => {
-            const active = visibilitySelected === opt.value;
-            return (
-              <button
-                key={opt.value}
-                className={`${styles.visibilityOption} ${
-                  active ? styles.visibilityOptionActive : ""
-                }`}
-                onClick={() => setVisibilitySelected(opt.value)}
-              >
-                <span className={styles.visibilityRadio}>
-                  {active ? "✓" : ""}
-                </span>
-                <span className={styles.visibilityCopy}>
-                  <span className={styles.visibilityTitle}>{opt.title}</span>
-                  <span className={styles.visibilityDesc}>
-                    {opt.description}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {visibilityError ? (
-          <div className={styles.inlineError}>{visibilityError}</div>
-        ) : null}
-
-        <div className={styles.modalActions}>
-          <button
-            className={styles.modalSecondary}
-            onClick={closeVisibilityModal}
-            disabled={visibilitySaving}
-          >
-            {t("visibility.cancel")}
-          </button>
-          <button
-            className={styles.modalPrimary}
-            onClick={submitVisibilityUpdate}
-            disabled={disableVisibilityUpdate}
-          >
-            {visibilitySaving
-              ? t("visibility.updating")
-              : t("visibility.update")}
-          </button>
-        </div>
-      </div>
-    </div>
+    <VisibilityPickerOverlay
+      open
+      onClose={closeVisibilityModal}
+      title={t("visibility.title")}
+      subtitle={t("visibility.description")}
+      options={visibilityOptions}
+      selected={visibilitySelected}
+      onChange={setVisibilitySelected}
+      onSave={submitVisibilityUpdate}
+      submitting={visibilitySaving}
+      error={visibilityError}
+      labelSave={t("visibility.update")}
+      labelSaving={t("visibility.updating")}
+      labelCancel={t("visibility.cancel")}
+    />
   );
 
   const muteModal = (
-    <div
-      className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
-      role="dialog"
-      aria-modal="true"
-      onClick={closeMuteModal}
-    >
-      <div
-        className={`${styles.modalCard} ${styles.modalCardOpen}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.modalHeader}>
-          <div>
-            <h3 className={styles.modalTitle}>Mute notifications</h3>
-            <p className={styles.modalBody}>
-              Choose how long to pause alerts for this post.
-            </p>
-          </div>
-          <button
-            className={styles.closeBtn}
-            aria-label={tCommon("close")}
-            onClick={closeMuteModal}
-          >
-            <IconClose size={18} />
-          </button>
-        </div>
-
-        <div className={styles.muteOptionGrid}>
-          {muteOptions.map((option) => (
-            <button
-              key={option.key}
-              className={`${styles.muteOption} ${
-                muteOption === option.key ? styles.muteOptionActive : ""
-              }`}
-              onClick={() => setMuteOption(option.key)}
-              type="button"
-            >
-              <span className={styles.muteOptionTitle}>{option.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {muteOption === "custom" ? (
-          <div className={styles.muteCustomRow}>
-            <div className={styles.mutePicker}>
-              <label className={styles.editLabel}>Date</label>
-              <DateSelect
-                value={muteCustomDate}
-                onChange={setMuteCustomDate}
-                minDate={new Date()}
-                maxDate={null}
-                placeholder="yyyy-mm-dd"
-              />
-            </div>
-            <div className={styles.mutePicker}>
-              <label className={styles.editLabel}>Time</label>
-              <TimeSelect
-                value={muteCustomTime}
-                onChange={setMuteCustomTime}
-                selectedDate={muteCustomDate}
-                minDateTime={new Date()}
-                disabled={!muteCustomDate}
-                placeholder="hh:mm"
-              />
-            </div>
-          </div>
-        ) : null}
-
-        {muteError ? (
-          <div className={styles.inlineError}>{muteError}</div>
-        ) : null}
-
-        <div className={styles.modalActions}>
-          <button
-            type="button"
-            className={styles.modalPrimary}
-            onClick={handleSavePostMute}
-            disabled={muteSaving}
-          >
-            {muteSaving ? "Saving..." : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <MutePickerOverlay
+      open
+      onClose={closeMuteModal}
+      options={muteOptions}
+      selected={muteOption}
+      onSelect={setMuteOption}
+      customDate={muteCustomDate}
+      onCustomDateChange={setMuteCustomDate}
+      customTime={muteCustomTime}
+      onCustomTimeChange={setMuteCustomTime}
+      onSave={handleSavePostMute}
+      submitting={muteSaving}
+      error={muteError}
+    />
   );
 
   return (

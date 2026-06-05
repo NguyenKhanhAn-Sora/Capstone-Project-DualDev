@@ -1,0 +1,242 @@
+/* ═══════════════════════════════════════════════════════════════
+   Shared Confirm Action Overlay — Galaxy UI
+   Used for: Delete post, Block user, Delete comment, any danger confirm
+   ═══════════════════════════════════════════════════════════════ */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 7, 18, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: backdropIn 180ms ease forwards;
+}
+
+.backdropClosing {
+  animation: backdropOut 160ms ease forwards;
+}
+
+@keyframes backdropIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes backdropOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* ── Card ── */
+.card {
+  width: min(420px, 96vw);
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 24px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: cardIn 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.cardClosing {
+  animation: cardOut 180ms ease forwards;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cardOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+
+/* Variant: danger — purple→red gradient top line */
+.cardDanger {
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.2) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(239, 68, 68, 0.12)  0%, transparent 55%),
+    rgba(8, 12, 28, 0.9);
+  border: 1px solid rgba(239, 68, 68, 0.32);
+  box-shadow:
+    0 2px 0 rgba(239, 68, 68, 0.08) inset,
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    0 6px 22px rgba(239, 68, 68, 0.16);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.cardDanger::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 18%,
+    #ef4444 50%,
+    #f97316 80%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* Variant: warning — purple→amber */
+.cardWarning {
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.2) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(245, 158, 11, 0.12) 0%, transparent 55%),
+    rgba(8, 12, 28, 0.9);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  box-shadow:
+    0 2px 0 rgba(245, 158, 11, 0.06) inset,
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    0 6px 22px rgba(245, 158, 11, 0.14);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.cardWarning::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 18%,
+    #f59e0b 55%,
+    #fbbf24 80%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* ── Content ── */
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.body {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+.error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  color: #fca5a5;
+  font-size: 13px;
+}
+
+/* ── Close button ── */
+.closeBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.2s ease;
+}
+
+.closeBtn:hover {
+  background: rgba(124, 58, 237, 0.2);
+  color: #ffffff;
+  transform: rotate(90deg);
+}
+
+/* ── Actions ── */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btnSecondary {
+  min-width: 88px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 14px;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.38);
+  transform: translateY(-1px);
+}
+
+.btnSecondary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Danger confirm button */
+.btnDanger {
+  min-width: 88px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+  transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease;
+}
+
+.btnDanger:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.48);
+  transform: translateY(-1px);
+}
+
+.btnDanger:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Warning confirm button */
+.btnWarning {
+  min-width: 88px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.32);
+  transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease;
+}
+
+.btnWarning:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.44);
+  transform: translateY(-1px);
+}
+
+.btnWarning:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Light mode — same dark-glass (overlay is dark) */
+:global([data-theme="light"]) .backdrop {
+  background: rgba(10, 16, 36, 0.68);
+}

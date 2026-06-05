@@ -2852,10 +2852,33 @@
     "failedToLoad": "Không thể tải danh sách thích",
     "failedToLoadMore": "Không thể tải thêm"
   },
+  "pollVotersOverlay": {
+    "title": "Lượt bình chọn",
+    "searchPlaceholder": "Tìm tên người dùng",
+    "loading": "Đang tải…",
+    "loadingMore": "Đang tải thêm…",
+    "noVotesYet": "Chưa có lượt bình chọn",
+    "noMatchingUsers": "Không tìm thấy người dùng",
+    "you": "Bạn",
+    "follow": "Theo dõi",
+    "following": "Đang theo dõi",
+    "close": "Đóng",
+    "viewProfile": "Xem hồ sơ {username}",
+    "sessionExpired": "Phiên đăng nhập đã hết hạn.",
+    "failedToLoad": "Không thể tải danh sách.",
+    "failedToLoadMore": "Không thể tải thêm."
+  },
   "poll": {
     "badge": "Bình chọn",
     "fallback": "Bình chọn",
     "votes": "{count} lượt bình chọn",
-    "noVotes": "Chưa có lượt bình chọn"
+    "noVotes": "Chưa có lượt bình chọn",
+    "vote": "Bình chọn",
+    "voting": "Đang gửi…",
+    "ended": "Đã kết thúc",
+    "open": "Đang mở",
+    "error": "Không thể bình chọn. Vui lòng thử lại.",
+    "timeLeftHM": "Còn {h}g {m}p",
+    "timeLeftM": "Còn {m} phút"
   }
 }

@@ -782,13 +782,15 @@
   font-weight: 600;
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    color 0.15s ease;
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   font-size: 14px;
 }
 
 .menuItem:hover {
   background: var(--color-surface-muted);
+  transform: translateX(3px);
 }
 
 .menuItemDanger {
@@ -1789,22 +1791,28 @@
   width: 100%;
   border-radius: 12px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
+  background: transparent;
   padding: 10px 12px;
   color: var(--color-text);
   cursor: pointer;
   transition:
-    transform 120ms ease,
-    border 120ms ease,
-    box-shadow 120ms ease;
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .categoryCard:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(14, 165, 233, 0.07));
+  border-color: rgba(124, 58, 237, 0.3);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.12);
 }
 
 .categoryCardActive {
-  background: rgba(255, 255, 255, 0.04);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(56, 189, 248, 0.09));
+  border-color: rgba(124, 58, 237, 0.4);
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15) inset;
 }
 
 .categoryDot {
@@ -1821,7 +1829,7 @@
 .reasonPanel {
   border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: var(--color-surface-muted);
+  background: transparent;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -2370,4 +2378,1624 @@
 /* reportStepTitle ẩn trên desktop */
 .reportStepTitle {
   display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Galaxy UI v2 — Deep Space, Dual Nebula, Gradient Borders, 3D
+   ═══════════════════════════════════════════════════════════════ */
+
+/*
+ * Gradient border technique: border: 1px solid transparent +
+ * background layers split between padding-box (content) and
+ * border-box (gradient fills the 1px border area).
+ */
+
+/* ── Feed card — dual nebula + gradient border + 3D hover ── */
+.feedCard {
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 16px;
+  position: relative;
+  background:
+    radial-gradient(ellipse at 92% 4%,  rgba(124, 58, 237, 0.13) 0%, transparent 50%) padding-box,
+    radial-gradient(ellipse at 8%  96%, rgba(14, 165, 233, 0.1)  0%, transparent 50%) padding-box,
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.38) 0%,
+      rgba(56,  189, 248, 0.26) 48%,
+      rgba(34,  211, 238, 0.18) 100%
+    ) border-box;
+  box-shadow:
+    0 6px 24px rgba(124, 58, 237, 0.09),
+    0 3px 10px rgba(14, 165, 233, 0.06);
+  backdrop-filter: blur(8px);
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.28s ease;
+}
+
+.feedCard:hover {
+  transform: translateY(-4px) perspective(900px) rotateX(0.9deg);
+  box-shadow:
+    0 16px 42px rgba(124, 58, 237, 0.18),
+    0 8px 22px rgba(56,  189, 248, 0.1),
+    0 3px 8px  rgba(34,  211, 238, 0.06);
+  background:
+    radial-gradient(ellipse at 92% 4%,  rgba(124, 58, 237, 0.18) 0%, transparent 50%) padding-box,
+    radial-gradient(ellipse at 8%  96%, rgba(14, 165, 233, 0.14) 0%, transparent 50%) padding-box,
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.55) 0%,
+      rgba(56,  189, 248, 0.38) 48%,
+      rgba(34,  211, 238, 0.28) 100%
+    ) border-box;
+}
+
+.sponsoredCard {
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(14, 165, 233, 0.14) 0%, transparent 50%) padding-box,
+    radial-gradient(ellipse at 12% 92%, rgba(34, 211, 238, 0.1)  0%, transparent 50%) padding-box,
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(14, 165, 233, 0.45) 0%,
+      rgba(34, 211, 238, 0.3)  60%,
+      rgba(56, 189, 248, 0.2)  100%
+    ) border-box;
+  box-shadow:
+    0 6px 22px rgba(14,  165, 233, 0.12),
+    0 3px 10px rgba(34,  211, 238, 0.07);
+}
+
+/* ── Action row — galaxy separator line ── */
+.actionRow {
+  position: relative;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.actionRow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(124, 58, 237, 0.22) 22%,
+    rgba(56,  189, 248, 0.18) 55%,
+    rgba(34,  211, 238, 0.12) 80%,
+    transparent 100%
+  );
+}
+
+/* ── Avatar — dual-ring halo (purple + blue) ── */
+.avatar {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee);
+  color: #fff;
+  box-shadow:
+    0 0 0 2px rgba(124, 58, 237, 0.4),
+    0 0 0 4px rgba(56,  189, 248, 0.14),
+    0 0 16px rgba(124, 58, 237, 0.28),
+    0 0 28px rgba(14,  165, 233, 0.1);
+}
+
+.avatarImg {
+  box-shadow:
+    0 0 0 2px rgba(124, 58, 237, 0.32),
+    0 0 0 4px rgba(56,  189, 248, 0.1),
+    0 0 12px rgba(124, 58, 237, 0.18);
+}
+
+/* ── Mute badge icon button ── */
+.muteBadge {
+  background: rgba(124, 58, 237, 0.07);
+  border: 1px solid rgba(124, 58, 237, 0.14);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.muteBadge:hover {
+  background: rgba(124, 58, 237, 0.14);
+  border-color: rgba(124, 58, 237, 0.3);
+  color: #a78bfa;
+}
+
+/* ── Tags / location labels ── */
+.tag {
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+}
+
+.metaLabel {
+  background: rgba(56, 189, 248, 0.09);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+/* ── Stats row — galaxy frosted glass ── */
+.statRow {
+  background:
+    radial-gradient(ellipse at 85% 50%, rgba(56, 189, 248, 0.07), transparent 60%),
+    rgba(124, 58, 237, 0.05);
+  border: 1px solid rgba(124, 58, 237, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+}
+
+.statItemClickable:hover {
+  color: #38bdf8;
+}
+
+/* ── Action buttons ── */
+.actionBtnActive {
+  color: #a78bfa;
+  filter: drop-shadow(0 0 5px rgba(167, 139, 250, 0.38));
+}
+
+.actionBtn:hover {
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+/* ── Media nav / counter ── */
+.mediaNavBtn {
+  background: rgba(8, 12, 28, 0.55);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  color: #e5e7eb;
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mediaNavBtn:hover {
+  background: rgba(14, 165, 233, 0.45);
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.35);
+  transform: translateY(-50%) scale(1.08);
+}
+
+.mediaNavLeft:hover  { transform: translateY(-50%) scale(1.08); }
+.mediaNavRight:hover { transform: translateY(-50%) scale(1.08); }
+
+.mediaCounter {
+  background: rgba(8, 12, 28, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  color: #e5e7eb;
+}
+
+/* ── "..." menu popover — gradient border ── */
+.menuPopover {
+  border: 1px solid transparent;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.48) 0%,
+      rgba(56,  189, 248, 0.32) 50%,
+      rgba(34,  211, 238, 0.22) 100%
+    ) border-box;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
+    0 20px 50px rgba(6, 10, 22, 0.38),
+    0 4px 16px rgba(124, 58, 237, 0.14),
+    0 2px 8px  rgba(56,  189, 248, 0.06);
+  backdrop-filter: blur(40px);
+}
+
+/* Galaxy accent line at top */
+.menuPopover::before {
+  content: "";
+  display: block;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 28%,
+    #0ea5e9 58%,
+    #22d3ee 82%,
+    transparent
+  );
+  margin-bottom: 8px;
+}
+
+.menuItem:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.1),
+    rgba(56, 189, 248, 0.06)
+  );
+  color: var(--color-text);
+}
+
+/* ── Modal overlays ── */
+.modalOverlay {
+  background: rgba(4, 7, 18, 0.62);
+  backdrop-filter: blur(10px);
+}
+
+.modalCard {
+  border: 1px solid transparent;
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 90% 5%,  rgba(124, 58, 237, 0.1) 0%, transparent 50%) padding-box,
+    radial-gradient(ellipse at 10% 95%, rgba(14,  165, 233, 0.08) 0%, transparent 50%) padding-box,
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.44) 0%,
+      rgba(56,  189, 248, 0.3)  50%,
+      rgba(34,  211, 238, 0.2)  100%
+    ) border-box;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
+    0 28px 70px rgba(4, 7, 18, 0.44),
+    0 6px 22px rgba(124, 58, 237, 0.14);
+}
+
+/* Galaxy gradient line at top */
+.modalCard::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 28%,
+    #0ea5e9 58%,
+    #22d3ee 82%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* ── Primary modal button — galaxy gradient + shimmer ── */
+.modalPrimary {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee);
+  border: none;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.modalPrimary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.14) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.4s ease;
+  pointer-events: none;
+}
+
+.modalPrimary:hover:not(:disabled)::after { transform: translateX(120%); }
+.modalPrimary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 26px rgba(124, 58, 237, 0.4);
+  filter: none;
+}
+
+/* ── Mute / option selectors ── */
+.muteOption:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.06), rgba(14, 165, 233, 0.05));
+}
+
+.muteOptionActive {
+  border-color: rgba(124, 58, 237, 0.5);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(56, 189, 248, 0.07));
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.2) inset,
+    0 6px 18px rgba(124, 58, 237, 0.1);
+  color: #a78bfa;
+}
+
+/* ── Visibility options ── */
+.visibilityOption:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.06), rgba(14, 165, 233, 0.04));
+  border-color: rgba(56, 189, 248, 0.22);
+  transform: translateY(-1px);
+}
+
+.visibilityOptionActive {
+  border-color: rgba(124, 58, 237, 0.44);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(56, 189, 248, 0.06));
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.16) inset;
+}
+
+.visibilityOptionActive .visibilityRadio {
+  border-color: #a78bfa;
+  background: rgba(124, 58, 237, 0.18);
+}
+
+/* ── Toggle cards ── */
+.toggleCard:hover {
+  border-color: rgba(56, 189, 248, 0.25);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.06), rgba(14, 165, 233, 0.04));
+}
+
+.toggleCardActive {
+  border-color: rgba(124, 58, 237, 0.46);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(56, 189, 248, 0.06));
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.16) inset;
+  transform: translateY(-1px);
+}
+
+/* ── Reason rows ── */
+.reasonRow:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.06), rgba(14, 165, 233, 0.04));
+  border-color: rgba(56, 189, 248, 0.18);
+}
+
+.reasonRowActive {
+  border-color: rgba(124, 58, 237, 0.42);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(56, 189, 248, 0.06));
+}
+
+.reasonRadioDot {
+  background: linear-gradient(135deg, #a78bfa, #38bdf8);
+}
+
+/* ── Report category cards — galaxy v2 ── */
+.categoryCard:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(14, 165, 233, 0.08));
+  border-color: rgba(56, 189, 248, 0.38);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.16), 0 2px 8px rgba(14, 165, 233, 0.1);
+}
+
+.categoryCardActive {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(14, 165, 233, 0.1));
+  border-color: rgba(56, 189, 248, 0.28);
+}
+
+/* ── Repost menu — gradient border ── */
+.repostMenu {
+  border: 1px solid transparent;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.45) 0%,
+      rgba(56,  189, 248, 0.3)  55%,
+      rgba(34,  211, 238, 0.2)  100%
+    ) border-box;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
+    0 16px 40px rgba(6, 10, 22, 0.36),
+    0 4px 14px rgba(124, 58, 237, 0.12);
+  backdrop-filter: blur(14px);
+}
+
+.repostMenuItem:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.09), rgba(14, 165, 233, 0.05));
+}
+
+/* ── Repost sheet — gradient border ── */
+.repostSheet {
+  border: 1px solid transparent;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.1) 0%, transparent 50%) padding-box,
+    radial-gradient(ellipse at 12% 92%, rgba(14,  165, 233, 0.08) 0%, transparent 50%) padding-box,
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.42) 0%,
+      rgba(56,  189, 248, 0.28) 55%,
+      rgba(34,  211, 238, 0.18) 100%
+    ) border-box;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
+    0 28px 68px rgba(4, 7, 18, 0.42),
+    0 6px 20px rgba(124, 58, 237, 0.12);
+}
+
+.repostSheetHeader {
+  border-bottom: 1px solid rgba(56, 189, 248, 0.12);
+}
+
+.repostSheetItem:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.07), rgba(14, 165, 233, 0.04));
+}
+
+.repostSheetPrimary { color: #38bdf8; }
+
+/* Repost option grid */
+.repostOption:hover {
+  transform: translateY(-2px) perspective(600px) rotateX(0.5deg);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(14, 165, 233, 0.05));
+  border-color: rgba(56, 189, 248, 0.28);
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.1);
+}
+
+.repostOptionActive {
+  border-color: rgba(124, 58, 237, 0.48);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(56, 189, 248, 0.07));
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.18) inset;
+}
+
+/* Repost badge */
+.repostBadge {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(56, 189, 248, 0.08));
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  color: #38bdf8;
+}
+
+.repostTextarea:focus {
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+  outline: none;
+}
+
+/* ── Skeleton shimmer — space nebula ── */
+.skeleton {
+  border-radius: 14px;
+  background: linear-gradient(
+    90deg,
+    rgba(10, 16, 36, 0.65)  0%,
+    rgba(44, 18, 82, 0.72)  38%,
+    rgba(8,  30, 60, 0.68)  65%,
+    rgba(10, 16, 36, 0.65) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+:global([data-theme="light"]) .skeleton {
+  background: linear-gradient(90deg, #eef0f8, #e2e6f5, #eef0f8);
+  background-size: 200% 100%;
+}
+
+/* ── Load more button ── */
+.loadMore {
+  border: 1px solid transparent;
+  background:
+    rgba(124, 58, 237, 0.06) padding-box,
+    linear-gradient(90deg, rgba(124,58,237,0.3), rgba(56,189,248,0.2), rgba(34,211,238,0.14)) border-box;
+  color: var(--color-text-muted);
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.loadMore:hover {
+  color: var(--color-text);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.12);
+  background:
+    rgba(124, 58, 237, 0.1) padding-box,
+    linear-gradient(90deg, rgba(124,58,237,0.44), rgba(56,189,248,0.3), rgba(34,211,238,0.22)) border-box;
+}
+
+/* ── Toast — floating in space ── */
+.toast {
+  border: 1px solid transparent;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(90deg,
+      rgba(124, 58, 237, 0.5),
+      rgba(56,  189, 248, 0.35),
+      rgba(34,  211, 238, 0.25)
+    ) border-box;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
+    0 10px 36px rgba(4, 7, 18, 0.42),
+    0 0  22px rgba(124, 58, 237, 0.16),
+    0 0  10px rgba(56,  189, 248, 0.08);
+  color: var(--color-text);
+}
+
+/* ── Note / report input focus ── */
+.noteInput:focus {
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+}
+
+/* ── Mention / location dropdowns ── */
+.mentionDropdown,
+.locationDropdown {
+  border: 1px solid transparent;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.35) 0%,
+      rgba(56,  189, 248, 0.22) 55%,
+      rgba(34,  211, 238, 0.15) 100%
+    ) border-box;
+  box-shadow:
+    0 12px 34px rgba(6, 10, 22, 0.28),
+    0 2px 8px rgba(124, 58, 237, 0.1);
+}
+
+.mentionItem:hover,
+.locationItem:hover,
+.mentionItemActive,
+.locationItemActive {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(14, 165, 233, 0.05));
+}
+
+/* ── Switch row toggle — galaxy gradient ── */
+.switchRow input[type="checkbox"]:checked {
+  background: linear-gradient(135deg, #7c3aed, #0ea5e9);
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
+}
+
+/* ── Chip tags ── */
+.chipTag {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
+}
+
+/* ── Light mode — keep effects subtle ── */
+:global([data-theme="light"]) .feedCard {
+  background:
+    radial-gradient(ellipse at 92% 4%,  rgba(124, 58, 237, 0.06) 0%, transparent 50%) padding-box,
+    radial-gradient(ellipse at 8%  96%, rgba(14, 165, 233, 0.05) 0%, transparent 50%) padding-box,
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.2)  0%,
+      rgba(56,  189, 248, 0.14) 48%,
+      rgba(34,  211, 238, 0.1)  100%
+    ) border-box;
+  box-shadow: 0 2px 12px rgba(124, 58, 237, 0.06), 0 1px 4px rgba(0,0,0,0.04);
+}
+
+:global([data-theme="light"]) .feedCard:hover {
+  transform: none;
+  box-shadow:
+    0 6px 22px rgba(124, 58, 237, 0.1),
+    0 3px 10px rgba(56, 189, 248, 0.06);
+}
+
+:global([data-theme="light"]) .avatar {
+  box-shadow:
+    0 0 0 2px rgba(124, 58, 237, 0.25),
+    0 0 0 4px rgba(56, 189, 248, 0.08),
+    0 0 10px rgba(124, 58, 237, 0.14);
+}
+
+/* ── Fix: remove hover lift on feed card (both modes) ── */
+.feedCard:hover {
+  transform: none;
+  box-shadow:
+    0 10px 32px rgba(124, 58, 237, 0.15),
+    0 5px 16px rgba(56, 189, 248, 0.09),
+    0 2px 6px rgba(34, 211, 238, 0.05);
+  background:
+    radial-gradient(ellipse at 92% 4%,  rgba(124, 58, 237, 0.18) 0%, transparent 50%) padding-box,
+    radial-gradient(ellipse at 8%  96%, rgba(14, 165, 233, 0.14) 0%, transparent 50%) padding-box,
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.55) 0%,
+      rgba(56,  189, 248, 0.38) 48%,
+      rgba(34,  211, 238, 0.28) 100%
+    ) border-box;
+}
+
+/* ── Fix: menu popover — solid background in light mode ── */
+:global([data-theme="light"]) .menuPopover {
+  background:
+    #ffffff padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.3) 0%,
+      rgba(56,  189, 248, 0.2) 50%,
+      rgba(34,  211, 238, 0.14) 100%
+    ) border-box;
+  box-shadow:
+    0 4px 28px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.07);
+  backdrop-filter: none;
+}
+
+/* ── Fix: tags & hashtags — galaxy gradient border + gradient text ── */
+.tag {
+  position: relative;
+  z-index: 0;
+  background: transparent;
+  border: none;
+  background-image: linear-gradient(135deg, #c084fc 0%, #38bdf8 62%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.tag::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(135deg, rgba(124,58,237,0.11), rgba(56,189,248,0.07)) padding-box,
+    linear-gradient(135deg,
+      rgba(124, 58, 237, 0.44),
+      rgba(56,  189, 248, 0.3),
+      rgba(34,  211, 238, 0.2)
+    ) border-box;
+}
+
+:global([data-theme="light"]) .tag {
+  background-image: linear-gradient(135deg, #7c3aed 0%, #0284c7 60%, #0891b2 100%);
+}
+
+:global([data-theme="light"]) .tag::before {
+  background:
+    linear-gradient(135deg, rgba(124,58,237,0.07), rgba(14,165,233,0.05)) padding-box,
+    linear-gradient(135deg,
+      rgba(124, 58, 237, 0.28),
+      rgba(56,  189, 248, 0.18),
+      rgba(34,  211, 238, 0.12)
+    ) border-box;
+}
+
+.metaLabel {
+  position: relative;
+  z-index: 0;
+  background: transparent;
+  border: none;
+  background-image: linear-gradient(135deg, #c084fc 0%, #38bdf8 62%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.metaLabel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(135deg, rgba(124,58,237,0.11), rgba(56,189,248,0.07)) padding-box,
+    linear-gradient(135deg,
+      rgba(124, 58, 237, 0.44),
+      rgba(56,  189, 248, 0.3),
+      rgba(34,  211, 238, 0.2)
+    ) border-box;
+}
+
+/* Hashtag links — galaxy gradient text */
+.hashtagLink {
+  background: linear-gradient(135deg, #a78bfa 0%, #38bdf8 60%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+:global([data-theme="light"]) .hashtagLink {
+  background: linear-gradient(135deg, #7c3aed 0%, #0284c7 60%, #0891b2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Fix: action button active — electric indigo (galaxy, not just purple) ── */
+.actionBtnActive {
+  color: #6366f1;
+  filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.4));
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .feedCard:hover {
+    transform: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   Hotfix — Menu opacity + Tag text readability
+   ═══════════════════════════════════════════════ */
+
+/* Menu: bỏ backdrop-filter hoàn toàn, background đặc */
+.menuPopover {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.48) 0%,
+      rgba(56,  189, 248, 0.32) 50%,
+      rgba(34,  211, 238, 0.22) 100%
+    ) border-box !important;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.05) inset,
+    0 18px 48px rgba(6, 10, 22, 0.42),
+    0 6px 20px rgba(124, 58, 237, 0.14),
+    0 2px 8px  rgba(56, 189, 248, 0.07) !important;
+}
+
+:global([data-theme="light"]) .menuPopover {
+  background:
+    #ffffff padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.3) 0%,
+      rgba(56,  189, 248, 0.2) 50%,
+      rgba(34,  211, 238, 0.14) 100%
+    ) border-box !important;
+  box-shadow:
+    0 4px 28px rgba(0, 0, 0, 0.18),
+    0 2px 10px rgba(0, 0, 0, 0.09) !important;
+}
+
+/* Tag / location — text contrast cao hơn */
+.tag {
+  /* dark mode: gradient đậm hơn, dễ đọc */
+  background-image: linear-gradient(
+    135deg,
+    #a78bfa 0%,
+    #60a5fa 55%,
+    #22d3ee 100%
+  ) !important;
+}
+
+:global([data-theme="light"]) .tag {
+  background-image: linear-gradient(
+    135deg,
+    #6d28d9 0%,
+    #0369a1 60%,
+    #0e7490 100%
+  ) !important;
+}
+
+/* Hashtag text contrast */
+.hashtagLink {
+  background: linear-gradient(
+    135deg,
+    #a78bfa 0%,
+    #60a5fa 55%,
+    #22d3ee 100%
+  ) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+:global([data-theme="light"]) .hashtagLink {
+  background: linear-gradient(
+    135deg,
+    #6d28d9 0%,
+    #0369a1 60%,
+    #0e7490 100%
+  ) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   Light Mode — Menu + Modal elevated visual separation
+   ══════════════════════════════════════════════════════ */
+
+/* ── Feed card "..." menu — elevated over white page ── */
+:global([data-theme="light"]) .menuPopover {
+  background:
+    #f3f4ff padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.32) 0%,
+      rgba(56,  189, 248, 0.22) 50%,
+      rgba(34,  211, 238, 0.15) 100%
+    ) border-box !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.07),
+    0 10px 38px rgba(0, 0, 0, 0.18),
+    0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: none !important;
+}
+
+:global([data-theme="light"]) .menuItem {
+  color: #1e1b4b;
+}
+
+:global([data-theme="light"]) .menuItem:hover {
+  background: linear-gradient(135deg, rgba(124,58,237,0.09), rgba(56,189,248,0.05));
+  color: #3b0764;
+}
+
+:global([data-theme="light"]) .menuItemDanger {
+  color: #dc2626;
+}
+
+:global([data-theme="light"]) .menuHint {
+  color: #6b7280;
+}
+
+/* .modalCard generic — each modal now has its own scoped dark-galaxy block */
+
+/* categoryCard / reasonPanel light mode → scoped to .reportCard in the dedicated block below */
+
+/* Note input — semi-transparent glass */
+:global([data-theme="light"]) .noteInput {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff;
+}
+
+:global([data-theme="light"]) .noteInput:focus {
+  border-color: rgba(124, 58, 237, 0.45) !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08) !important;
+}
+
+/* Modal action buttons */
+:global([data-theme="light"]) .modalSecondary {
+  background: #ffffff !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+  color: #374151 !important;
+}
+
+:global([data-theme="light"]) .modalSecondary:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.04) !important;
+  border-color: rgba(124, 58, 237, 0.34) !important;
+  transform: translateY(-1px);
+}
+
+/* reportCard closeBtn → moved to dedicated .reportCard block below */
+
+/* Visibility & toggle options */
+:global([data-theme="light"]) .visibilityOption {
+  background: #ffffff !important;
+  border-color: rgba(124, 58, 237, 0.12) !important;
+  color: #1e1b4b;
+}
+
+:global([data-theme="light"]) .visibilityOptionActive {
+  background: linear-gradient(135deg, rgba(124,58,237,0.07), rgba(56,189,248,0.04)) !important;
+  border-color: rgba(124, 58, 237, 0.28) !important;
+}
+
+:global([data-theme="light"]) .toggleCard {
+  background: #ffffff !important;
+  border-color: rgba(124, 58, 237, 0.12) !important;
+  color: #1e1b4b;
+}
+
+:global([data-theme="light"]) .toggleCardActive {
+  background: linear-gradient(135deg, rgba(124,58,237,0.07), rgba(56,189,248,0.04)) !important;
+  border-color: rgba(124, 58, 237, 0.28) !important;
+}
+
+/* Mute options */
+:global([data-theme="light"]) .muteOption {
+  background: #ffffff !important;
+  border-color: rgba(124, 58, 237, 0.12) !important;
+  color: #1e1b4b;
+}
+
+:global([data-theme="light"]) .muteOptionActive {
+  background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(56,189,248,0.05)) !important;
+  border-color: rgba(124, 58, 237, 0.3) !important;
+  color: #4c1d95 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LIGHT MODE — Menu + Report visibility overhaul
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Feed card "..." menu — solid elevated white card ── */
+:global([data-theme="light"]) .menuPopover {
+  border: 1px solid rgba(124, 58, 237, 0.22) !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 8px 36px rgba(0, 0, 0, 0.18),
+    0 3px 14px rgba(124, 58, 237, 0.1) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Softer galaxy accent line on white menu */
+:global([data-theme="light"]) .menuPopover::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.35) 25%,
+    rgba(14, 165, 233, 0.28) 55%,
+    rgba(34, 211, 238, 0.22) 80%,
+    transparent
+  ) !important;
+}
+
+:global([data-theme="light"]) .menuItem {
+  color: #1e1b4b !important;
+  font-weight: 600;
+  /* transition comes from base .menuItem */
+}
+
+:global([data-theme="light"]) .menuItem:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.1),
+    rgba(56, 189, 248, 0.06)
+  ) !important;
+  color: #3b0764 !important;
+  transform: translateX(3px);
+  /* cubic-bezier spring inherited from base transition */
+}
+
+:global([data-theme="light"]) .menuItemDanger {
+  color: #dc2626 !important;
+}
+
+:global([data-theme="light"]) .menuItemDanger:hover {
+  background: rgba(220, 38, 38, 0.07) !important;
+  color: #b91c1c !important;
+}
+
+:global([data-theme="light"]) .menuHint {
+  color: #6b7280 !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LIGHT MODE — Overlay backdrop (chung cho tất cả modal)
+   ══════════════════════════════════════════════════════════════════ */
+:global([data-theme="light"]) .modalOverlay {
+  background: rgba(10, 16, 36, 0.62) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LIGHT MODE — REPORT CARD: dark-glass card riêng biệt
+   Tất cả styles liên quan đến report modal trong light mode
+   tập trung ở đây, scope vào .reportCard để không ảnh hưởng modal khác
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Card background — dark semi-transparent, higher specificity (.reportCard.modalCard) to beat general .modalCard white override */
+:global([data-theme="light"]) .reportCard.modalCard {
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(14, 165, 233, 0.16) 0%, transparent 55%),
+    rgba(8, 12, 28, 0.86) !important;
+  border: 1px solid rgba(124, 58, 237, 0.38) !important;
+  box-shadow:
+    0 2px 0 rgba(124, 58, 237, 0.1) inset,
+    0 24px 64px rgba(0, 0, 0, 0.42),
+    0 6px 22px rgba(124, 58, 237, 0.2) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* Galaxy accent line — sáng hơn để thấy trên nền tối */
+:global([data-theme="light"]) .reportCard.modalCard::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 22%,
+    #0ea5e9 55%,
+    #22d3ee 80%,
+    transparent
+  ) !important;
+}
+
+/* ── Text trong report card — trắng ── */
+:global([data-theme="light"]) .reportCard .modalTitle {
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .reportCard .modalBody {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+:global([data-theme="light"]) .reportCard .closeBtn {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+:global([data-theme="light"]) .reportCard .closeBtn:hover {
+  color: #ffffff !important;
+}
+
+/* ── Category cards — transparent + white text ── */
+:global([data-theme="light"]) .reportCard .categoryCard {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: none !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+:global([data-theme="light"]) .reportCard .categoryCard:hover {
+  transform: translateY(-2px) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.3),
+    rgba(56, 189, 248, 0.18)
+  ) !important;
+  border-color: rgba(124, 58, 237, 0.55) !important;
+  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.28) !important;
+}
+
+:global([data-theme="light"]) .reportCard .categoryCardActive {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.4),
+    rgba(14, 165, 233, 0.24)
+  ) !important;
+  border-color: rgba(124, 58, 237, 0.65) !important;
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.2) inset,
+    0 4px 20px rgba(124, 58, 237, 0.32) !important;
+}
+
+:global([data-theme="light"]) .reportCard .categoryLabel {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+/* ── Reason panel ── */
+:global([data-theme="light"]) .reportCard .reasonPanel {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
+}
+
+:global([data-theme="light"]) .reportCard .reasonHeader {
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .reportCard .reasonRow {
+  color: rgba(255, 255, 255, 0.85) !important;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+:global([data-theme="light"]) .reportCard .reasonRow:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+:global([data-theme="light"]) .reportCard .reasonRowActive {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.35),
+    rgba(56, 189, 248, 0.2)
+  ) !important;
+  border-color: rgba(124, 58, 237, 0.55) !important;
+}
+
+:global([data-theme="light"]) .reportCard .reasonPlaceholder {
+  color: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* ── Note input ── */
+:global([data-theme="light"]) .reportCard .noteInput {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+}
+
+:global([data-theme="light"]) .reportCard .noteInput::placeholder {
+  color: rgba(255, 255, 255, 0.38) !important;
+}
+
+:global([data-theme="light"]) .reportCard .noteInput:focus {
+  border-color: rgba(124, 58, 237, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18) !important;
+}
+
+:global([data-theme="light"]) .reportCard .noteLabel {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+/* ── Action buttons trong report card ── */
+:global([data-theme="light"]) .reportCard .modalSecondary {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .reportCard .modalSecondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ── DARK MODE — Improve menu hover feedback ── */
+.menuItem:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.13),
+    rgba(56, 189, 248, 0.07)
+  ) !important;
+  color: var(--color-text) !important;
+  transform: translateX(3px);
+  /* transition inherited from base .menuItem */
+}
+
+.menuItemDanger:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #f97373 !important;
+  transform: translateX(3px);
+}
+
+/* ── DARK MODE — Report category cards hover ── */
+.categoryCard:hover {
+  border-color: rgba(124, 58, 237, 0.36) !important;
+  box-shadow:
+    0 4px 16px rgba(124, 58, 237, 0.14),
+    0 2px 8px rgba(56, 189, 248, 0.06) !important;
+}
+
+.reasonRow:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.09),
+    rgba(56, 189, 248, 0.05)
+  ) !important;
+  border-color: rgba(124, 58, 237, 0.22) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GALAXY EDIT MODAL — Dark + Light, 3D + Glass
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Base inputs — galaxy border + radius (both modes) ── */
+.editTextarea,
+.editInput {
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.editTextarea:focus,
+.editInput:focus {
+  border-color: rgba(124, 58, 237, 0.55) !important;
+  box-shadow:
+    0 0 0 3px rgba(124, 58, 237, 0.12),
+    0 4px 14px rgba(124, 58, 237, 0.1) !important;
+  transform: perspective(600px) translateZ(2px);
+  background: var(--color-surface-muted) !important;
+}
+
+/* ── Switch group — galaxy gradient border ── */
+.switchGroup {
+  border: 1px solid transparent;
+  background:
+    var(--color-surface-muted) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.3) 0%,
+      rgba(56, 189, 248, 0.18) 55%,
+      rgba(34, 211, 238, 0.12) 100%
+    ) border-box;
+  border-radius: 14px;
+  transition: box-shadow 0.2s ease;
+}
+
+.switchGroup:hover {
+  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.08);
+}
+
+/* ── Switch row hover — galaxy tint ── */
+.switchRow:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.07),
+    rgba(56, 189, 248, 0.04)
+  ) !important;
+  border-color: rgba(124, 58, 237, 0.16) !important;
+  transform: perspective(600px) translateZ(1px);
+}
+
+/* ── Chip shell — galaxy border ── */
+.chipShell,
+.chipRow {
+  border: 1px solid transparent;
+  background:
+    var(--color-surface-muted) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.28) 0%,
+      rgba(56, 189, 248, 0.16) 55%,
+      rgba(34, 211, 238, 0.1) 100%
+    ) border-box;
+  transition: box-shadow 0.2s ease;
+}
+
+.chipShell:focus-within,
+.chipRow:focus-within {
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+/* Chip gradient — stronger galaxy ── */
+.chipShell .chip {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee) !important;
+  box-shadow:
+    0 4px 14px rgba(124, 58, 237, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+}
+
+/* ── Galaxy switch toggle checked ── */
+.switchRow input[type="checkbox"]:checked {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee) !important;
+  box-shadow: 0 0 10px rgba(124, 58, 237, 0.45) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LIGHT MODE — Edit modal: dark-galaxy, scoped to .editCard
+   ══════════════════════════════════════════════════════════════ */
+
+:global([data-theme="light"]) .editCard.modalCard {
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(14, 165, 233, 0.16) 0%, transparent 55%),
+    rgba(8, 12, 28, 0.86) !important;
+  border: 1px solid rgba(124, 58, 237, 0.38) !important;
+  box-shadow:
+    0 2px 0 rgba(124, 58, 237, 0.1) inset,
+    0 24px 64px rgba(0, 0, 0, 0.42),
+    0 6px 22px rgba(124, 58, 237, 0.2) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+:global([data-theme="light"]) .editCard.modalCard::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 22%,
+    #0ea5e9 55%,
+    #22d3ee 80%,
+    transparent
+  ) !important;
+}
+
+/* ── Text — trắng ── */
+:global([data-theme="light"]) .editCard .modalTitle {
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .editCard .closeBtn {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+:global([data-theme="light"]) .editCard .closeBtn:hover {
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .editCard .editLabel,
+:global([data-theme="light"]) .editCard .editLabelText {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+:global([data-theme="light"]) .editCard .editHint {
+  color: rgba(255, 255, 255, 0.48) !important;
+}
+
+/* ── Inputs — glass ── */
+:global([data-theme="light"]) .editCard .editTextarea,
+:global([data-theme="light"]) .editCard .editInput {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+}
+
+:global([data-theme="light"]) .editCard .editTextarea::placeholder,
+:global([data-theme="light"]) .editCard .editInput::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+:global([data-theme="light"]) .editCard .editTextarea:focus,
+:global([data-theme="light"]) .editCard .editInput:focus {
+  background: rgba(124, 58, 237, 0.18) !important;
+  border-color: rgba(124, 58, 237, 0.65) !important;
+  box-shadow:
+    0 0 0 3px rgba(124, 58, 237, 0.2),
+    0 4px 14px rgba(124, 58, 237, 0.15) !important;
+}
+
+/* ── Switch group — glass ── */
+:global([data-theme="light"]) .editCard .switchGroup {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+:global([data-theme="light"]) .editCard .switchGroup:hover {
+  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.14) !important;
+}
+
+:global([data-theme="light"]) .editCard .switchRow:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+}
+
+:global([data-theme="light"]) .editCard .switchTitle {
+  color: rgba(255, 255, 255, 0.92) !important;
+  font-weight: 700 !important;
+}
+
+:global([data-theme="light"]) .editCard .switchHint {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+:global([data-theme="light"]) .editCard .switchRow input[type="checkbox"] {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+:global([data-theme="light"]) .editCard .switchRow input[type="checkbox"]:checked {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee) !important;
+  box-shadow:
+    0 0 12px rgba(124, 58, 237, 0.55),
+    0 0 24px rgba(14, 165, 233, 0.2) !important;
+}
+
+/* ── Chip shell ── */
+:global([data-theme="light"]) .editCard .chipShell,
+:global([data-theme="light"]) .editCard .chipRow {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 12px !important;
+}
+
+:global([data-theme="light"]) .editCard .chipInput {
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .editCard .chipInput::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+/* ── Char count ── */
+:global([data-theme="light"]) .editCard .charCount {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* ── Buttons ── */
+:global([data-theme="light"]) .editCard .modalSecondary {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .editCard .modalSecondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* noteInput / noteLabel belong to the report modal — scoped to .reportCard */
+
+/* ══════════════════════════════════════════════════════════════════
+   LIGHT MODE — VISIBILITY CARD & MUTE CARD: same dark-galaxy style
+   as reportCard — scoped to .visibilityCard / .muteCard
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Shared mixin — dark galaxy card */
+:global([data-theme="light"]) .visibilityCard.modalCard,
+:global([data-theme="light"]) .muteCard.modalCard {
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(14, 165, 233, 0.16) 0%, transparent 55%),
+    rgba(8, 12, 28, 0.86) !important;
+  border: 1px solid rgba(124, 58, 237, 0.38) !important;
+  box-shadow:
+    0 2px 0 rgba(124, 58, 237, 0.1) inset,
+    0 24px 64px rgba(0, 0, 0, 0.42),
+    0 6px 22px rgba(124, 58, 237, 0.2) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+:global([data-theme="light"]) .visibilityCard.modalCard::before,
+:global([data-theme="light"]) .muteCard.modalCard::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 22%,
+    #0ea5e9 55%,
+    #22d3ee 80%,
+    transparent
+  ) !important;
+}
+
+/* ── Text — trắng ── */
+:global([data-theme="light"]) .visibilityCard .modalTitle,
+:global([data-theme="light"]) .muteCard .modalTitle {
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .modalBody,
+:global([data-theme="light"]) .muteCard .modalBody {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .closeBtn,
+:global([data-theme="light"]) .muteCard .closeBtn {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .closeBtn:hover,
+:global([data-theme="light"]) .muteCard .closeBtn:hover {
+  color: #ffffff !important;
+}
+
+/* ── Visibility options ── */
+:global([data-theme="light"]) .visibilityCard .visibilityOption {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+:global([data-theme="light"]) .visibilityCard .visibilityOption:hover {
+  transform: translateY(-2px) !important;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(56, 189, 248, 0.14)) !important;
+  border-color: rgba(124, 58, 237, 0.45) !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.22) !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .visibilityOptionActive {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.35), rgba(14, 165, 233, 0.22)) !important;
+  border-color: rgba(124, 58, 237, 0.6) !important;
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.2) inset,
+    0 4px 18px rgba(124, 58, 237, 0.28) !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .visibilityTitle {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .visibilityDesc {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .visibilityRadio {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .visibilityOptionActive .visibilityRadio {
+  border-color: #a78bfa !important;
+  background: rgba(124, 58, 237, 0.3) !important;
+}
+
+/* ── Mute options ── */
+:global([data-theme="light"]) .muteCard .muteOption {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+:global([data-theme="light"]) .muteCard .muteOption:hover {
+  transform: translateY(-2px) !important;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(56, 189, 248, 0.14)) !important;
+  border-color: rgba(124, 58, 237, 0.45) !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.22) !important;
+}
+
+:global([data-theme="light"]) .muteCard .muteOptionActive {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.38), rgba(14, 165, 233, 0.22)) !important;
+  border-color: rgba(124, 58, 237, 0.62) !important;
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.22) inset,
+    0 4px 18px rgba(124, 58, 237, 0.28) !important;
+  color: #e0d4ff !important;
+}
+
+:global([data-theme="light"]) .muteCard .muteOptionTitle {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Custom mute date pickers */
+:global([data-theme="light"]) .muteCard .mutePicker label,
+:global([data-theme="light"]) .muteCard .switchTitle {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+:global([data-theme="light"]) .muteCard .switchRow input[type="checkbox"] {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+:global([data-theme="light"]) .muteCard .switchRow input[type="checkbox"]:checked {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee) !important;
+  box-shadow:
+    0 0 12px rgba(124, 58, 237, 0.55),
+    0 0 24px rgba(14, 165, 233, 0.2) !important;
+}
+
+/* ── Shared action buttons ── */
+:global([data-theme="light"]) .visibilityCard .modalSecondary,
+:global([data-theme="light"]) .muteCard .modalSecondary {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .visibilityCard .modalSecondary:hover:not(:disabled),
+:global([data-theme="light"]) .muteCard .modalSecondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LIGHT MODE — DELETE CARD: dark-galaxy style
+   ══════════════════════════════════════════════════════════════════ */
+
+:global([data-theme="light"]) .deleteCard.modalCard {
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(14, 165, 233, 0.16) 0%, transparent 55%),
+    rgba(8, 12, 28, 0.86) !important;
+  border: 1px solid rgba(239, 68, 68, 0.35) !important;
+  box-shadow:
+    0 2px 0 rgba(239, 68, 68, 0.08) inset,
+    0 24px 64px rgba(0, 0, 0, 0.42),
+    0 6px 22px rgba(239, 68, 68, 0.14) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+:global([data-theme="light"]) .deleteCard.modalCard::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 18%,
+    #ef4444 50%,
+    #f97316 80%,
+    transparent
+  ) !important;
+}
+
+:global([data-theme="light"]) .deleteCard .modalTitle {
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .deleteCard .modalBody {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+:global([data-theme="light"]) .deleteCard .modalSecondary {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+:global([data-theme="light"]) .deleteCard .modalSecondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+:global([data-theme="light"]) .deleteCard .modalDanger {
+  background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.35) !important;
+}
+
+:global([data-theme="light"]) .deleteCard .modalDanger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b91c1c, #dc2626) !important;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.48) !important;
+  transform: translateY(-1px) !important;
+}
+
+:global([data-theme="light"]) .deleteCard .inlineError {
+  background: rgba(239, 68, 68, 0.18) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5 !important;
 }

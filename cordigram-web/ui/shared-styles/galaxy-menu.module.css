@@ -1,0 +1,117 @@
+/* ═══════════════════════════════════════════════════════════════
+   Shared Galaxy Menu Popover styles
+   Compose into any dropdown menu class via:
+     .myMenu { composes: galaxyMenu from '@/ui/shared-styles/galaxy-menu.module.css'; }
+   ═══════════════════════════════════════════════════════════════ */
+
+.galaxyMenu {
+  border: 1px solid transparent;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.48) 0%,
+      rgba(56,  189, 248, 0.3)  50%,
+      rgba(34,  211, 238, 0.2)  100%
+    ) border-box;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
+    0 20px 52px rgba(6, 10, 22, 0.42),
+    0 4px 16px rgba(124, 58, 237, 0.16),
+    0 2px 8px  rgba(56,  189, 248, 0.06);
+  backdrop-filter: none;
+  animation: galaxyMenuIn 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.galaxyMenuItem {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.galaxyMenuItem:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.12),
+    rgba(56, 189, 248, 0.07)
+  );
+  color: var(--color-text);
+  transform: translateX(3px);
+}
+
+.galaxyMenuItemDanger {
+  color: #f97373;
+}
+
+.galaxyMenuItemDanger:hover {
+  background: rgba(239, 68, 68, 0.09) !important;
+  color: #f87171 !important;
+}
+
+.galaxyMenuAccentLine {
+  display: block;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 28%,
+    #0ea5e9 58%,
+    #22d3ee 82%,
+    transparent
+  );
+  margin-bottom: 6px;
+}
+
+/* Light mode */
+:global([data-theme="light"]) .galaxyMenu {
+  background:
+    #ffffff padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.3) 0%,
+      rgba(56,  189, 248, 0.2) 50%,
+      rgba(34,  211, 238, 0.14) 100%
+    ) border-box;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 10px 38px rgba(0, 0, 0, 0.18),
+    0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+:global([data-theme="light"]) .galaxyMenuItem {
+  color: #1e1b4b;
+}
+
+:global([data-theme="light"]) .galaxyMenuItem:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.09),
+    rgba(56, 189, 248, 0.05)
+  );
+  color: #3b0764;
+}
+
+:global([data-theme="light"]) .galaxyMenuItemDanger {
+  color: #dc2626;
+}
+
+:global([data-theme="light"]) .galaxyMenuItemDanger:hover {
+  background: rgba(220, 38, 38, 0.07) !important;
+  color: #b91c1c !important;
+}
+
+@keyframes galaxyMenuIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}

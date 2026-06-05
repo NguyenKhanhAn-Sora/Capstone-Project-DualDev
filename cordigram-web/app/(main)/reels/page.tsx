@@ -48,6 +48,10 @@ import postStyles from "../post/post.module.css";
 import feedStyles from "../home-feed.module.css";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
+import ReportOverlay from "@/ui/report-overlay/report-overlay";
+import ConfirmActionOverlay from "@/ui/confirm-action-overlay/confirm-action-overlay";
+import VisibilityPickerOverlay from "@/ui/visibility-picker-overlay/visibility-picker-overlay";
+import MutePickerOverlay from "@/ui/mute-picker-overlay/mute-picker-overlay";
 import RepostOverlay, {
   type QuoteInput,
   type RepostTarget,
@@ -4232,371 +4236,88 @@ export default function ReelPage({
         </div>
       ) : null}
 
-      {deleteConfirmOpen ? (
-        <div
-          className={`${postStyles.reportOverlay} ${postStyles.reportOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeDeleteConfirm}
-        >
-          <div
-            className={postStyles.reportCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={postStyles.reportHeader}>
-              <div>
-                <h3 className={postStyles.reportTitle}>{t("reelsPage.deleteModal.title")}</h3>
-                <p className={postStyles.reportBody}>
-                  Removing this reel cannot be undone. It will disappear
-                  immediately.
-                </p>
-              </div>
-              <button
-                className={postStyles.reportClose}
-                aria-label={t("reelsPage.deleteModal.close")}
-                onClick={closeDeleteConfirm}
-                disabled={deleteSubmitting}
-              >
-                ×
-              </button>
-            </div>
+      <ConfirmActionOverlay
+        open={deleteConfirmOpen}
+        onClose={closeDeleteConfirm}
+        variant="danger"
+        title={t("reelsPage.deleteModal.title")}
+        body="Removing this reel cannot be undone. It will disappear immediately."
+        error={deleteError}
+        submitting={deleteSubmitting}
+        onConfirm={confirmDelete}
+        labelConfirm={t("reelsPage.deleteModal.delete")}
+        labelConfirming={t("reelsPage.deleteModal.deleting")}
+        labelCancel={t("reelsPage.cancel")}
+      />
 
-            {deleteError ? (
-              <div className={postStyles.reportInlineError}>{deleteError}</div>
-            ) : null}
-
-            <div className={postStyles.reportActions}>
-              <button
-                className={postStyles.reportSecondary}
-                onClick={closeDeleteConfirm}
-                disabled={deleteSubmitting}
-              >
-                {t("reelsPage.cancel")}
-              </button>
-              <button
-                className={`${postStyles.reportPrimary} ${postStyles.blockDanger}`}
-                onClick={confirmDelete}
-                disabled={deleteSubmitting}
-              >
-                {deleteSubmitting ? t("reelsPage.deleteModal.deleting") : t("reelsPage.deleteModal.delete")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {visibilityModalOpen ? (
-        <div
-          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeVisibilityModal}
-        >
-          <div
-            className={feedStyles.modalCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={feedStyles.modalHeader}>
-              <div>
-                <h3 className={feedStyles.modalTitle}>{t("reelsPage.visibilityModal.title")}</h3>
-                <p className={feedStyles.modalBody}>
-                  Choose who can view this reel.
-                </p>
-              </div>
-              <button
-                className={feedStyles.closeBtn}
-                aria-label={t("reelsPage.visibilityModal.close")}
-                onClick={closeVisibilityModal}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className={feedStyles.visibilityGrid}>
-              {visibilityOptions.map((opt) => {
-                const activeOpt = visibilitySelected === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    className={`${feedStyles.visibilityOption} ${
-                      activeOpt ? feedStyles.visibilityOptionActive : ""
-                    }`}
-                    onClick={() => setVisibilitySelected(opt.value)}
-                  >
-                    <span className={feedStyles.visibilityRadio}>
-                      {activeOpt ? "✓" : ""}
-                    </span>
-                    <span className={feedStyles.visibilityCopy}>
-                      <span className={feedStyles.visibilityTitle}>
-                        {opt.title}
-                      </span>
-                      <span className={feedStyles.visibilityDesc}>
-                        {opt.description}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {visibilityError ? (
-              <div className={feedStyles.inlineError}>{visibilityError}</div>
-            ) : null}
-
-            <div className={feedStyles.modalActions}>
-              <button
-                className={feedStyles.modalSecondary}
-                onClick={closeVisibilityModal}
-                disabled={visibilitySaving}
-              >
-                {t("reelsPage.cancel")}
-              </button>
-              <button
-                className={feedStyles.modalPrimary}
-                onClick={submitVisibilityUpdate}
-                disabled={visibilitySaving}
-              >
-                {visibilitySaving ? t("reelsPage.visibilityModal.updating") : t("reelsPage.visibilityModal.update")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <VisibilityPickerOverlay
+        open={visibilityModalOpen}
+        onClose={closeVisibilityModal}
+        title={t("reelsPage.visibilityModal.title")}
+        subtitle="Choose who can view this reel."
+        options={visibilityOptions}
+        selected={visibilitySelected}
+        onChange={setVisibilitySelected}
+        onSave={submitVisibilityUpdate}
+        submitting={visibilitySaving}
+        error={visibilityError}
+        labelSave={t("reelsPage.visibilityModal.update")}
+        labelSaving={t("reelsPage.visibilityModal.updating")}
+        labelCancel={t("reelsPage.cancel")}
+      />
 
       {muteModalOpen && muteTarget ? (
-        <div
-          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeMuteModal}
-        >
-          <div
-            className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={feedStyles.modalHeader}>
-              <div>
-                <h3 className={feedStyles.modalTitle}>{t("reelsPage.muteModal.title")}</h3>
-                <p className={feedStyles.modalBody}>
-                  Choose how long to pause alerts for this reel.
-                </p>
-              </div>
-              <button
-                className={feedStyles.closeBtn}
-                aria-label={t("reelsPage.muteModal.close")}
-                onClick={closeMuteModal}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className={feedStyles.muteOptionGrid}>
-              {muteOptions.map((option) => (
-                <button
-                  key={option.key}
-                  className={`${feedStyles.muteOption} ${
-                    muteOption === option.key ? feedStyles.muteOptionActive : ""
-                  }`}
-                  onClick={() => setMuteOption(option.key)}
-                  type="button"
-                >
-                  <span className={feedStyles.muteOptionTitle}>
-                    {option.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {muteOption === "custom" ? (
-              <div className={feedStyles.muteCustomRow}>
-                <div className={feedStyles.mutePicker}>
-                  <label className={feedStyles.editLabel}>{t("reelsPage.muteModal.dateLabel")}</label>
-                  <DateSelect
-                    value={muteCustomDate}
-                    onChange={setMuteCustomDate}
-                    minDate={new Date()}
-                    maxDate={null}
-                    placeholder={t("reelsPage.muteModal.datePlaceholder")}
-                  />
-                </div>
-                <div className={feedStyles.mutePicker}>
-                  <label className={feedStyles.editLabel}>{t("reelsPage.muteModal.timeLabel")}</label>
-                  <TimeSelect
-                    value={muteCustomTime}
-                    onChange={setMuteCustomTime}
-                    selectedDate={muteCustomDate}
-                    minDateTime={new Date()}
-                    disabled={!muteCustomDate}
-                    placeholder={t("reelsPage.muteModal.timePlaceholder")}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            {muteError ? (
-              <div className={feedStyles.inlineError}>{muteError}</div>
-            ) : null}
-
-            <div className={feedStyles.modalActions}>
-              <button
-                type="button"
-                className={feedStyles.modalPrimary}
-                onClick={handleSaveReelMute}
-                disabled={muteSaving}
-              >
-                {muteSaving ? t("reelsPage.muteModal.saving") : t("reelsPage.muteModal.save")}
-              </button>
-            </div>
-          </div>
-        </div>
+        <MutePickerOverlay
+          open
+          onClose={closeMuteModal}
+          title={t("reelsPage.muteModal.title")}
+          subtitle="Choose how long to pause alerts for this reel."
+          options={muteOptions}
+          selected={muteOption}
+          onSelect={setMuteOption}
+          customDate={muteCustomDate}
+          onCustomDateChange={setMuteCustomDate}
+          customTime={muteCustomTime}
+          onCustomTimeChange={setMuteCustomTime}
+          onSave={handleSaveReelMute}
+          submitting={muteSaving}
+          error={muteError}
+          labelSave={t("reelsPage.muteModal.save")}
+          labelSaving={t("reelsPage.muteModal.saving")}
+        />
       ) : null}
 
-      {reportOpen ? (
-        <div
-          className={`${postStyles.reportOverlay} ${
-            reportClosing
-              ? postStyles.reportOverlayClosing
-              : postStyles.reportOverlayOpen
-          }`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeReportModal}
-        >
-          <div
-            className={`${postStyles.reportCard} ${
-              reportClosing
-                ? postStyles.reportCardClosing
-                : postStyles.reportCardOpen
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={postStyles.reportHeader}>
-              <div>
-                <h3 className={postStyles.reportTitle}>{t("reelsPage.reportModal.title")}</h3>
-                <p className={postStyles.reportBody}>
-                  Help us understand what is wrong with this content.
-                </p>
-              </div>
-              <button
-                className={postStyles.reportClose}
-                aria-label={t("reelsPage.reportModal.close")}
-                onClick={closeReportModal}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className={postStyles.reportGrid}>
-              <div className={postStyles.reportCategoryGrid}>
-                {REPORT_GROUPS.map((group) => {
-                  const isActive = reportCategory === group.key;
-                  return (
-                    <button
-                      key={group.key}
-                      className={`${postStyles.reportCategoryCard} ${
-                        isActive ? postStyles.reportCategoryCardActive : ""
-                      }`}
-                      style={{
-                        borderColor: isActive ? group.accent : undefined,
-                        boxShadow: isActive
-                          ? `0 0 0 1px ${group.accent}`
-                          : undefined,
-                      }}
-                      onClick={() => {
-                        setReportCategory(group.key);
-                        setReportReason(
-                          group.reasons.length === 1
-                            ? group.reasons[0].key
-                            : null,
-                        );
-                      }}
-                    >
-                      <span
-                        className={postStyles.reportCategoryDot}
-                        style={{ background: group.accent }}
-                      />
-                      <span className={postStyles.reportCategoryLabel}>
-                        {t(`reelsPage.reportCategories.${group.key}`)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={postStyles.reportReasonPanel}>
-                <div className={postStyles.reportReasonHeader}>
-                  {t("reelsPage.reportModal.title")}
-                </div>
-                {selectedReportGroup ? (
-                  <div className={postStyles.reportReasonList}>
-                    {selectedReportGroup.reasons.map((reason) => {
-                      const checked = reportReason === reason.key;
-                      return (
-                        <button
-                          key={reason.key}
-                          className={`${postStyles.reportReasonRow} ${
-                            checked ? postStyles.reportReasonRowActive : ""
-                          }`}
-                          onClick={() => setReportReason(reason.key)}
-                        >
-                          <span
-                            className={postStyles.reportReasonRadio}
-                            aria-checked={checked}
-                          >
-                            {checked ? (
-                              <span
-                                className={postStyles.reportReasonRadioDot}
-                              />
-                            ) : null}
-                          </span>
-                          <span>{t(`reelsPage.reportReasons.${reason.key}`)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={postStyles.reportReasonPlaceholder}>
-                    {t("reelsPage.reportModal.title")}
-                  </div>
-                )}
-
-                <label className={postStyles.reportNoteLabel}>
-                  Additional notes (optional)
-                  <textarea
-                    className={postStyles.reportNoteInput}
-                    placeholder={t("reelsPage.reportModal.placeholder")}
-                    value={reportNote}
-                    onChange={(e) => setReportNote(e.target.value)}
-                    maxLength={500}
-                  />
-                </label>
-                {reportError ? (
-                  <div className={postStyles.reportInlineError}>
-                    {reportError}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className={postStyles.reportActions}>
-              <button
-                className={postStyles.reportSecondary}
-                onClick={closeReportModal}
-                disabled={reportSubmitting}
-              >
-                {t("reelsPage.cancel")}
-              </button>
-              <button
-                className={postStyles.reportPrimary}
-                onClick={submitReport}
-                disabled={!reportReason || reportSubmitting}
-              >
-                {reportSubmitting ? t("reelsPage.reportModal.submitting") : t("reelsPage.reportModal.submit")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ReportOverlay
+        open={reportOpen}
+        closing={reportClosing}
+        onClose={closeReportModal}
+        title={t("reelsPage.reportModal.title")}
+        subtitle="Help us understand what is wrong with this content."
+        groups={REPORT_GROUPS.map((g) => ({
+          ...g,
+          label: t(`reelsPage.reportCategories.${g.key}`),
+          reasons: g.reasons.map((r) => ({
+            ...r,
+            label: t(`reelsPage.reportReasons.${r.key}`),
+          })),
+        }))}
+        category={reportCategory}
+        reason={reportReason}
+        note={reportNote}
+        submitting={reportSubmitting}
+        error={reportError}
+        onSelectCategory={(key) => {
+          setReportCategory(key as typeof reportCategory);
+          const group = REPORT_GROUPS.find((g) => g.key === key);
+          setReportReason(group?.reasons.length === 1 ? group.reasons[0].key : null);
+        }}
+        onSelectReason={setReportReason}
+        onNoteChange={setReportNote}
+        onSubmit={submitReport}
+        labelCancel={t("reelsPage.cancel")}
+        labelSubmit={t("reelsPage.reportModal.submit")}
+        labelSubmitting={t("reelsPage.reportModal.submitting")}
+      />
     </>
   );
 }

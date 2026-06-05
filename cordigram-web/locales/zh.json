@@ -2828,10 +2828,33 @@
     "captionLangZh": "中文",
     "captionLangJa": "日语"
   },
+  "pollVotersOverlay": {
+    "title": "投票者",
+    "searchPlaceholder": "搜索用户名",
+    "loading": "加载中…",
+    "loadingMore": "加载更多…",
+    "noVotesYet": "暂无投票",
+    "noMatchingUsers": "未找到用户",
+    "you": "你",
+    "follow": "关注",
+    "following": "已关注",
+    "close": "关闭",
+    "viewProfile": "查看{username}的资料",
+    "sessionExpired": "会话已过期。",
+    "failedToLoad": "无法加载列表。",
+    "failedToLoadMore": "加载更多失败。"
+  },
   "poll": {
     "badge": "投票",
     "fallback": "投票",
     "votes": "{count} 票",
-    "noVotes": "暂无投票"
+    "noVotes": "暂无投票",
+    "vote": "投票",
+    "voting": "提交中…",
+    "ended": "已结束",
+    "open": "进行中",
+    "error": "无法投票，请重试。",
+    "timeLeftHM": "剩余{h}小时{m}分",
+    "timeLeftM": "剩余{m}分钟"
   }
 }

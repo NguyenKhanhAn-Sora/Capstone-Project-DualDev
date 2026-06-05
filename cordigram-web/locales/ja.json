@@ -2828,10 +2828,33 @@
     "captionLangZh": "中国語",
     "captionLangJa": "日本語"
   },
+  "pollVotersOverlay": {
+    "title": "投票者",
+    "searchPlaceholder": "ユーザー名を検索",
+    "loading": "読み込み中…",
+    "loadingMore": "さらに読み込み中…",
+    "noVotesYet": "まだ投票がありません",
+    "noMatchingUsers": "ユーザーが見つかりません",
+    "you": "あなた",
+    "follow": "フォロー",
+    "following": "フォロー中",
+    "close": "閉じる",
+    "viewProfile": "{username}のプロフィールを見る",
+    "sessionExpired": "セッションが切れました。",
+    "failedToLoad": "リストを読み込めませんでした。",
+    "failedToLoadMore": "さらに読み込めませんでした。"
+  },
   "poll": {
     "badge": "投票",
     "fallback": "投票",
     "votes": "{count} 票",
-    "noVotes": "まだ投票がありません"
+    "noVotes": "まだ投票がありません",
+    "vote": "投票する",
+    "voting": "送信中…",
+    "ended": "終了",
+    "open": "受付中",
+    "error": "投票できませんでした。もう一度お試しください。",
+    "timeLeftHM": "残り{h}時間{m}分",
+    "timeLeftM": "残り{m}分"
   }
 }

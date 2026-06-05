@@ -2854,10 +2854,33 @@
     "failedToLoad": "Failed to load likes",
     "failedToLoadMore": "Failed to load more"
   },
+  "pollVotersOverlay": {
+    "title": "Votes",
+    "searchPlaceholder": "Search username",
+    "loading": "Loading…",
+    "loadingMore": "Loading more…",
+    "noVotesYet": "No votes yet",
+    "noMatchingUsers": "No matching users",
+    "you": "You",
+    "follow": "Follow",
+    "following": "Following",
+    "close": "Close",
+    "viewProfile": "View profile {username}",
+    "sessionExpired": "Session expired.",
+    "failedToLoad": "Failed to load list.",
+    "failedToLoadMore": "Failed to load more."
+  },
   "poll": {
     "badge": "Poll",
     "fallback": "Poll",
     "votes": "{count} votes",
-    "noVotes": "No votes yet"
+    "noVotes": "No votes yet",
+    "vote": "Vote",
+    "voting": "Submitting…",
+    "ended": "Ended",
+    "open": "Open",
+    "error": "Unable to vote. Please try again.",
+    "timeLeftHM": "{h}h {m}m left",
+    "timeLeftM": "{m}m left"
   }
 }

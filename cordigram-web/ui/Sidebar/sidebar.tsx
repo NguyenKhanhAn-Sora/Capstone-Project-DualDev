@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import styles from "./sidebar.module.css";
 import {
@@ -76,6 +76,7 @@ const navItems = [
 
 export default function Sidebar() {
   const router = useRouter();
+  const pathname = usePathname();
   const t = useTranslations("sidebar");
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [isGuest, setIsGuest] = useState(true);
@@ -510,12 +511,15 @@ export default function Sidebar() {
         </Link>
 
         <nav className={styles.nav}>
-          {navItems.filter(({ guestVisible }) => !mounted || !isGuest || guestVisible).map(({ key, href, icon: Icon, hasAvatar }) =>
-            key === "search" ? (
+          {navItems.filter(({ guestVisible }) => !mounted || !isGuest || guestVisible).map(({ key, href, icon: Icon, hasAvatar }) => {
+            const isActivePath = href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(href);
+            return key === "search" ? (
               <button
                 key={key}
                 type="button"
-                className={styles.item}
+                className={`${styles.item} ${searchOpen ? styles.itemActive : ""}`}
                 onClick={() => setSearchOpen(true)}
               >
                 <span className={styles.icon}>
@@ -527,7 +531,7 @@ export default function Sidebar() {
               <button
                 key={key}
                 type="button"
-                className={styles.item}
+                className={`${styles.item} ${notificationOpen ? styles.itemActive : ""}`}
                 onClick={() => {
                   setNotificationClosing(false);
                   const now = Date.now();
@@ -563,7 +567,7 @@ export default function Sidebar() {
               <Link
                 key={key}
                 href={href}
-                className={styles.item}
+                className={`${styles.item} ${isActivePath ? styles.itemActive : ""}`}
                 onClick={key === "home" ? clearSessionAndGoHome : (e) => handleGuardedNav(href, e)}
               >
                 <span className={styles.icon}>
@@ -580,8 +584,8 @@ export default function Sidebar() {
                   </span>
                 ) : null}
               </Link>
-            ),
-          )}
+            );
+          })}
         </nav>
 
         {!mounted ? null : isGuest ? (

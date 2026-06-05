@@ -9,21 +9,24 @@ import {
 } from "@/lib/api";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
 import PollVotersOverlay from "@/ui/poll-voters-overlay/poll-voters-overlay";
+import { useLanguage } from "@/component/language-provider";
 import styles from "./poll-widget.module.css";
 
-function formatCountdown(expiresAt: string): string {
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
+function formatCountdown(expiresAt: string, t: TFn): string {
   const ms = new Date(expiresAt).getTime() - Date.now();
-  if (ms <= 0) return "Đã kết thúc";
+  if (ms <= 0) return t("poll.ended");
   const totalSeconds = Math.floor(ms / 1000);
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
-  if (h > 0) return `Còn ${h}g ${m}p`;
-  return `Còn ${m} phút`;
+  if (h > 0) return t("poll.timeLeftHM", { h, m });
+  return t("poll.timeLeftM", { m });
 }
 
-function formatVoteCount(n: number): string {
-  if (n === 0) return "Chưa có lượt bình chọn";
-  return `${n.toLocaleString("vi-VN")} lượt bình chọn`;
+function formatVoteCount(n: number, t: TFn, language: string): string {
+  if (n === 0) return t("poll.noVotes");
+  return t("poll.votes", { count: n.toLocaleString(language) });
 }
 
 interface PollWidgetProps {
@@ -36,6 +39,8 @@ interface PollWidgetProps {
 }
 
 export default function PollWidget({ poll, token, compact, viewerId }: PollWidgetProps) {
+  const { t, language } = useLanguage();
+
   const isExpired = useMemo(() => {
     if (poll.isExpired) return true;
     return new Date(poll.expiresAt).getTime() <= Date.now();
@@ -61,13 +66,13 @@ export default function PollWidget({ poll, token, compact, viewerId }: PollWidge
 
   // Countdown ticker
   const [countdown, setCountdown] = useState(() =>
-    isExpired ? "Đã kết thúc" : formatCountdown(poll.expiresAt),
+    isExpired ? t("poll.ended") : formatCountdown(poll.expiresAt, t),
   );
 
   useEffect(() => {
     if (isExpired) return;
     const id = setInterval(() => {
-      setCountdown(formatCountdown(poll.expiresAt));
+      setCountdown(formatCountdown(poll.expiresAt, t));
     }, 30_000);
     return () => clearInterval(id);
   }, [isExpired, poll.expiresAt]);
@@ -110,12 +115,12 @@ export default function PollWidget({ poll, token, compact, viewerId }: PollWidge
         setTotalVotes(res.totalVotes);
         void updated; // suppress unused warning
       } catch (err: any) {
-        setError(err?.message ?? "Không thể bình chọn. Vui lòng thử lại.");
+        setError(err?.message ?? t("poll.error"));
       } finally {
         setVoting(false);
       }
     },
-    [token, poll.id, voting],
+    [token, poll.id, voting, t],
   );
 
   const handleMultiVoteSubmit = useCallback(async () => {
@@ -131,11 +136,11 @@ export default function PollWidget({ poll, token, compact, viewerId }: PollWidge
       setPending([]);
       void updated;
     } catch (err: any) {
-      setError(err?.message ?? "Không thể bình chọn. Vui lòng thử lại.");
+      setError(err?.message ?? t("poll.error"));
     } finally {
       setVoting(false);
     }
-  }, [token, poll.id, voting, pending]);
+  }, [token, poll.id, voting, pending, t]);
 
   const hasImages = poll.optionImages?.some(Boolean);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
@@ -151,7 +156,7 @@ export default function PollWidget({ poll, token, compact, viewerId }: PollWidge
             <rect x="10" y="8" width="4" height="14" rx="1" />
             <rect x="18" y="2" width="4" height="20" rx="1" />
           </svg>
-          Bình chọn
+          {t("poll.badge")}
         </span>
       </div>
 
@@ -252,7 +257,7 @@ export default function PollWidget({ poll, token, compact, viewerId }: PollWidge
           tabIndex={totalVotes > 0 ? 0 : undefined}
           onKeyDown={totalVotes > 0 ? (e) => { if (e.key === "Enter" || e.key === " ") setVotersOpen(true); } : undefined}
         >
-          {formatVoteCount(totalVotes)}
+          {formatVoteCount(totalVotes, t, language)}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* Multi-choice submit */}
@@ -263,15 +268,15 @@ export default function PollWidget({ poll, token, compact, viewerId }: PollWidge
               disabled={pending.length === 0 || voting || !token}
               onClick={() => void handleMultiVoteSubmit()}
             >
-              {voting ? "Đang gửi…" : "Bình chọn"}
+              {voting ? t("poll.voting") : t("poll.vote")}
             </button>
           )}
           {isExpired ? (
-            <span className={styles.footerBadgeClosed}>Đã kết thúc</span>
+            <span className={styles.footerBadgeClosed}>{t("poll.ended")}</span>
           ) : compact ? (
             <span className={styles.footerBadgeLive}>
               <span className={styles.liveDot} />
-              Đang mở
+              {t("poll.open")}
             </span>
           ) : (
             <span className={styles.footerBadgeLive}>

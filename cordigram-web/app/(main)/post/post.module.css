@@ -186,20 +186,46 @@
   cursor: pointer;
 }
 
+/* Galaxy menu — sync style with @/ui/shared-styles/galaxy-menu.module.css */
 .moreMenu {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   min-width: 200px;
-  background: var(--color-surface, #0f172a);
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
-  border-radius: 12px;
-  box-shadow: -1px 1px 5px rgba(0, 0, 0, 0.35);
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   z-index: 12;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.48) 0%,
+      rgba(56,  189, 248, 0.3)  50%,
+      rgba(34,  211, 238, 0.2)  100%
+    ) border-box;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
+    0 20px 52px rgba(6, 10, 22, 0.42),
+    0 4px 16px rgba(124, 58, 237, 0.16);
+  animation: galaxyMenuIn 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes galaxyMenuIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Galaxy accent line */
+.moreMenu::before {
+  content: "";
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #7c3aed 28%, #0ea5e9 58%, #22d3ee 82%, transparent);
+  margin-bottom: 4px;
 }
 
 .moreMenuItem {
@@ -209,17 +235,85 @@
   background: transparent;
   color: var(--color-text, #e5e7eb);
   font-weight: 600;
-  padding: 10px 10px;
+  padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
+  font-size: 14px;
   transition:
-    background 140ms ease,
-    transform 120ms ease;
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.moreMenuItem:hover {
-  background: var(--color-surface-muted, rgba(255, 255, 255, 0.06));
-  transform: translateY(-1px);
+.moreMenuItem:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.12),
+    rgba(56, 189, 248, 0.07)
+  );
+  color: var(--color-text, #e5e7eb);
+  transform: translateX(3px);
+}
+
+.moreMenuDanger {
+  color: #f97373;
+}
+
+.moreMenuDanger:hover {
+  background: rgba(239, 68, 68, 0.09) !important;
+  color: #f87171 !important;
+}
+
+.moreMenuDivider {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.22) 30%,
+    rgba(56, 189, 248, 0.14) 65%,
+    transparent
+  );
+  margin: 4px 0;
+}
+
+/* Light mode */
+:global([data-theme="light"]) .moreMenu {
+  border: 1px solid rgba(124, 58, 237, 0.22) !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 8px 36px rgba(0, 0, 0, 0.18),
+    0 3px 14px rgba(124, 58, 237, 0.1) !important;
+}
+
+:global([data-theme="light"]) .moreMenu::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.35) 25%,
+    rgba(14, 165, 233, 0.28) 55%,
+    rgba(34, 211, 238, 0.22) 80%,
+    transparent
+  ) !important;
+}
+
+:global([data-theme="light"]) .moreMenuItem {
+  color: #1e1b4b;
+}
+
+:global([data-theme="light"]) .moreMenuItem:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.09), rgba(56, 189, 248, 0.05));
+  color: #3b0764;
+}
+
+:global([data-theme="light"]) .moreMenuDanger {
+  color: #dc2626;
+}
+
+:global([data-theme="light"]) .moreMenuDanger:hover {
+  background: rgba(220, 38, 38, 0.07) !important;
+  color: #b91c1c !important;
 }
 
 .moreMenuItem:disabled,
@@ -2450,4 +2544,690 @@
   .profilePostNavRail {
     display: none !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GALAXY UI — Post Overlay upgrade
+   Both dark + light mode, 3D entrance, galaxy accents throughout
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Overlay backdrop ── */
+.modalOverlay {
+  background: rgba(4, 7, 18, 0.72) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  animation: galaxyOverlayIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes galaxyOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Modal card — galaxy border + 3D entrance ── */
+.modalCard {
+  border-radius: 20px !important;
+  border: 1px solid transparent !important;
+  overflow: hidden !important;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.5) 0%,
+      rgba(56, 189, 248, 0.32) 50%,
+      rgba(34, 211, 238, 0.2) 100%
+    ) border-box !important;
+  box-shadow:
+    0 2px 0 rgba(124, 58, 237, 0.08) inset,
+    0 32px 80px rgba(4, 7, 18, 0.52),
+    0 8px 28px rgba(124, 58, 237, 0.16) !important;
+  animation: postModalIn 320ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+@keyframes postModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97) perspective(900px) rotateX(1.5deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) perspective(900px) rotateX(0deg);
+  }
+}
+
+/* Galaxy accent line at very top of modal */
+.modalCard::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 20%,
+    #0ea5e9 55%,
+    #22d3ee 80%,
+    transparent
+  );
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ── Info pane — subtle galaxy tint ── */
+.infoPane {
+  background:
+    radial-gradient(ellipse at 90% 5%,  rgba(124, 58, 237, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 10% 95%, rgba(14, 165, 233, 0.05) 0%, transparent 55%),
+    var(--color-surface-muted) !important;
+  border-left: 1px solid rgba(124, 58, 237, 0.18) !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+}
+
+:global([data-theme="dark"]) .infoPane {
+  background:
+    radial-gradient(ellipse at 90% 5%,  rgba(124, 58, 237, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse at 10% 95%, rgba(14, 165, 233, 0.07) 0%, transparent 55%),
+    var(--color-surface-muted) !important;
+  border-left-color: rgba(124, 58, 237, 0.22) !important;
+}
+
+/* ── Author avatar — galaxy halo ── */
+.avatarLarge {
+  box-shadow:
+    0 0 0 2px rgba(124, 58, 237, 0.45),
+    0 0 0 4px rgba(56, 189, 248, 0.15),
+    0 0 14px rgba(124, 58, 237, 0.3) !important;
+  transition: box-shadow 0.22s ease !important;
+}
+
+.avatarLarge:hover {
+  box-shadow:
+    0 0 0 2px rgba(124, 58, 237, 0.65),
+    0 0 0 4px rgba(56, 189, 248, 0.28),
+    0 0 22px rgba(124, 58, 237, 0.45) !important;
+}
+
+/* ── Comments header — galaxy separator ── */
+.commentsHeader {
+  border-top: none !important;
+  position: relative;
+  padding-top: 10px !important;
+  margin-top: 8px !important;
+}
+
+.commentsHeader::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.3) 25%,
+    rgba(56, 189, 248, 0.2) 65%,
+    transparent
+  );
+}
+
+/* ── Stats row — galaxy tint ── */
+.statsRow {
+  background:
+    radial-gradient(ellipse at 80% 50%, rgba(56, 189, 248, 0.06), transparent 60%),
+    rgba(124, 58, 237, 0.04) !important;
+  border: 1px solid rgba(124, 58, 237, 0.1) !important;
+  border-radius: 12px !important;
+  padding: 8px 12px !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* ── Comment reply list — galaxy left border ── */
+.replyList {
+  border-left: 1px solid rgba(124, 58, 237, 0.25) !important;
+}
+
+:global([data-theme="light"]) .replyList {
+  border-left-color: rgba(124, 58, 237, 0.3) !important;
+}
+
+/* ── Comment avatar — galaxy halo ── */
+.commentAvatar,
+.commentAvatarSmall {
+  box-shadow:
+    0 0 0 1.5px rgba(124, 58, 237, 0.35),
+    0 0 8px rgba(124, 58, 237, 0.18) !important;
+}
+
+/* ── Comment composer — galaxy border on focus ── */
+.commentComposer {
+  border: 1px solid rgba(124, 58, 237, 0.2) !important;
+  border-radius: 18px !important;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease !important;
+}
+
+.commentComposer:focus-within {
+  border-color: rgba(124, 58, 237, 0.5) !important;
+  box-shadow:
+    0 0 0 3px rgba(124, 58, 237, 0.1),
+    0 4px 18px rgba(124, 58, 237, 0.12) !important;
+}
+
+/* ── Composer submit — galaxy gradient ── */
+.composerSubmit {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee) !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.32) !important;
+  transition:
+    box-shadow 0.2s ease,
+    filter 0.2s ease !important;
+}
+
+.composerSubmit:hover:not(:disabled) {
+  filter: brightness(1.1) !important;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45) !important;
+}
+
+/* moreMenu galaxy styles → defined in base section above (line ~190) */
+
+/* ── Media nav buttons — galaxy style ── */
+.mediaNavBtn {
+  background: rgba(8, 12, 28, 0.55) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(56, 189, 248, 0.22) !important;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease !important;
+}
+
+.mediaNavBtn:hover {
+  background: rgba(14, 165, 233, 0.45) !important;
+  box-shadow: 0 0 16px rgba(14, 165, 233, 0.4) !important;
+  transform: translateY(-50%) scale(1.1) !important;
+}
+
+/* ── View more comments button — galaxy hover ── */
+.viewMoreCommentsBtn {
+  border: 1px solid transparent !important;
+  background:
+    rgba(124, 58, 237, 0.05) padding-box,
+    linear-gradient(90deg,
+      rgba(124, 58, 237, 0.28),
+      rgba(56, 189, 248, 0.18),
+      rgba(34, 211, 238, 0.12)
+    ) border-box !important;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease !important;
+}
+
+.viewMoreCommentsBtn:hover:not(:disabled) {
+  background:
+    rgba(124, 58, 237, 0.1) padding-box,
+    linear-gradient(90deg,
+      rgba(124, 58, 237, 0.48),
+      rgba(56, 189, 248, 0.32),
+      rgba(34, 211, 238, 0.22)
+    ) border-box !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.14) !important;
+  color: var(--color-text) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ── Follow button in post header — galaxy pill ── */
+.followBtn {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 999px !important;
+  padding: 6px 16px !important;
+  font-size: 13px !important;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3) !important;
+  transition:
+    filter 0.2s ease,
+    box-shadow 0.2s ease !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.followBtn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.38s ease;
+  pointer-events: none;
+}
+
+.followBtn:hover::after {
+  transform: translateX(120%);
+}
+
+.followBtn:hover {
+  filter: brightness(1.1) !important;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.44) !important;
+}
+
+.following {
+  background: transparent !important;
+  border: 1px solid rgba(124, 58, 237, 0.35) !important;
+  color: #a78bfa !important;
+  box-shadow: none !important;
+}
+
+.following:hover {
+  background: rgba(124, 58, 237, 0.08) !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Profile post nav buttons ── */
+.profilePostNavBtn {
+  border: 1px solid transparent !important;
+  background:
+    color-mix(in srgb, var(--color-surface) 88%, transparent) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.4) 0%,
+      rgba(56, 189, 248, 0.25) 55%,
+      rgba(34, 211, 238, 0.16) 100%
+    ) border-box !important;
+  backdrop-filter: blur(10px) !important;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s ease !important;
+}
+
+.profilePostNavBtn:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.25) !important;
+}
+
+/* ── Page card (non-modal route) ── */
+.pageCard {
+  border: 1px solid transparent !important;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.3) 0%,
+      rgba(56, 189, 248, 0.18) 50%,
+      rgba(34, 211, 238, 0.12) 100%
+    ) border-box !important;
+  border-radius: 20px !important;
+  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.08) !important;
+  overflow: hidden !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT MODE — Post overlay specific fixes
+   ═══════════════════════════════════════════════════════════ */
+
+:global([data-theme="light"]) .modalOverlay {
+  background: rgba(10, 16, 36, 0.65) !important;
+}
+
+:global([data-theme="light"]) .modalCard {
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.28) 0%,
+      rgba(56, 189, 248, 0.18) 50%,
+      rgba(34, 211, 238, 0.12) 100%
+    ) border-box !important;
+  box-shadow:
+    0 24px 72px rgba(0, 0, 0, 0.24),
+    0 6px 22px rgba(124, 58, 237, 0.12) !important;
+}
+
+:global([data-theme="light"]) .infoPane {
+  background:
+    radial-gradient(ellipse at 90% 5%, rgba(124, 58, 237, 0.05) 0%, transparent 55%),
+    #f8faff !important;
+  border-left-color: rgba(124, 58, 237, 0.16) !important;
+}
+
+/* moreMenu light mode → defined at line ~281 */
+
+:global([data-theme="light"]) .statsRow {
+  background:
+    radial-gradient(ellipse at 80% 50%, rgba(56, 189, 248, 0.07), transparent 60%),
+    rgba(124, 58, 237, 0.04) !important;
+  border-color: rgba(124, 58, 237, 0.12) !important;
+}
+
+:global([data-theme="light"]) .commentComposer {
+  background: #ffffff !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+:global([data-theme="light"]) .commentComposer:focus-within {
+  border-color: rgba(124, 58, 237, 0.48) !important;
+  box-shadow:
+    0 0 0 3px rgba(124, 58, 237, 0.1),
+    0 4px 18px rgba(124, 58, 237, 0.1) !important;
+}
+
+:global([data-theme="light"]) .viewMoreCommentsBtn {
+  background:
+    rgba(124, 58, 237, 0.04) padding-box,
+    linear-gradient(90deg,
+      rgba(124, 58, 237, 0.2),
+      rgba(56, 189, 248, 0.12),
+      rgba(34, 211, 238, 0.08)
+    ) border-box !important;
+  color: #374151 !important;
+}
+
+:global([data-theme="light"]) .viewMoreCommentsBtn:hover:not(:disabled) {
+  background:
+    rgba(124, 58, 237, 0.07) padding-box,
+    linear-gradient(90deg,
+      rgba(124, 58, 237, 0.38),
+      rgba(56, 189, 248, 0.24),
+      rgba(34, 211, 238, 0.16)
+    ) border-box !important;
+  color: #1e1b4b !important;
+}
+
+:global([data-theme="light"]) .following {
+  border-color: rgba(124, 58, 237, 0.4) !important;
+  color: #7c3aed !important;
+}
+
+/* ── Comment menu card (See who liked / Edit / Delete) ── */
+.commentMenuCard {
+  border: 1px solid transparent !important;
+  border-radius: 16px !important;
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.45) 0%,
+      rgba(56, 189, 248, 0.28) 55%,
+      rgba(34, 211, 238, 0.18) 100%
+    ) border-box !important;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
+    0 20px 52px rgba(4, 7, 18, 0.42),
+    0 4px 16px rgba(124, 58, 237, 0.16) !important;
+  backdrop-filter: blur(14px) !important;
+  animation: commentMenuScaleIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Galaxy accent line */
+.commentMenuCard::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1.5px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 25%,
+    #0ea5e9 58%,
+    #22d3ee 80%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+.commentMenuHeader {
+  background: linear-gradient(135deg, var(--color-text) 20%, #a78bfa 60%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 13px !important;
+  letter-spacing: 0.3px !important;
+}
+
+.commentMoreItem {
+  border-radius: 10px !important;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.commentMoreItem:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.1),
+    rgba(56, 189, 248, 0.06)
+  ) !important;
+  transform: translateX(3px) !important;
+  color: var(--color-text) !important;
+}
+
+/* ── Comment menu overlay backdrop ── */
+.commentMenuOverlay {
+  background: rgba(4, 7, 18, 0.62) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* ── Report overlay (post route) ── */
+.reportOverlay {
+  background: rgba(4, 7, 18, 0.62) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+.reportCard {
+  border: 1px solid rgba(124, 58, 237, 0.38) !important;
+  background:
+    radial-gradient(ellipse at 88% 8%,  rgba(124, 58, 237, 0.18) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 92%, rgba(14, 165, 233, 0.13) 0%, transparent 55%),
+    rgba(8, 12, 28, 0.9) !important;
+  box-shadow:
+    0 2px 0 rgba(124, 58, 237, 0.08) inset,
+    0 24px 64px rgba(0, 0, 0, 0.48),
+    0 6px 22px rgba(124, 58, 237, 0.2) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-radius: 20px !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.reportCard::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #7c3aed 22%,
+    #0ea5e9 55%,
+    #22d3ee 80%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+.reportTitle {
+  color: #ffffff !important;
+}
+
+.reportBody {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.reportClose {
+  color: rgba(255, 255, 255, 0.55) !important;
+  transition: color 0.18s ease, transform 0.2s ease !important;
+}
+
+.reportClose:hover {
+  color: #ffffff !important;
+  transform: rotate(90deg) !important;
+}
+
+/* Category cards */
+.reportCategoryCard {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  border-radius: 12px !important;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease !important;
+}
+
+.reportCategoryCard:hover {
+  transform: translateY(-2px) !important;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.28), rgba(56, 189, 248, 0.16)) !important;
+  border-color: rgba(124, 58, 237, 0.52) !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.24) !important;
+}
+
+.reportCategoryCardActive {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.38), rgba(14, 165, 233, 0.22)) !important;
+  border-color: rgba(124, 58, 237, 0.6) !important;
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.2) inset,
+    0 4px 18px rgba(124, 58, 237, 0.28) !important;
+}
+
+.reportCategoryLabel {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Reason panel */
+.reportReasonPanel {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 14px !important;
+}
+
+.reportReasonHeader {
+  color: #ffffff !important;
+}
+
+.reportReasonRow {
+  color: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 10px !important;
+  transition: background 0.18s ease, border-color 0.18s ease !important;
+}
+
+.reportReasonRow:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.reportReasonRowActive {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.32), rgba(56, 189, 248, 0.18)) !important;
+  border-color: rgba(124, 58, 237, 0.52) !important;
+}
+
+.reportReasonRadioDot {
+  background: linear-gradient(135deg, #a78bfa, #38bdf8) !important;
+}
+
+.reportReasonPlaceholder {
+  color: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.reportNoteLabel {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.reportNoteInput {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+}
+
+.reportNoteInput::placeholder {
+  color: rgba(255, 255, 255, 0.36) !important;
+}
+
+.reportNoteInput:focus {
+  border-color: rgba(124, 58, 237, 0.6) !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18) !important;
+}
+
+/* Buttons */
+.reportSecondary {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+
+.reportSecondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
+  transform: translateY(-1px) !important;
+}
+
+.reportPrimary {
+  background: linear-gradient(135deg, #7c3aed, #0284c7 55%, #22d3ee) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35) !important;
+}
+
+.reportPrimary:hover:not(:disabled) {
+  filter: brightness(1.1) !important;
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.48) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ── Light mode — comment menu card ── */
+:global([data-theme="light"]) .commentMenuCard {
+  background:
+    #ffffff padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.28) 0%,
+      rgba(56, 189, 248, 0.18) 50%,
+      rgba(34, 211, 238, 0.12) 100%
+    ) border-box !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 12px 36px rgba(0, 0, 0, 0.16) !important;
+  backdrop-filter: none !important;
+}
+
+:global([data-theme="light"]) .commentMenuHeader {
+  background: linear-gradient(135deg, #0f1629 20%, #7c3aed 60%, #0284c7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+:global([data-theme="light"]) .commentMoreItem {
+  color: #1e1b4b !important;
+}
+
+:global([data-theme="light"]) .commentMoreItem:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.09), rgba(56, 189, 248, 0.05)) !important;
+  color: #3b0764 !important;
+}
+
+:global([data-theme="light"]) .commentDanger {
+  color: #dc2626 !important;
+}
+
+:global([data-theme="light"]) .pageCard {
+  background:
+    var(--color-surface) padding-box,
+    linear-gradient(145deg,
+      rgba(124, 58, 237, 0.2) 0%,
+      rgba(56, 189, 248, 0.13) 50%,
+      rgba(34, 211, 238, 0.09) 100%
+    ) border-box !important;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.06), 0 1px 4px rgba(0,0,0,0.04) !important;
 }

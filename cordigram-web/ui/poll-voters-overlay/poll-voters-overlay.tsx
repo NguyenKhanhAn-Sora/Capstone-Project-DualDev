@@ -11,6 +11,7 @@ import {
   type PostLikeItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { useLanguage } from "@/component/language-provider";
 
 type Props = {
   open: boolean;
@@ -51,6 +52,7 @@ function toProfileHref(item: { userId: string }) {
 
 export default function PollVotersOverlay(props: Props) {
   const { open, closing, pollId, viewerId, onClose } = props;
+  const { t } = useLanguage();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -98,7 +100,7 @@ export default function PollVotersOverlay(props: Props) {
       setState((p) => ({
         ...p,
         loadingMore: false,
-        error: err?.message || "Không thể tải thêm.",
+        error: err?.message || t("pollVotersOverlay.failedToLoadMore"),
       }));
     }
   };
@@ -111,7 +113,7 @@ export default function PollVotersOverlay(props: Props) {
     let cancelled = false;
     const token = getStoredAccessToken();
     if (!token) {
-      setState((p) => ({ ...p, loading: false, error: "Session expired." }));
+      setState((p) => ({ ...p, loading: false, error: t("pollVotersOverlay.sessionExpired") }));
       return;
     }
     fetchPollVoters({ token, pollId, limit: PAGE_SIZE })
@@ -130,7 +132,7 @@ export default function PollVotersOverlay(props: Props) {
         setState((p) => ({
           ...p,
           loading: false,
-          error: err?.message || "Không thể tải danh sách.",
+          error: err?.message || t("pollVotersOverlay.failedToLoad"),
         }));
       });
     return () => { cancelled = true; };
@@ -201,12 +203,12 @@ export default function PollVotersOverlay(props: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.header}>
-          <div className={styles.title}>Lượt bình chọn</div>
+          <div className={styles.title}>{t("pollVotersOverlay.title")}</div>
           <button
             className={styles.close}
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("pollVotersOverlay.close")}
           >
             <IconClose />
           </button>
@@ -216,29 +218,29 @@ export default function PollVotersOverlay(props: Props) {
           <input
             className={styles.searchInput}
             type="search"
-            placeholder="Tìm tên người dùng"
+            placeholder={t("pollVotersOverlay.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Tìm tên người dùng"
+            aria-label={t("pollVotersOverlay.searchPlaceholder")}
           />
         </div>
 
         <div className={styles.list} ref={scrollRef}>
           {state.loading ? (
-            <div className={styles.loading}>Đang tải…</div>
+            <div className={styles.loading}>{t("pollVotersOverlay.loading")}</div>
           ) : null}
           {state.error && !state.loading ? (
             <div className={styles.error}>{state.error}</div>
           ) : null}
           {!state.loading && !state.error && !filteredItems.length ? (
             <div className={styles.loading}>
-              {search.trim() ? "Không tìm thấy người dùng" : "Chưa có lượt bình chọn"}
+              {search.trim() ? t("pollVotersOverlay.noMatchingUsers") : t("pollVotersOverlay.noVotesYet")}
             </div>
           ) : null}
 
           {filteredItems.map((item) => (
             <div key={item.userId} className={styles.row}>
-              <Link href={toProfileHref(item)} aria-label={`Xem hồ sơ ${item.username}`}>
+              <Link href={toProfileHref(item)} aria-label={t("pollVotersOverlay.viewProfile", { username: item.username ?? "" })}>
                 <img
                   className={styles.avatar}
                   src={item.avatarUrl || DEFAULT_AVATAR_URL}
@@ -259,16 +261,16 @@ export default function PollVotersOverlay(props: Props) {
                 disabled={Boolean(viewerId && item.userId === viewerId)}
               >
                 {viewerId && item.userId === viewerId
-                  ? "You"
+                  ? t("pollVotersOverlay.you")
                   : item.isFollowing
-                    ? "Following"
-                    : "Follow"}
+                    ? t("pollVotersOverlay.following")
+                    : t("pollVotersOverlay.follow")}
               </button>
             </div>
           ))}
 
           {state.loadingMore ? (
-            <div className={styles.loading}>Đang tải thêm…</div>
+            <div className={styles.loading}>{t("pollVotersOverlay.loadingMore")}</div>
           ) : null}
           <div ref={sentinelRef} className={styles.sentinel} />
         </div>
