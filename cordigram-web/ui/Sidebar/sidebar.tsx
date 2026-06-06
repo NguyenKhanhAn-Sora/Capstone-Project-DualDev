@@ -70,7 +70,6 @@ const navItems = [
   { key: "explore", href: "/explore", icon: IconCompass, hasAvatar: false, guestVisible: true },
   { key: "notification", href: "/notifications", icon: IconBell, hasAvatar: false, guestVisible: false },
   { key: "ads", href: "/ads", icon: IconAds, hasAvatar: false, guestVisible: false },
-  { key: "create", href: "/create", icon: IconPlus, hasAvatar: false, guestVisible: false },
   { key: "reels", href: "/reels", icon: IconReel, hasAvatar: false, guestVisible: true },
 ];
 
@@ -587,6 +586,20 @@ export default function Sidebar() {
             );
           })}
         </nav>
+
+        {/* ── Prominent Create button (auth-only, outside nav scroll) ── */}
+        {mounted && !isGuest ? (
+          <Link
+            href="/create"
+            className={`${styles.createBtn}${pathname === "/create" ? ` ${styles.createBtnActive}` : ""}`}
+            onClick={(e) => handleGuardedNav("/create", e)}
+          >
+            <span className={styles.createBtnIcon}>
+              <IconPlus />
+            </span>
+            <span className={styles.createBtnLabel}>{t("nav.create")}</span>
+          </Link>
+        ) : null}
 
         {!mounted ? null : isGuest ? (
           <div className={styles.guestCard}>

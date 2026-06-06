@@ -371,6 +371,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
+  // Prevent the browser from auto-restoring the previous scroll position when
+  // navigating back to a page (e.g. home feed position restored after logout→login).
+  useEffect(() => {
+    if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+  }, []);
+
   useEffect(() => {
     applyTheme(theme);
     if (typeof window !== "undefined") {
