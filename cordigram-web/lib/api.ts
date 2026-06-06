@@ -269,8 +269,9 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
   const callerSetContentType =
     Boolean(mergedHeaders["Content-Type"] || mergedHeaders["content-type"]);
   const skipDefaultJsonContentType =
-    !hasBody &&
-    (method === "DELETE" || method === "GET" || method === "HEAD");
+    !hasBody ||
+    (method === "DELETE" || method === "GET" || method === "HEAD") ||
+    (typeof FormData !== "undefined" && rest.body instanceof FormData);
   if (!callerSetContentType && !skipDefaultJsonContentType) {
     mergedHeaders["Content-Type"] = "application/json";
   }
@@ -4689,5 +4690,186 @@ export async function searchDirectMessages(opts: {
     headers: {
       Authorization: `Bearer ${opts.token}`,
     },
+  });
+}
+
+// ─── Stories ─────────────────────────────────────────────────────────────────
+
+export type StoryTextOverlay = {
+  text: string;
+  color?: string;
+  backgroundColor?: string;
+  fontSize?: number;
+  align?: 'left' | 'center' | 'right';
+  x?: number;
+  y?: number;
+};
+
+export type StorySticker = {
+  emoji: string;
+  x?: number;
+  y?: number;
+  size?: number;
+};
+
+export type StoryItem = {
+  id: string;
+  type: 'media' | 'text';
+  mediaType: 'image' | 'video' | null;
+  mediaUrl: string | null;
+  mediaDurationMs: number | null;
+  trimStartMs: number | null;
+  trimEndMs: number | null;
+  textContent: string | null;
+  backgroundStyle: string | null;
+  textOverlays: StoryTextOverlay[];
+  stickers: StorySticker[];
+  location: string | null;
+  viewCount: number;
+  reactionCount: number;
+  viewed: boolean;
+  myReaction: string | null;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type StoryFeedGroup = {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  isCreatorVerified: boolean;
+  stories: StoryItem[];
+  hasUnviewed: boolean;
+  latestStoryAt: string;
+};
+
+export async function uploadStoryMedia(opts: {
+  token: string;
+  file: File;
+  onProgress?: (pct: number) => void;
+  trimStart?: number;
+  trimEnd?: number;
+}): Promise<{ url: string; type: 'image' | 'video'; mediaDurationMs?: number }> {
+  const form = new FormData();
+  form.append('file', opts.file);
+  if (opts.trimStart !== undefined) form.append('trimStart', String(opts.trimStart));
+  if (opts.trimEnd !== undefined) form.append('trimEnd', String(opts.trimEnd));
+  opts.onProgress?.(10);
+  const result = await apiFetch<{ url: string; type: 'image' | 'video'; mediaDurationMs?: number }>({
+    path: '/stories/upload',
+    method: 'POST',
+    headers: { Authorization: `Bearer ${opts.token}` },
+    body: form,
+  });
+  opts.onProgress?.(100);
+  return result;
+}
+
+export async function createStory(opts: {
+  token: string;
+  payload: {
+    type?: 'media' | 'text';
+    mediaType?: 'image' | 'video';
+    mediaUrl?: string;
+    mediaDurationMs?: number;
+    trimStartMs?: number;
+    trimEndMs?: number;
+    textContent?: string;
+    backgroundStyle?: string;
+    textOverlays?: StoryTextOverlay[];
+    stickers?: StorySticker[];
+    visibility?: 'public' | 'followers' | 'close_friends';
+    location?: string;
+  };
+}): Promise<StoryItem> {
+  return apiFetch<StoryItem>({
+    path: '/stories',
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(opts.payload),
+  });
+}
+
+export async function deleteStory(opts: {
+  token: string;
+  storyId: string;
+}): Promise<{ deleted: boolean }> {
+  return apiFetch<{ deleted: boolean }>({
+    path: `/stories/${opts.storyId}`,
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function fetchStoryFeed(opts: {
+  token: string;
+}): Promise<StoryFeedGroup[]> {
+  return apiFetch<StoryFeedGroup[]>({
+    path: '/stories/feed',
+    method: 'GET',
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function fetchMyStories(opts: {
+  token: string;
+}): Promise<StoryItem[]> {
+  return apiFetch<StoryItem[]>({
+    path: '/stories/my',
+    method: 'GET',
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function markStoryViewed(opts: {
+  token: string;
+  storyId: string;
+}): Promise<{ viewed: boolean }> {
+  return apiFetch<{ viewed: boolean }>({
+    path: `/stories/${opts.storyId}/view`,
+    method: 'POST',
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function fetchStoryViewers(opts: {
+  token: string;
+  storyId: string;
+}): Promise<{ viewers: { userId: string; viewedAt: string; username: string | null; displayName: string | null; avatarUrl: string | null }[]; totalViews: number }> {
+  return apiFetch({
+    path: `/stories/${opts.storyId}/viewers`,
+    method: 'GET',
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function reactToStory(opts: {
+  token: string;
+  storyId: string;
+  emoji: string;
+}): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>({
+    path: `/stories/${opts.storyId}/react`,
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ emoji: opts.emoji }),
+  });
+}
+
+export async function removeStoryReaction(opts: {
+  token: string;
+  storyId: string;
+}): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>({
+    path: `/stories/${opts.storyId}/react`,
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${opts.token}` },
   });
 }

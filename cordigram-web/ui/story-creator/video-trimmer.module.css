@@ -1,0 +1,294 @@
+.trimmerRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0 4px;
+  user-select: none;
+}
+
+/* ── Header ────────────────────────────────────────── */
+.trimmerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 4px;
+}
+
+.trimmerTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #111);
+}
+
+[data-theme="dark"] .trimmerTitle { color: #f0f0f0; }
+
+.trimmerCancel,
+.trimmerConfirm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+}
+
+.trimmerCancel {
+  background: rgba(0,0,0,0.07);
+  color: var(--color-text-muted, #666);
+}
+
+[data-theme="dark"] .trimmerCancel {
+  background: rgba(255,255,255,0.08);
+  color: #aaa;
+}
+
+.trimmerCancel:hover { background: rgba(0,0,0,0.14); transform: scale(1.08); }
+[data-theme="dark"] .trimmerCancel:hover { background: rgba(255,255,255,0.14); }
+
+.trimmerConfirm {
+  background: #22c55e;
+  color: #fff;
+}
+
+.trimmerConfirm:hover { background: #16a34a; transform: scale(1.08); }
+
+/* ── Wrap: play + rail + duration ──────────────────── */
+.trimmerWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #111;
+  border-radius: 14px;
+  padding: 6px 8px;
+}
+
+.playBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.playBtn:hover { background: rgba(255,255,255,0.22); }
+
+/* ── Rail ──────────────────────────────────────────── */
+.rail {
+  flex: 1;
+  position: relative;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* ── Filmstrip ─────────────────────────────────────── */
+.filmstrip {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.thumb {
+  flex: 1;
+  height: 100%;
+  background-color: #333;
+  background-size: cover;
+  background-position: center;
+}
+
+.thumbSkeleton {
+  flex: 1;
+  height: 100%;
+  background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Dim regions ───────────────────────────────────── */
+.dimLeft {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(0,0,0,0.55);
+  pointer-events: none;
+}
+
+.dimRight {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  background: rgba(0,0,0,0.55);
+  pointer-events: none;
+}
+
+/* ── Trim highlight border ─────────────────────────── */
+.trimHighlight {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border: 2.5px solid #3b82f6;
+  border-radius: 4px;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* Solid green overlay showing the actual 20s that will be confirmed */
+.trimEffectiveHighlight {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border: 2.5px solid #22c55e;
+  border-radius: 4px;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ── Handles ───────────────────────────────────────── */
+.handle {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 18px;
+  transform: translateX(-50%);
+  z-index: 10;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.handleLeft { /* shift so border aligns */ transform: translateX(-1px); }
+.handleRight { transform: translateX(-17px); }
+
+.handleGrip {
+  width: 16px;
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 4px 0 0 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.handleRight .handleGrip { border-radius: 0 4px 4px 0; }
+
+.handleGrip span {
+  display: block;
+  width: 2px;
+  height: 10px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 2px;
+}
+
+/* ── Playhead ──────────────────────────────────────── */
+.playhead {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 20px;            /* hit-area wide enough to grab */
+  transform: translateX(-10px);
+  z-index: 15;
+  cursor: ew-resize;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: all;
+}
+
+.playheadLine {
+  width: 2px;
+  height: 100%;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(0,0,0,0.7);
+  flex-shrink: 0;
+}
+
+/* Visible knob sitting on top of the line */
+.playheadHandle {
+  position: absolute;
+  top: -1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.55);
+  transform: translateY(-50%);
+  flex-shrink: 0;
+}
+
+.playhead:active .playheadLine { background: #e0e7ff; }
+.playhead:active .playheadHandle { background: #c7d2fe; }
+
+/* ── Duration ──────────────────────────────────────── */
+.trimDuration {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+  transition: color 0.2s;
+}
+
+.trimDurationMax {
+  color: #f87171;
+}
+
+.trimMaxBadge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 3px;
+  padding: 1px 4px;
+  line-height: 1.4;
+}
+
+/* ── Time info ─────────────────────────────────────── */
+.trimInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--color-text-muted, #888);
+  padding: 0 2px;
+}
+
+.trimInfoEffective {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.trimInfoEffectiveLabel {
+  font-weight: 400;
+  opacity: 0.8;
+}

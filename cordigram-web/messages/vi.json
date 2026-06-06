@@ -717,12 +717,30 @@
         "title": "Chọn mục tiêu chiến dịch",
         "required": "Bắt buộc",
         "options": {
-          "awareness": { "label": "Nhận diện thương hiệu", "desc": "Tiếp cận những người có thể nhớ thương hiệu của bạn." },
-          "traffic": { "label": "Lưu lượng truy cập", "desc": "Dẫn người dùng đến website hoặc trang sản phẩm." },
-          "engagement": { "label": "Tương tác", "desc": "Nhận nhiều phản ứng, bình luận và chia sẻ hơn." },
-          "leads": { "label": "Tạo khách hàng tiềm năng", "desc": "Thu thập thông tin liên hệ từ khách hàng tiềm năng." },
-          "sales": { "label": "Doanh số", "desc": "Thúc đẩy mua hàng và hành động chuyển đổi." },
-          "messages": { "label": "Tin nhắn", "desc": "Bắt đầu cuộc trò chuyện với người quan tâm đến sản phẩm." }
+          "awareness": {
+            "label": "Nhận diện thương hiệu",
+            "desc": "Tiếp cận những người có thể nhớ thương hiệu của bạn."
+          },
+          "traffic": {
+            "label": "Lưu lượng truy cập",
+            "desc": "Dẫn người dùng đến website hoặc trang sản phẩm."
+          },
+          "engagement": {
+            "label": "Tương tác",
+            "desc": "Nhận nhiều phản ứng, bình luận và chia sẻ hơn."
+          },
+          "leads": {
+            "label": "Tạo khách hàng tiềm năng",
+            "desc": "Thu thập thông tin liên hệ từ khách hàng tiềm năng."
+          },
+          "sales": {
+            "label": "Doanh số",
+            "desc": "Thúc đẩy mua hàng và hành động chuyển đổi."
+          },
+          "messages": {
+            "label": "Tin nhắn",
+            "desc": "Bắt đầu cuộc trò chuyện với người quan tâm đến sản phẩm."
+          }
         }
       },
       "creative": {
@@ -803,9 +821,21 @@
         "totalCost": "Tổng chi phí",
         "selected": "Bạn đã chọn {boost} trong {days} ngày.",
         "boosts": {
-          "light": { "title": "Tăng cường nhẹ", "level": "Ít cạnh tranh", "highlight": "Tốt nhất cho lần đầu" },
-          "standard": { "title": "Tăng cường tiêu chuẩn", "level": "Cạnh tranh trung bình", "highlight": "Được chọn nhiều nhất" },
-          "strong": { "title": "Tăng cường mạnh", "level": "Cạnh tranh cao", "highlight": "Hiển thị cao" }
+          "light": {
+            "title": "Tăng cường nhẹ",
+            "level": "Ít cạnh tranh",
+            "highlight": "Tốt nhất cho lần đầu"
+          },
+          "standard": {
+            "title": "Tăng cường tiêu chuẩn",
+            "level": "Cạnh tranh trung bình",
+            "highlight": "Được chọn nhiều nhất"
+          },
+          "strong": {
+            "title": "Tăng cường mạnh",
+            "level": "Cạnh tranh cao",
+            "highlight": "Hiển thị cao"
+          }
         },
         "durations": {
           "none": "Không gia hạn",
@@ -937,11 +967,26 @@
       "follow": "Người theo dõi"
     },
     "empty": {
-      "all": { "title": "Chưa có gì ở đây", "text": "Khi bạn nhận được thông báo, chúng sẽ xuất hiện ở đây." },
-      "like": { "title": "Lượt thích bài viết của bạn", "text": "Khi ai đó thích nội dung của bạn, bạn sẽ thấy ở đây." },
-      "comment": { "title": "Bình luận bài viết của bạn", "text": "Khi ai đó bình luận, bạn sẽ thấy ở đây." },
-      "mentions": { "title": "Nhắc đến & gắn thẻ", "text": "Khi ai đó nhắc đến hoặc gắn thẻ bạn, bạn sẽ thấy ở đây." },
-      "follow": { "title": "Người theo dõi mới", "text": "Khi ai đó theo dõi bạn, bạn sẽ thấy ở đây." }
+      "all": {
+        "title": "Chưa có gì ở đây",
+        "text": "Khi bạn nhận được thông báo, chúng sẽ xuất hiện ở đây."
+      },
+      "like": {
+        "title": "Lượt thích bài viết của bạn",
+        "text": "Khi ai đó thích nội dung của bạn, bạn sẽ thấy ở đây."
+      },
+      "comment": {
+        "title": "Bình luận bài viết của bạn",
+        "text": "Khi ai đó bình luận, bạn sẽ thấy ở đây."
+      },
+      "mentions": {
+        "title": "Nhắc đến & gắn thẻ",
+        "text": "Khi ai đó nhắc đến hoặc gắn thẻ bạn, bạn sẽ thấy ở đây."
+      },
+      "follow": {
+        "title": "Người theo dõi mới",
+        "text": "Khi ai đó theo dõi bạn, bạn sẽ thấy ở đây."
+      }
     },
     "loading": "Đang tải",
     "loadingText": "Đang lấy thông báo...",
@@ -1280,6 +1325,44 @@
       "captionLangEn": "Tiếng Anh",
       "captionLangZh": "Tiếng Trung",
       "captionLangJa": "Tiếng Nhật"
-    }
+    },
+    "tabStory": "Story",
+    "eyebrowStory": "Tạo story",
+    "titleStory": "Chia sẻ khoảnh khắc",
+    "storyPosted": "Story đã được đăng!",
+    "postAnother": "Đăng story khác"
+  },
+  "storyCreator": {
+    "tabMedia": "Ảnh / Video",
+    "tabText": "Văn bản",
+    "placeholderText": "Nhấn để nhập nội dung...",
+    "labelBackground": "Nền",
+    "labelAudience": "Đối tượng",
+    "optFollowers": "Người theo dõi",
+    "optPublic": "Công khai",
+    "optCloseFriends": "Bạn thân",
+    "btnPost": "Đăng story",
+    "btnPosting": "Đang đăng...",
+    "btnChangePhoto": "Đổi ảnh",
+    "btnChangeVideo": "Đổi video",
+    "btnChooseFile": "Chọn file",
+    "dropHint": "Kéo thả hoặc nhấn để chọn ảnh / video",
+    "errMediaRequired": "Vui lòng chọn ảnh hoặc video",
+    "errTextRequired": "Vui lòng nhập nội dung",
+    "errUploadFailed": "Không thể đăng story",
+    "errMediaType": "Chỉ hỗ trợ ảnh hoặc video",
+    "btnBack": "Quay lại",
+    "discardTitle": "Bỏ story đang tạo?",
+    "discardBody": "Nội dung sẽ không được lưu nếu bạn quay lại.",
+    "discardConfirm": "Bỏ story",
+    "discardCancel": "Tiếp tục tạo",
+    "editPhoto": "Chỉnh sửa ảnh",
+    "editVideo": "Cắt video",
+    "btnDone": "Xong",
+    "btnReset": "Đặt lại",
+    "btnEditPhoto": "Chỉnh sửa",
+    "btnEditVideo": "Cắt",
+    "labelRotate": "Xoay",
+    "labelZoom": "Zoom"
   }
 }
