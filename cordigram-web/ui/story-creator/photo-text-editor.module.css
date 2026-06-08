@@ -33,6 +33,8 @@
 .overlayText {
   display: block;
   white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
   text-align: center;
   font-weight: 700;
   line-height: 1.25;
@@ -44,13 +46,16 @@
   background: transparent;
   border: none;
   outline: none;
-  resize: none;
   font-weight: 700;
   line-height: 1.25;
   text-align: center;
   text-shadow: 0 1px 6px rgba(0,0,0,0.6);
-  width: 160px;
-  min-height: 36px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  display: inline-block;
+  min-width: 60px;
+  width: 100%;
   pointer-events: auto;
   cursor: text;
 }
@@ -132,19 +137,22 @@
   background: transparent;
   border: none;
   outline: none;
-  resize: none;
   font-weight: 700;
   line-height: 1.3;
   text-align: center;
   text-shadow: 0 1px 8px rgba(0,0,0,0.7);
-  width: 80%;
-  max-width: 240px;
-  min-height: 60px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  display: inline-block;
+  min-width: 80px;
   cursor: text;
 }
 
-.inputTextarea::placeholder {
+.inputTextarea:empty::before {
+  content: "Nhập văn bản...";
   color: rgba(255,255,255,0.45);
+  pointer-events: none;
 }
 
 .inputDoneBtn {

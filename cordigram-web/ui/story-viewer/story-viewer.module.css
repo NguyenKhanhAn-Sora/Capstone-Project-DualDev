@@ -182,8 +182,10 @@
 .textOverlay {
   position: absolute;
   pointer-events: none;
-  transform: translate(-50%, -50%);
+  /* transform set inline via translate-only positioning */
   white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
   text-align: center;
   font-weight: 700;
   line-height: 1.25;

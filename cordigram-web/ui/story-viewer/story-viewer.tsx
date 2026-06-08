@@ -58,6 +58,7 @@ export default function StoryViewer({
   const mountedRef = useRef(true);
   const storyContentRef = useRef<HTMLDivElement>(null);
   const [contentH, setContentH] = useState(844);
+  const contentW = Math.round(contentH * (9 / 16));
 
   const group = groups[groupIdx];
   const story: StoryItem | undefined = group?.stories[storyIdx];
@@ -370,8 +371,10 @@ export default function StoryViewer({
               key={i}
               className={styles.textOverlay}
               style={{
-                left: `${ov.x ?? 50}%`,
-                top: `${ov.y ?? 50}%`,
+                left: 0,
+                top: 0,
+                transform: `translate(calc(-50% + ${((ov.x ?? 50) / 100) * contentW}px), calc(-50% + ${((ov.y ?? 50) / 100) * contentH}px))`,
+                maxWidth: Math.max(80, Math.round(2 * Math.min(((ov.x ?? 50) / 100) * contentW, ((100 - (ov.x ?? 50)) / 100) * contentW)) - 8),
                 color: ov.color ?? "#fff",
                 fontSize: `${((ov.fontSize ?? 5) / 100) * contentH}px`,
                 textAlign: ov.align ?? "center",

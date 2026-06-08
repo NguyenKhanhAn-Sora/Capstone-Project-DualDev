@@ -563,6 +563,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
             <button className={styles.editorDoneBtn} onClick={confirmPhotoEdit}>{t("btnDone")}</button>
           </div>
 
+          <div className={styles.editorMainRow}>
           {/* ── Draggable 9:16 canvas ── */}
           <div className={styles.photoEditorCanvasWrap}>
             <div
@@ -604,6 +605,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
             </div>
           </div>
 
+          <div className={styles.photoEditorSidePanel}>
           <div className={styles.photoEditorTools}>
             <div className={styles.photoToolGroup}>
               <span className={styles.photoToolLabel}>{t("labelRotate")}</span>
@@ -660,6 +662,8 @@ export default function StoryCreator({ token, onCreated }: Props) {
               {t("btnReset")}
             </button>
           </div>
+          </div>{/* photoEditorSidePanel */}
+          </div>{/* editorMainRow */}
         </div>
         <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={handleFileInput} />
         {discardModal}
@@ -793,34 +797,38 @@ export default function StoryCreator({ token, onCreated }: Props) {
               </div>
             </div>
 
-            {/* Toolbar below preview */}
-            {step === "media" && (
-              <div className={styles.previewToolbar}>
-                <button className={styles.toolbarBtn} onClick={() => setMediaSubStep("editor")} title={mediaType === "image" ? t("btnEditPhoto") : t("btnEditVideo")}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span>{mediaType === "image" ? t("btnEditPhoto") : t("btnEditVideo")}</span>
-                </button>
-                {mediaType === "image" && (
-                  <button className={`${styles.toolbarBtn} ${styles.toolbarBtnAaWrap}`} onClick={() => setAddTextTrigger((n) => n + 1)} title="Add Text">
-                    <span className={styles.toolbarBtnAa}>Aa</span>
-                    <span>Add Text</span>
-                  </button>
-                )}
-                <button className={styles.toolbarBtn} onClick={() => fileInputRef.current?.click()} title={mediaType === "image" ? t("btnChangePhoto") : t("btnChangeVideo")}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span>{mediaType === "image" ? t("btnChangePhoto") : t("btnChangeVideo")}</span>
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Options panel */}
           <div className={styles.optionsSection}>
+            {/* Action buttons — Edit, Add Text, Change Photo */}
+            {step === "media" && (
+              <div className={styles.optionCard}>
+                <p className={styles.optionCardLabel}>Actions</p>
+                <div className={styles.actionBtnsRow}>
+                  <button className={styles.toolbarBtn} onClick={() => setMediaSubStep("editor")} title={mediaType === "image" ? t("btnEditPhoto") : t("btnEditVideo")}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span>{mediaType === "image" ? t("btnEditPhoto") : t("btnEditVideo")}</span>
+                  </button>
+                  {mediaType === "image" && (
+                    <button className={`${styles.toolbarBtn} ${styles.toolbarBtnAaWrap}`} onClick={() => setAddTextTrigger((n) => n + 1)} title="Add Text">
+                      <span className={styles.toolbarBtnAa}>Aa</span>
+                      <span>Add Text</span>
+                    </button>
+                  )}
+                  <button className={styles.toolbarBtn} onClick={() => fileInputRef.current?.click()} title={mediaType === "image" ? t("btnChangePhoto") : t("btnChangeVideo")}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span>{mediaType === "image" ? t("btnChangePhoto") : t("btnChangeVideo")}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Text overlay controls — shown when an overlay is selected or in input mode */}
             {step === "media" && mediaType === "image" && (textSelectedId !== null || textInputMode) && (
               <div className={styles.optionCard}>
