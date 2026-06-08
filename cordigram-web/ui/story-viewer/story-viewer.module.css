@@ -140,6 +140,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .storyImage {
@@ -182,6 +183,11 @@
   position: absolute;
   pointer-events: none;
   transform: translate(-50%, -50%);
+  white-space: pre-wrap;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1.25;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.55);
 }
 
 /* Tap zones */

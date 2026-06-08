@@ -56,6 +56,8 @@ export default function StoryViewer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const viewedRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
+  const storyContentRef = useRef<HTMLDivElement>(null);
+  const [contentH, setContentH] = useState(844);
 
   const group = groups[groupIdx];
   const story: StoryItem | undefined = group?.stories[storyIdx];
@@ -64,6 +66,14 @@ export default function StoryViewer({
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    const el = storyContentRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setContentH(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // Khi story thay đổi
@@ -329,7 +339,7 @@ export default function StoryViewer({
         </div>
 
         {/* Story content */}
-        <div className={styles.storyContent}>
+        <div ref={storyContentRef} className={styles.storyContent}>
           {story.type === "media" && story.mediaUrl && story.mediaType === "image" && (
             <img src={story.mediaUrl} alt="" className={styles.storyImage} />
           )}
@@ -363,11 +373,11 @@ export default function StoryViewer({
                 left: `${ov.x ?? 50}%`,
                 top: `${ov.y ?? 50}%`,
                 color: ov.color ?? "#fff",
-                fontSize: `${ov.fontSize ?? 20}px`,
+                fontSize: `${((ov.fontSize ?? 5) / 100) * contentH}px`,
                 textAlign: ov.align ?? "center",
-                backgroundColor: ov.backgroundColor ?? "transparent",
-                padding: ov.backgroundColor ? "4px 10px" : undefined,
-                borderRadius: ov.backgroundColor ? "6px" : undefined,
+                backgroundColor: (ov.backgroundColor && ov.backgroundColor !== '#000000') ? ov.backgroundColor : "transparent",
+                padding: (ov.backgroundColor && ov.backgroundColor !== '#000000') ? "4px 10px" : undefined,
+                borderRadius: (ov.backgroundColor && ov.backgroundColor !== '#000000') ? "6px" : undefined,
               }}
             >
               {ov.text}

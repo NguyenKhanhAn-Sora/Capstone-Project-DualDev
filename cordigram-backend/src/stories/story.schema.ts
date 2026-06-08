@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 export type StoryMediaType = 'image' | 'video';
 export type StoryType = 'media' | 'text';
-export type StoryVisibility = 'public' | 'followers' | 'close_friends';
+export type StoryVisibility = 'public' | 'followers' | 'private';
 
 @Schema({ _id: false })
 export class StoryTextOverlay {
@@ -13,10 +13,10 @@ export class StoryTextOverlay {
   @Prop({ type: String, default: '#ffffff' })
   color: string;
 
-  @Prop({ type: String, default: '#000000' })
-  backgroundColor: string;
+  @Prop({ type: String })
+  backgroundColor?: string;
 
-  @Prop({ type: Number, default: 20 })
+  @Prop({ type: Number, default: 5 })
   fontSize: number;
 
   @Prop({ type: String, enum: ['left', 'center', 'right'], default: 'center' })
@@ -107,7 +107,7 @@ export class Story extends Document {
   @Prop({ type: [StoryStickerSchema], default: [] })
   stickers: StorySticker[];
 
-  @Prop({ type: String, enum: ['public', 'followers', 'close_friends'], default: 'followers' })
+  @Prop({ type: String, enum: ['public', 'followers', 'private'], default: 'followers' })
   visibility: StoryVisibility;
 
   @Prop({ type: [StoryViewSchema], default: [] })

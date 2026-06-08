@@ -70,7 +70,7 @@ export class CreateStoryDto {
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => StickerDto)
   stickers?: StickerDto[];
 
-  @IsOptional() @IsEnum(['public', 'followers', 'close_friends'])
+  @IsOptional() @IsEnum(['public', 'followers', 'private'])
   visibility?: StoryVisibility;
 
   @IsOptional() @IsString()

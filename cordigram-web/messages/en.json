@@ -1340,7 +1340,7 @@
     "labelAudience": "Audience",
     "optFollowers": "Followers",
     "optPublic": "Public",
-    "optCloseFriends": "Close Friends",
+    "optPrivate": "Private",
     "btnPost": "Share Story",
     "btnPosting": "Posting...",
     "btnChangePhoto": "Change photo",

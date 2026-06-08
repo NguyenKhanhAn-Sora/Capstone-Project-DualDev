@@ -4779,7 +4779,7 @@ export async function createStory(opts: {
     backgroundStyle?: string;
     textOverlays?: StoryTextOverlay[];
     stickers?: StorySticker[];
-    visibility?: 'public' | 'followers' | 'close_friends';
+    visibility?: 'public' | 'followers' | 'private';
     location?: string;
   };
 }): Promise<StoryItem> {
