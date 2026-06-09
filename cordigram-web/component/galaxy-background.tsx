@@ -93,7 +93,7 @@ const NEBULAE: Nebula[] = [
   { nx: 0.68, ny: 0.30, rx: 0.18, ry: 0.20, r1: 180, g1: 80, b1: 240, a1: 0.16, r2: 120, g2: 50, b2: 200, a2: 0.07, parallaxStrength: 4 },
 ];
 
-export default function GalaxyBackground() {
+export default function GalaxyBackground({ scoped = false }: { scoped?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const mouseRef = useRef({ x: 0.5, y: 0.5 });
@@ -105,12 +105,18 @@ export default function GalaxyBackground() {
     if (!ctx) return;
 
     let w = 0, h = 0;
-    const stars = buildStars(520);
+    const stars = buildStars(scoped ? 280 : 520);
     let frame = 0;
 
     const resize = () => {
-      w = canvas.width = window.innerWidth;
-      h = canvas.height = window.innerHeight;
+      if (scoped) {
+        const parent = canvas.parentElement;
+        w = canvas.width = parent ? parent.clientWidth : window.innerWidth;
+        h = canvas.height = parent ? parent.clientHeight : window.innerHeight;
+      } else {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      }
     };
     resize();
 
@@ -264,6 +270,13 @@ export default function GalaxyBackground() {
     window.addEventListener("resize", resize);
     window.addEventListener("mousemove", onMouse, { passive: true });
     window.addEventListener("touchmove", onTouch, { passive: true });
+
+    let ro: ResizeObserver | null = null;
+    if (scoped && canvas.parentElement) {
+      ro = new ResizeObserver(resize);
+      ro.observe(canvas.parentElement);
+    }
+
     rafRef.current = requestAnimationFrame(draw);
 
     return () => {
@@ -271,14 +284,22 @@ export default function GalaxyBackground() {
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", onMouse);
       window.removeEventListener("touchmove", onTouch);
+      ro?.disconnect();
     };
-  }, []);
+  }, [scoped]);
 
   return (
     <canvas
       ref={canvasRef}
       aria-hidden
-      style={{
+      style={scoped ? {
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        zIndex: 0,
+        pointerEvents: "none",
+      } : {
         position: "fixed",
         inset: 0,
         width: "100vw",

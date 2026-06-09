@@ -12,11 +12,12 @@ import {
   searchProfiles,
   type ProfileSearchItem,
 } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   usePostUpload,
   type PollOption,
 } from "@/context/post-upload-context";
+import StoryCreator from "@/ui/story-creator/story-creator";
 import { useTranslations } from "next-intl";
 
 function LocationIcon() {
@@ -257,7 +258,13 @@ export default function CreatePostPage() {
   const router = useRouter();
   const { startUpload, startPollUpload } = usePostUpload();
   const t = useTranslations("create");
-  const [mode, setMode] = useState<"post" | "reel" | "livestream" | "poll">("post");
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<"post" | "reel" | "livestream" | "poll" | "story">(() => {
+    const tab = searchParams?.get("tab");
+    if (tab === "story" || tab === "reel" || tab === "livestream" || tab === "poll") return tab;
+    return "post";
+  });
+  const [storyCreated, setStoryCreated] = useState(false);
   const [step, setStep] = useState<Step>("select");
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [form, setForm] = useState<FormState>(initialForm);
@@ -1259,7 +1266,7 @@ export default function CreatePostPage() {
       <div className={styles.headerRow}>
         <div>
           <p className={styles.eyebrow}>
-            {mode === "reel" ? t("eyebrowReel") : mode === "livestream" ? t("eyebrowLivestream") : mode === "poll" ? "Tạo nội dung" : t("eyebrowPost")}
+            {mode === "reel" ? t("eyebrowReel") : mode === "livestream" ? t("eyebrowLivestream") : mode === "poll" ? "Tạo nội dung" : mode === "story" ? t("eyebrowStory") : t("eyebrowPost")}
           </p>
           <h1 className={styles.title}>
             {mode === "reel"
@@ -1268,7 +1275,9 @@ export default function CreatePostPage() {
                 ? t("titleLivestream")
                 : mode === "poll"
                   ? "Cuộc bình chọn"
-                  : t("titlePost")}
+                  : mode === "story"
+                    ? t("titleStory")
+                    : t("titlePost")}
           </h1>
           <div className={styles.modeSwitch}>
             <button
@@ -1335,9 +1344,29 @@ export default function CreatePostPage() {
                 <span>Bình chọn</span>
               </span>
             </button>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${
+                mode === "story" ? styles.modeButtonActive : ""
+              }`}
+              onClick={() => {
+                setMode("story");
+                setError("");
+                resetSelection();
+                setStoryCreated(false);
+              }}
+            >
+              <span className={styles.modeButtonInner}>
+                <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/>
+                  <circle cx="12" cy="12" r="3.5" fill="currentColor"/>
+                </svg>
+                <span>{t("tabStory")}</span>
+              </span>
+            </button>
           </div>
         </div>
-        {mode !== "livestream" && mode !== "poll" ? (
+        {mode !== "livestream" && mode !== "poll" && mode !== "story" ? (
           <div className={styles.stepper}>
             <div
               className={`${styles.step} ${
@@ -1363,7 +1392,63 @@ export default function CreatePostPage() {
         ) : null}
       </div>
 
-      {mode === "livestream" ? (
+      {mode === "story" ? (
+        storyCreated ? (
+          <div className={styles.storySuccess}>
+            {/* Illustration */}
+            <div className={styles.successIllustration}>
+              <div className={styles.successOrbit} />
+              <div className={styles.successGlowRing} />
+              <div className={styles.successCircle}>
+                <svg className={styles.successCheck} viewBox="0 0 48 48" fill="none">
+                  <path
+                    className={styles.successCheckPath}
+                    d="M13 25l8 8 14-16"
+                    stroke="url(#checkGrad)"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <defs>
+                    <linearGradient id="checkGrad" x1="13" y1="24" x2="35" y2="33" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#a78bfa" />
+                      <stop offset="1" stopColor="#60a5fa" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              {/* Floating sparks */}
+              <div className={styles.successSparks}>
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+              </div>
+            </div>
+
+            {/* Text */}
+            <div className={styles.successText}>
+              <div className={styles.successTitle}>{t("storyPosted")}</div>
+              <div className={styles.successSub}>Story của bạn đã được chia sẻ với mọi người</div>
+            </div>
+
+            {/* CTA */}
+            <button
+              className={styles.successBtn}
+              onClick={() => { setStoryCreated(false); setMode("story"); }}
+            >
+              {t("postAnother")}
+            </button>
+          </div>
+        ) : (
+          <StoryCreator
+            token={typeof window !== "undefined" ? localStorage.getItem("accessToken") ?? "" : ""}
+            onCreated={() => setStoryCreated(true)}
+          />
+        )
+      ) : mode === "livestream" ? (
         <LivestreamCreatePanel />
       ) : mode === "poll" ? (
         <PollCreateForm

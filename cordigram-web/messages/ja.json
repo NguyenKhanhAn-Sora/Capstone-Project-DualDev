@@ -798,12 +798,30 @@
         "title": "キャンペーン目的を選択",
         "required": "必須",
         "options": {
-          "awareness": { "label": "ブランド認知", "desc": "ブランドを記憶してもらえる新規ユーザーにリーチします。" },
-          "traffic": { "label": "トラフィック", "desc": "ウェブサイトや製品ページにユーザーを誘導します。" },
-          "engagement": { "label": "エンゲージメント", "desc": "いいね、コメント、シェアを増やします。" },
-          "leads": { "label": "リード獲得", "desc": "潜在顧客の連絡先情報を収集します。" },
-          "sales": { "label": "販売", "desc": "購入とコンバージョンを促進します。" },
-          "messages": { "label": "メッセージ", "desc": "提案に興味のあるユーザーとの会話を始めます。" }
+          "awareness": {
+            "label": "ブランド認知",
+            "desc": "ブランドを記憶してもらえる新規ユーザーにリーチします。"
+          },
+          "traffic": {
+            "label": "トラフィック",
+            "desc": "ウェブサイトや製品ページにユーザーを誘導します。"
+          },
+          "engagement": {
+            "label": "エンゲージメント",
+            "desc": "いいね、コメント、シェアを増やします。"
+          },
+          "leads": {
+            "label": "リード獲得",
+            "desc": "潜在顧客の連絡先情報を収集します。"
+          },
+          "sales": {
+            "label": "販売",
+            "desc": "購入とコンバージョンを促進します。"
+          },
+          "messages": {
+            "label": "メッセージ",
+            "desc": "提案に興味のあるユーザーとの会話を始めます。"
+          }
         }
       },
       "creative": {
@@ -884,9 +902,21 @@
         "totalCost": "合計費用",
         "selected": "{boost} を {days} 日間選択しました。",
         "boosts": {
-          "light": { "title": "ライトブースト", "level": "競争が少ない", "highlight": "初めての広告に最適" },
-          "standard": { "title": "スタンダードブースト", "level": "中程度の競争", "highlight": "最も選ばれている" },
-          "strong": { "title": "ストロングブースト", "level": "高競争", "highlight": "高い露出" }
+          "light": {
+            "title": "ライトブースト",
+            "level": "競争が少ない",
+            "highlight": "初めての広告に最適"
+          },
+          "standard": {
+            "title": "スタンダードブースト",
+            "level": "中程度の競争",
+            "highlight": "最も選ばれている"
+          },
+          "strong": {
+            "title": "ストロングブースト",
+            "level": "高競争",
+            "highlight": "高い露出"
+          }
         },
         "durations": {
           "none": "延長なし",
@@ -1730,11 +1760,26 @@
       "follow": "フォロワー"
     },
     "empty": {
-      "all": { "title": "まだ何もありません", "text": "通知が届いたらここに表示されます。" },
-      "like": { "title": "投稿へのいいね", "text": "誰かがコンテンツをいいねしたらここに表示されます。" },
-      "comment": { "title": "投稿へのコメント", "text": "誰かがコメントしたらここに表示されます。" },
-      "mentions": { "title": "メンションとタグ", "text": "誰かがあなたをメンションまたはタグしたらここに表示されます。" },
-      "follow": { "title": "新しいフォロワー", "text": "誰かがあなたをフォローしたらここに表示されます。" }
+      "all": {
+        "title": "まだ何もありません",
+        "text": "通知が届いたらここに表示されます。"
+      },
+      "like": {
+        "title": "投稿へのいいね",
+        "text": "誰かがコンテンツをいいねしたらここに表示されます。"
+      },
+      "comment": {
+        "title": "投稿へのコメント",
+        "text": "誰かがコメントしたらここに表示されます。"
+      },
+      "mentions": {
+        "title": "メンションとタグ",
+        "text": "誰かがあなたをメンションまたはタグしたらここに表示されます。"
+      },
+      "follow": {
+        "title": "新しいフォロワー",
+        "text": "誰かがあなたをフォローしたらここに表示されます。"
+      }
     },
     "loading": "読み込み中",
     "loadingText": "通知を取得中...",
@@ -2071,6 +2116,80 @@
       "captionLangEn": "英語",
       "captionLangZh": "中国語",
       "captionLangJa": "日本語"
-    }
+    },
+    "tabStory": "ストーリー",
+    "eyebrowStory": "ストーリーを作成",
+    "titleStory": "瞬間をシェア",
+    "storyPosted": "ストーリーを投稿しました！",
+    "postAnother": "別のストーリーを投稿"
+  },
+  "storyViewer": {
+    "prevGroup": "前へ",
+    "nextGroup": "次へ",
+    "pause": "一時停止",
+    "resume": "再生",
+    "options": "オプション",
+    "close": "閉じる",
+    "prevStory": "前のストーリー",
+    "nextStory": "次のストーリー",
+    "replyPlaceholder": "{name}に返信...",
+    "react": "リアクション",
+    "viewViewers": "閲覧者を見る",
+    "deleteStory": "ストーリーを削除",
+    "report": "報告",
+    "viewers": "閲覧者 ({count})",
+    "loading": "読み込み中...",
+    "noViewers": "まだ誰も見ていません",
+    "viewCount": "{count} 回閲覧",
+    "removeReaction": "取り消す",
+    "user": "ユーザー",
+    "volume": "音量",
+    "mute": "ミュート",
+    "unmute": "ミュート解除",
+    "editVisibility": "公開範囲を編集",
+    "visibilityTitle": "ストーリーの公開範囲",
+    "visibilityDesc": "このストーリーを見られる人を選択",
+    "visibilitySave": "変更を保存",
+    "visibilitySaving": "保存中...",
+    "visibilityPublic": "全員",
+    "visibilityPublicDesc": "誰でもこのストーリーを見られます",
+    "visibilityFollowers": "フォロワー",
+    "visibilityFollowersDesc": "フォロワーのみ見ることができます",
+    "visibilityPrivate": "自分のみ",
+    "visibilityPrivateDesc": "自分だけが見ることができます",
+    "visibilityUpdated": "公開範囲を更新しました"
+  },
+  "storyCreator": {
+    "tabMedia": "写真 / 動画",
+    "tabText": "テキスト",
+    "placeholderText": "タップして入力...",
+    "labelBackground": "背景",
+    "labelAudience": "公開範囲",
+    "optFollowers": "フォロワー",
+    "optPublic": "公開",
+    "optPrivate": "自分のみ",
+    "btnPost": "ストーリーをシェア",
+    "btnPosting": "投稿中...",
+    "btnChangePhoto": "写真を変更",
+    "btnChangeVideo": "動画を変更",
+    "btnChooseFile": "ファイルを選択",
+    "dropHint": "ドラッグ＆ドロップまたはタップして写真/動画を選択",
+    "errMediaRequired": "写真または動画を選択してください",
+    "errTextRequired": "テキストを入力してください",
+    "errUploadFailed": "ストーリーの投稿に失敗しました",
+    "errMediaType": "画像と動画のみ対応しています",
+    "btnBack": "戻る",
+    "discardTitle": "ストーリーを破棄しますか？",
+    "discardBody": "戻ると、入力内容は保存されません。",
+    "discardConfirm": "破棄する",
+    "discardCancel": "編集を続ける",
+    "editPhoto": "写真を編集",
+    "editVideo": "動画をトリミング",
+    "btnDone": "完了",
+    "btnReset": "リセット",
+    "btnEditPhoto": "編集",
+    "btnEditVideo": "カット",
+    "labelRotate": "回転",
+    "labelZoom": "ズーム"
   }
 }

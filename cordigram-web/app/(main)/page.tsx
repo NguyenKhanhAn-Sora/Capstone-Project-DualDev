@@ -68,6 +68,9 @@ import {
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 import ReelFeedCard from "@/ui/reel-feed-card/reel-feed-card";
 import LivestreamHub from "@/components/livestream/LivestreamHub";
+import StoryBar from "@/ui/story-bar/story-bar";
+import StoryViewer from "@/ui/story-viewer/story-viewer";
+import { type StoryFeedGroup } from "@/lib/api";
 import CustomVideoPlayer, { VideoQuality } from "@/ui/custom-video-player/CustomVideoPlayer";
 import { videoVolumeStore } from "@/hooks/use-video-volume";
 import styles from "./home-feed.module.css";
@@ -539,7 +542,15 @@ export default function HomePage({
       : getUserIdFromToken(localStorage.getItem("accessToken")),
   );
   const [viewerProfile, setViewerProfile] =
-    useState<CurrentProfileResponse | null>(null);
+    useState<CurrentProfileResponse | null>(() => {
+      if (typeof window === "undefined") return null;
+      try {
+        const cached = localStorage.getItem("cachedViewerProfile");
+        return cached ? (JSON.parse(cached) as CurrentProfileResponse) : null;
+      } catch {
+        return null;
+      }
+    });
   const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const itemsRef = useRef<PostViewState[]>([]);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -788,6 +799,24 @@ export default function HomePage({
 
   const { newPost, clearNewPost } = usePostUpload();
 
+  // Story state
+  const [storyGroups, setStoryGroups] = useState<StoryFeedGroup[]>([]);
+  const [storyViewerOpen, setStoryViewerOpen] = useState(false);
+  const [storyViewerGroupIdx, setStoryViewerGroupIdx] = useState(0);
+  const [storyBarRefreshKey, setStoryBarRefreshKey] = useState(0);
+
+  const handleOpenStory = (groups: StoryFeedGroup[], groupIndex: number) => {
+    setStoryGroups(groups);
+    setStoryViewerGroupIdx(groupIndex);
+    setStoryViewerOpen(true);
+  };
+
+  const handleCreateStory = () => {
+    if (typeof window !== "undefined") {
+      window.location.href = "/create?tab=story";
+    }
+  };
+
   useEffect(() => {
     if (!newPost) return;
     setItems((prev) => {
@@ -810,10 +839,14 @@ export default function HomePage({
   useEffect(() => {
     if (!token) {
       setViewerProfile(null);
+      localStorage.removeItem("cachedViewerProfile");
       return;
     }
     fetchCurrentProfile({ token })
-      .then(setViewerProfile)
+      .then((profile) => {
+        setViewerProfile(profile);
+        localStorage.setItem("cachedViewerProfile", JSON.stringify(profile));
+      })
       .catch(() => setViewerProfile(null));
   }, [token]);
 
@@ -1694,6 +1727,19 @@ export default function HomePage({
         <PostUploadBanner />
         {headerSlot}
 
+        {/* Story Bar */}
+        {!embedded && token && (
+          <StoryBar
+            token={token}
+            viewerId={viewerId}
+            viewerAvatarUrl={viewerProfile?.avatarUrl ?? undefined}
+            viewerUsername={viewerProfile?.username ?? undefined}
+            onOpenStory={handleOpenStory}
+            onCreateStory={handleCreateStory}
+            refreshKey={storyBarRefreshKey}
+          />
+        )}
+
         {/* Mobile PYMK — CSS quyết định hiện/ẩn (≤1100px), không dùng JS */}
         {!embedded && (
           <div className={styles.mobilePymkWrapper}>
@@ -1881,6 +1927,20 @@ export default function HomePage({
         viewerId={viewerId}
         onClose={() => setLikesOverlayPostId(null)}
       />
+
+      {storyViewerOpen && storyGroups.length > 0 && (
+        <StoryViewer
+          groups={storyGroups}
+          initialGroupIndex={storyViewerGroupIdx}
+          viewerId={viewerId}
+          token={token}
+          onClose={() => {
+            setStoryViewerOpen(false);
+            setStoryBarRefreshKey((k) => k + 1);
+          }}
+          onStoryDeleted={() => setStoryBarRefreshKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }

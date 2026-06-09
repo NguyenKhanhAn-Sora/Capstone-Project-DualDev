@@ -1,0 +1,370 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  height: min(76vh, 600px);
+  max-height: min(76vh, 600px);
+  background: #1a1a2e;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 0;
+  flex-shrink: 0;
+}
+
+.searchBar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 0 10px;
+  height: 38px;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: border-color 0.2s;
+}
+.searchBar:focus-within {
+  border-color: rgba(139,92,246,0.6);
+}
+
+.searchIcon {
+  color: rgba(255,255,255,0.4);
+  display: flex;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 13px;
+  min-width: 0;
+}
+.searchInput::placeholder { color: rgba(255,255,255,0.35); }
+
+.searchClear {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  display: flex;
+  padding: 0;
+  transition: color 0.15s;
+}
+.searchClear:hover { color: rgba(255,255,255,0.8); }
+
+.closeBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: rgba(255,255,255,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.closeBtn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+/* ── Tabs ────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 12px 4px;
+  flex-shrink: 0;
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.45);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.tab:hover { color: rgba(255,255,255,0.8); }
+.tabActive {
+  color: #a78bfa;
+  background: rgba(139,92,246,0.12);
+}
+
+.removeBtn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #f87171;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.removeBtn:hover { background: rgba(248,113,113,0.1); }
+
+/* ── Selected bar ────────────────────────────────────── */
+.selectedBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 12px;
+  padding: 8px 10px;
+  background: rgba(139,92,246,0.12);
+  border: 1px solid rgba(139,92,246,0.3);
+  border-radius: 10px;
+  flex-shrink: 0;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.selectedCover {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.selectedCoverImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.selectedNoteIcon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.5);
+  background: rgba(0,0,0,0.3);
+}
+
+.selectedInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.selectedTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.selectedArtist {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.selectedCheck {
+  color: #a78bfa;
+  display: flex;
+  flex-shrink: 0;
+}
+
+/* ── Track list ──────────────────────────────────────── */
+.trackList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0 12px;
+}
+.trackList::-webkit-scrollbar { width: 3px; }
+.trackList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* Skeleton */
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+.skeletonCover {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.07);
+  flex-shrink: 0;
+  animation: pulse 1.4s ease infinite;
+}
+.skeletonText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.skeletonLine {
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.07);
+  animation: pulse 1.4s ease infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Empty */
+.empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: rgba(255,255,255,0.3);
+  font-size: 13px;
+}
+
+/* Track row */
+.trackRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 0;
+}
+.trackRow:hover { background: rgba(255,255,255,0.05); }
+.trackRowSelected { background: rgba(139,92,246,0.1); }
+.trackRowSelected:hover { background: rgba(139,92,246,0.15); }
+
+.trackCover {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.06);
+}
+.trackCoverImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.trackCoverOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(139,92,246,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.trackInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.trackTitle {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trackArtist {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trackDuration {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.previewBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.previewBtn:hover {
+  background: rgba(139,92,246,0.25);
+  border-color: rgba(139,92,246,0.6);
+  color: #c4b5fd;
+}
+.previewBtnPlaying {
+  background: rgba(139,92,246,0.3);
+  border-color: rgba(139,92,246,0.7);
+  color: #c4b5fd;
+}
+
+/* ── Light mode ──────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  .panel {
+    background: #f8f8fc;
+    border-left-color: rgba(0,0,0,0.08);
+  }
+  .searchBar {
+    background: rgba(0,0,0,0.05);
+    border-color: rgba(0,0,0,0.1);
+  }
+  .searchInput { color: #111; }
+  .searchInput::placeholder { color: rgba(0,0,0,0.35); }
+  .searchIcon, .searchClear { color: rgba(0,0,0,0.4); }
+  .closeBtn { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.6); }
+  .tab { color: rgba(0,0,0,0.45); }
+  .tabActive { color: #7c3aed; background: rgba(124,58,237,0.1); }
+  .selectedBar { background: rgba(124,58,237,0.08); border-color: rgba(124,58,237,0.25); }
+  .selectedTitle { color: #111; }
+  .selectedArtist { color: rgba(0,0,0,0.5); }
+  .selectedCheck { color: #7c3aed; }
+  .trackRow:hover { background: rgba(0,0,0,0.04); }
+  .trackRowSelected { background: rgba(124,58,237,0.08); }
+  .trackTitle { color: rgba(0,0,0,0.88); }
+  .trackArtist { color: rgba(0,0,0,0.45); }
+  .trackDuration { color: rgba(0,0,0,0.3); }
+  .previewBtn { border-color: rgba(0,0,0,0.2); background: rgba(0,0,0,0.04); color: rgba(0,0,0,0.7); }
+  .skeletonCover, .skeletonLine { background: rgba(0,0,0,0.07); }
+  .empty { color: rgba(0,0,0,0.3); }
+}

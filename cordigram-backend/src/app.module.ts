@@ -43,6 +43,8 @@ import { BoostModule } from './boost/boost.module';
 import { MessagingProfilesModule } from './messaging-profiles/messaging-profiles.module';
 import { AppUpdateModule } from './app-update/app-update.module';
 import { LinkPreviewModule } from './link-preview/link-preview.module';
+import { StoriesModule } from './stories/stories.module';
+import { MusicModule } from './music/music.module';
 
 @Module({
   imports: [
@@ -88,6 +90,8 @@ import { LinkPreviewModule } from './link-preview/link-preview.module';
     MessagingProfilesModule,
     AppUpdateModule,
     LinkPreviewModule,
+    StoriesModule,
+    MusicModule,
   ],
   controllers: [AppController],
   providers: [AppService],

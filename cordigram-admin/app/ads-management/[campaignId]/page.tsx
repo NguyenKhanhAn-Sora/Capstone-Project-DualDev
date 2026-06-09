@@ -294,7 +294,7 @@ export default function AdminAdsCampaignDetailPage() {
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <Link href="/ads-management" className={styles.backLink}>
-            Back to ads management
+            ← Ads Management
           </Link>
         </div>
 

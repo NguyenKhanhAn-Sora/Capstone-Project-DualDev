@@ -1594,6 +1594,8 @@ function ContentModerationPageClient() {
                                     src={getMediaDisplayUrl(reviewPostMedia[reviewPostMediaIndex])}
                                     muted
                                     playsInline
+                                    autoPlay
+                                    loop
                                     className={styles.reviewMediaImageLarge}
                                   />
                                 ) : (

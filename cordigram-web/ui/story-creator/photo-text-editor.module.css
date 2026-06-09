@@ -1,0 +1,177 @@
+/* ── Editor Layer ──────────────────────────────────── */
+.editorLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ── Overlay (each text block) ────────────────────── */
+.overlay {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
+  touch-action: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1.5px solid transparent;
+  transition: border-color 0.12s;
+}
+
+.overlay:active { cursor: grabbing; }
+
+.overlaySelected {
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.overlayText {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1.25;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+
+.overlayInput {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  display: inline-block;
+  min-width: 60px;
+  width: 100%;
+  pointer-events: auto;
+  cursor: text;
+}
+
+/* ── Delete button (top-left) ──────────────────────── */
+.deleteBtn {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 5;
+  transition: background 0.15s, transform 0.12s;
+  backdrop-filter: blur(4px);
+}
+
+.deleteBtn:hover {
+  background: #ef4444;
+  transform: scale(1.18);
+}
+
+/* ── Corner resize handles (TR, BL, BR) ────────────── */
+.cornerHandle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  pointer-events: auto;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cornerHandle::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.92);
+  border: 1.5px solid rgba(0,0,0,0.3);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+}
+
+.cornerTR { top: -12px;    right: -12px;  cursor: ne-resize; }
+.cornerBL { bottom: -12px; left: -12px;   cursor: sw-resize; }
+.cornerBR { bottom: -12px; right: -12px;  cursor: se-resize; }
+
+/* ── Input mode ─────────────────────────────────────── */
+.inputMode {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inputBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.52);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.inputTextarea {
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.7);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  display: inline-block;
+  min-width: 80px;
+  cursor: text;
+}
+
+.inputTextarea:empty::before {
+  content: "Nhập văn bản...";
+  color: rgba(255,255,255,0.45);
+  pointer-events: none;
+}
+
+.inputDoneBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  background: rgba(255,255,255,0.16);
+  border: 1.5px solid rgba(255,255,255,0.45);
+  color: #fff;
+  border-radius: 18px;
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.15s;
+  letter-spacing: -0.01em;
+}
+
+.inputDoneBtn:hover { background: rgba(255,255,255,0.28); }

@@ -427,42 +427,42 @@ export default function AdsManagementPage() {
 
   if (!ready) return null;
 
+  const L = loadingOverview;
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Ads Center</p>
-          <h1>Ads Management</h1>
-          <p className={styles.subtitle}>
-            Dashboard and campaign list for monitoring ad performance and controlling ad delivery.
-          </p>
-        </div>
+        <p className={styles.eyebrow}>Ads Center</p>
+        <h1>Ads Management</h1>
+        <p className={styles.subtitle}>
+          Monitor ad performance and control campaign delivery across the platform.
+        </p>
       </header>
 
       <section className={styles.kpis}>
         <article className={styles.kpiCard}>
-          <p>Gross Revenue (30d)</p>
-          <strong>{loadingOverview ? "..." : formatCurrencyCompact(overview?.adsGrossRevenue30d)}</strong>
+          <p>Revenue (30d)</p>
+          <strong>{L ? "..." : formatCurrencyCompact(overview?.adsGrossRevenue30d)}</strong>
         </article>
         <article className={styles.kpiCard}>
-          <p>Active Campaigns</p>
-          <strong>{loadingOverview ? "..." : formatNumber(overview?.adsActiveCampaigns)}</strong>
+          <p>Ad Spend (30d)</p>
+          <strong>{L ? "..." : formatCurrencyCompact(overview?.adsSpend30d)}</strong>
+        </article>
+        <article className={styles.kpiCard}>
+          <p>Impressions (30d)</p>
+          <strong>{L ? "..." : formatNumber(overview?.adsImpressions30d)}</strong>
         </article>
         <article className={styles.kpiCard}>
           <p>CTR (30d)</p>
-          <strong>{loadingOverview ? "..." : formatPercentCompact(overview?.adsCtr30dPct)}</strong>
+          <strong>{L ? "..." : formatPercentCompact(overview?.adsCtr30dPct)}</strong>
+        </article>
+        <article className={styles.kpiCard}>
+          <p>Active Campaigns</p>
+          <strong>{L ? "..." : formatNumber(overview?.adsActiveCampaigns)}</strong>
         </article>
         <article className={styles.kpiCard}>
           <p>Total Campaigns</p>
-          <strong>{loadingOverview ? "..." : formatNumber(overview?.totalCampaigns)}</strong>
-        </article>
-        <article className={styles.kpiCard}>
-          <p>Hidden</p>
-          <strong>{loadingOverview ? "..." : formatNumber(overview?.pausedCampaigns)}</strong>
-        </article>
-        <article className={styles.kpiCard}>
-          <p>Completed</p>
-          <strong>{loadingOverview ? "..." : formatNumber(overview?.completedCampaigns)}</strong>
+          <strong>{L ? "..." : formatNumber(overview?.totalCampaigns)}</strong>
         </article>
       </section>
 
@@ -471,20 +471,20 @@ export default function AdsManagementPage() {
           className={styles.search}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by campaign, owner, promoted post, session..."
+          placeholder="Search by campaign name, owner, post ID…"
         />
         <div className={styles.filterItem}>
-          <span className={styles.filterLabel}>Status:</span>
+          <span className={styles.filterLabel}>Status</span>
           <CustomSelect
             value={statusFilter}
             onChange={(value) => setStatusFilter(value as "all" | CampaignStatus)}
             ariaLabel="Ads campaign status filter"
             options={[
-              { value: "all", label: "all status" },
-              { value: "active", label: "active" },
-              { value: "hidden", label: "hidden" },
-              { value: "canceled", label: "canceled" },
-              { value: "completed", label: "completed" },
+              { value: "all", label: "All status" },
+              { value: "active", label: "Active" },
+              { value: "hidden", label: "Hidden" },
+              { value: "canceled", label: "Canceled" },
+              { value: "completed", label: "Completed" },
             ]}
           />
         </div>
@@ -492,7 +492,7 @@ export default function AdsManagementPage() {
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
-          <h2>All Ads Campaigns</h2>
+          <h2>All Campaigns</h2>
           <span>{formatNumber(campaigns.length)} loaded</span>
         </div>
 
@@ -506,6 +506,7 @@ export default function AdsManagementPage() {
                 <th>Owner</th>
                 <th>Status</th>
                 <th>Schedule</th>
+                <th>Performance</th>
                 <th>Spent</th>
                 <th>Actions</th>
               </tr>
@@ -518,9 +519,10 @@ export default function AdsManagementPage() {
                     <p className={styles.codeText}>{item.campaignId}</p>
                   </td>
                   <td>
-                    <p className={styles.mainText}>{item.owner.displayName || item.owner.username || "Unknown"}</p>
+                    <p className={styles.mainText}>
+                      {item.owner.displayName || item.owner.username || "Unknown"}
+                    </p>
                     <p className={styles.subText}>@{item.owner.username || "unknown"}</p>
-                    <p className={styles.codeText}>User: {item.owner.userId}</p>
                   </td>
                   <td>
                     <span className={`${styles.badge} ${styles[`status_${item.status}`]}`}>
@@ -532,12 +534,26 @@ export default function AdsManagementPage() {
                     <p className={styles.subText}>End: {formatDate(item.expiresAt)}</p>
                   </td>
                   <td>
+                    <p className={styles.metricRow}>
+                      <span>Impr.</span>
+                      <strong>{formatNumber(item.metrics.impressions)}</strong>
+                    </p>
+                    <p className={styles.metricRow}>
+                      <span>Clicks</span>
+                      <strong>{formatNumber(item.metrics.clicks)}</strong>
+                    </p>
+                    <p className={styles.metricRow}>
+                      <span>CTR</span>
+                      <strong>{formatPercentCompact(item.metrics.ctrPct)}</strong>
+                    </p>
+                  </td>
+                  <td>
                     <p className={styles.mainText}>{formatCurrencyCompact(item.amountTotal)}</p>
                   </td>
                   <td>
                     <div className={styles.actions}>
                       <Link href={`/ads-management/${item.campaignId}`} className={styles.actionLink}>
-                        Review content
+                        View detail
                       </Link>
                       {item.status === "canceled" ? (
                         <button
@@ -578,7 +594,7 @@ export default function AdsManagementPage() {
 
               {!loadingCampaigns && campaigns.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className={styles.emptyCell}>
+                  <td colSpan={7} className={styles.emptyCell}>
                     No ads campaigns found.
                   </td>
                 </tr>
@@ -598,7 +614,7 @@ export default function AdsManagementPage() {
               {loadingCampaigns ? "Loading..." : "Load more campaigns"}
             </button>
           ) : (
-            <span className={styles.subText}>No more campaigns</span>
+            <span className={styles.subText}>All campaigns loaded</span>
           )}
         </div>
       </section>
@@ -609,18 +625,14 @@ export default function AdsManagementPage() {
           onClick={() => {
             if (actionLoadingId === cancelReasonModal.campaignId) return;
             setCancelReasonInput("");
-            setCancelReasonModal({
-              open: false,
-              campaignId: "",
-              campaignName: "",
-            });
+            setCancelReasonModal({ open: false, campaignId: "", campaignName: "" });
           }}
         >
           <div className={styles.confirmCard} onClick={(event) => event.stopPropagation()}>
             <p className={styles.confirmTitle}>Cancel ads campaign</p>
             <p className={styles.confirmText}>
-              You are canceling <strong>{cancelReasonModal.campaignName}</strong>. Please provide a clear reason to send
-              to the advertiser.
+              You are canceling <strong>{cancelReasonModal.campaignName}</strong>. Provide a clear
+              reason — it will be sent to the advertiser.
             </p>
             <textarea
               className={styles.reasonInput}
@@ -630,18 +642,14 @@ export default function AdsManagementPage() {
               rows={4}
               maxLength={500}
             />
-            <div className={styles.reasonMeta}>{cancelReasonInput.trim().length}/500 characters</div>
+            <div className={styles.reasonMeta}>{cancelReasonInput.trim().length}/500</div>
             <div className={styles.confirmActions}>
               <button
                 type="button"
                 className={styles.confirmSecondary}
                 onClick={() => {
                   setCancelReasonInput("");
-                  setCancelReasonModal({
-                    open: false,
-                    campaignId: "",
-                    campaignName: "",
-                  });
+                  setCancelReasonModal({ open: false, campaignId: "", campaignName: "" });
                 }}
                 disabled={actionLoadingId === cancelReasonModal.campaignId}
               >
@@ -652,7 +660,8 @@ export default function AdsManagementPage() {
                 className={styles.confirmPrimary}
                 onClick={() => void confirmCancelWithReason()}
                 disabled={
-                  actionLoadingId === cancelReasonModal.campaignId || cancelReasonInput.trim().length === 0
+                  actionLoadingId === cancelReasonModal.campaignId ||
+                  cancelReasonInput.trim().length === 0
                 }
               >
                 {actionLoadingId === cancelReasonModal.campaignId ? "Confirming..." : "Confirm"}
@@ -667,29 +676,21 @@ export default function AdsManagementPage() {
           className={styles.confirmOverlay}
           onClick={() => {
             if (actionLoadingId === reopenConfirmModal.campaignId) return;
-            setReopenConfirmModal({
-              open: false,
-              campaignId: "",
-              campaignName: "",
-            });
+            setReopenConfirmModal({ open: false, campaignId: "", campaignName: "" });
           }}
         >
           <div className={styles.confirmCard} onClick={(event) => event.stopPropagation()}>
             <p className={styles.confirmTitle}>Reopen ads campaign</p>
             <p className={styles.confirmText}>
-              Confirm reopen for <strong>{reopenConfirmModal.campaignName}</strong>? This campaign will be active again,
-              and the advertiser will receive realtime notification and email.
+              Confirm reopen for <strong>{reopenConfirmModal.campaignName}</strong>? The campaign
+              will go active again and the advertiser will be notified.
             </p>
             <div className={styles.confirmActions}>
               <button
                 type="button"
                 className={styles.confirmSecondary}
                 onClick={() =>
-                  setReopenConfirmModal({
-                    open: false,
-                    campaignId: "",
-                    campaignName: "",
-                  })
+                  setReopenConfirmModal({ open: false, campaignId: "", campaignName: "" })
                 }
                 disabled={actionLoadingId === reopenConfirmModal.campaignId}
               >

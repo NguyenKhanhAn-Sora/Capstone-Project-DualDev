@@ -717,12 +717,30 @@
         "title": "Choose Campaign Objective",
         "required": "Required",
         "options": {
-          "awareness": { "label": "Awareness", "desc": "Reach new people likely to remember your brand." },
-          "traffic": { "label": "Traffic", "desc": "Send people to your website or product page." },
-          "engagement": { "label": "Engagement", "desc": "Get more reactions, comments, and shares." },
-          "leads": { "label": "Lead generation", "desc": "Collect contact info from potential customers." },
-          "sales": { "label": "Sales", "desc": "Drive purchases and conversion actions." },
-          "messages": { "label": "Messages", "desc": "Start conversations with people interested in your offer." }
+          "awareness": {
+            "label": "Awareness",
+            "desc": "Reach new people likely to remember your brand."
+          },
+          "traffic": {
+            "label": "Traffic",
+            "desc": "Send people to your website or product page."
+          },
+          "engagement": {
+            "label": "Engagement",
+            "desc": "Get more reactions, comments, and shares."
+          },
+          "leads": {
+            "label": "Lead generation",
+            "desc": "Collect contact info from potential customers."
+          },
+          "sales": {
+            "label": "Sales",
+            "desc": "Drive purchases and conversion actions."
+          },
+          "messages": {
+            "label": "Messages",
+            "desc": "Start conversations with people interested in your offer."
+          }
         }
       },
       "creative": {
@@ -803,9 +821,21 @@
         "totalCost": "Total cost",
         "selected": "You selected {boost} for {days} days.",
         "boosts": {
-          "light": { "title": "Light Boost", "level": "Low competition", "highlight": "Best for first ad" },
-          "standard": { "title": "Standard Boost", "level": "Medium competition", "highlight": "Most chosen" },
-          "strong": { "title": "Strong Boost", "level": "High competition", "highlight": "High visibility" }
+          "light": {
+            "title": "Light Boost",
+            "level": "Low competition",
+            "highlight": "Best for first ad"
+          },
+          "standard": {
+            "title": "Standard Boost",
+            "level": "Medium competition",
+            "highlight": "Most chosen"
+          },
+          "strong": {
+            "title": "Strong Boost",
+            "level": "High competition",
+            "highlight": "High visibility"
+          }
         },
         "durations": {
           "none": "No extension",
@@ -937,11 +967,26 @@
       "follow": "Followers"
     },
     "empty": {
-      "all": { "title": "Nothing here yet", "text": "When you get notifications, they will appear here." },
-      "like": { "title": "Likes on your posts", "text": "When someone likes your content, you'll see it here." },
-      "comment": { "title": "Comments on your posts", "text": "When someone comments, you'll see it here." },
-      "mentions": { "title": "Mentions and tags", "text": "When someone mentions or tags you, you'll see it here." },
-      "follow": { "title": "New followers", "text": "When someone follows you, you'll see it here." }
+      "all": {
+        "title": "Nothing here yet",
+        "text": "When you get notifications, they will appear here."
+      },
+      "like": {
+        "title": "Likes on your posts",
+        "text": "When someone likes your content, you'll see it here."
+      },
+      "comment": {
+        "title": "Comments on your posts",
+        "text": "When someone comments, you'll see it here."
+      },
+      "mentions": {
+        "title": "Mentions and tags",
+        "text": "When someone mentions or tags you, you'll see it here."
+      },
+      "follow": {
+        "title": "New followers",
+        "text": "When someone follows you, you'll see it here."
+      }
     },
     "loading": "Loading",
     "loadingText": "Fetching notifications...",
@@ -1280,6 +1325,80 @@
       "captionLangEn": "English",
       "captionLangZh": "Chinese",
       "captionLangJa": "Japanese"
-    }
+    },
+    "tabStory": "Story",
+    "eyebrowStory": "Create story",
+    "titleStory": "Share a moment",
+    "storyPosted": "Story posted!",
+    "postAnother": "Post another story"
+  },
+  "storyViewer": {
+    "prevGroup": "Previous",
+    "nextGroup": "Next",
+    "pause": "Pause",
+    "resume": "Resume",
+    "options": "Options",
+    "close": "Close",
+    "prevStory": "Previous story",
+    "nextStory": "Next story",
+    "replyPlaceholder": "Reply to {name}...",
+    "react": "React",
+    "viewViewers": "Who viewed",
+    "deleteStory": "Delete story",
+    "report": "Report",
+    "viewers": "Viewers ({count})",
+    "loading": "Loading...",
+    "noViewers": "No viewers yet",
+    "viewCount": "{count} views",
+    "removeReaction": "Remove",
+    "user": "User",
+    "volume": "Volume",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "editVisibility": "Edit visibility",
+    "visibilityTitle": "Story visibility",
+    "visibilityDesc": "Choose who can see this story",
+    "visibilitySave": "Save changes",
+    "visibilitySaving": "Saving...",
+    "visibilityPublic": "Public",
+    "visibilityPublicDesc": "Anyone can see this story",
+    "visibilityFollowers": "Followers",
+    "visibilityFollowersDesc": "Only your followers can see this",
+    "visibilityPrivate": "Private",
+    "visibilityPrivateDesc": "Only you can see this",
+    "visibilityUpdated": "Visibility updated"
+  },
+  "storyCreator": {
+    "tabMedia": "Photo / Video",
+    "tabText": "Text",
+    "placeholderText": "Tap to type...",
+    "labelBackground": "Background",
+    "labelAudience": "Audience",
+    "optFollowers": "Followers",
+    "optPublic": "Public",
+    "optPrivate": "Private",
+    "btnPost": "Share Story",
+    "btnPosting": "Posting...",
+    "btnChangePhoto": "Change photo",
+    "btnChangeVideo": "Change video",
+    "btnChooseFile": "Choose file",
+    "dropHint": "Drag & drop or tap to choose photo / video",
+    "errMediaRequired": "Please choose a photo or video",
+    "errTextRequired": "Please enter some text",
+    "errUploadFailed": "Failed to post story",
+    "errMediaType": "Only images and videos are supported",
+    "btnBack": "Back",
+    "discardTitle": "Discard this story?",
+    "discardBody": "Your content will not be saved if you go back.",
+    "discardConfirm": "Discard",
+    "discardCancel": "Keep editing",
+    "editPhoto": "Edit photo",
+    "editVideo": "Trim video",
+    "btnDone": "Done",
+    "btnReset": "Reset",
+    "btnEditPhoto": "Edit",
+    "btnEditVideo": "Trim",
+    "labelRotate": "Rotate",
+    "labelZoom": "Zoom"
   }
 }
