@@ -542,7 +542,15 @@ export default function HomePage({
       : getUserIdFromToken(localStorage.getItem("accessToken")),
   );
   const [viewerProfile, setViewerProfile] =
-    useState<CurrentProfileResponse | null>(null);
+    useState<CurrentProfileResponse | null>(() => {
+      if (typeof window === "undefined") return null;
+      try {
+        const cached = localStorage.getItem("cachedViewerProfile");
+        return cached ? (JSON.parse(cached) as CurrentProfileResponse) : null;
+      } catch {
+        return null;
+      }
+    });
   const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const itemsRef = useRef<PostViewState[]>([]);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -831,10 +839,14 @@ export default function HomePage({
   useEffect(() => {
     if (!token) {
       setViewerProfile(null);
+      localStorage.removeItem("cachedViewerProfile");
       return;
     }
     fetchCurrentProfile({ token })
-      .then(setViewerProfile)
+      .then((profile) => {
+        setViewerProfile(profile);
+        localStorage.setItem("cachedViewerProfile", JSON.stringify(profile));
+      })
       .catch(() => setViewerProfile(null));
   }, [token]);
 
