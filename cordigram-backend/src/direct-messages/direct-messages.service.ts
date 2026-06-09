@@ -738,6 +738,11 @@ export class DirectMessagesService {
               },
             },
             lastMessage: { $last: '$content' },
+            lastMessageType: { $last: '$type' },
+            lastCallType: { $last: '$callType' },
+            lastCallStatus: { $last: '$callStatus' },
+            lastCallDuration: { $last: '$callDuration' },
+            lastCallInitiatorId: { $last: '$callInitiatorId' },
             lastMessageTime: { $last: '$createdAt' },
             unreadCount: {
               $sum: {
@@ -780,6 +785,11 @@ export class DirectMessagesService {
       avatar: conv.userInfo[0]?.avatar,
       email: conv.userInfo[0]?.email,
       lastMessage: conv.lastMessage,
+      lastMessageType: conv.lastMessageType ?? 'text',
+      lastCallType: conv.lastCallType ?? null,
+      lastCallStatus: conv.lastCallStatus ?? null,
+      lastCallDuration: conv.lastCallDuration ?? null,
+      lastCallInitiatorId: conv.lastCallInitiatorId?.toString?.() ?? null,
       lastMessageTime: conv.lastMessageTime,
       unreadCount: conv.unreadCount,
     }));

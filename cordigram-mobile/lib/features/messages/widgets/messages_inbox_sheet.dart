@@ -11,6 +11,8 @@ import '../services/direct_messages_realtime_service.dart';
 import '../services/direct_messages_service.dart';
 import '../services/inbox_service.dart';
 import '../services/servers_service.dart';
+import '../../../core/theme/messages_chrome_palette.dart';
+import 'messages_chrome_builder.dart';
 import 'server_join_flow.dart';
 
 typedef InboxNavigateToChannel = Future<void> Function(
@@ -180,33 +182,45 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
 
   String _serverLabel(String name) {
     final n = name.trim();
-    return n.isEmpty ? 'Máy chủ' : n;
+    return n.isEmpty ? _t('chat.popups.inbox.serverFallback') : n;
   }
 
   String _resolveNotifTitle(String raw) {
-    if (raw == '__SYS:adminView') return 'Quản trị viên đang xem máy chủ';
+    if (raw == '__SYS:adminView') {
+      return _t('chat.popups.inbox.adminViewTitle');
+    }
     if (raw.startsWith('__SYS:adminViewContent:')) {
       final s = raw.substring('__SYS:adminViewContent:'.length);
-      return 'Kiểm tra máy chủ "$s"';
+      return _t('chat.popups.inbox.adminViewContent', {'server': s});
     }
-    if (raw == '__SYS:mentionSpamTitle') return 'Cảnh báo spam đề cập';
+    if (raw == '__SYS:mentionSpamTitle') {
+      return _t('chat.popups.inbox.mentionSpamTitle');
+    }
     if (raw.startsWith('__SYS:mentionSpamWarning:')) {
       final s = raw.substring('__SYS:mentionSpamWarning:'.length);
-      return 'Spam đề cập trong "$s"';
+      return _t('chat.popups.inbox.mentionSpamWarning', {'server': s});
     }
-    if (raw == '__SYS:joinAppApprovedTitle') return 'Đơn đăng ký được chấp thuận';
+    if (raw == '__SYS:joinAppApprovedTitle') {
+      return _t('chat.popups.inbox.joinAppApprovedTitle');
+    }
     if (raw == '__SYS:joinAppApprovedContent') {
-      return 'Bạn đã được chấp thuận tham gia máy chủ.';
+      return _t('chat.popups.inbox.joinAppApprovedContent');
     }
-    if (raw == '__SYS:joinAppRejectedTitle') return 'Đơn đăng ký bị từ chối';
+    if (raw == '__SYS:joinAppRejectedTitle') {
+      return _t('chat.popups.inbox.joinAppRejectedTitle');
+    }
     if (raw == '__SYS:joinAppRejectedContent') {
-      return 'Đơn đăng ký tham gia máy chủ đã bị từ chối.';
+      return _t('chat.popups.inbox.joinAppRejectedContent');
     }
-    if (raw == '__SYS:serverDeletedTitle') return 'Máy chủ đã bị xóa';
+    if (raw == '__SYS:serverDeletedTitle') {
+      return _t('chat.popups.inbox.serverDeletedTitle');
+    }
     if (raw.startsWith('__SYS:serverDeletedContent:')) {
       try {
-        final s = Uri.decodeComponent(raw.substring('__SYS:serverDeletedContent:'.length));
-        return 'Máy chủ "$s" không còn.';
+        final s = Uri.decodeComponent(
+          raw.substring('__SYS:serverDeletedContent:'.length),
+        );
+        return _t('chat.popups.inbox.serverDeletedContent', {'server': s});
       } catch (_) {
         return raw;
       }
@@ -218,9 +232,17 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
     final d = DateTime.tryParse(iso);
     if (d == null) return '';
     final diff = DateTime.now().difference(d);
-    if (diff.inMinutes < 60) return '${diff.inMinutes.clamp(0, 59)} phút';
-    if (diff.inHours < 24) return '${diff.inHours} giờ';
-    if (diff.inDays < 28) return '${diff.inDays} ngày';
+    if (diff.inMinutes < 60) {
+      return _t('chat.popups.inbox.timeMinutes', {
+        'n': '${diff.inMinutes.clamp(0, 59)}',
+      });
+    }
+    if (diff.inHours < 24) {
+      return _t('chat.popups.inbox.timeHours', {'n': '${diff.inHours}'});
+    }
+    if (diff.inDays < 28) {
+      return _t('chat.popups.inbox.timeDays', {'n': '${diff.inDays}'});
+    }
     return '${d.day}/${d.month}';
   }
 
@@ -319,7 +341,7 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không chấp nhận được: $e')),
+        SnackBar(content: Text('${_t('common.tryAgain')}: $e')),
       );
     }
   }
@@ -334,7 +356,7 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không từ chối được: $e')),
+        SnackBar(content: Text('${_t('common.tryAgain')}: $e')),
       );
     }
   }
@@ -355,61 +377,70 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final screenH = MediaQuery.sizeOf(context).height;
     final h = (screenH > 0 ? screenH * 0.88 : 560.0).clamp(320.0, 920.0);
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Material(
-        color: scheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        child: SizedBox(
-          height: h,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                child: Row(
+    return MessagesChromeBuilder(
+      builder: (context, chrome) => Align(
+        alignment: Alignment.bottomCenter,
+        child: Material(
+          color: chrome.bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: SizedBox(
+            height: h,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.mail_outline_rounded,
+                        color: chrome.text,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _t('chat.popups.inbox.title'),
+                          style: TextStyle(
+                            color: chrome.text,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _markAllBusy ? null : _markAllRead,
+                        child: Text(
+                          _markAllBusy
+                              ? _t('chat.popups.inbox.markAllDoing')
+                              : _t('chat.popups.inbox.markAll'),
+                          style: TextStyle(
+                            color: chrome.accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed:
+                            widget.onClose ?? () => Navigator.of(context).pop(),
+                        icon: Icon(Icons.close_rounded, color: chrome.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
                   children: [
-                    Icon(Icons.mail_outline_rounded, color: scheme.onSurface, size: 22),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _t('chat.popups.inbox.title'),
-                        style: TextStyle(
-                          color: scheme.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _markAllBusy ? null : _markAllRead,
-                      child: Text(
-                        _markAllBusy
-                            ? '…'
-                            : _t('chat.popups.inbox.markAll'),
-                        style: TextStyle(
-                          color: scheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: widget.onClose ?? () => Navigator.of(context).pop(),
-                      icon: Icon(Icons.close_rounded, color: scheme.onSurfaceVariant),
+                    _tabBtn(chrome, _t('chat.popups.inbox.tabForYou'), _InboxTab.forYou),
+                    _tabBtn(chrome, _t('chat.popups.inbox.tabUnread'), _InboxTab.unread),
+                    _tabBtn(
+                      chrome,
+                      _t('chat.popups.inbox.tabMentions'),
+                      _InboxTab.mentions,
                     ),
                   ],
                 ),
-              ),
-              Row(
-                children: [
-                  _tabBtn(_t('chat.popups.inbox.tabForYou'), _InboxTab.forYou),
-                  _tabBtn(_t('chat.popups.inbox.tabUnread'), _InboxTab.unread),
-                  _tabBtn(_t('chat.popups.inbox.tabMentions'), _InboxTab.mentions),
-                ],
-              ),
-              Divider(height: 1, color: scheme.outline),
+                Divider(height: 1, color: chrome.border),
                 if (_loadError != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -417,26 +448,32 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Không tải được hộp thư:\n$_loadError',
-                          style: const TextStyle(color: Color(0xFFFF8A8A), fontSize: 12),
+                          '${_t('chat.popups.inbox.loadError')}\n$_loadError',
+                          style: TextStyle(
+                            color: const Color(0xFFFF8A8A),
+                            fontSize: 12,
+                          ),
                         ),
                         TextButton(
                           onPressed: _loadAll,
-                          child: const Text('Thử lại'),
+                          child: Text(
+                            _t('common.tryAgain'),
+                            style: TextStyle(color: chrome.accent),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                Expanded(child: _buildList()),
+                Expanded(child: _buildList(chrome)),
               ],
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 
-  Widget _tabBtn(String label, _InboxTab t) {
-    final scheme = Theme.of(context).colorScheme;
+  Widget _tabBtn(MessagesChromePalette chrome, String label, _InboxTab t) {
     final on = _tab == t;
     return Expanded(
       child: InkWell(
@@ -451,7 +488,7 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: on ? scheme.primary : Colors.transparent,
+                color: on ? chrome.accent : Colors.transparent,
                 width: 2,
               ),
             ),
@@ -460,7 +497,7 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: on ? scheme.onSurface : scheme.onSurfaceVariant,
+              color: on ? chrome.text : chrome.textMuted,
               fontWeight: on ? FontWeight.w700 : FontWeight.w500,
               fontSize: 13,
             ),
@@ -470,15 +507,15 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(MessagesChromePalette chrome) {
     if (_loadError != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'Nhấn "Thử lại" phía trên sau khi kiểm tra mạng và đăng nhập.',
+            _t('chat.popups.inbox.loadError'),
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withOpacity(0.72)),
+            style: TextStyle(color: chrome.textMuted),
           ),
         ),
       );
@@ -486,92 +523,115 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
     switch (_tab) {
       case _InboxTab.forYou:
         if (_loadingForYou) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: chrome.accent));
         }
         if (_forYou.isEmpty) {
-          return const Center(
-            child: Text('Không có mục nào', style: TextStyle(color: Color(0xFF8EA3CC))),
+          return Center(
+            child: Text(
+              _t('chat.popups.inbox.emptyForYou'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: chrome.textMuted),
+            ),
           );
         }
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 24),
           itemCount: _forYou.length,
-          itemBuilder: (_, i) => _forYouTile(_forYou[i]),
+          itemBuilder: (_, i) => _forYouTile(chrome, _forYou[i]),
         );
       case _InboxTab.unread:
         if (_loadingUnread) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: chrome.accent));
         }
         if (_unread.isEmpty) {
-          return const Center(
-            child: Text('Không có tin chưa đọc', style: TextStyle(color: Color(0xFF8EA3CC))),
+          return Center(
+            child: Text(
+              _t('chat.popups.inbox.emptyUnread'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: chrome.textMuted),
+            ),
           );
         }
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 24),
           itemCount: _unread.length,
-          itemBuilder: (_, i) => _unreadTile(_unread[i]),
+          itemBuilder: (_, i) => _unreadTile(chrome, _unread[i]),
         );
       case _InboxTab.mentions:
         if (_loadingMentions) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: chrome.accent));
         }
         if (_mentions.isEmpty) {
-          return const Center(
-            child: Text('Không có đề cập', style: TextStyle(color: Color(0xFF8EA3CC))),
+          return Center(
+            child: Text(
+              _t('chat.popups.inbox.emptyMentions'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: chrome.textMuted),
+            ),
           );
         }
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 24),
           itemCount: _mentions.length,
-          itemBuilder: (_, i) => _mentionTile(_mentions[i]),
+          itemBuilder: (_, i) => _mentionTile(chrome, _mentions[i]),
         );
     }
   }
 
-  Widget _forYouTile(InboxForYouItem item) {
+  TextStyle _titleStyle(MessagesChromePalette chrome) => TextStyle(
+        color: chrome.text,
+        fontWeight: FontWeight.w600,
+      );
+
+  TextStyle _subtitleStyle(MessagesChromePalette chrome) => TextStyle(
+        color: chrome.textMuted,
+        fontSize: 12,
+      );
+
+  Widget _forYouTile(MessagesChromePalette chrome, InboxForYouItem item) {
     if (item is InboxUnknownForYouItem) {
       final r = item.raw;
       final hint = (r['type'] ?? r['Type'] ?? '?').toString();
       return ListTile(
-        leading: const Icon(Icons.help_outline_rounded, color: Color(0xFFFFC107)),
-        title: Text(
-          'Mục hộp thư ($hint)',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
+        leading: Icon(Icons.help_outline_rounded, color: chrome.accent),
+        title: Text('($hint)', style: _titleStyle(chrome)),
         subtitle: Text(
-          '${r['title'] ?? r['topic'] ?? ''}'.trim().isNotEmpty
-              ? '${r['title'] ?? r['topic']}'
-              : 'Không nhận dạng được loại — kiểm tra phiên bản app/BE.',
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          '${r['title'] ?? r['topic'] ?? ''}'.trim(),
+          style: _subtitleStyle(chrome),
         ),
       );
     }
     if (item is InboxServerInviteItem) {
       return ListTile(
         leading: _avatar(
+          chrome,
           url: item.serverAvatarUrl,
           letter: _letter(_serverLabel(item.serverName)),
           dot: item.seen != true,
         ),
         title: Text(
-          'Lời mời vào ${_serverLabel(item.serverName)}',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          _t('chat.popups.inbox.inviteTitle'),
+          style: _titleStyle(chrome),
         ),
         subtitle: Text(
-          'Từ ${item.inviterDisplay} · ${_timeAgo(item.createdAt)}',
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          _t('chat.popups.inbox.inviteMeta', {
+            'inviter': item.inviterDisplay,
+            'serverName': _serverLabel(item.serverName),
+          }),
+          style: _subtitleStyle(chrome),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
               onPressed: () => _acceptInvite(item),
-              icon: Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.primary),
+              tooltip: _t('chat.popups.inbox.acceptInviteAria'),
+              icon: Icon(Icons.check_circle_outline, color: chrome.accent),
             ),
             IconButton(
               onPressed: () => _declineInvite(item),
-              icon: const Icon(Icons.close_rounded, color: Color(0xFFFF6B7A)),
+              tooltip: _t('chat.popups.inbox.declineInviteAria'),
+              icon: Icon(Icons.close_rounded, color: const Color(0xFFFF6B7A)),
             ),
           ],
         ),
@@ -581,17 +641,15 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
       return ListTile(
         onTap: () => _onForYouTap(item),
         leading: _avatar(
+          chrome,
           url: item.serverAvatarUrl,
           letter: _letter(_serverLabel(item.serverName)),
           dot: item.seen != true,
         ),
-        title: Text(
-          item.topic ?? 'Sự kiện',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
+        title: Text(item.topic ?? '', style: _titleStyle(chrome)),
         subtitle: Text(
           '${_serverLabel(item.serverName)} · ${_timeAgo(item.startAt)}',
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          style: _subtitleStyle(chrome),
         ),
       );
     }
@@ -599,24 +657,22 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
       return ListTile(
         onTap: () => _onForYouTap(item),
         leading: _avatar(
+          chrome,
           url: item.serverAvatarUrl,
           letter: _letter(_serverLabel(item.serverName)),
           dot: item.seen != true,
         ),
-        title: Text(
-          _resolveNotifTitle(item.title),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
+        title: Text(_resolveNotifTitle(item.title), style: _titleStyle(chrome)),
         subtitle: Text(
           '${_resolveNotifTitle(item.content)}\n${_timeAgo(item.createdAt)}',
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          style: _subtitleStyle(chrome),
         ),
       );
     }
     return const SizedBox.shrink();
   }
 
-  Widget _unreadTile(InboxUnreadItem u) {
+  Widget _unreadTile(MessagesChromePalette chrome, InboxUnreadItem u) {
     if (u is InboxUnreadDmItem) {
       return ListTile(
         onTap: () {
@@ -624,23 +680,23 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
           widget.onNavigateToDm(u.userId, u.displayName, u.username, null);
         },
         leading: _avatar(
+          chrome,
           letter: _letter(u.displayName.isNotEmpty ? u.displayName : u.username),
           dot: u.unreadCount > 0,
         ),
         title: Text(
           u.displayName.isNotEmpty ? u.displayName : u.username,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: _titleStyle(chrome),
         ),
         subtitle: Text(
-          u.lastMessage.isNotEmpty ? u.lastMessage : 'Tin nhắn mới',
+          u.lastMessage.isNotEmpty
+              ? u.lastMessage
+              : _t('chat.popups.inbox.newMessageFallback'),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          style: _subtitleStyle(chrome),
         ),
-        trailing: Text(
-          _timeAgo(u.lastMessageAt),
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 11),
-        ),
+        trailing: Text(_timeAgo(u.lastMessageAt), style: _subtitleStyle(chrome)),
       );
     }
     if (u is InboxUnreadChannelItem) {
@@ -650,66 +706,69 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
           unawaited(widget.onNavigateToChannel(u.serverId, u.channelId));
         },
         leading: _avatar(
+          chrome,
           letter: _letter(_serverLabel(u.serverName)),
           dot: (u.unreadCount ?? 0) > 0,
         ),
         title: Text(
           '${_serverLabel(u.serverName)} · #${u.channelName}',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: _titleStyle(chrome),
         ),
         subtitle: Text(
-          u.lastMessage.isNotEmpty ? u.lastMessage : 'Tin nhắn mới',
+          u.lastMessage.isNotEmpty
+              ? u.lastMessage
+              : _t('chat.popups.inbox.newMessageFallback'),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          style: _subtitleStyle(chrome),
         ),
-        trailing: Text(
-          _timeAgo(u.lastMessageAt),
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 11),
-        ),
+        trailing: Text(_timeAgo(u.lastMessageAt), style: _subtitleStyle(chrome)),
       );
     }
     return const SizedBox.shrink();
   }
 
-  Widget _mentionTile(InboxMentionItem m) {
+  Widget _mentionTile(MessagesChromePalette chrome, InboxMentionItem m) {
     return ListTile(
       onTap: () => _onMentionTap(m),
       leading: _avatar(
+        chrome,
         letter: _letter(_serverLabel(m.serverName)),
         dot: m.seen != true,
       ),
       title: Text(
         '${_serverLabel(m.serverName)} · #${m.channelName}',
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        style: _titleStyle(chrome),
       ),
       subtitle: Text(
-        '${m.actorName} đã nhắc tới bạn'
+        '${m.actorName} ${_t('chat.popups.inbox.mentionYou')}'
             '${(m.excerpt ?? '').trim().isNotEmpty ? ' — ${m.excerpt!.trim()}' : ''}',
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+        style: _subtitleStyle(chrome),
       ),
-      trailing: Text(
-        _timeAgo(m.createdAt),
-        style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 11),
-      ),
+      trailing: Text(_timeAgo(m.createdAt), style: _subtitleStyle(chrome)),
     );
   }
 
-  Widget _avatar({String? url, required String letter, bool dot = false}) {
+  Widget _avatar(
+    MessagesChromePalette chrome, {
+    String? url,
+    required String letter,
+    bool dot = false,
+  }) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
         CircleAvatar(
           radius: 22,
-          backgroundColor: const Color(0xFF1B2A4A),
+          backgroundColor: chrome.surfaceMuted,
           backgroundImage: (url != null && url.isNotEmpty) ? NetworkImage(url) : null,
           child: (url == null || url.isEmpty)
               ? Text(
                   letter.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: chrome.text,
                     fontWeight: FontWeight.w800,
                   ),
                 )

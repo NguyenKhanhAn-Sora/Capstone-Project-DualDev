@@ -64,11 +64,22 @@ class AccentColorController extends ChangeNotifier {
   String get preset => _preset;
   MessagesChromePalette get palette => _palette;
 
+  /// Chưa chọn nền / màu Boost — follow Social (light / dark / galaxy).
+  bool get isFollowingSocialAppearance {
+    if (_source == 'accent') return false;
+    final n = MessagesChromePalette.normalizeHex(_chromeHex);
+    return n == MessagesAppearanceStorage.defaultChromeHex ||
+        n == '#0C1220';
+  }
+
   /// Palette đã áp dụng theo shell + nguồn (port `resolveMessagesChromeApplyHex`).
   MessagesChromePalette get effectivePalette {
     final shell = MessagesShellThemeController.instance.theme;
     final hex = resolveApplyHex(shell);
     if (hex == null) {
+      if (shell == MessagesShellTheme.galaxy) {
+        return MessagesChromePalette.galaxy;
+      }
       return MessagesChromePalette.fromHex(
         MessagesAppearanceStorage.defaultChromeHex,
         shellTheme: shell,
@@ -135,7 +146,8 @@ class AccentColorController extends ChangeNotifier {
     if (_source == 'accent') {
       return _chromeHex;
     }
-    if (shell == MessagesShellTheme.light) {
+    if (shell == MessagesShellTheme.light ||
+        shell == MessagesShellTheme.galaxy) {
       return null;
     }
     return _chromeHex;

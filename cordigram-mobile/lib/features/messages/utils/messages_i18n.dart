@@ -1,4 +1,5 @@
 import '../../../core/services/language_controller.dart';
+import '../models/dm_conversation.dart';
 import '../models/dm_message.dart';
 import '../models/presence_state.dart';
 
@@ -163,26 +164,207 @@ class MessagesI18n {
 
   static String callBackLabel() => t('chat.callMessage.callBack');
 
+  /// Sidebar / conversation list — API may return Vietnamese `content` only.
+  static String localizeSidebarPreview(
+    String raw, {
+    String? messageType,
+    String? callType,
+    String? callStatus,
+    int? callDurationSec,
+    String? callInitiatorId,
+    String? viewerId,
+  }) {
+    final type = (messageType ?? '').trim().toLowerCase();
+    if (type == 'voice' || _looksLikeVoicePreview(raw)) {
+      return t('chat.messagesPage.voiceMessageLabel');
+    }
+    if (type == 'sticker') return t('chat.composer.replySticker');
+    if (type == 'gif') return t('chat.composer.replyGif');
+    if (type == 'call' || _looksLikeCallPreview(raw)) {
+      final parsed = type == 'call'
+          ? _callPreviewFromMetadata(
+              callType: callType,
+              callStatus: callStatus,
+              callDurationSec: callDurationSec,
+              callInitiatorId: callInitiatorId,
+            )
+          : _parseCallPreviewFromRaw(raw);
+      if (parsed != null) {
+        return threadPreviewForMessage(parsed, viewerId: viewerId);
+      }
+    }
+    return raw.trim();
+  }
+
+  static String previewForConversation(
+    DmConversation conversation, {
+    String? viewerId,
+  }) =>
+      localizeSidebarPreview(
+        conversation.lastMessage,
+        messageType: conversation.lastMessageType,
+        callType: conversation.lastCallType,
+        callStatus: conversation.lastCallStatus,
+        callDurationSec: conversation.lastCallDurationSec,
+        callInitiatorId: conversation.lastCallInitiatorId,
+        viewerId: viewerId,
+      );
+
+  static bool _looksLikeVoicePreview(String raw) {
+    final lower = raw.toLowerCase().replaceAll('🔊', '').trim();
+    const needles = [
+      'tin nhắn thoại',
+      'voice message',
+      'ボイスメッセージ',
+      '语音消息',
+      'voice note',
+      'voice msg',
+    ];
+    return needles.any((n) => lower == n || lower.startsWith('$n '));
+  }
+
+  static bool _looksLikeCallPreview(String raw) {
+    final lower = raw.toLowerCase();
+    const needles = [
+      'cuộc gọi',
+      'cuoc goi',
+      'video call',
+      'voice call',
+      'phone call',
+      'missed call',
+      'bỏ lỡ',
+      'bo lo',
+      '通話',
+      '通话',
+      'ビデオ通話',
+      '视频通话',
+    ];
+    return needles.any(lower.contains);
+  }
+
+  static DmMessage? _callPreviewFromMetadata({
+    String? callType,
+    String? callStatus,
+    int? callDurationSec,
+    String? callInitiatorId,
+  }) {
+    final ct = (callType ?? '').trim().toLowerCase();
+    if (ct.isEmpty) return null;
+    return _syntheticCallMessage(
+      callType: ct == 'video' ? 'video' : 'audio',
+      callStatus: (callStatus ?? 'completed').trim().toLowerCase(),
+      callDurationSec: callDurationSec,
+      callInitiatorId: callInitiatorId,
+    );
+  }
+
+  static DmMessage? _parseCallPreviewFromRaw(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty || !_looksLikeCallPreview(s)) return null;
+
+    final lower = s.toLowerCase();
+    final isVideo = lower.contains('video') ||
+        lower.contains('ビデオ') ||
+        lower.contains('视频');
+    final callType = isVideo ? 'video' : 'audio';
+
+    String status = 'completed';
+    if (lower.contains('từ chối') ||
+        lower.contains('declined') ||
+        lower.contains('拒否')) {
+      status = 'declined';
+    } else if (lower.contains('đã hủy') ||
+        lower.contains('cancelled') ||
+        lower.contains('キャンセル') ||
+        lower.contains('取消')) {
+      status = 'cancelled';
+    } else if (lower.contains('bỏ lỡ') ||
+        lower.contains('missed') ||
+        lower.contains('見逃') ||
+        lower.contains('未接')) {
+      status = 'missed';
+    }
+
+    int? durationSec;
+    final secMatch = RegExp(
+      r'[·•]\s*(\d+)\s*(?:giây|giay|sec(?:ond)?s?|秒)',
+      caseSensitive: false,
+    ).firstMatch(s);
+    if (secMatch != null) {
+      durationSec = int.tryParse(secMatch.group(1)!);
+      status = 'completed';
+    } else {
+      final minOnly = RegExp(
+        r'[·•]\s*(\d+)\s*(?:phút|phut|min(?:ute)?s?|分)(?:\s|$)',
+        caseSensitive: false,
+      ).firstMatch(s);
+      if (minOnly != null) {
+        durationSec = (int.tryParse(minOnly.group(1)!) ?? 0) * 60;
+        status = 'completed';
+      } else {
+        final minSec = RegExp(
+          r'[·•]\s*(\d+)\s*(?:phút|phut|min(?:ute)?s?|分)\s+(\d+)\s*(?:giây|giay|sec(?:ond)?s?|秒)',
+          caseSensitive: false,
+        ).firstMatch(s);
+        if (minSec != null) {
+          final m = int.tryParse(minSec.group(1)!) ?? 0;
+          final sec = int.tryParse(minSec.group(2)!) ?? 0;
+          durationSec = m * 60 + sec;
+          status = 'completed';
+        }
+      }
+    }
+
+    return _syntheticCallMessage(
+      callType: callType,
+      callStatus: status,
+      callDurationSec: durationSec,
+    );
+  }
+
+  static DmMessage _syntheticCallMessage({
+    required String callType,
+    required String callStatus,
+    int? callDurationSec,
+    String? callInitiatorId,
+  }) =>
+      DmMessage(
+        id: '_sidebar_preview',
+        senderId: callInitiatorId ?? '',
+        receiverId: '',
+        content: '',
+        createdAt: DateTime.now(),
+        type: 'call',
+        read: true,
+        callType: callType,
+        callStatus: callStatus,
+        callDurationSec: callDurationSec,
+        callInitiatorId: callInitiatorId,
+      );
+
   static String threadPreviewForMessage(
     DmMessage message, {
     String? viewerId,
   }) {
-    final trimmed = message.content.trim();
-    if (!message.isCallMessage) {
-      if (trimmed.isNotEmpty) return trimmed;
-      switch (message.type) {
-        case 'voice':
-          return t('chat.messagesPage.voiceMessageLabel');
-        case 'sticker':
-          return t('chat.composer.replySticker');
-        case 'gif':
-          return t('chat.composer.replyGif');
-        default:
-          return trimmed;
+    if (message.isCallMessage) {
+      final title = callCardTitle(message, viewerId);
+      final status = message.callStatus ?? '';
+      if (status == 'completed' && message.callDurationSec != null) {
+        return '$title · ${formatCallDuration(message.callDurationSec!)}';
       }
+      return title;
     }
-    if (trimmed.isNotEmpty) return trimmed;
-    return callCardTitle(message, viewerId);
+    switch (message.type) {
+      case 'voice':
+        return t('chat.messagesPage.voiceMessageLabel');
+      case 'sticker':
+        return t('chat.composer.replySticker');
+      case 'gif':
+        return t('chat.composer.replyGif');
+      default:
+        final trimmed = message.content.trim();
+        return trimmed;
+    }
   }
 
   static String dmListSent() => t('chat.dmList.sent');

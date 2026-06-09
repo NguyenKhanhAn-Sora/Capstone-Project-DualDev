@@ -386,6 +386,7 @@
         "videoPreviewAvailable": "此违规内容有视频预览。"
       }
     },
+    "hubHint": "自定义消息、隐私和外观。使用同一账号登录时与 Web 同步。",
     "sections": {
       "general": "常规",
       "privacy": "隐私",
@@ -437,7 +438,8 @@
       "dark": "深色",
       "mutualHint": "消息界面只保存一套配色：背景预设与 Boost 主题色写入同一值，不会叠加。每个色块会重绘整个消息界面（背景、侧栏、强调色等）。未订阅 Boost 仅可用背景；订阅后可切换到主题色。",
       "modeBackground": "当前：背景预设",
-      "modeAccent": "当前：主题色（Boost）"
+      "modeAccent": "当前：主题色（Boost）",
+      "currentColor": "当前颜色：{hex}"
     },
     "appearanceBg": {
       "title": "背景",
@@ -1944,6 +1946,9 @@
       "tabGif": "GIF",
       "tabSticker": "贴纸",
       "tabEmoji": "表情",
+      "tabServerEmoji": "服务器表情",
+      "tabServerSticker": "服务器贴纸",
+      "expressionsHub": "表情与贴纸",
       "tabKaomoji": "颜文字",
       "searchGifPlaceholder": "在 Giphy 搜索…",
       "searchStickerPlaceholder": "搜索贴纸…",
@@ -2112,6 +2117,48 @@
     "messageRecalled": {
       "self": "你删除了一条消息",
       "other": "{name} 删除了一条消息"
+    },
+    "conversationDetails": {
+      "title": "会话详情",
+      "encrypted": "端到端加密",
+      "search": "搜索",
+      "searchPlaceholder": "搜索消息...",
+      "noResults": "未找到消息",
+      "pinnedMessages": "置顶消息",
+      "noPinned": "暂无置顶消息",
+      "sharedMedia": "媒体文件",
+      "noMedia": "暂无图片或视频",
+      "loadMore": "查看更多（剩余 {n}）",
+      "sharedFiles": "文件",
+      "noFiles": "暂无共享文件",
+      "searchFiles": "搜索文件...",
+      "noFilesFound": "未找到文件",
+      "loading": "加载中...",
+      "today": "今天",
+      "yesterday": "昨天",
+      "download": "下载",
+      "close": "关闭"
+    },
+    "linkPreview": {
+      "noDescription": "无描述",
+      "visitLink": "打开链接"
+    },
+    "channel": {
+      "searchTooltip": "搜索消息",
+      "detailsTooltip": "会话详情",
+      "noMessages": "暂无消息",
+      "replying": "正在回复",
+      "replyVoice": "🔊 语音消息",
+      "replyGeneric": "消息",
+      "blockedPlaceholder": "该频道聊天受限",
+      "messagePlaceholder": "在 #{channel} 中发消息",
+      "newMessages": "↓ 新消息"
+    },
+    "pinnedScreen": {
+      "title": "置顶消息",
+      "empty": "暂无置顶消息",
+      "emptyMessage": "（空消息）",
+      "serverInvite": "服务器邀请"
     },
     "callMessage": {
       "missedVoice": "未接语音通话",
@@ -2437,6 +2484,7 @@
         "markAllDoing": "正在标记...",
         "markAll": "标为已读",
         "loading": "加载中...",
+        "loadError": "无法加载收件箱。请检查网络后重试。",
         "emptyForYou": "你的服务器暂无活动、邀请或身份组通知。",
         "emptyUnread": "频道暂无未读消息或通知。",
         "emptyMentions": "还没有人在频道中提及你。",
@@ -2532,6 +2580,8 @@
       },
       "heroTitle": "使用 BOOST 解锁更多特权",
       "expiresLabel": "到期",
+      "expiresLine": "{label}：{date}",
+      "expiresWithTier": "{label}：{date} · {tier}",
       "buttons": {
         "gift": "赠送 Boost",
         "renew": "续费",
@@ -2578,10 +2628,25 @@
         "redirecting": "正在跳转到支付...",
         "cta": "选择套餐并支付"
       },
+      "app": {
+        "heroSubtitle": "更大上传、跨服务器表情与贴纸、自定义主题，以及聊天媒体优化。",
+        "perksTitle": "核心特权"
+      },
+      "payment": {
+        "verifyingTitle": "正在确认支付",
+        "verifyingBody": "请稍候，Stripe 确认后 Boost 会立即生效。",
+        "successTitle": "支付成功",
+        "successBody": "Messages Boost 已为你的账号激活。",
+        "failedTitle": "支付未完成",
+        "failedBody": "结账会话已过期或已取消，你可以重试。",
+        "timeoutBody": "尚未收到 Stripe 确认，请查看邮件或稍后再试。",
+        "countdown": "{seconds} 秒后关闭"
+      },
       "warnings": {
         "activeTitle": "你的套餐仍在有效期内",
         "activeBodyPrefix": "当前套餐有效",
         "activeBodySuffix": "你可以续费或更换计费周期；续同套餐会叠加剩余时长。",
+        "activeBodyWithDate": "当前套餐有效期至 {date}。你可以续费或更换计费周期；续同套餐会叠加剩余时长。",
         "switchTitle": "更换 Boost 套餐",
         "switchBodyPrefix": "你当前使用的是",
         "switchCurrentFallback": "Boost 套餐",
@@ -2813,7 +2878,62 @@
       "suppressRoles": "屏蔽所有身份组 @提及",
       "hideHighlights": "隐藏新活动亮点",
       "muteNewEvents": "静音新活动提醒",
-      "mobileNotif": "移动端推送通知"
+      "mobileNotif": "移动端推送通知",
+      "markAllChannelsRead": "标记为已读（所有聊天频道）",
+      "copyInviteCopied": "已复制服务器邀请链接",
+      "unmuteShort": "取消静音",
+      "serverNotificationsTitle": "服务器通知",
+      "leaveConfirmTitle": "离开服务器？",
+      "leaveConfirmBody": "你将离开 {serverName}。",
+      "leaveConfirmAction": "离开",
+      "createCategoryTitle": "创建类别",
+      "categoryNamePlaceholder": "类别名称",
+      "errorCreateChannel": "无法创建频道：{error}",
+      "errorCreateCategory": "无法创建类别：{error}",
+      "errorLeave": "无法离开：{error}"
+    },
+    "inviteToServerSheet": {
+      "title": "邀请到 {serverName}",
+      "description": "邀请尚未加入此服务器的好友（你关注或关注你的人）。",
+      "copyInviteLink": "复制邀请链接",
+      "searchPlaceholder": "按名称或用户名搜索...",
+      "invite": "邀请",
+      "copiedToast": "已复制服务器邀请链接",
+      "errorLoad": "无法加载好友列表"
+    },
+    "createEvent": {
+      "title": "创建活动",
+      "stepLocation": "位置",
+      "stepDetails": "详情",
+      "stepReview": "审核",
+      "whereQuestion": "活动在哪里举行？",
+      "voiceChannel": "语音频道",
+      "voiceChannelHint": "语音通话、屏幕共享",
+      "otherLocation": "其他位置",
+      "otherLocationHint": "文字频道或其他地点（需要结束时间）",
+      "noChannels": "服务器上没有合适的频道。请从服务器菜单创建。",
+      "selectChannel": "选择频道",
+      "channelPlaceholder": "频道",
+      "next": "下一步",
+      "topicLabel": "活动主题 *",
+      "start": "开始",
+      "end": "结束",
+      "endAfterStartError": "结束时间必须晚于开始时间。",
+      "frequency": "频率",
+      "freqNone": "不重复",
+      "freqWeekly": "每周",
+      "freqBiweekly": "每两周",
+      "freqMonthly": "每月",
+      "freqYearly": "每年",
+      "descriptionOptional": "描述（可选）",
+      "coverOptional": "封面图片 URL（可选）",
+      "reviewStart": "开始：{time}",
+      "reviewEnd": "结束：{time}",
+      "reviewNote": "活动将通过服务器 API（所有者/版主）安排。",
+      "submit": "创建活动",
+      "created": "活动已创建",
+      "createdWithLink": "活动已创建 — 链接已复制",
+      "errorCreate": "无法创建：{error}"
     },
     "channelUserProfile": {
       "loading": "加载中…",
@@ -3445,6 +3565,12 @@
       "moreOptions": "更多选项"
     },
     "joinApplications": {
+      "mobileTitle": "加入申请",
+      "emptyApplications": "没有申请。",
+      "mobileTabAll": "全部",
+      "mobileTabPending": "待处理",
+      "mobileTabRejected": "已拒绝",
+      "mobileTabApproved": "已批准",
       "title": "成员 — {serverName}",
       "tabAll": "所有成员",
       "tabPending": "待处理",

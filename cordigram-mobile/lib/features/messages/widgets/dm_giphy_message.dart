@@ -63,9 +63,12 @@ class _DmGiphyMessageState extends State<DmGiphyMessage> {
         ),
       );
     }
-    final url = _url ?? '';
+    final url = _url ??
+        (widget.giphyId.isNotEmpty
+            ? 'https://media.giphy.com/media/${widget.giphyId}/giphy.gif'
+            : '');
     if (url.isEmpty) {
-      return const Text('GIF', style: TextStyle(color: Colors.white));
+      return const Text('👋', style: TextStyle(fontSize: 48));
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),

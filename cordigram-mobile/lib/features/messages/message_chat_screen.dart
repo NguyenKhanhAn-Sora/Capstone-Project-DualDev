@@ -26,9 +26,14 @@ import 'widgets/dm_peer_profile_sheet.dart';
 import 'widgets/chat_link_preview.dart';
 import 'widgets/report_dm_message_sheet.dart';
 import 'widgets/server_join_flow.dart';
+import 'widgets/chat_expressions_menu.dart';
+import 'widgets/dm_chat_expressions_host.dart';
+import 'widgets/chat_message_media_bubble.dart';
+import 'widgets/chat_media_viewer.dart';
 import 'widgets/messages_chrome_builder.dart';
 import '../../core/services/accent_color_controller.dart';
 import '../../core/services/language_controller.dart';
+import 'utils/chat_media_resolver.dart';
 import 'utils/messages_i18n.dart';
 import '../../core/theme/messages_chrome_palette.dart';
 import 'services/giphy_search_service.dart';
@@ -1178,6 +1183,42 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     );
   }
 
+  void _openExpressionsHub(MessagesChromePalette chrome) {
+    unawaited(
+      ChatExpressionsMenu.show(
+        context: context,
+        chrome: chrome,
+        host: DmChatExpressionsHost(
+          inputController: _inputController,
+          chrome: chrome,
+          serverEmojiMap: _serverEmojiMap,
+          onSendGiphy: (g, stickers) async {
+            await widget.controller.sendGiphyMessage(
+              peerUserId: widget.thread.id,
+              giphyId: g.id,
+              mediaType: stickers ? 'sticker' : 'gif',
+              title: g.title,
+              replyTo: _replyingTo?.id,
+            );
+            if (mounted && _replyingTo != null) {
+              setState(() => _replyingTo = null);
+            }
+          },
+          onSendServerSticker: (sticker, group) async {
+            await widget.controller.sendTextMessage(
+              userId: widget.thread.id,
+              content: '🎨 [Sticker]: ${sticker.imageUrl}',
+              replyTo: _replyingTo?.id,
+            );
+            if (mounted && _replyingTo != null) {
+              setState(() => _replyingTo = null);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _showStickerPickerMenu() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1899,78 +1940,37 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       );
     }
 
-    if (text.startsWith('📷 [Image]:') || text.startsWith('🎬 [Video]:')) {
-      final isVideo = text.startsWith('🎬 [Video]:');
-      final rawUrl = text.substring(text.indexOf(':') + 1).trim();
-      final mediaUrl = MessagesMediaService.optimizeHeavyVideoUrl(
-        rawUrl.startsWith('http://') ? 'https://${rawUrl.substring(7)}' : rawUrl,
-      );
-
-      // Collect all media items from this conversation for gallery navigation
-      final allMessages = widget.controller.liveMessages(widget.thread.id);
-      final mediaItems = <_MediaItem>[];
-      int initialIndex = 0;
-      for (final msg in allMessages) {
-        final t = _normalizedText(msg).trim();
-        if (t.startsWith('📷 [Image]:') || t.startsWith('🎬 [Video]:')) {
-          final u = t.substring(t.indexOf(':') + 1).trim();
-          final safeU = u.startsWith('http://') ? 'https://${u.substring(7)}' : u;
-          final isVid = t.startsWith('🎬 [Video]:');
-          final optimized = MessagesMediaService.optimizeHeavyVideoUrl(safeU);
-          if (optimized == mediaUrl) initialIndex = mediaItems.length;
-          mediaItems.add(_MediaItem(url: optimized, isVideo: isVid));
-        }
-        // Handle raw attachments
-        for (final att in msg.attachments) {
-          final a = att.trim();
-          if (a.isEmpty) continue;
-          final safeA = a.startsWith('http://') ? 'https://${a.substring(7)}' : a;
-          final isVid = safeA.endsWith('.mp4') || safeA.endsWith('.webm') || safeA.endsWith('.mov');
-          if (safeA == mediaUrl) initialIndex = mediaItems.length;
-          mediaItems.add(_MediaItem(url: safeA, isVideo: isVid));
-        }
-      }
-      if (mediaItems.isEmpty) {
-        mediaItems.add(_MediaItem(url: mediaUrl, isVideo: isVideo));
-        initialIndex = 0;
-      }
-
-      return GestureDetector(
-        onTap: () => _openMediaViewer(context, mediaItems, initialIndex),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Stack(
-            children: [
-              Image.network(
-                mediaUrl,
-                width: 220,
-                height: 160,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.low,
-                cacheWidth: 660,
-                cacheHeight: 480,
-                errorBuilder: (_, __, ___) =>
-                    Container(
-                      width: 220,
-                      height: 160,
-                      color: const Color(0xFF1A2340),
-                      child: const Icon(Icons.broken_image_rounded, color: Colors.white54),
-                    ),
-              ),
-              if (isVideo)
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black26,
-                    child: const Center(
-                      child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 44),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-    }
+    final mediaBubble = ChatMessageMediaBubble.fromContent(
+      content: text,
+      attachments: message.attachments,
+      onTapImage: (url) {
+        final items = collectDmMedia(
+          widget.controller.liveMessages(widget.thread.id),
+        );
+        openChatMediaViewer(
+          context,
+          items: items,
+          initialIndex: indexOfChatMedia(items, url),
+        );
+      },
+      onTapVideo: () {
+        final items = collectDmMedia(
+          widget.controller.liveMessages(widget.thread.id),
+        );
+        final resolved = ChatMediaResolver.resolveContentText(
+          content: text,
+          attachments: message.attachments,
+        );
+        final video = ChatMediaResolver.extractVideoUrl(resolved);
+        if (video == null || items.isEmpty) return;
+        openChatMediaViewer(
+          context,
+          items: items,
+          initialIndex: indexOfChatMedia(items, video),
+        );
+      },
+    );
+    if (mediaBubble != null) return mediaBubble;
 
     if (inviteUrl != null && inviteServerId != null) {
       return _ServerInviteCard(
@@ -2606,18 +2606,21 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                   fontSize: 14,
                                 ),
                                 border: InputBorder.none,
-                                suffixIcon: IconButton(
-                                  padding: const EdgeInsets.only(right: 4),
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(
-                                    Icons.tag_faces_rounded,
-                                    color: Color(0xFFB6C2DC),
-                                    size: 22,
-                                  ),
-                                  onPressed: _showEmojiPicker,
-                                ),
                               ),
                             ),
+                          ),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 44,
+                          ),
+                          onPressed: () => _openExpressionsHub(chrome),
+                          icon: Icon(
+                            Icons.mood_rounded,
+                            color: chrome.textMuted,
+                            size: 24,
                           ),
                         ),
                         IconButton(
@@ -2632,26 +2635,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                             color: Color(0xFFB6C2DC),
                             size: 24,
                           ),
-                        ),
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 44,
-                          ),
-                          tooltip: 'GIF',
-                          onPressed: () => _openGiphyPicker(stickers: false),
-                          icon: const GifToolbarIcon(size: 18),
-                        ),
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 44,
-                          ),
-                          tooltip: 'Sticker',
-                          onPressed: _showStickerPickerMenu,
-                          icon: const StickerToolbarIcon(size: 20),
                         ),
                         Padding(
                           padding: const EdgeInsets.only(left: 2, bottom: 2),

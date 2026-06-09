@@ -48,6 +48,26 @@ class MessagesChromePalette {
   static final MessagesChromePalette fallback =
       MessagesChromePalette.fromHex(defaultHex);
 
+  /// Token galaxy — port `[data-appearance="galaxy"]` + `#cordigram-messages-root[data-messages-theme="galaxy"]`.
+  static final MessagesChromePalette galaxy = MessagesChromePalette(
+    baseHex: defaultHex,
+    accent: const Color(0xFF5865F2),
+    accentHover: const Color(0xFF4752C4),
+    accentSoft: const Color(0x2E5865F2),
+    bg: Colors.transparent,
+    surface: const Color(0xC70C1220),
+    surfaceMuted: const Color(0xD110182A),
+    border: const Color(0xBF1F2A3D),
+    text: const Color(0xFFE5E7EF),
+    textMuted: const Color(0xFF98A3C7),
+    panelSidebar: const Color(0xE02B2D31),
+    panelHover: const Color(0xD935373C),
+    panelContext: const Color(0xEB111214),
+    chatInput: const Color(0xE0101828),
+    chatReceived: const Color(0xD1182236),
+    onAccent: Colors.white,
+  );
+
   static String normalizeHex(String color) {
     final raw = color.trim();
     if (RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(raw)) {
@@ -91,6 +111,9 @@ class MessagesChromePalette {
         isLightTone ? _darken(baseColor, 48) : _lighten(baseColor, 38);
 
     // Web: shell sáng → chữ tối cố định (dù accent tối).
+    if (shellTheme == MessagesShellTheme.galaxy) {
+      return MessagesChromePalette.galaxy;
+    }
     if (shellTheme == MessagesShellTheme.light) {
       text = const Color(0xFF0F1629);
       textMuted = const Color(0xFF5B6378);

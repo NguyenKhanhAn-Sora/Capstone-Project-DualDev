@@ -393,6 +393,7 @@
       "disabledToast": "Đã tắt thông báo.",
       "soundLabel": "Âm thanh thông báo (tin & thông báo mới)"
     },
+    "hubHint": "Tùy chỉnh tin nhắn, quyền riêng tư và giao diện. Cài đặt đồng bộ với web khi đăng nhập cùng tài khoản.",
     "sections": {
       "general": "Cài đặt chung",
       "privacy": "Quyền riêng tư",
@@ -444,7 +445,8 @@
       "dark": "Tối",
       "mutualHint": "Messages chỉ lưu một màu giao diện: preset Nền và màu chủ đề Boost dùng chung một giá trị, không chồng trong storage. Mỗi ô tô lại toàn bộ chrome Messages (nền, panel, accent). Chưa Boost chỉ dùng Nền; có Boost có thể chuyển sang Màu chủ đề.",
       "modeBackground": "Đang dùng: Nền có sẵn",
-      "modeAccent": "Đang dùng: Màu chủ đề (Boost)"
+      "modeAccent": "Đang dùng: Màu chủ đề (Boost)",
+      "currentColor": "Màu hiện tại: {hex}"
     },
     "appearanceBg": {
       "title": "Nền",
@@ -1956,6 +1958,9 @@
       "tabGif": "Ảnh động",
       "tabSticker": "Sticker",
       "tabEmoji": "Emoji",
+      "tabServerEmoji": "Emoji máy chủ",
+      "tabServerSticker": "Sticker máy chủ",
+      "expressionsHub": "Biểu cảm",
       "tabKaomoji": "Kaomoji",
       "searchGifPlaceholder": "Tìm GIF trên Giphy…",
       "searchStickerPlaceholder": "Tìm sticker phù hợp nhất…",
@@ -2124,6 +2129,48 @@
     "messageRecalled": {
       "self": "Bạn đã xóa tin nhắn",
       "other": "{name} đã xóa tin nhắn"
+    },
+    "conversationDetails": {
+      "title": "Chi tiết cuộc trò chuyện",
+      "encrypted": "Được mã hóa đầu cuối",
+      "search": "Tìm kiếm",
+      "searchPlaceholder": "Tìm tin nhắn...",
+      "noResults": "Không tìm thấy tin nhắn",
+      "pinnedMessages": "Tin nhắn đã ghim",
+      "noPinned": "Chưa có tin nhắn được ghim",
+      "sharedMedia": "File phương tiện",
+      "noMedia": "Chưa có ảnh hoặc video nào",
+      "loadMore": "Xem thêm ({n} còn lại)",
+      "sharedFiles": "File",
+      "noFiles": "Chưa có file nào được chia sẻ",
+      "searchFiles": "Tìm file...",
+      "noFilesFound": "Không tìm thấy file",
+      "loading": "Đang tải...",
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua",
+      "download": "Tải xuống",
+      "close": "Đóng"
+    },
+    "linkPreview": {
+      "noDescription": "Không có mô tả",
+      "visitLink": "Mở liên kết"
+    },
+    "channel": {
+      "searchTooltip": "Tìm tin nhắn",
+      "detailsTooltip": "Chi tiết cuộc trò chuyện",
+      "noMessages": "Chưa có tin nhắn nào",
+      "replying": "Đang trả lời",
+      "replyVoice": "🔊 Tin nhắn thoại",
+      "replyGeneric": "Tin nhắn",
+      "blockedPlaceholder": "Kênh đang bị giới hạn chat",
+      "messagePlaceholder": "Nhắn tin trong #{channel}",
+      "newMessages": "↓ Tin nhắn mới"
+    },
+    "pinnedScreen": {
+      "title": "Tin nhắn đã ghim",
+      "empty": "Chưa có tin nhắn đã ghim",
+      "emptyMessage": "(Tin nhắn trống)",
+      "serverInvite": "Lời mời vào máy chủ"
     },
     "callMessage": {
       "missedVoice": "Đã bỏ lỡ cuộc gọi thoại",
@@ -2449,6 +2496,7 @@
         "markAllDoing": "Đang đánh dấu...",
         "markAll": "Đánh dấu đã đọc",
         "loading": "Đang tải...",
+        "loadError": "Không tải được hộp thư. Kiểm tra mạng và thử lại.",
         "emptyForYou": "Không có sự kiện, lời mời hoặc thông báo vai trò nào từ các máy chủ của bạn.",
         "emptyUnread": "Không có tin nhắn hoặc thông báo chưa đọc từ các kênh.",
         "emptyMentions": "Chưa có ai đề cập bạn trong kênh.",
@@ -2544,6 +2592,8 @@
       },
       "heroTitle": "MỞ KHÓA VÔ VÀN ĐẶC QUYỀN CÙNG BOOST",
       "expiresLabel": "Hết hạn",
+      "expiresLine": "{label}: {date}",
+      "expiresWithTier": "{label}: {date} · {tier}",
       "buttons": {
         "gift": "Tặng Boost",
         "renew": "Gia hạn",
@@ -2590,10 +2640,25 @@
         "redirecting": "Đang chuyển tới thanh toán...",
         "cta": "Chọn gói & Thanh toán"
       },
+      "app": {
+        "heroSubtitle": "Upload lớn hơn, emoji/sticker xuyên server, tùy chỉnh giao diện và tối ưu media trong chat.",
+        "perksTitle": "ĐẶC QUYỀN NỔI BẬT"
+      },
+      "payment": {
+        "verifyingTitle": "Đang xác nhận thanh toán",
+        "verifyingBody": "Vui lòng đợi trong giây lát. Boost sẽ kích hoạt ngay khi Stripe xác nhận.",
+        "successTitle": "Thanh toán thành công",
+        "successBody": "Boost Messages đã được kích hoạt cho tài khoản của bạn.",
+        "failedTitle": "Thanh toán chưa hoàn tất",
+        "failedBody": "Phiên thanh toán đã hết hạn hoặc bị hủy. Bạn có thể thử lại.",
+        "timeoutBody": "Chưa nhận được xác nhận từ Stripe. Kiểm tra email hoặc thử lại sau.",
+        "countdown": "Tự đóng sau {seconds}s"
+      },
       "warnings": {
         "activeTitle": "Bạn vẫn còn thời hạn gói",
         "activeBodyPrefix": "Gói hiện tại còn hiệu lực",
         "activeBodySuffix": "Bạn có thể gia hạn hoặc đổi chu kỳ; phần thời gian còn lại sẽ được cộng dồn nếu bạn gia hạn cùng gói.",
+        "activeBodyWithDate": "Gói hiện tại còn hiệu lực đến {date}. Bạn có thể gia hạn hoặc đổi chu kỳ; phần thời gian còn lại sẽ được cộng dồn nếu bạn gia hạn cùng gói.",
         "switchTitle": "Đổi gói Boost",
         "switchBodyPrefix": "Bạn đang dùng",
         "switchCurrentFallback": "gói Boost",
@@ -2825,7 +2890,62 @@
       "suppressRoles": "Bỏ Tất Cả Vai Trò @mentions",
       "hideHighlights": "Ẩn các tin tức nổi bật",
       "muteNewEvents": "Tắt âm báo sự kiện mới",
-      "mobileNotif": "Thông báo nhắc nhở trên di động"
+      "mobileNotif": "Thông báo nhắc nhở trên di động",
+      "markAllChannelsRead": "Đánh dấu đã đọc (tất cả kênh chat)",
+      "copyInviteCopied": "Đã sao chép link mời vào máy chủ",
+      "unmuteShort": "Bỏ tắt âm",
+      "serverNotificationsTitle": "Thông báo máy chủ",
+      "leaveConfirmTitle": "Rời máy chủ?",
+      "leaveConfirmBody": "Bạn sẽ rời {serverName}.",
+      "leaveConfirmAction": "Rời",
+      "createCategoryTitle": "Tạo danh mục",
+      "categoryNamePlaceholder": "Tên danh mục",
+      "errorCreateChannel": "Không tạo được kênh: {error}",
+      "errorCreateCategory": "Không tạo được danh mục: {error}",
+      "errorLeave": "Không rời được: {error}"
+    },
+    "inviteToServerSheet": {
+      "title": "Mời vào {serverName}",
+      "description": "Gửi lời mời tới bạn bè (đang follow hoặc follow bạn) chưa tham gia máy chủ.",
+      "copyInviteLink": "Sao chép link mời",
+      "searchPlaceholder": "Tìm theo tên hoặc username...",
+      "invite": "Mời",
+      "copiedToast": "Đã sao chép link mời vào máy chủ",
+      "errorLoad": "Không tải được danh sách bạn bè"
+    },
+    "createEvent": {
+      "title": "Tạo sự kiện",
+      "stepLocation": "Vị trí",
+      "stepDetails": "Chi tiết",
+      "stepReview": "Xem lại",
+      "whereQuestion": "Sự kiện diễn ra ở đâu?",
+      "voiceChannel": "Kênh thoại",
+      "voiceChannelHint": "Gọi thoại, chia sẻ màn hình",
+      "otherLocation": "Một nơi khác",
+      "otherLocationHint": "Kênh chat hoặc địa điểm khác (cần thời gian kết thúc)",
+      "noChannels": "Server chưa có kênh phù hợp. Hãy tạo kênh trong menu máy chủ.",
+      "selectChannel": "Chọn kênh",
+      "channelPlaceholder": "Kênh",
+      "next": "Tiếp theo",
+      "topicLabel": "Chủ đề sự kiện *",
+      "start": "Bắt đầu",
+      "end": "Kết thúc",
+      "endAfterStartError": "Thời gian kết thúc phải sau thời gian bắt đầu.",
+      "frequency": "Tần suất",
+      "freqNone": "Không lặp lại",
+      "freqWeekly": "Hàng tuần",
+      "freqBiweekly": "Hai tuần một lần",
+      "freqMonthly": "Hàng tháng",
+      "freqYearly": "Hàng năm",
+      "descriptionOptional": "Mô tả (tuỳ chọn)",
+      "coverOptional": "URL ảnh bìa (tuỳ chọn)",
+      "reviewStart": "Bắt đầu: {time}",
+      "reviewEnd": "Kết thúc: {time}",
+      "reviewNote": "Sự kiện sẽ được lên lịch theo API máy chủ (owner/moderator).",
+      "submit": "Tạo sự kiện",
+      "created": "Đã tạo sự kiện",
+      "createdWithLink": "Đã tạo sự kiện — link đã sao chép",
+      "errorCreate": "Không tạo được: {error}"
     },
     "channelUserProfile": {
       "loading": "Đang tải…",
@@ -3457,6 +3577,12 @@
       "moreOptions": "Tùy chọn khác"
     },
     "joinApplications": {
+      "mobileTitle": "Đơn tham gia",
+      "emptyApplications": "Không có đơn nào.",
+      "mobileTabAll": "Tất cả",
+      "mobileTabPending": "Chờ duyệt",
+      "mobileTabRejected": "Từ chối",
+      "mobileTabApproved": "Đã duyệt",
       "title": "Thành viên — {serverName}",
       "tabAll": "Tất Cả Thành Viên",
       "tabPending": "Đang chờ xử lý",

@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/services/language_controller.dart';
+import '../../core/theme/app_theme_context.dart';
 import 'models/server_models.dart';
+import 'server_settings/server_settings_ui.dart';
 import 'services/servers_service.dart';
+import 'widgets/messages_chrome_builder.dart';
 
 /// Tạo sự kiện — POST `/servers/:serverId/events` (cùng body như web `CreateEventWizard`).
 class CreateServerEventScreen extends StatefulWidget {
@@ -24,9 +28,6 @@ class CreateServerEventScreen extends StatefulWidget {
 }
 
 class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
-  static const Color _pageColor = Color(0xFF08183A);
-  static const Color _fieldFill = Color(0xFF152A52);
-
   final PageController _pageCtrl = PageController();
   int _step = 0;
 
@@ -42,13 +43,16 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
 
   bool _submitting = false;
 
-  static const _freqLabels = <String, String>{
-    'none': 'Không lặp lại',
-    'weekly': 'Hàng tuần',
-    'biweekly': 'Hai tuần một lần',
-    'monthly': 'Hàng tháng',
-    'yearly': 'Hàng năm',
-  };
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
+
+  Map<String, String> get _freqLabels => {
+        'none': _t('chat.createEvent.freqNone'),
+        'weekly': _t('chat.createEvent.freqWeekly'),
+        'biweekly': _t('chat.createEvent.freqBiweekly'),
+        'monthly': _t('chat.createEvent.freqMonthly'),
+        'yearly': _t('chat.createEvent.freqYearly'),
+      };
 
   List<ServerChannel> get _channelsForLocation =>
       _locationType == 'voice' ? widget.voiceChannels : widget.textChannels;
@@ -159,8 +163,8 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
         SnackBar(
           content: Text(
             id.isEmpty
-                ? 'Đã tạo sự kiện'
-                : 'Đã tạo sự kiện — link đã sao chép',
+                ? _t('chat.createEvent.created')
+                : _t('chat.createEvent.createdWithLink'),
           ),
         ),
       );
@@ -168,7 +172,9 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không tạo được: $e')),
+          SnackBar(
+            content: Text(_t('chat.createEvent.errorCreate', {'error': '$e'})),
+          ),
         );
       }
     } finally {
@@ -176,73 +182,69 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
     }
   }
 
-  InputDecoration _dec(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-        filled: true,
-        fillColor: _fieldFill,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      );
+  InputDecoration _dec(BuildContext context, String hint) {
+    final ui = ServerSettingsUi.of(context);
+    return ui.fieldDecoration(hintText: hint);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _pageColor,
-      appBar: AppBar(
-        backgroundColor: _pageColor,
-        elevation: 0,
-        title: const Text(
-          'Tạo sự kiện',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                _stepChip(0, 'Vị trí'),
-                const Icon(Icons.chevron_right, color: Color(0xFF5A6B8C)),
-                _stepChip(1, 'Chi tiết'),
-                const Icon(Icons.chevron_right, color: Color(0xFF5A6B8C)),
-                _stepChip(2, 'Xem lại'),
-              ],
-            ),
+    return MessagesChromeBuilder(
+      builder: (context, chrome) {
+        final ui = ServerSettingsUi(chrome);
+        return Scaffold(
+          backgroundColor: chrome.bg,
+          appBar: ui.buildAppBar(title: _t('chat.createEvent.title')),
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    _stepChip(context, 0, _t('chat.createEvent.stepLocation')),
+                    Icon(Icons.chevron_right, color: chrome.textMuted),
+                    _stepChip(context, 1, _t('chat.createEvent.stepDetails')),
+                    Icon(Icons.chevron_right, color: chrome.textMuted),
+                    _stepChip(context, 2, _t('chat.createEvent.stepReview')),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: PageView(
+                  controller: _pageCtrl,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _buildStep1(context),
+                    _buildStep2(context),
+                    _buildStep3(context),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            child: PageView(
-              controller: _pageCtrl,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildStep1(),
-                _buildStep2(),
-                _buildStep3(),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _stepChip(int idx, String label) {
+  Widget _stepChip(BuildContext context, int idx, String label) {
+    final c = context.chrome;
     final on = _step == idx;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: on ? const Color(0xFF1E3A6E) : const Color(0xFF121E38),
+          color: on ? c.surface : c.surfaceMuted,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: on ? const Color(0xFF7FB6FF) : const Color(0xFF2A3F6A),
+            color: on ? c.accent : c.border,
           ),
         ),
         child: Text(
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: on ? Colors.white : const Color(0xFF8EA3CC),
+            color: on ? c.text : c.textMuted,
             fontWeight: on ? FontWeight.w800 : FontWeight.w500,
             fontSize: 12,
           ),
@@ -251,15 +253,16 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
     );
   }
 
-  Widget _buildStep1() {
+  Widget _buildStep1(BuildContext context) {
+    final c = context.chrome;
     final list = _channelsForLocation;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text(
-          'Sự kiện diễn ra ở đâu?',
+        Text(
+          _t('chat.createEvent.whereQuestion'),
           style: TextStyle(
-            color: Colors.white,
+            color: c.text,
             fontSize: 18,
             fontWeight: FontWeight.w800,
           ),
@@ -269,17 +272,15 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
           value: 'voice',
           groupValue: _locationType,
           fillColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected)
-                ? const Color(0xFF00C48C)
-                : null,
+            (s) => s.contains(WidgetState.selected) ? c.accent : null,
           ),
-          title: const Text(
-            'Kênh thoại',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          title: Text(
+            _t('chat.createEvent.voiceChannel'),
+            style: TextStyle(color: c.text, fontWeight: FontWeight.w600),
           ),
-          subtitle: const Text(
-            'Gọi thoại, chia sẻ màn hình',
-            style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          subtitle: Text(
+            _t('chat.createEvent.voiceChannelHint'),
+            style: TextStyle(color: c.textMuted, fontSize: 12),
           ),
           onChanged: (v) {
             if (v == null) return;
@@ -294,17 +295,15 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
           value: 'other',
           groupValue: _locationType,
           fillColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected)
-                ? const Color(0xFF00C48C)
-                : null,
+            (s) => s.contains(WidgetState.selected) ? c.accent : null,
           ),
-          title: const Text(
-            'Một nơi khác',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          title: Text(
+            _t('chat.createEvent.otherLocation'),
+            style: TextStyle(color: c.text, fontWeight: FontWeight.w600),
           ),
-          subtitle: const Text(
-            'Kênh chat hoặc địa điểm khác (cần thời kết thúc)',
-            style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+          subtitle: Text(
+            _t('chat.createEvent.otherLocationHint'),
+            style: TextStyle(color: c.textMuted, fontSize: 12),
           ),
           onChanged: (v) {
             if (v == null) return;
@@ -316,28 +315,28 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
           },
         ),
         if (list.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
             child: Text(
-              'Server chưa có kênh phù hợp. Hãy tạo kênh trong menu máy chủ.',
-              style: TextStyle(color: Color(0xFFFFB4B4)),
+              _t('chat.createEvent.noChannels'),
+              style: TextStyle(color: c.accent),
             ),
           )
         else ...[
           const SizedBox(height: 16),
-          const Text(
-            'Chọn kênh',
+          Text(
+            _t('chat.createEvent.selectChannel'),
             style: TextStyle(
-              color: Color(0xFFAFC0E2),
+              color: c.textMuted,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: _channelId.isEmpty ? null : _channelId,
-            dropdownColor: const Color(0xFF152A52),
-            decoration: _dec('Kênh'),
-            style: const TextStyle(color: Colors.white),
+            dropdownColor: c.chatInput,
+            decoration: _dec(context, _t('chat.createEvent.channelPlaceholder')),
+            style: TextStyle(color: c.text),
             items: list
                 .map(
                   (c) => DropdownMenuItem(
@@ -363,29 +362,31 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
                   }
                 : null,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF00C48C),
+              backgroundColor: c.accent,
+              foregroundColor: c.onAccent,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            child: const Text('Tiếp theo'),
+            child: Text(_t('chat.createEvent.next')),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStep2() {
+  Widget _buildStep2(BuildContext context) {
+    final c = context.chrome;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         TextField(
           controller: _topicCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: _dec('Chủ đề sự kiện *'),
+          style: TextStyle(color: c.text),
+          decoration: _dec(context, _t('chat.createEvent.topicLabel')),
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Bắt đầu',
-          style: TextStyle(color: Color(0xFFAFC0E2), fontWeight: FontWeight.w700),
+        Text(
+          _t('chat.createEvent.start'),
+          style: TextStyle(color: c.textMuted, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 6),
         Row(
@@ -395,7 +396,7 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
                 onPressed: () => _pickDate(forEnd: false),
                 child: Text(
                   '${_start.year}-${_start.month.toString().padLeft(2, '0')}-${_start.day.toString().padLeft(2, '0')}',
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: c.text),
                 ),
               ),
             ),
@@ -405,7 +406,7 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
                 onPressed: () => _pickTime(forEnd: false),
                 child: Text(
                   '${_start.hour.toString().padLeft(2, '0')}:${_start.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: c.text),
                 ),
               ),
             ),
@@ -413,10 +414,10 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
         ),
         if (_locationType == 'other') ...[
           const SizedBox(height: 16),
-          const Text(
-            'Kết thúc',
+          Text(
+            _t('chat.createEvent.end'),
             style: TextStyle(
-              color: Color(0xFFAFC0E2),
+              color: c.textMuted,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -428,7 +429,7 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
                   onPressed: () => _pickDate(forEnd: true),
                   child: Text(
                     '${_end.year}-${_end.month.toString().padLeft(2, '0')}-${_end.day.toString().padLeft(2, '0')}',
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: c.text),
                   ),
                 ),
               ),
@@ -438,27 +439,27 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
                   onPressed: () => _pickTime(forEnd: true),
                   child: Text(
                     '${_end.hour.toString().padLeft(2, '0')}:${_end.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: c.text),
                   ),
                 ),
               ),
             ],
           ),
           if (!_endAfterStart)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Thời gian kết thúc phải sau thời gian bắt đầu.',
-                style: TextStyle(color: Color(0xFFFF8A8A)),
+                _t('chat.createEvent.endAfterStartError'),
+                style: TextStyle(color: c.accent),
               ),
             ),
         ],
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
           value: _frequency,
-          dropdownColor: const Color(0xFF152A52),
-          decoration: _dec('Tần suất'),
-          style: const TextStyle(color: Colors.white),
+          dropdownColor: c.chatInput,
+          decoration: _dec(context, _t('chat.createEvent.frequency')),
+          style: TextStyle(color: c.text),
           items: _freqLabels.entries
               .map(
                 (e) => DropdownMenuItem(
@@ -474,14 +475,14 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
           controller: _descCtrl,
           minLines: 2,
           maxLines: 5,
-          style: const TextStyle(color: Colors.white),
-          decoration: _dec('Mô tả (tuỳ chọn)'),
+          style: TextStyle(color: c.text),
+          decoration: _dec(context, _t('chat.createEvent.descriptionOptional')),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _coverCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: _dec('URL ảnh bìa (tuỳ chọn)'),
+          style: TextStyle(color: c.text),
+          decoration: _dec(context, _t('chat.createEvent.coverOptional')),
         ),
         const SizedBox(height: 24),
         Row(
@@ -491,7 +492,10 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
                 setState(() => _step = 0);
                 _pageCtrl.jumpToPage(0);
               },
-              child: const Text('Quay lại'),
+              child: Text(
+                _t('common.back'),
+                style: TextStyle(color: c.accent),
+              ),
             ),
             const Spacer(),
             FilledButton(
@@ -502,9 +506,10 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
                     }
                   : null,
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF00C48C),
+                backgroundColor: c.accent,
+                foregroundColor: c.onAccent,
               ),
-              child: const Text('Tiếp theo'),
+              child: Text(_t('chat.createEvent.next')),
             ),
           ],
         ),
@@ -512,7 +517,8 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
     );
   }
 
-  Widget _buildStep3() {
+  Widget _buildStep3(BuildContext context) {
+    final c = context.chrome;
     final list = _channelsForLocation;
     String? chName;
     for (final c in list) {
@@ -527,31 +533,33 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
       children: [
         Text(
           _topicCtrl.text.trim().isEmpty ? '—' : _topicCtrl.text.trim(),
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: c.text,
             fontSize: 20,
             fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 12),
         Text(
-          'Bắt đầu: ${_start.toLocal()}',
-          style: const TextStyle(color: Color(0xFF8EA3CC)),
+          _t('chat.createEvent.reviewStart', {
+            'time': '${_start.toLocal()}',
+          }),
+          style: TextStyle(color: c.textMuted),
         ),
         if (_locationType == 'other')
           Text(
-            'Kết thúc: ${_end.toLocal()}',
-            style: const TextStyle(color: Color(0xFF8EA3CC)),
+            _t('chat.createEvent.reviewEnd', {'time': '${_end.toLocal()}'}),
+            style: TextStyle(color: c.textMuted),
           ),
         const SizedBox(height: 8),
         Text(
           '${_locationType == 'voice' ? '🔊' : '#'} ${chName ?? '—'}',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(color: c.text.withValues(alpha: 0.85)),
         ),
         const SizedBox(height: 24),
-        const Text(
-          'Sự kiện sẽ được lên lịch theo API máy chủ (owner/moderator).',
-          style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 13),
+        Text(
+          _t('chat.createEvent.reviewNote'),
+          style: TextStyle(color: c.textMuted, fontSize: 13),
         ),
         const SizedBox(height: 24),
         Row(
@@ -561,26 +569,30 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
                 setState(() => _step = 1);
                 _pageCtrl.jumpToPage(1);
               },
-              child: const Text('Quay lại'),
+              child: Text(
+                _t('common.back'),
+                style: TextStyle(color: c.accent),
+              ),
             ),
             const Spacer(),
             FilledButton(
               onPressed: _submitting || !_canStep2 ? null : _submit,
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF00C48C),
+                backgroundColor: c.accent,
+                foregroundColor: c.onAccent,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
               child: _submitting
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: c.onAccent,
                       ),
                     )
-                  : const Text('Tạo sự kiện'),
+                  : Text(_t('chat.createEvent.submit')),
             ),
           ],
         ),

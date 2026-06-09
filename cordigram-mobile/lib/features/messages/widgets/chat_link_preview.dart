@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/theme/app_theme_context.dart';
 import '../models/dm_message.dart' show DmLinkPreview;
+import 'link_preview_card.dart' show LinkPreviewCard, extractFirstUrl;
 
 /// Renders a column of pre-fetched link preview cards for chat messages
 /// (DM and channel). Data is fetched server-side when the message is sent.
@@ -33,6 +35,7 @@ class ChatLinkPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.chrome;
     final href = (preview.canonicalUrl?.trim().isNotEmpty == true
             ? preview.canonicalUrl
             : preview.url)
@@ -64,9 +67,9 @@ class ChatLinkPreviewCard extends StatelessWidget {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 320),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2035),
+          color: c.surface,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF2D3A55), width: 1),
+          border: Border.all(color: c.border, width: 1),
         ),
         clipBehavior: Clip.hardEdge,
         child: IntrinsicHeight(
@@ -101,8 +104,8 @@ class ChatLinkPreviewCard extends StatelessWidget {
                           title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFFE5E7EB),
+                          style: TextStyle(
+                            color: c.text,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             height: 1.2,
@@ -114,8 +117,8 @@ class ChatLinkPreviewCard extends StatelessWidget {
                           preview.description!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF94A3B8),
+                          style: TextStyle(
+                            color: c.textMuted,
                             fontSize: 11,
                             height: 1.3,
                           ),
@@ -125,8 +128,8 @@ class ChatLinkPreviewCard extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           domain,
-                          style: const TextStyle(
-                            color: Color(0xFF3D63DD),
+                          style: TextStyle(
+                            color: c.accent,
                             fontSize: 11,
                           ),
                         ),
@@ -149,9 +152,10 @@ class _FaviconFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.chrome;
     return Container(
       width: 72,
-      color: const Color(0xFF111827),
+      color: c.surfaceMuted,
       child: Center(
         child: favicon?.isNotEmpty == true
             ? Image.network(
@@ -159,18 +163,61 @@ class _FaviconFallback extends StatelessWidget {
                 width: 24,
                 height: 24,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
+                errorBuilder: (_, __, ___) => Icon(
                   Icons.link,
-                  color: Color(0xFF4B5563),
+                  color: c.textMuted,
                   size: 20,
                 ),
               )
-            : const Icon(
+            : Icon(
                 Icons.link,
-                color: Color(0xFF4B5563),
+                color: c.textMuted,
                 size: 20,
               ),
       ),
     );
+  }
+}
+
+/// Text bubble + link previews (server-stored or client fallback for legacy).
+class ChatMessageLinkSection extends StatelessWidget {
+  const ChatMessageLinkSection({
+    super.key,
+    required this.text,
+    required this.linkPreviews,
+    required this.textBuilder,
+  });
+
+  final String text;
+  final List<DmLinkPreview> linkPreviews;
+  final Widget Function(String text) textBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = text.trim();
+    if (linkPreviews.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (trimmed.isNotEmpty) textBuilder(trimmed),
+          if (trimmed.isNotEmpty) const SizedBox(height: 6),
+          ChatLinkPreviewList(previews: linkPreviews),
+        ],
+      );
+    }
+    final fallbackUrl = extractFirstUrl(trimmed);
+    if (fallbackUrl != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (trimmed.isNotEmpty) textBuilder(trimmed),
+          if (trimmed.isNotEmpty) const SizedBox(height: 6),
+          LinkPreviewCard(url: fallbackUrl),
+        ],
+      );
+    }
+    return textBuilder(trimmed);
   }
 }

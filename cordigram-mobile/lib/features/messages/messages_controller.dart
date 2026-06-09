@@ -128,6 +128,7 @@ class MessagesController extends ChangeNotifier {
     _startInboxPolling();
     _languageCode = LanguageController.instance.language;
     LanguageController.instance.addListener(_onLanguageChanged);
+    await DirectMessagesService.hydrateConversationMutes();
     await refreshInboxCount();
     await refreshMyIdentity();
     await refreshBlockedUsers();
@@ -154,7 +155,7 @@ class MessagesController extends ChangeNotifier {
               lastMsg,
               viewerId: _myUserId,
             )
-          : t.lastMessage;
+          : MessagesI18n.localizeSidebarPreview(t.lastMessage);
       final activityMs = _peerLastActivityMs[t.id];
       final activityAt = activityMs != null
           ? DateTime.fromMillisecondsSinceEpoch(activityMs)
@@ -281,12 +282,12 @@ class MessagesController extends ChangeNotifier {
             (c) => MessageThread(
               id: c.userId,
               name: c.title,
-              lastMessage: c.lastMessage,
+              lastMessage: MessagesI18n.previewForConversation(
+                c,
+                viewerId: _myUserId,
+              ),
               lastActiveLabel: MessagesI18n.formatThreadTimeShort(c.lastMessageAt),
-              unreadCount: _readPeers.contains(c.userId) ||
-                      _activeConversationPeerId == c.userId
-                  ? 0
-                  : c.unreadCount,
+              unreadCount: _displayUnreadForPeer(c.userId, c.unreadCount),
               avatarUrl: c.avatarUrl,
               isOnline: c.isOnline,
               lastSeenAt: c.lastActiveAt,
@@ -301,7 +302,7 @@ class MessagesController extends ChangeNotifier {
       DirectMessagesRealtimeService.subscribePresence(
         _threads.map((e) => e.id).where((e) => e.isNotEmpty).toList(),
       );
-      _totalUnread = _threads.fold<int>(0, (sum, e) => sum + e.unreadCount);
+      _recalcTotalUnread();
     } catch (e) {
       _threadsError = e.toString();
     } finally {
@@ -382,7 +383,7 @@ class MessagesController extends ChangeNotifier {
         lastSeenAt: _threads[idx].lastSeenAt,
         presenceLabel: _threads[idx].presenceLabel,
       );
-      _totalUnread = _threads.fold<int>(0, (sum, e) => sum + e.unreadCount);
+      _recalcTotalUnread();
       notifyListeners();
     }
   }
@@ -749,6 +750,37 @@ class MessagesController extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
+  int _displayUnreadForPeer(String peerId, int raw) {
+    if (isConversationMuted(peerId)) return 0;
+    if (_readPeers.contains(peerId) || _activeConversationPeerId == peerId) {
+      return 0;
+    }
+    return raw.clamp(0, 999999);
+  }
+
+  void _recalcTotalUnread() {
+    _totalUnread = _threads.fold<int>(0, (sum, e) => sum + e.unreadCount);
+  }
+
+  void _applyMuteToThreadUnread(String userId) {
+    final idx = _threads.indexWhere((e) => e.id == userId);
+    if (idx == -1) return;
+    final t = _threads[idx];
+    if (t.unreadCount == 0) return;
+    _threads[idx] = MessageThread(
+      id: t.id,
+      name: t.name,
+      lastMessage: t.lastMessage,
+      lastActiveLabel: t.lastActiveLabel,
+      unreadCount: 0,
+      avatarUrl: t.avatarUrl,
+      isOnline: t.isOnline,
+      isPinned: t.isPinned,
+      lastSeenAt: t.lastSeenAt,
+      presenceLabel: t.presenceLabel,
+    );
+  }
+
   bool isConversationMuted(String userId) {
     if (DirectMessagesService.isConversationMuted(userId)) return true;
     if (_conversationMutedForever.contains(userId)) return true;
@@ -784,6 +816,10 @@ class MessagesController extends ChangeNotifier {
       _conversationMutedForever.remove(userId);
       _conversationMutedUntil[userId] = DateTime.now().add(duration);
       DirectMessagesService.setConversationMuted(userId, duration: duration);
+    }
+    if (isConversationMuted(userId)) {
+      _applyMuteToThreadUnread(userId);
+      _recalcTotalUnread();
     }
     notifyListeners();
   }
@@ -912,7 +948,6 @@ class MessagesController extends ChangeNotifier {
   }
 
   void _onUnreadCount(DmUnreadCountEvent event) {
-    _totalUnread = event.totalUnread;
     final peerId = event.fromUserId?.trim();
     final convUnread = event.conversationUnread;
     if (peerId != null &&
@@ -920,11 +955,10 @@ class MessagesController extends ChangeNotifier {
         convUnread != null) {
       if (convUnread <= 0) {
         _readPeers.add(peerId);
-      } else {
+      } else if (!isConversationMuted(peerId)) {
         _readPeers.remove(peerId);
       }
-      final displayUnread =
-          _activeConversationPeerId == peerId ? 0 : convUnread.clamp(0, 999999);
+      final displayUnread = _displayUnreadForPeer(peerId, convUnread);
       final idx = _threads.indexWhere((e) => e.id == peerId);
       if (idx != -1) {
         final t = _threads[idx];
@@ -942,6 +976,7 @@ class MessagesController extends ChangeNotifier {
         );
       }
     }
+    _recalcTotalUnread();
     notifyListeners();
   }
 

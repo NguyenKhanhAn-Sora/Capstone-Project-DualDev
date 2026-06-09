@@ -1130,12 +1130,16 @@ export class PaymentsService {
       ],
       success_url:
         actionType === 'boost_subscribe' || actionType === 'boost_gift'
-          ? `${this.config.frontendUrl}/boost/payment/success?session_id={CHECKOUT_SESSION_ID}`
-          : `${this.config.frontendUrl}/ads/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+          ? dto.successUrl?.trim()
+            ? successUrl
+            : `${this.config.frontendUrl}/boost/payment/success?session_id={CHECKOUT_SESSION_ID}`
+          : successUrl,
       cancel_url:
         actionType === 'boost_subscribe' || actionType === 'boost_gift'
-          ? `${this.config.frontendUrl}/boost/payment/cancel`
-          : `${this.config.frontendUrl}/ads/payment/cancel`,
+          ? dto.cancelUrl?.trim()
+            ? cancelUrl
+            : `${this.config.frontendUrl}/boost/payment/cancel`
+          : cancelUrl,
       metadata: {
         userId,
         actionType,

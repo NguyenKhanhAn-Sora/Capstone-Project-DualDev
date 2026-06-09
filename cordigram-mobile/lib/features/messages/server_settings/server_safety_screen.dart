@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../services/servers_service.dart';
+import 'server_settings_ui.dart';
 
 /// Mức xác minh + lọc nội dung nhạy cảm — PATCH `/safety-settings`.
 class ServerSafetyScreen extends StatefulWidget {
@@ -20,9 +21,6 @@ class ServerSafetyScreen extends StatefulWidget {
 }
 
 class _ServerSafetyScreenState extends State<ServerSafetyScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-
   Map<String, dynamic> _doc = {};
   bool _loading = true;
   String? _error;
@@ -115,30 +113,29 @@ class _ServerSafetyScreenState extends State<ServerSafetyScreen> {
       {'id': 'none', 't': 'Tắt', 'd': 'Không lọc tự động.'},
     ];
 
+    final ui = ServerSettingsUi.of(context);
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: const Text(
-          'Thiết lập an toàn',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-      ),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(title: 'Thiết lập an toàn'),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: ui.accent))
           : _error != null
-              ? Center(child: Text(_error!))
+              ? Center(
+                  child: Text(_error!, style: TextStyle(color: ui.textMuted)),
+                )
               : RefreshIndicator(
                   onRefresh: _load,
-                  color: const Color(0xFF7FB6FF),
+                  color: ui.accent,
                   child: ListView(
                     padding: EdgeInsets.fromLTRB(hPad, 12, hPad, pad.bottom + 24),
                     children: [
-                      _sectionTitle('Mức xác minh'),
+                      _sectionTitle(ui, 'Mức xác minh'),
                       _sectionBody(
+                        ui,
                         'Áp dụng khi gửi tin / DM tùy cấu hình máy chủ.',
                       ),
                       ...verifyOpts.map((o) => _radioTile(
+                            ui,
                             selected: _verifyLevel() == o['id'],
                             title: o['t'] ?? '',
                             subtitle: o['d'] ?? '',
@@ -147,11 +144,13 @@ class _ServerSafetyScreenState extends State<ServerSafetyScreen> {
                                 : null,
                           )),
                       const SizedBox(height: 20),
-                      _sectionTitle('Lọc nội dung nhạy cảm'),
+                      _sectionTitle(ui, 'Lọc nội dung nhạy cảm'),
                       _sectionBody(
+                        ui,
                         'Kiểm soát ảnh/video nhạy cảm trong kênh không giới hạn tuổi.',
                       ),
                       ...filterOpts.map((o) => _radioTile(
+                            ui,
                             selected: _filterLevel() == o['id'],
                             title: o['t'] ?? '',
                             subtitle: o['d'] ?? '',
@@ -164,27 +163,28 @@ class _ServerSafetyScreenState extends State<ServerSafetyScreen> {
     );
   }
 
-  Widget _sectionTitle(String t) => Padding(
+  Widget _sectionTitle(ServerSettingsUi ui, String t) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
           t,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: ui.text,
             fontWeight: FontWeight.w800,
             fontSize: 16,
           ),
         ),
       );
 
-  Widget _sectionBody(String t) => Padding(
+  Widget _sectionBody(ServerSettingsUi ui, String t) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Text(
           t,
-          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 13, height: 1.4),
+          style: TextStyle(color: ui.textMuted, fontSize: 13, height: 1.4),
         ),
       );
 
-  Widget _radioTile({
+  Widget _radioTile(
+    ServerSettingsUi ui, {
     required bool selected,
     required String title,
     required String subtitle,
@@ -193,7 +193,7 @@ class _ServerSafetyScreenState extends State<ServerSafetyScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: _card,
+        color: ui.card,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -206,9 +206,7 @@ class _ServerSafetyScreenState extends State<ServerSafetyScreen> {
                   selected
                       ? Icons.radio_button_checked_rounded
                       : Icons.radio_button_off_rounded,
-                  color: selected
-                      ? const Color(0xFF00C48C)
-                      : const Color(0xFF6B7A99),
+                  color: selected ? ui.accent : ui.textMuted,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -217,16 +215,16 @@ class _ServerSafetyScreenState extends State<ServerSafetyScreen> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: ui.text,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF8EA3CC),
+                        style: TextStyle(
+                          color: ui.textMuted,
                           fontSize: 12,
                           height: 1.35,
                         ),

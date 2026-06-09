@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/language_controller.dart';
+
 /// Same storage key as web `sidebar-prefs.ts` for cross-device compatibility.
 class ServerSidebarPrefsStore {
   ServerSidebarPrefsStore._();
@@ -277,13 +279,14 @@ class ServerSidebarPrefsStore {
   }
 
   static String notifyLabelForLevel(String level) {
+    final t = LanguageController.instance.t;
     switch (level) {
       case 'mentions':
-        return 'Chỉ @mentions';
+        return t('chat.serverContextMenu.notifMentions');
       case 'none':
-        return 'Không có';
+        return t('chat.serverContextMenu.notifNone');
       default:
-        return 'Tất cả tin nhắn';
+        return t('chat.serverContextMenu.notifAll');
     }
   }
 

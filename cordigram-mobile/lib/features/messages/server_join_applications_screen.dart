@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/language_controller.dart';
+import '../../core/theme/app_theme_context.dart';
 import 'models/server_models.dart';
+import 'widgets/messages_chrome_builder.dart';
 import 'services/servers_service.dart';
 
 /// Admin duyệt đơn đăng ký — cùng API và luồng chính như web `ServerJoinApplicationsPanel`.
@@ -67,17 +70,21 @@ class _ServerJoinApplicationsScreenState
     }
   }
 
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
+
   String _tabLabel(String key) {
     switch (key) {
       case 'all':
-        return 'Tất cả';
+        return _t('chat.joinApplications.mobileTabAll');
       case 'pending':
         final n = _tab == 'pending' ? _items.length : _pendingCountFromApi;
-        return n > 0 ? 'Chờ duyệt ($n)' : 'Chờ duyệt';
+        final base = _t('chat.joinApplications.mobileTabPending');
+        return n > 0 ? '$base ($n)' : base;
       case 'rejected':
-        return 'Từ chối';
+        return _t('chat.joinApplications.mobileTabRejected');
       case 'approved':
-        return 'Đã duyệt';
+        return _t('chat.joinApplications.mobileTabApproved');
       default:
         return key;
     }
@@ -293,14 +300,16 @@ class _ServerJoinApplicationsScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF08183A),
+    return MessagesChromeBuilder(
+      builder: (context, chrome) => Scaffold(
+      backgroundColor: chrome.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF08183A),
-        title: const Text('Đơn tham gia'),
+        backgroundColor: chrome.bg,
+        foregroundColor: chrome.text,
+        title: Text(_t('chat.joinApplications.mobileTitle')),
         actions: [
           IconButton(
-            tooltip: 'Làm mới',
+            tooltip: _t('common.refresh'),
             onPressed: _loading ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),
@@ -313,8 +322,8 @@ class _ServerJoinApplicationsScreenState
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
             child: Text(
               widget.server.name,
-              style: const TextStyle(
-                color: Color(0xFFAFC0E2),
+              style: TextStyle(
+                color: chrome.textMuted,
                 fontSize: 13,
               ),
             ),
@@ -346,17 +355,17 @@ class _ServerJoinApplicationsScreenState
               padding: const EdgeInsets.all(12),
               child: Text(
                 _listError!,
-                style: const TextStyle(color: Color(0xFFFF6B6B)),
+                style: TextStyle(color: chrome.accent),
               ),
             ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(child: CircularProgressIndicator(color: chrome.accent))
                 : _items.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'Không có đơn nào.',
-                      style: TextStyle(color: Color(0xFFAFC0E2)),
+                      _t('chat.joinApplications.emptyApplications'),
+                      style: TextStyle(color: chrome.textMuted),
                     ),
                   )
                 : RefreshIndicator(
@@ -366,7 +375,7 @@ class _ServerJoinApplicationsScreenState
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
                       itemCount: _items.length,
                       separatorBuilder: (_, __) =>
-                          const Divider(height: 1, color: Color(0xFF21345D)),
+                          Divider(height: 1, color: chrome.border),
                       itemBuilder: (context, i) {
                         final row = _items[i];
                         final userId = (row['userId'] ?? '').toString();
@@ -381,7 +390,7 @@ class _ServerJoinApplicationsScreenState
                         return ListTile(
                           onTap: () => _openDetail(row),
                           leading: CircleAvatar(
-                            backgroundColor: const Color(0xFF1F2D4D),
+                            backgroundColor: chrome.surfaceMuted,
                             backgroundImage:
                                 av.startsWith('http') ? NetworkImage(av) : null,
                             child: av.startsWith('http')
@@ -395,14 +404,14 @@ class _ServerJoinApplicationsScreenState
                           ),
                           title: Text(
                             name.isNotEmpty ? name : user,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: chrome.text,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           subtitle: Text(
                             user.isNotEmpty ? '@$user' : '',
-                            style: const TextStyle(color: Color(0xFFAFC0E2)),
+                            style: TextStyle(color: chrome.textMuted),
                           ),
                           trailing: pending
                               ? Row(
@@ -440,12 +449,12 @@ class _ServerJoinApplicationsScreenState
                                 )
                               : Text(
                                   status == 'accepted'
-                                      ? 'Đã duyệt'
+                                      ? _t('chat.joinApplications.mobileTabApproved')
                                       : status == 'rejected'
-                                      ? 'Từ chối'
+                                      ? _t('chat.joinApplications.mobileTabRejected')
                                       : status,
-                                  style: const TextStyle(
-                                    color: Color(0xFFAFC0E2),
+                                  style: TextStyle(
+                                    color: chrome.textMuted,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -456,6 +465,7 @@ class _ServerJoinApplicationsScreenState
           ),
         ],
       ),
+    ),
     );
   }
 }

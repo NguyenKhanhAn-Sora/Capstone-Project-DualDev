@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/services/language_controller.dart';
 import '../models/message_thread.dart';
+import '../utils/messages_i18n.dart';
 
 class MessageThreadTile extends StatelessWidget {
   const MessageThreadTile({
@@ -34,7 +35,8 @@ class MessageThreadTile extends StatelessWidget {
     final nameLetter = thread.name.trim().isNotEmpty
         ? thread.name.trim().substring(0, 1).toUpperCase()
         : '?';
-    final preview = thread.lastMessage.trim();
+    final preview =
+        MessagesI18n.localizeSidebarPreview(thread.lastMessage.trim());
     final hasPreview = preview.isNotEmpty;
 
     return ListTile(

@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import '../models/dm_message.dart';
 import '../services/direct_messages_service.dart';
 import '../utils/messages_i18n.dart';
-import '../../../core/services/accent_color_controller.dart';
 import '../../../core/theme/messages_chrome_palette.dart';
+import 'messages_chrome_builder.dart';
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -56,24 +56,27 @@ class ConversationDetailsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
-    return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      snap: true,
-      snapSizes: const [0.5, 0.92, 0.97],
-      builder: (ctx, scrollController) => _SheetBody(
-        scrollController: scrollController,
-        peerUserId: peerUserId,
-        peerName: peerName,
-        peerAvatarUrl: peerAvatarUrl,
-        messages: messages,
-        onJumpToMessage: (id) {
-          Navigator.of(context).pop();
-          onJumpToMessage(id);
-        },
-        onOpenMediaViewer: onOpenMediaViewer,
-        bottomPadding: mq.padding.bottom,
+    return MessagesChromeBuilder(
+      builder: (context, chrome) => DraggableScrollableSheet(
+        initialChildSize: 0.92,
+        minChildSize: 0.5,
+        maxChildSize: 0.97,
+        snap: true,
+        snapSizes: const [0.5, 0.92, 0.97],
+        builder: (ctx, scrollController) => _SheetBody(
+          chrome: chrome,
+          scrollController: scrollController,
+          peerUserId: peerUserId,
+          peerName: peerName,
+          peerAvatarUrl: peerAvatarUrl,
+          messages: messages,
+          onJumpToMessage: (id) {
+            Navigator.of(context).pop();
+            onJumpToMessage(id);
+          },
+          onOpenMediaViewer: onOpenMediaViewer,
+          bottomPadding: mq.padding.bottom,
+        ),
       ),
     );
   }
@@ -90,6 +93,7 @@ class CdsMediaItem {
 
 class _SheetBody extends StatefulWidget {
   const _SheetBody({
+    required this.chrome,
     required this.scrollController,
     required this.peerUserId,
     required this.peerName,
@@ -100,6 +104,7 @@ class _SheetBody extends StatefulWidget {
     required this.bottomPadding,
   });
 
+  final MessagesChromePalette chrome;
   final ScrollController scrollController;
   final String peerUserId;
   final String peerName;
@@ -115,7 +120,7 @@ class _SheetBody extends StatefulWidget {
 
 class _SheetBodyState extends State<_SheetBody>
     with SingleTickerProviderStateMixin {
-  MessagesChromePalette get _c => AccentColorController.instance.palette;
+  MessagesChromePalette get _c => widget.chrome;
 
   // ── tabs ─────────────────────────────────────────────────────────────
   late final TabController _tabController;
@@ -339,7 +344,7 @@ class _SheetBodyState extends State<_SheetBody>
           const SizedBox(height: 4),
           // Tabs
           _buildTabBar(),
-          const Divider(height: 1, thickness: 1, color: Color(0xFF233358)),
+          Divider(height: 1, thickness: 1, color: _c.border),
           // Tab views
           Expanded(
             child: TabBarView(

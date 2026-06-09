@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/services/language_controller.dart';
+import '../../../core/theme/messages_chrome_palette.dart';
+import '../widgets/messages_chrome_builder.dart';
 import '../models/message_thread.dart';
 import '../models/server_models.dart';
 import '../services/direct_messages_service.dart';
@@ -569,6 +571,12 @@ class _MessageSearchSheetState extends State<MessageSearchSheet> {
 
   @override
   Widget build(BuildContext context) {
+    return MessagesChromeBuilder(
+      builder: (context, chrome) => _buildSheet(context, chrome),
+    );
+  }
+
+  Widget _buildSheet(BuildContext context, MessagesChromePalette chrome) {
     final t = LanguageController.instance.t;
     final scheme = Theme.of(context).colorScheme;
     final title = switch (widget.mode) {
@@ -590,7 +598,7 @@ class _MessageSearchSheetState extends State<MessageSearchSheet> {
     };
 
     return Material(
-      color: scheme.surface,
+      color: chrome.bg,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       child: SafeArea(
         top: false,
@@ -657,7 +665,7 @@ class _MessageSearchSheetState extends State<MessageSearchSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
                       _error!,
-                      style: const TextStyle(color: Color(0xFFFF9CAB)),
+                      style: TextStyle(color: scheme.error),
                     ),
                   ),
                 Expanded(
@@ -672,18 +680,18 @@ class _MessageSearchSheetState extends State<MessageSearchSheet> {
                         return _buildQuickSwitch();
                       }
                       if (!_searched) {
-                        return const Center(
+                        return Center(
                           child: Text(
                             'Nhập từ khóa hoặc bộ lọc from:/in:/has:',
-                            style: TextStyle(color: Color(0xFFAFC0E2)),
+                            style: TextStyle(color: chrome.textMuted),
                           ),
                         );
                       }
                       if (_results.isEmpty) {
-                        return const Center(
+                        return Center(
                           child: Text(
                             'Không có kết quả',
-                            style: TextStyle(color: Color(0xFFAFC0E2)),
+                            style: TextStyle(color: chrome.textMuted),
                           ),
                         );
                       }

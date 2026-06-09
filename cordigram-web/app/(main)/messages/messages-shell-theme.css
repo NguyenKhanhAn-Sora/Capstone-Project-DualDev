@@ -146,8 +146,81 @@
   --color-voice-received-text: #dde2f0;
 }
 
+#cordigram-messages-root[data-messages-theme="galaxy"] {
+  color-scheme: dark;
+  --color-bg: transparent;
+  --color-surface: rgba(12, 18, 32, 0.78);
+  --color-surface-muted: rgba(16, 24, 42, 0.82);
+  --color-border: rgba(31, 42, 61, 0.75);
+  --color-text: #e5e7ef;
+  --color-text-muted: #98a3c7;
+  --color-overlay: rgba(4, 8, 18, 0.72);
+  --accent-color: #5865f2;
+  --accent-hover: #4752c4;
+  --accent-active: #3d46a5;
+  --accent-soft: rgba(88, 101, 242, 0.18);
+  --color-on-accent: #ffffff;
+  --color-button-x: #ffffff;
+  --color-border-button-x: #434f65;
+  --color-primary: #559ac2;
+  --color-primary-strong: #2b74b0;
+  --color-primary-accent: #1b5f9d;
+  --shadow-strong: 0 24px 80px rgba(0, 0, 0, 0.65);
+  --gradient-surface: linear-gradient(135deg, rgba(17, 27, 48, 0.85), rgba(12, 18, 32, 0.85));
+  --color-title-primary: #e5e7ef;
+  --color-bg-home: transparent;
+  --user-appearance-bg: transparent;
+  --color-scrollbar-thumb: #293653;
+  --color-background-stat-reel: #ffffff0f;
+  --color-panel-bg: rgba(49, 51, 56, 0.82);
+  --color-panel-sidebar: rgba(43, 45, 49, 0.88);
+  --color-panel-sidebar-border: rgba(30, 31, 34, 0.88);
+  --color-panel-hover: rgba(53, 55, 60, 0.85);
+  --color-panel-active: rgba(64, 66, 73, 0.9);
+  --color-panel-text: #f2f3f5;
+  --color-panel-text-muted: #b5bac1;
+  --color-panel-text-faint: #949ba4;
+  --color-panel-border: rgba(63, 65, 71, 0.8);
+  --color-panel-deep: rgba(30, 31, 34, 0.9);
+  --color-panel-deep-border: rgba(56, 58, 64, 0.85);
+  --color-panel-context: rgba(17, 18, 20, 0.92);
+  --color-panel-accent: #5865f2;
+  --color-panel-accent-hover: #4752c4;
+  --color-panel-danger: #f23f43;
+  --color-panel-danger-hover: #da373c;
+  --color-panel-warning: #fee75c;
+  --color-panel-success: #23a55a;
+  --color-panel-success-hover: #1a7d45;
+  --color-panel-neutral: #4e5058;
+  --color-panel-neutral-hover: #5d6069;
+  --color-chat-received: rgba(24, 34, 54, 0.82);
+  --color-chat-received-hover: rgba(30, 44, 68, 0.88);
+  --color-chat-overlay: rgba(4, 8, 18, 0.75);
+  --color-chat-modal: rgba(21, 32, 58, 0.9);
+  --color-chat-modal-border: rgba(36, 51, 71, 0.85);
+  --color-chat-input: rgba(16, 24, 40, 0.88);
+  --color-chat-input-border: rgba(36, 51, 71, 0.85);
+  --color-chat-hover: rgba(28, 43, 66, 0.85);
+  --color-chat-text-strong: #dde2f0;
+  --color-chat-text-secondary: #8799bf;
+  --color-chat-accent: #4a9eff;
+  --color-chat-danger: #f06060;
+  --color-chat-danger-hover: #da4848;
+  --color-chat-spinner-track: #253449;
+  --color-chat-empty: #5e728f;
+  --color-chat-read: #4a9eff;
+  --color-chat-typing-bg: rgba(255, 255, 255, 0.05);
+  --color-chat-typing-border: rgba(255, 255, 255, 0.1);
+  --color-voice-sent: #5865f2;
+  --color-voice-sent-hover: #4752c4;
+  --color-voice-received: rgba(24, 34, 54, 0.82);
+  --color-voice-received-hover: rgba(30, 44, 68, 0.88);
+  --color-voice-received-text: #dde2f0;
+}
+
 #cordigram-messages-root[data-messages-theme="light"],
-#cordigram-messages-root[data-messages-theme="dark"] {
+#cordigram-messages-root[data-messages-theme="dark"],
+#cordigram-messages-root[data-messages-theme="galaxy"] {
   --color-primary: var(--accent-color);
   --color-primary-strong: var(--accent-hover);
   --color-primary-accent: var(--accent-active);

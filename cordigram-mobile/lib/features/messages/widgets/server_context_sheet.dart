@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/services/language_controller.dart';
+import '../../../core/theme/app_theme_context.dart';
 import '../models/server_models.dart';
+import 'messages_chrome_builder.dart';
 import '../models/server_permissions.dart';
 import '../services/channel_messages_service.dart';
 import '../services/server_sidebar_prefs_store.dart';
@@ -80,6 +83,9 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
 
   CurrentUserServerPermissions get _p => widget.permissions;
 
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
+
   @override
   void initState() {
     super.initState();
@@ -123,7 +129,7 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã sao chép link mời vào máy chủ')),
+      SnackBar(content: Text(_t('chat.serverContextMenu.copyInviteCopied'))),
     );
   }
 
@@ -135,30 +141,40 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
 
   Future<void> _createChannel(String type) async {
     final nameCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF152A52),
-        title: Text(
-          type == 'voice' ? 'Tạo kênh thoại' : 'Tạo kênh chat',
-          style: const TextStyle(color: Colors.white),
-        ),
-        content: TextField(
-          controller: nameCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Tên kênh',
-            hintStyle: TextStyle(color: Color(0xFF8EA3CC)),
+    final ok = await MessagesUi.showThemedDialog<bool>(
+      context,
+      builder: (dCtx) {
+        final c = dCtx.chrome;
+        return AlertDialog(
+          backgroundColor: c.surface,
+          title: Text(
+            type == 'voice'
+                ? _t('chat.sidebar.createVoiceChannel')
+                : _t('chat.sidebar.createTextChannel'),
+            style: TextStyle(color: c.text),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Huỷ')),
-          TextButton(
-            onPressed: () => Navigator.pop(dCtx, true),
-            child: const Text('Tạo'),
+          content: TextField(
+            controller: nameCtrl,
+            style: TextStyle(color: c.text),
+            decoration: InputDecoration(
+              hintText: _t('chat.popups.createChannel.channelName'),
+              hintStyle: TextStyle(color: c.textMuted),
+              filled: true,
+              fillColor: c.chatInput,
+            ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: Text(_t('common.cancel'), style: TextStyle(color: c.textMuted)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, true),
+              child: Text(_t('messages.create'), style: TextStyle(color: c.accent)),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
     final name = nameCtrl.text.trim();
@@ -176,7 +192,11 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không tạo được kênh: $e')),
+          SnackBar(
+            content: Text(
+              _t('chat.serverContextMenu.errorCreateChannel', {'error': '$e'}),
+            ),
+          ),
         );
       }
     } finally {
@@ -186,24 +206,38 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
 
   Future<void> _createCategory() async {
     final nameCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF152A52),
-        title: const Text('Tạo danh mục', style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: nameCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Tên danh mục',
-            hintStyle: TextStyle(color: Color(0xFF8EA3CC)),
+    final ok = await MessagesUi.showThemedDialog<bool>(
+      context,
+      builder: (dCtx) {
+        final c = dCtx.chrome;
+        return AlertDialog(
+          backgroundColor: c.surface,
+          title: Text(
+            _t('chat.serverContextMenu.createCategoryTitle'),
+            style: TextStyle(color: c.text),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Huỷ')),
-          TextButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('Tạo')),
-        ],
-      ),
+          content: TextField(
+            controller: nameCtrl,
+            style: TextStyle(color: c.text),
+            decoration: InputDecoration(
+              hintText: _t('chat.serverContextMenu.categoryNamePlaceholder'),
+              hintStyle: TextStyle(color: c.textMuted),
+              filled: true,
+              fillColor: c.chatInput,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: Text(_t('common.cancel'), style: TextStyle(color: c.textMuted)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, true),
+              child: Text(_t('messages.create'), style: TextStyle(color: c.accent)),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
     final name = nameCtrl.text.trim();
@@ -217,7 +251,11 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không tạo được danh mục: $e')),
+          SnackBar(
+            content: Text(
+              _t('chat.serverContextMenu.errorCreateCategory', {'error': '$e'}),
+            ),
+          ),
         );
       }
     } finally {
@@ -226,23 +264,37 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
   }
 
   Future<void> _leave() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF152A52),
-        title: const Text('Rời máy chủ?', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Bạn sẽ rời ${widget.server.name}.',
-          style: const TextStyle(color: Color(0xFFB8C8E8)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Huỷ')),
-          TextButton(
-            onPressed: () => Navigator.pop(dCtx, true),
-            child: const Text('Rời', style: TextStyle(color: Color(0xFFFF6B7A))),
+    final ok = await MessagesUi.showThemedDialog<bool>(
+      context,
+      builder: (dCtx) {
+        final c = dCtx.chrome;
+        return AlertDialog(
+          backgroundColor: c.surface,
+          title: Text(
+            _t('chat.serverContextMenu.leaveConfirmTitle'),
+            style: TextStyle(color: c.text),
           ),
-        ],
-      ),
+          content: Text(
+            _t('chat.serverContextMenu.leaveConfirmBody', {
+              'serverName': widget.server.name,
+            }),
+            style: TextStyle(color: c.textMuted),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: Text(_t('common.cancel'), style: TextStyle(color: c.textMuted)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, true),
+              child: Text(
+                _t('chat.serverContextMenu.leaveConfirmAction'),
+                style: const TextStyle(color: Color(0xFFFF6B7A)),
+              ),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
@@ -253,7 +305,11 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không rời được: $e')),
+          SnackBar(
+            content: Text(
+              _t('chat.serverContextMenu.errorLeave', {'error': '$e'}),
+            ),
+          ),
         );
       }
     } finally {
@@ -261,29 +317,39 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
     }
   }
 
-  Widget _tile(String title, VoidCallback? onTap, {Color? color}) {
-    final scheme = Theme.of(context).colorScheme;
+  Widget _tile(
+    BuildContext context,
+    String title,
+    VoidCallback? onTap, {
+    Color? color,
+  }) {
+    final c = context.chrome;
     return ListTile(
       title: Text(
         title,
         style: TextStyle(
-          color: color ?? scheme.onSurface,
+          color: color ?? c.text,
           fontWeight: FontWeight.w600,
         ),
       ),
-      trailing: Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+      trailing: Icon(Icons.chevron_right_rounded, color: c.accent),
       onTap: _busy ? null : onTap,
     );
   }
 
+  static const Color _destructive = Color(0xFFFF8A8A);
+
   @override
   Widget build(BuildContext context) {
-    final uid = _uid;
-    final hasUser = uid.isNotEmpty;
-    final p = _p;
-    final manageAny = p.canManageServer || p.canManageChannels || p.canManageEvents;
+    return MessagesChromeBuilder(
+      builder: (context, chrome) {
+        final uid = _uid;
+        final hasUser = uid.isNotEmpty;
+        final p = _p;
+        final manageAny =
+            p.canManageServer || p.canManageChannels || p.canManageEvents;
 
-    return SafeArea(
+        return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 8),
         child: Column(
@@ -297,8 +363,8 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
                   Expanded(
                     child: Text(
                       widget.server.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: chrome.text,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
@@ -306,32 +372,45 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
                   ),
                   IconButton(
                     onPressed: _busy ? null : () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    icon: Icon(Icons.close_rounded, color: chrome.textMuted),
                   ),
                 ],
               ),
             ),
-            if (_busy) const LinearProgressIndicator(minHeight: 2),
+            if (_busy) LinearProgressIndicator(minHeight: 2, color: chrome.accent),
             Flexible(
               child: ListView(
                 shrinkWrap: true,
                 children: [
-                  _tile('Đánh dấu đã đọc (tất cả kênh chat)', _markAllRead),
-                  if (p.canCreateInvite) _tile('Sao chép link mời', _invite),
-                  const Divider(color: Color(0xFF2A3F6A)),
+                  _tile(
+                    context,
+                    _t('chat.serverContextMenu.markAllChannelsRead'),
+                    _markAllRead,
+                  ),
+                  if (p.canCreateInvite)
+                    _tile(context, _t('common.copyLink'), _invite),
+                  Divider(color: chrome.border),
                   if (hasUser)
                     ExpansionTile(
                       initiallyExpanded: false,
-                      iconColor: const Color(0xFF8EA3CC),
-                      collapsedIconColor: const Color(0xFF8EA3CC),
+                      iconColor: chrome.textMuted,
+                      collapsedIconColor: chrome.textMuted,
                       title: Text(
-                        _serverMuted ? 'Bỏ tắt âm máy chủ' : 'Tắt âm máy chủ',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        _serverMuted
+                            ? _t('chat.serverContextMenu.unmuteServer')
+                            : _t('chat.serverContextMenu.muteServer'),
+                        style: TextStyle(
+                          color: chrome.text,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       children: _serverMuted
                           ? [
                               ListTile(
-                                title: const Text('Bỏ tắt âm', style: TextStyle(color: Colors.white)),
+                                title: Text(
+                                  _t('chat.serverContextMenu.unmuteShort'),
+                                  style: TextStyle(color: chrome.text),
+                                ),
                                 onTap: () async {
                                   await ServerSidebarPrefsStore.clearServerMute(uid, _sid);
                                   await _loadPrefs();
@@ -342,17 +421,21 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
                             ]
                           : ['15m', '1h', '3h', '8h', '24h', 'until'].map((k) {
                               final labels = {
-                                '15m': '15 phút',
-                                '1h': '1 giờ',
-                                '3h': '3 giờ',
-                                '8h': '8 giờ',
-                                '24h': '24 giờ',
-                                'until': 'Cho đến khi bật lại',
+                                '15m': _t('chat.serverContextMenu.muteFor15m'),
+                                '1h': _t('chat.serverContextMenu.muteFor1h'),
+                                '3h': _t('chat.serverContextMenu.muteFor3h'),
+                                '8h': _t('chat.serverContextMenu.muteFor8h'),
+                                '24h': _t('chat.serverContextMenu.muteFor24h'),
+                                'until': _t(
+                                  'chat.serverContextMenu.muteUntilReenable',
+                                ),
                               };
                               return ListTile(
                                 title: Text(
                                   labels[k]!,
-                                  style: const TextStyle(color: Colors.white70),
+                                  style: TextStyle(
+                                    color: chrome.text.withValues(alpha: 0.85),
+                                  ),
                                 ),
                                 onTap: () async {
                                   final r = ServerSidebarPrefsStore.muteKeyToUntil(k);
@@ -371,25 +454,32 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
                     ),
                   if (hasUser)
                     ExpansionTile(
-                      iconColor: const Color(0xFF8EA3CC),
-                      collapsedIconColor: const Color(0xFF8EA3CC),
-                      title: const Text(
-                        'Thông báo máy chủ',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      iconColor: chrome.textMuted,
+                      collapsedIconColor: chrome.textMuted,
+                      title: Text(
+                        _t('chat.serverContextMenu.serverNotificationsTitle'),
+                        style: TextStyle(
+                          color: chrome.text,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       subtitle: Text(
-                        ServerSidebarPrefsStore.notifyLabelForLevel(_notifyLevel ?? 'all'),
-                        style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+                        ServerSidebarPrefsStore.notifyLabelForLevel(
+                          _notifyLevel ?? 'all',
+                        ),
+                        style: TextStyle(color: chrome.textMuted, fontSize: 12),
                       ),
                       children: [
                         for (final level in ['all', 'mentions', 'none'])
                           RadioListTile<String>(
                             value: level,
                             groupValue: _notifyLevel ?? 'all',
-                            activeColor: const Color(0xFF00C48C),
+                            activeColor: chrome.accent,
                             title: Text(
                               ServerSidebarPrefsStore.notifyLabelForLevel(level),
-                              style: const TextStyle(color: Colors.white70),
+                              style: TextStyle(
+                                color: chrome.text.withValues(alpha: 0.85),
+                              ),
                             ),
                             onChanged: (v) async {
                               if (v == null) return;
@@ -400,10 +490,13 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
                           ),
                         SwitchListTile(
                           value: _suppressEveryone,
-                          activeColor: const Color(0xFF00C48C),
-                          title: const Text(
-                            'Bỏ qua @everyone / @here',
-                            style: TextStyle(color: Colors.white70, fontSize: 14),
+                          activeTrackColor: chrome.accent,
+                          title: Text(
+                            _t('chat.serverContextMenu.suppressEveryone'),
+                            style: TextStyle(
+                              color: chrome.text.withValues(alpha: 0.85),
+                              fontSize: 14,
+                            ),
                           ),
                           onChanged: (v) async {
                             await ServerSidebarPrefsStore.setServerSuppressFlags(
@@ -417,10 +510,13 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
                         ),
                         SwitchListTile(
                           value: _suppressRoles,
-                          activeColor: const Color(0xFF00C48C),
-                          title: const Text(
-                            'Bỏ qua @vai trò',
-                            style: TextStyle(color: Colors.white70, fontSize: 14),
+                          activeTrackColor: chrome.accent,
+                          title: Text(
+                            _t('chat.serverContextMenu.suppressRoles'),
+                            style: TextStyle(
+                              color: chrome.text.withValues(alpha: 0.85),
+                              fontSize: 14,
+                            ),
                           ),
                           onChanged: (v) async {
                             await ServerSidebarPrefsStore.setServerSuppressFlags(
@@ -437,10 +533,13 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
                   if (hasUser)
                     SwitchListTile(
                       value: _hideMuted,
-                      activeColor: const Color(0xFF00C48C),
-                      title: const Text(
-                        'Ẩn kênh đang tắt âm',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      activeTrackColor: chrome.accent,
+                      title: Text(
+                        _t('chat.serverContextMenu.hideVoiceChannels'),
+                        style: TextStyle(
+                          color: chrome.text,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       onChanged: (v) async {
                         await ServerSidebarPrefsStore.setServerHideMutedChannels(uid, _sid, v);
@@ -448,25 +547,44 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
                         widget.onServerChanged();
                       },
                     ),
-                  if (manageAny) const Divider(color: Color(0xFF2A3F6A)),
+                  if (manageAny) Divider(color: chrome.border),
                   if (p.canManageServer)
                     _tile(
-                      'Cài đặt máy chủ',
+                      context,
+                      _t('chat.serverContextMenu.serverSettings'),
                       () => _runAfterClose(widget.onOpenServerSettings),
                     ),
                   if (p.canManageChannels) ...[
-                    _tile('Tạo kênh chat', () => _createChannel('text')),
-                    _tile('Tạo kênh thoại', () => _createChannel('voice')),
-                    _tile('Tạo danh mục', _createCategory),
+                    _tile(
+                      context,
+                      _t('chat.sidebar.createTextChannel'),
+                      () => _createChannel('text'),
+                    ),
+                    _tile(
+                      context,
+                      _t('chat.sidebar.createVoiceChannel'),
+                      () => _createChannel('voice'),
+                    ),
+                    _tile(
+                      context,
+                      _t('chat.serverContextMenu.createCategory'),
+                      _createCategory,
+                    ),
                   ],
                   if (p.canManageEvents)
                     _tile(
-                      'Tạo sự kiện',
+                      context,
+                      _t('chat.serverContextMenu.createEvent'),
                       () => _runAfterClose(widget.onOpenCreateEvent),
                     ),
                   if (!p.isOwner) ...[
-                    const Divider(color: Color(0xFF2A3F6A)),
-                    _tile('Rời máy chủ', _leave, color: const Color(0xFFFF8A8A)),
+                    Divider(color: chrome.border),
+                    _tile(
+                      context,
+                      _t('chat.serverContextMenu.leaveServer'),
+                      _leave,
+                      color: _destructive,
+                    ),
                   ],
                 ],
               ),
@@ -474,6 +592,8 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

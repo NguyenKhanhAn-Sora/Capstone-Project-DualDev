@@ -203,7 +203,11 @@ export default function MessagesUserSettingsModal({
     setMessagesShellTheme(getMessagesShellTheme());
   }, [open, currentUserId]);
 
-  const cardClass = `${styles.card} ${messagesShellTheme === "dark" ? styles.cardDark : ""}`;
+  const cardClass = `${styles.card} ${
+    messagesShellTheme === "dark" || messagesShellTheme === "galaxy"
+      ? styles.cardDark
+      : ""
+  }`;
 
   const loadCore = useCallback(async () => {
     try {

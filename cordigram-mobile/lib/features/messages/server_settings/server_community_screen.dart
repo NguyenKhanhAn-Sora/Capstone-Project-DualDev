@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/server_models.dart';
 import '../services/servers_service.dart';
+import 'server_settings_ui.dart';
 
 /// GET `/servers/:id/community`, kích hoạt + tổng quan Community.
 class ServerCommunityScreen extends StatefulWidget {
@@ -19,9 +20,6 @@ class ServerCommunityScreen extends StatefulWidget {
 }
 
 class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-
   Map<String, dynamic>? _data;
   List<ServerChannel> _channels = [];
   bool _loading = true;
@@ -125,26 +123,25 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final hPad = MediaQuery.sizeOf(context).width > 520 ? 24.0 : 14.0;
     final enabled = _data?['enabled'] == true;
 
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: const Text(
-          'Cộng đồng',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-      ),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(title: 'Cộng đồng'),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: ui.accent))
           : _error != null
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(_error!, textAlign: TextAlign.center),
+                child: Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: ui.textMuted),
+                ),
               ),
             )
           : ListView(
@@ -154,8 +151,8 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                   enabled
                       ? 'Community đang bật trên máy chủ này.'
                       : 'Community chưa bật. Chủ máy chủ có thể kích hoạt để mở kênh quy định / cập nhật.',
-                  style: const TextStyle(
-                    color: Color(0xFF8EA3CC),
+                  style: TextStyle(
+                    color: ui.textMuted,
                     height: 1.45,
                   ),
                 ),
@@ -163,21 +160,28 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _activating ? null : _activate,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ui.accent,
+                      foregroundColor: ui.onAccent,
+                    ),
                     child: _activating
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 22,
                             height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: ui.onAccent,
+                            ),
                           )
                         : const Text('Kích hoạt Community'),
                   ),
                 ],
                 if (enabled) ...[
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'Tổng quan',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: ui.text,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -186,34 +190,28 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                     controller: _descCtrl,
                     enabled: widget.isOwner,
                     maxLines: 4,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
+                    style: TextStyle(color: ui.text),
+                    decoration: ui.fieldDecoration(
                       labelText: 'Mô tả cộng đồng',
-                      labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-                      filled: true,
-                      fillColor: _card,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: _primaryLanguage,
-                    dropdownColor: _card,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
+                    dropdownColor: ui.card,
+                    style: TextStyle(color: ui.text),
+                    decoration: ui.fieldDecoration(
                       labelText: 'Ngôn ngữ chính',
-                      labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-                      filled: true,
-                      fillColor: _card,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'vi', child: Text('Tiếng Việt')),
-                      DropdownMenuItem(value: 'en', child: Text('English')),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'vi',
+                        child: Text('Tiếng Việt', style: TextStyle(color: ui.text)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'en',
+                        child: Text('English', style: TextStyle(color: ui.text)),
+                      ),
                     ],
                     onChanged: widget.isOwner
                         ? (v) => setState(() => _primaryLanguage = v ?? 'vi')
@@ -222,28 +220,22 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: _rulesChannelId ?? '',
-                    dropdownColor: _card,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
+                    dropdownColor: ui.card,
+                    style: TextStyle(color: ui.text),
+                    decoration: ui.fieldDecoration(
                       labelText: 'Kênh quy định',
-                      labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-                      filled: true,
-                      fillColor: _card,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
                     ),
                     items: [
-                      const DropdownMenuItem(
+                      DropdownMenuItem(
                         value: '',
-                        child: Text('(Không chọn)'),
+                        child: Text('(Không chọn)', style: TextStyle(color: ui.text)),
                       ),
                       ..._channels
                           .where((c) => c.isText)
                           .map(
                             (c) => DropdownMenuItem(
                               value: c.id,
-                              child: Text('#${c.name}'),
+                              child: Text('#${c.name}', style: TextStyle(color: ui.text)),
                             ),
                           ),
                     ],
@@ -260,18 +252,25 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         'Kênh cập nhật: ${_data!['updatesChannelId']}',
-                        style: const TextStyle(color: Color(0xFF8EA3CC)),
+                        style: TextStyle(color: ui.textMuted),
                       ),
                     ),
                   if (widget.isOwner) ...[
                     const SizedBox(height: 16),
                     FilledButton(
                       onPressed: _savingOverview ? null : _saveOverview,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ui.accent,
+                        foregroundColor: ui.onAccent,
+                      ),
                       child: _savingOverview
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 22,
                               height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: ui.onAccent,
+                              ),
                             )
                           : const Text('Lưu tổng quan'),
                     ),

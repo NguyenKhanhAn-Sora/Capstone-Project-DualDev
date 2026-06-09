@@ -23,8 +23,10 @@ import 'widgets/messages_inbox_sheet.dart';
 import 'widgets/message_thread_tile.dart';
 import 'messages_settings_screen.dart';
 import '../../core/services/accent_color_controller.dart';
+import '../../core/services/appearance_preset_controller.dart';
 import '../../core/services/language_controller.dart';
 import 'utils/messages_navigator.dart';
+import 'widgets/messages_boost_store_screen.dart';
 import 'widgets/messages_chrome_builder.dart';
 
 class MessageHomeScreen extends StatefulWidget {
@@ -56,6 +58,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     _serverListController.addListener(_onControllerChanged);
     _messagesController.init();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await AppearancePresetController.instance.reload();
       await AccentColorController.instance.bindUser(_messagesController.myUserId);
       if (mounted) _serverListController.loadServers();
       if (mounted && widget.initialThread != null) {
@@ -210,13 +213,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     }
     if (action == _quickBoost) {
       setState(() => _isFolderExpanded = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${_t('chat.messagesPage.boostUpgrade')} — ${_t('chat.common.server')}',
-          ),
-        ),
-      );
+      unawaited(MessagesBoostStoreScreen.open(context));
       return;
     }
     final shouldSwitchToServer = action == _quickSwitch && !_isServerMode;

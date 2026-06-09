@@ -135,10 +135,22 @@ export function resolveMessagesChromeApplyHex(
   if (source === "accent") {
     return stored;
   }
-  if (messagesShellTheme === "light") {
+  if (messagesShellTheme === "light" || messagesShellTheme === "galaxy") {
     return null;
   }
   return stored;
+}
+
+/** Chưa chọn nền / màu chủ đề Boost — Messages follow Social (light / dark / galaxy). */
+export function isMessagesFollowingSocialAppearance(userId: string): boolean {
+  if (typeof window === "undefined") return true;
+  const u = String(userId || "").trim();
+  if (!u) return true;
+  migrateMessagesChromeStorageOnce(u);
+  const source = readMessagesAppearanceSource(u);
+  if (source === "accent") return false;
+  const stored = normalizeMessagesChromeHex(readMessagesChromeHex(u));
+  return stored === DEFAULT_MESSAGES_CHROME_HEX || stored === "#0C1220";
 }
 
 export function applyMessagesRootChromeFromStorage(

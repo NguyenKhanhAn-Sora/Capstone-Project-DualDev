@@ -11,6 +11,7 @@ import 'auth_storage.dart';
 import '../../features/messages/call/dm_call_manager.dart';
 import '../../features/messages/call/pending_dm_call_storage.dart';
 import '../../features/messages/services/direct_messages_realtime_service.dart';
+import '../../features/messages/services/direct_messages_service.dart';
 import '../../features/notifications/notification_screen.dart';
 import '../../features/post/post_detail_screen.dart';
 import '../../features/profile/profile_screen.dart';
@@ -47,6 +48,7 @@ class PushNotificationService {
     if (_initialized) return;
 
     await Firebase.initializeApp();
+    await DirectMessagesService.hydrateConversationMutes();
 
     await _local.initialize(
       const InitializationSettings(
@@ -89,6 +91,14 @@ class PushNotificationService {
       if (_isDmCallIncomingType(type)) {
         await _routeDmCallIncoming(data);
         return;
+      }
+
+      if (_isDmMessagePushType(type)) {
+        final dmPeerId = _readDmPeerIdFromPushData(data);
+        if (dmPeerId.isNotEmpty &&
+            DirectMessagesService.isConversationMuted(dmPeerId)) {
+          return;
+        }
       }
 
       final title = message.notification?.title ?? 'Cordigram';
@@ -237,6 +247,14 @@ class PushNotificationService {
     _openNotifications();
   }
 
+  static bool _isDmMessagePushType(String type) {
+    final t = type.toLowerCase();
+    return t == 'dm_message' ||
+        t == 'direct_message' ||
+        t == 'new_dm_message' ||
+        (t.startsWith('dm_') && !_isDmCallIncomingType(t));
+  }
+
   static bool _isDmCallIncomingType(String type) {
     final t = type.toLowerCase();
     return t == 'dm_call_incoming' ||
@@ -279,6 +297,23 @@ class PushNotificationService {
       video: video,
       callId: callId.isNotEmpty ? callId : null,
     );
+  }
+
+  static String _readDmPeerIdFromPushData(Map<String, dynamic> data) {
+    for (final key in <String>[
+      'peerUserId',
+      'senderUserId',
+      'senderId',
+      'fromUserId',
+      'actorId',
+      'userId',
+    ]) {
+      final v = data[key];
+      if (v == null) continue;
+      final s = v.toString().trim();
+      if (s.isNotEmpty) return s;
+    }
+    return '';
   }
 
   static String _readDmCallerId(Map<String, dynamic> data) {

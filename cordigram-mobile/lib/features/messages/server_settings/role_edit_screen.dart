@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/server_role_models.dart';
 import '../services/servers_service.dart';
 import 'role_permission_sections.dart';
+import 'server_settings_ui.dart';
 
 /// Chỉnh sửa vai trò: hiển thị / quyền / thành viên — logic theo web `RoleEditModal`.
 class RoleEditScreen extends StatefulWidget {
@@ -25,7 +26,6 @@ class RoleEditScreen extends StatefulWidget {
 
 class _RoleEditScreenState extends State<RoleEditScreen>
     with SingleTickerProviderStateMixin {
-  static const Color _bg = Color(0xFF08183A);
   static const List<String> _presetColors = <String>[
     '#99AAB5',
     '#5865F2',
@@ -233,21 +233,24 @@ class _RoleEditScreenState extends State<RoleEditScreen>
     if (!widget.isOwner || widget.initialRole.isDefault) return;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: const Color(0xFF152A52),
-        title: const Text('Xóa vai trò?', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Xóa ${widget.initialRole.name}?',
-          style: const TextStyle(color: Color(0xFFB8C8E8)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
-          TextButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('Xóa', style: TextStyle(color: Color(0xFFFF6B7A))),
+      builder: (c) {
+        final dui = ServerSettingsUi.of(c);
+        return AlertDialog(
+          backgroundColor: dui.card,
+          title: Text('Xóa vai trò?', style: TextStyle(color: dui.text)),
+          content: Text(
+            'Xóa ${widget.initialRole.name}?',
+            style: TextStyle(color: dui.textMuted),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+            TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: Text('Xóa', style: TextStyle(color: dui.destructive)),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
     setState(() => _deleting = true);
@@ -268,13 +271,8 @@ class _RoleEditScreenState extends State<RoleEditScreen>
     }
   }
 
-  InputDecoration _dec(String h) => InputDecoration(
-        hintText: h,
-        hintStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-        filled: true,
-        fillColor: const Color(0xFF152A52),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      );
+  InputDecoration _dec(ServerSettingsUi ui, String h) =>
+      ui.fieldDecoration(hintText: h);
 
   Color _parseHex(String hex) {
     var h = hex.trim();
@@ -306,22 +304,26 @@ class _RoleEditScreenState extends State<RoleEditScreen>
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final canEditPerms = widget.isOwner;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: ui.bg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: ui.bg,
+        foregroundColor: ui.text,
         title: Text(
           widget.initialRole.isDefault
               ? '@everyone'
               : widget.initialRole.name,
-          style: const TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(fontWeight: FontWeight.w800, color: ui.text),
         ),
         bottom: TabBar(
           controller: _tab,
-          indicatorColor: const Color(0xFF7FB6FF),
+          indicatorColor: ui.accent,
+          labelColor: ui.text,
+          unselectedLabelColor: ui.textMuted,
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: [
             const Tab(text: 'Hiển thị'),
@@ -339,14 +341,14 @@ class _RoleEditScreenState extends State<RoleEditScreen>
               TextField(
                 controller: _nameCtrl,
                 enabled: !widget.initialRole.isDefault,
-                style: const TextStyle(color: Colors.white),
-                decoration: _dec('Tên vai trò'),
+                style: TextStyle(color: ui.text),
+                decoration: _dec(ui, 'Tên vai trò'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _colorCtrl,
-                style: const TextStyle(color: Colors.white),
-                decoration: _dec('Màu (#RRGGBB)'),
+                style: TextStyle(color: ui.text),
+                decoration: _dec(ui, 'Màu (#RRGGBB)'),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -364,9 +366,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                         color: _parseHex(c),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: selected
-                              ? Colors.white
-                              : const Color(0xFF21345D),
+                          color: selected ? ui.text : ui.border,
                           width: selected ? 2 : 1,
                         ),
                       ),
@@ -378,7 +378,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0E1F45),
+                  color: ui.card,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: _parseHex(_colorCtrl.text.trim())),
                 ),
@@ -403,9 +403,9 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const Text(
+                          Text(
                             'Preview vai trò',
-                            style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+                            style: TextStyle(color: ui.textMuted, fontSize: 12),
                           ),
                         ],
                       ),
@@ -419,26 +419,26 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                 onChanged: widget.isOwner
                     ? (v) => setState(() => _displaySeparately = v)
                     : null,
-                title: const Text(
+                title: Text(
                   'Hiển thị vai trò riêng biệt',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: ui.text),
                 ),
-                activeThumbColor: const Color(0xFF00C48C),
+                activeThumbColor: ui.accent,
               ),
               SwitchListTile(
                 value: _mentionable,
                 onChanged: widget.isOwner
                     ? (v) => setState(() => _mentionable = v)
                     : null,
-                title: const Text(
+                title: Text(
                   'Cho phép @mention vai trò này',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: ui.text),
                 ),
-                subtitle: const Text(
+                subtitle: Text(
                   'Thành viên có quyền mention sẽ có thể nhắc vai trò.',
-                  style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+                  style: TextStyle(color: ui.textMuted, fontSize: 12),
                 ),
-                activeThumbColor: const Color(0xFF00C48C),
+                activeThumbColor: ui.accent,
               ),
               const SizedBox(height: 20),
               if (_displayDirty)
@@ -455,7 +455,8 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                       child: FilledButton(
                         onPressed: _saving ? null : _saveDisplay,
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF00C48C),
+                          backgroundColor: ui.accent,
+                          foregroundColor: ui.onAccent,
                           minimumSize: const Size(double.infinity, 48),
                         ),
                         child: _saving
@@ -470,11 +471,11 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                   ],
                 ),
               if (!widget.isOwner && !widget.initialRole.isDefault)
-                const Padding(
-                  padding: EdgeInsets.only(top: 12),
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
                   child: Text(
                     'Chỉ chủ máy chủ có thể chỉnh sửa vai trò tùy chỉnh.',
-                    style: TextStyle(color: Color(0xFF8EA3CC)),
+                    style: TextStyle(color: ui.textMuted),
                   ),
                 ),
               if (widget.isOwner && !widget.initialRole.isDefault) ...[
@@ -482,7 +483,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                 OutlinedButton(
                   onPressed: _deleting ? null : _deleteRole,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFF8A8A),
+                    foregroundColor: ui.destructive,
                     minimumSize: const Size(double.infinity, 48),
                   ),
                   child: Text(_deleting ? 'Đang xóa…' : 'Xóa vai trò'),
@@ -499,15 +500,15 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                   controller: _permSearchCtrl,
                   onChanged: (_) => setState(() {}),
                   style: const TextStyle(color: Colors.white),
-                  decoration: _dec('Tìm quyền...'),
+                  decoration: _dec(ui, 'Tìm quyền...'),
                 ),
               ),
               if (!canEditPerms)
-                const Padding(
-                  padding: EdgeInsets.all(12),
+                Padding(
+                  padding: const EdgeInsets.all(12),
                   child: Text(
                     'Chỉ chủ máy chủ chỉnh quyền chi tiết (giống web).',
-                    style: TextStyle(color: Color(0xFF8EA3CC)),
+                    style: TextStyle(color: ui.textMuted),
                   ),
                 ),
               ...kRolePermissionSections.map((sec) {
@@ -522,12 +523,12 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                 if (filtered.isEmpty) return const SizedBox.shrink();
                 return ExpansionTile(
                   tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-                  iconColor: const Color(0xFF8EA3CC),
-                  collapsedIconColor: const Color(0xFF8EA3CC),
+                  iconColor: ui.textMuted,
+                  collapsedIconColor: ui.textMuted,
                   title: Text(
                     sec.title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: ui.text,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -537,15 +538,18 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                       onChanged: canEditPerms
                           ? (v) => setState(() => _perm[item.key] = v)
                           : null,
-                      activeThumbColor: const Color(0xFF00C48C),
+                      activeThumbColor: ui.accent,
                       title: Text(
                         item.label,
-                        style: const TextStyle(color: Colors.white70),
+                        style: TextStyle(color: ui.textMuted),
                       ),
                       subtitle: item.warn
-                          ? const Text(
+                          ? Text(
                               'Quyền nhạy cảm',
-                              style: TextStyle(color: Color(0xFFFFB4B4), fontSize: 11),
+                              style: TextStyle(
+                                color: ui.destructive.withValues(alpha: 0.8),
+                                fontSize: 11,
+                              ),
                             )
                           : null,
                     );
@@ -571,7 +575,8 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                           onPressed:
                               (!canEditPerms || _saving) ? null : _savePermissions,
                           style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF00C48C),
+                            backgroundColor: ui.accent,
+                            foregroundColor: ui.onAccent,
                             minimumSize: const Size(double.infinity, 48),
                           ),
                           child: _saving
@@ -589,7 +594,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
             ],
           ),
           _loadingMembers
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(child: CircularProgressIndicator(color: ui.accent))
               : Builder(
                   builder: (context) {
                     final query = _memberSearchCtrl.text.trim().toLowerCase();
@@ -615,8 +620,8 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                             child: TextField(
                               controller: _memberSearchCtrl,
                               onChanged: (_) => setState(() {}),
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _dec('Tìm thành viên...'),
+                              style: TextStyle(color: ui.text),
+                              decoration: _dec(ui, 'Tìm thành viên...'),
                             ),
                           );
                         }
@@ -639,16 +644,16 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                         return ListTile(
                           title: Text(
                             m.displayName,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: ui.text),
                           ),
                           subtitle: Text(
                             '@${m.username}',
-                            style: const TextStyle(color: Color(0xFF8EA3CC)),
+                            style: TextStyle(color: ui.textMuted),
                           ),
                           trailing: widget.isOwner && !widget.initialRole.isDefault
                               ? IconButton(
                                   onPressed: () => _toggleMember(m.userId, false),
-                                  icon: const Icon(Icons.close, color: Colors.white70),
+                                  icon: Icon(Icons.close, color: ui.textMuted),
                                 )
                               : null,
                         );
@@ -684,6 +689,7 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final q = _searchCtrl.text.trim().toLowerCase();
     final filtered = widget.members.where((m) {
       if (q.isEmpty) return true;
@@ -692,10 +698,9 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF08183A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF08183A),
-        title: const Text('Thêm thành viên'),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(
+        title: 'Thêm thành viên',
         actions: [
           TextButton(
             onPressed: _selected.isEmpty
@@ -703,7 +708,7 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
                 : () => Navigator.of(context).pop(_selected.toList()),
             child: Text(
               'Thêm (${_selected.length})',
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(fontWeight: FontWeight.w700, color: ui.accent),
             ),
           ),
         ],
@@ -715,16 +720,8 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
             child: TextField(
               controller: _searchCtrl,
               onChanged: (_) => setState(() {}),
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Tìm kiếm thành viên',
-                hintStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-                filled: true,
-                fillColor: const Color(0xFF152A52),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
+              style: TextStyle(color: ui.text),
+              decoration: ui.fieldDecoration(hintText: 'Tìm kiếm thành viên'),
             ),
           ),
           Padding(
@@ -752,27 +749,27 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
           const SizedBox(height: 8),
           Expanded(
             child: filtered.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'Không có thành viên phù hợp',
-                      style: TextStyle(color: Color(0xFF8EA3CC)),
+                      style: TextStyle(color: ui.textMuted),
                     ),
                   )
                 : ListView.separated(
                     itemCount: filtered.length,
                     separatorBuilder: (_, __) =>
-                        const Divider(height: 1, color: Color(0xFF1C305A)),
+                        Divider(height: 1, color: ui.divider),
                     itemBuilder: (context, index) {
                       final m = filtered[index];
                       final checked = _selected.contains(m.userId);
                       return ListTile(
                         title: Text(
                           m.displayName,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: ui.text),
                         ),
                         subtitle: Text(
                           '@${m.username}',
-                          style: const TextStyle(color: Color(0xFF8EA3CC)),
+                          style: TextStyle(color: ui.textMuted),
                         ),
                         trailing: _quickSelect
                             ? Checkbox(

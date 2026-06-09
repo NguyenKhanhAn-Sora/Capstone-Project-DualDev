@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/messages_media_service.dart';
 import '../services/servers_service.dart';
+import 'server_settings_ui.dart';
 
 class ServerEmojiScreen extends StatefulWidget {
   const ServerEmojiScreen({
@@ -17,9 +18,6 @@ class ServerEmojiScreen extends StatefulWidget {
 }
 
 class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-
   int _max = 30;
   int _count = 0;
   List<Map<String, dynamic>> _emojis = [];
@@ -103,28 +101,29 @@ class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final hPad = MediaQuery.sizeOf(context).width > 520 ? 24.0 : 14.0;
     final rem = (_max - _count).clamp(0, 999);
 
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: const Text('Emoji máy chủ', style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(title: 'Emoji máy chủ'),
       floatingActionButton: _adding
           ? null
           : FloatingActionButton.extended(
               onPressed: _add,
-              backgroundColor: const Color(0xFF5865F2),
+              backgroundColor: ui.accent,
+              foregroundColor: ui.onAccent,
               icon: const Icon(Icons.add_photo_alternate_outlined),
               label: const Text('Tải lên'),
             ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: ui.accent))
           : _error != null
-              ? Center(child: Text(_error!))
+              ? Center(
+                  child: Text(_error!, style: TextStyle(color: ui.textMuted)),
+                )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -132,15 +131,15 @@ class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
                       padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
                       child: Text(
                         'Còn $rem / $_max chỗ. PNG, JPG, WebP, GIF.',
-                        style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 13),
+                        style: TextStyle(color: ui.textMuted, fontSize: 13),
                       ),
                     ),
                     Expanded(
                       child: _emojis.isEmpty
-                          ? const Center(
+                          ? Center(
                               child: Text(
                                 'Chưa có emoji tùy chỉnh',
-                                style: TextStyle(color: Color(0xFF8EA3CC)),
+                                style: TextStyle(color: ui.textMuted),
                               ),
                             )
                           : GridView.builder(
@@ -165,7 +164,7 @@ class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
                                 return Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: _card,
+                                    color: ui.card,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Column(
@@ -176,7 +175,10 @@ class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
                                                 url,
                                                 fit: BoxFit.contain,
                                                 errorBuilder: (_, __, ___) =>
-                                                    const Icon(Icons.broken_image),
+                                                    Icon(
+                                                      Icons.broken_image,
+                                                      color: ui.textMuted,
+                                                    ),
                                               )
                                             : const SizedBox.shrink(),
                                       ),
@@ -185,8 +187,8 @@ class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
                                         name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white70,
+                                        style: TextStyle(
+                                          color: ui.textMuted,
                                           fontSize: 11,
                                         ),
                                       ),

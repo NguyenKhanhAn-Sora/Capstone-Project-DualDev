@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/server_role_models.dart';
 import '../services/servers_service.dart';
+import 'server_settings_ui.dart';
 
 /// Nhật ký chỉnh sửa máy chủ — mirrors web `AuditLogSection`.
 class ServerAuditLogScreen extends StatefulWidget {
@@ -14,9 +15,6 @@ class ServerAuditLogScreen extends StatefulWidget {
 }
 
 class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-
   static const _actions = <Map<String, String>>[
     {'value': '', 'label': 'Tất cả hành động'},
     {'value': 'server.update', 'label': 'Cập nhật máy chủ'},
@@ -76,17 +74,14 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final hPad = MediaQuery.sizeOf(context).width > 520 ? 24.0 : 14.0;
 
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: const Text(
-          'Nhật ký chỉnh sửa',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(
+        title: 'Nhật ký chỉnh sửa',
         actions: [
           IconButton(
             onPressed: _loading ? null : _load,
@@ -103,11 +98,11 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _actorUserId.isEmpty ? '' : _actorUserId,
-                    dropdownColor: _card,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    dropdownColor: ui.card,
+                    style: TextStyle(color: ui.text, fontSize: 13),
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: _card,
+                      fillColor: ui.card,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
@@ -118,9 +113,9 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                       ),
                     ),
                     items: [
-                      const DropdownMenuItem(
+                      DropdownMenuItem(
                         value: '',
-                        child: Text('Tất cả người dùng'),
+                        child: Text('Tất cả người dùng', style: TextStyle(color: ui.text)),
                       ),
                       ..._members.map(
                         (m) => DropdownMenuItem(
@@ -128,6 +123,7 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                           child: Text(
                             m['label']?.toString() ?? '',
                             overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: ui.text),
                           ),
                         ),
                       ),
@@ -142,11 +138,11 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _action,
-                    dropdownColor: _card,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    dropdownColor: ui.card,
+                    style: TextStyle(color: ui.text, fontSize: 13),
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: _card,
+                      fillColor: ui.card,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
@@ -163,6 +159,7 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                             child: Text(
                               a['label']!,
                               overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: ui.text),
                             ),
                           ),
                         )
@@ -178,14 +175,16 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(child: CircularProgressIndicator(color: ui.accent))
                 : _error != null
-                ? Center(child: Text(_error!))
+                ? Center(
+                    child: Text(_error!, style: TextStyle(color: ui.textMuted)),
+                  )
                 : _rows.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'Không có bản ghi',
-                      style: TextStyle(color: Color(0xFF8EA3CC)),
+                      style: TextStyle(color: ui.textMuted),
                     ),
                   )
                 : ListView.builder(
@@ -207,7 +206,7 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Material(
-                          color: _card,
+                          color: ui.card,
                           borderRadius: BorderRadius.circular(12),
                           child: Padding(
                             padding: const EdgeInsets.all(14),
@@ -216,8 +215,8 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                               children: [
                                 Text(
                                   target.isEmpty ? action : '$action — $target',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: ui.text,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -226,8 +225,8 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Text(
                                       '${created.toLocal()}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF8EA3CC),
+                                      style: TextStyle(
+                                        color: ui.textMuted,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -241,8 +240,8 @@ class _ServerAuditLogScreenState extends State<ServerAuditLogScreen> {
                                       padding: const EdgeInsets.only(top: 6),
                                       child: Text(
                                         '$field: "$from" → "$to"',
-                                        style: const TextStyle(
-                                          color: Color(0xFFB8C8E8),
+                                        style: TextStyle(
+                                          color: ui.textMuted.withValues(alpha: 0.9),
                                           fontSize: 13,
                                         ),
                                       ),

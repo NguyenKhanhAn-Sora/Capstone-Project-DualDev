@@ -51,12 +51,22 @@ class GiphySearchService {
     );
   }
 
-  /// Giống cordigram-web `getRandomWaveSticker`: sticker chào / vẫy tay.
+  /// Giống cordigram-web `getGifById` — thử `gifs` rồi `stickers` (wave dùng sticker id).
   static Future<GiphySearchItem?> getById(String id) async {
     if (AppConfig.giphyApiKey.isEmpty || id.trim().isEmpty) return null;
+    final gid = id.trim();
+    final fromGif = await _fetchByIdEndpoint('gifs', gid);
+    if (fromGif != null) return fromGif;
+    return _fetchByIdEndpoint('stickers', gid);
+  }
+
+  static Future<GiphySearchItem?> _fetchByIdEndpoint(
+    String endpoint,
+    String id,
+  ) async {
     final res = await http.get(
       Uri.parse(
-        '$_base/gifs/${Uri.encodeComponent(id)}?api_key=${AppConfig.giphyApiKey}',
+        '$_base/$endpoint/${Uri.encodeComponent(id)}?api_key=${AppConfig.giphyApiKey}',
       ),
     );
     if (res.statusCode < 200 || res.statusCode >= 300) return null;
@@ -70,7 +80,12 @@ class GiphySearchService {
     String preview = '';
     final images = data['images'];
     if (images is Map) {
-      for (final key in ['fixed_height', 'fixed_height_small', 'downsized', 'original']) {
+      for (final key in [
+        'fixed_height',
+        'fixed_height_small',
+        'downsized',
+        'original',
+      ]) {
         final block = images[key];
         if (block is Map && block['url'] != null) {
           preview = block['url'].toString();
@@ -78,6 +93,7 @@ class GiphySearchService {
         }
       }
     }
+    if (preview.isEmpty) return null;
     return GiphySearchItem(id: gid, title: title, previewUrl: preview);
   }
 

@@ -9,6 +9,11 @@ class DmConversation {
     this.avatarUrl,
     this.isOnline = false,
     this.lastActiveAt,
+    this.lastMessageType,
+    this.lastCallType,
+    this.lastCallStatus,
+    this.lastCallDurationSec,
+    this.lastCallInitiatorId,
   });
 
   final String userId;
@@ -20,6 +25,11 @@ class DmConversation {
   final String? avatarUrl;
   final bool isOnline;
   final DateTime? lastActiveAt;
+  final String? lastMessageType;
+  final String? lastCallType;
+  final String? lastCallStatus;
+  final int? lastCallDurationSec;
+  final String? lastCallInitiatorId;
 
   String get title => displayName.isNotEmpty ? displayName : username;
 
@@ -37,6 +47,13 @@ class DmConversation {
           .toString(),
       username: (peerMap['username'] ?? json['username'] ?? '').toString(),
       lastMessage: (json['lastMessage'] ?? '').toString(),
+      lastMessageType: json['lastMessageType']?.toString(),
+      lastCallType: json['lastCallType']?.toString(),
+      lastCallStatus: json['lastCallStatus']?.toString(),
+      lastCallDurationSec: json['lastCallDuration'] is num
+          ? (json['lastCallDuration'] as num).toInt()
+          : int.tryParse(json['lastCallDuration']?.toString() ?? ''),
+      lastCallInitiatorId: json['lastCallInitiatorId']?.toString(),
       lastMessageAt: DateTime.tryParse(lastAt?.toString() ?? '')?.toLocal(),
       unreadCount: unreadRaw is num ? unreadRaw.toInt() : 0,
       avatarUrl: (peerMap['avatar'] ?? json['avatar'])?.toString(),

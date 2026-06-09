@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/messages_media_service.dart';
 import '../services/servers_service.dart';
+import 'server_settings_ui.dart';
 
 class ServerStickerScreen extends StatefulWidget {
   const ServerStickerScreen({
@@ -19,9 +20,6 @@ class ServerStickerScreen extends StatefulWidget {
 }
 
 class _ServerStickerScreenState extends State<ServerStickerScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-
   int _max = 15;
   int _count = 0;
   List<Map<String, dynamic>> _stickers = [];
@@ -124,27 +122,28 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final hPad = MediaQuery.sizeOf(context).width > 520 ? 24.0 : 14.0;
 
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: const Text('Sticker máy chủ', style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(title: 'Sticker máy chủ'),
       floatingActionButton: _busy
           ? null
           : FloatingActionButton.extended(
               onPressed: _add,
-              backgroundColor: const Color(0xFF5865F2),
+              backgroundColor: ui.accent,
+              foregroundColor: ui.onAccent,
               icon: const Icon(Icons.add_photo_alternate_outlined),
               label: const Text('Tải lên'),
             ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: ui.accent))
           : _error != null
-              ? Center(child: Text(_error!))
+              ? Center(
+                  child: Text(_error!, style: TextStyle(color: ui.textMuted)),
+                )
               : ListView(
                   padding: EdgeInsets.fromLTRB(hPad, 12, hPad, pad.bottom + 88),
                   children: [
@@ -152,16 +151,16 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2C1F4A),
+                          color: ui.card,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'Boost sticker (chủ máy chủ)',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: ui.text,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -191,7 +190,7 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
                     ],
                     Text(
                       '$_count / $_max sticker',
-                      style: const TextStyle(color: Color(0xFF8EA3CC)),
+                      style: TextStyle(color: ui.textMuted),
                     ),
                     const SizedBox(height: 12),
                     ..._stickers.map(
@@ -200,7 +199,7 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: _card,
+                            color: ui.card,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -212,10 +211,13 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
                                   width: 56,
                                   height: 56,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const SizedBox(
+                                  errorBuilder: (_, __, ___) => SizedBox(
                                     width: 56,
                                     height: 56,
-                                    child: Icon(Icons.image_not_supported),
+                                    child: Icon(
+                                      Icons.image_not_supported,
+                                      color: ui.textMuted,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -226,15 +228,15 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
                                   children: [
                                     Text(
                                       s['name']?.toString() ?? '',
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      style: TextStyle(
+                                        color: ui.text,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                     Text(
                                       (s['animated'] == true) ? 'GIF' : 'Tĩnh',
-                                      style: const TextStyle(
-                                        color: Color(0xFF8EA3CC),
+                                      style: TextStyle(
+                                        color: ui.textMuted,
                                         fontSize: 12,
                                       ),
                                     ),

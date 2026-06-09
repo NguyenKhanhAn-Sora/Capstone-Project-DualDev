@@ -386,6 +386,7 @@
       "disabledToast": "通知をオフにしました。",
       "soundLabel": "通知サウンド（メッセージ・新着通知）"
     },
+    "hubHint": "メッセージ、プライバシー、外観をカスタマイズします。同じアカウントでログインすると Web と同期されます。",
     "sections": {
       "general": "一般",
       "privacy": "プライバシー",
@@ -437,7 +438,8 @@
       "dark": "ダーク",
       "mutualHint": "メッセージUIの色は1つだけ保存されます。背景プリセットとブーストのテーマカラーは同じ値に書き込まれ、重なりません。各色は背景・パネル・アクセントまでまとめて再配色されます。ブーストなしは背景のみ。ブーストありでテーマカラーに切り替え可能。",
       "modeBackground": "有効: 背景プリセット",
-      "modeAccent": "有効: テーマカラー（ブースト）"
+      "modeAccent": "有効: テーマカラー（ブースト）",
+      "currentColor": "現在の色: {hex}"
     },
     "appearanceBg": {
       "title": "背景",
@@ -1944,6 +1946,9 @@
       "tabGif": "GIF",
       "tabSticker": "スタンプ",
       "tabEmoji": "絵文字",
+      "tabServerEmoji": "サーバー絵文字",
+      "tabServerSticker": "サーバーステッカー",
+      "expressionsHub": "スタンプ・絵文字",
       "tabKaomoji": "顔文字",
       "searchGifPlaceholder": "Giphy で検索…",
       "searchStickerPlaceholder": "スタンプを検索…",
@@ -2112,6 +2117,48 @@
     "messageRecalled": {
       "self": "あなたがメッセージを削除しました",
       "other": "{name} さんがメッセージを削除しました"
+    },
+    "conversationDetails": {
+      "title": "会話の詳細",
+      "encrypted": "エンドツーエンド暗号化",
+      "search": "検索",
+      "searchPlaceholder": "メッセージを検索...",
+      "noResults": "メッセージが見つかりません",
+      "pinnedMessages": "ピン留めメッセージ",
+      "noPinned": "ピン留めされたメッセージはありません",
+      "sharedMedia": "メディア",
+      "noMedia": "写真や動画はまだありません",
+      "loadMore": "さらに表示（残り {n}）",
+      "sharedFiles": "ファイル",
+      "noFiles": "共有ファイルはまだありません",
+      "searchFiles": "ファイルを検索...",
+      "noFilesFound": "ファイルが見つかりません",
+      "loading": "読み込み中...",
+      "today": "今日",
+      "yesterday": "昨日",
+      "download": "ダウンロード",
+      "close": "閉じる"
+    },
+    "linkPreview": {
+      "noDescription": "説明なし",
+      "visitLink": "リンクを開く"
+    },
+    "channel": {
+      "searchTooltip": "メッセージを検索",
+      "detailsTooltip": "会話の詳細",
+      "noMessages": "メッセージはまだありません",
+      "replying": "返信先",
+      "replyVoice": "🔊 ボイスメッセージ",
+      "replyGeneric": "メッセージ",
+      "blockedPlaceholder": "このチャンネルは制限されています",
+      "messagePlaceholder": "#{channel} にメッセージ",
+      "newMessages": "↓ 新しいメッセージ"
+    },
+    "pinnedScreen": {
+      "title": "ピン留めメッセージ",
+      "empty": "ピン留めされたメッセージはありません",
+      "emptyMessage": "（空のメッセージ）",
+      "serverInvite": "サーバー招待"
     },
     "callMessage": {
       "missedVoice": "不在着信（音声）",
@@ -2437,6 +2484,7 @@
         "markAllDoing": "処理中...",
         "markAll": "既読にする",
         "loading": "読み込み中...",
+        "loadError": "受信トレイを読み込めませんでした。接続を確認して再試行してください。",
         "emptyForYou": "サーバーからのイベント、招待、ロール通知はありません。",
         "emptyUnread": "チャンネルからの未読メッセージや通知はありません。",
         "emptyMentions": "チャンネルでメンションはまだありません。",
@@ -2532,6 +2580,8 @@
       },
       "heroTitle": "BOOSTで特典をアンロック",
       "expiresLabel": "有効期限",
+      "expiresLine": "{label}: {date}",
+      "expiresWithTier": "{label}: {date} · {tier}",
       "buttons": {
         "gift": "Boostを贈る",
         "renew": "更新",
@@ -2578,10 +2628,25 @@
         "redirecting": "決済ページへ移動中...",
         "cta": "プランを選択して支払う"
       },
+      "app": {
+        "heroSubtitle": "大容量アップロード、サーバー横断の絵文字・スタンプ、カスタムテーマ、チャットメディア最適化。",
+        "perksTitle": "主な特典"
+      },
+      "payment": {
+        "verifyingTitle": "支払いを確認中",
+        "verifyingBody": "少々お待ちください。Stripeの確認後すぐにBoostが有効になります。",
+        "successTitle": "支払い完了",
+        "successBody": "Messages Boostがアカウントで有効になりました。",
+        "failedTitle": "支払いが完了していません",
+        "failedBody": "セッションの期限切れまたはキャンセルです。再度お試しください。",
+        "timeoutBody": "Stripeからの確認がありません。メールを確認するか、後でもう一度お試しください。",
+        "countdown": "{seconds}秒後に閉じます"
+      },
       "warnings": {
         "activeTitle": "まだ有効期間が残っています",
         "activeBodyPrefix": "現在のプランは有効です",
         "activeBodySuffix": "同じプランを更新する場合、残り期間に追加されます。",
+        "activeBodyWithDate": "現在のプランは {date} まで有効です。更新または請求サイクルの変更が可能です。同じプランを更新する場合、残り期間は追加されます。",
         "switchTitle": "Boostプランを変更",
         "switchBodyPrefix": "現在のプランは",
         "switchCurrentFallback": "Boostプラン",
@@ -2813,7 +2878,62 @@
       "suppressRoles": "すべてのロール @メンションを抑制",
       "hideHighlights": "新イベントのハイライトを非表示",
       "muteNewEvents": "新イベントのアラートをミュート",
-      "mobileNotif": "モバイルプッシュ通知"
+      "mobileNotif": "モバイルプッシュ通知",
+      "markAllChannelsRead": "既読にする（すべてのチャットチャンネル）",
+      "copyInviteCopied": "サーバー招待リンクをコピーしました",
+      "unmuteShort": "ミュート解除",
+      "serverNotificationsTitle": "サーバー通知",
+      "leaveConfirmTitle": "サーバーを退出しますか？",
+      "leaveConfirmBody": "{serverName} から退出します。",
+      "leaveConfirmAction": "退出",
+      "createCategoryTitle": "カテゴリを作成",
+      "categoryNamePlaceholder": "カテゴリ名",
+      "errorCreateChannel": "チャンネルを作成できません: {error}",
+      "errorCreateCategory": "カテゴリを作成できません: {error}",
+      "errorLeave": "退出できません: {error}"
+    },
+    "inviteToServerSheet": {
+      "title": "{serverName} に招待",
+      "description": "まだサーバーに参加していない友達（フォロー中またはフォロワー）に招待を送ります。",
+      "copyInviteLink": "招待リンクをコピー",
+      "searchPlaceholder": "名前またはユーザー名で検索...",
+      "invite": "招待",
+      "copiedToast": "サーバー招待リンクをコピーしました",
+      "errorLoad": "友達リストを読み込めません"
+    },
+    "createEvent": {
+      "title": "イベントを作成",
+      "stepLocation": "場所",
+      "stepDetails": "詳細",
+      "stepReview": "確認",
+      "whereQuestion": "イベントはどこで行われますか？",
+      "voiceChannel": "ボイスチャンネル",
+      "voiceChannelHint": "音声通話、画面共有",
+      "otherLocation": "その他の場所",
+      "otherLocationHint": "テキストチャンネルなど（終了時刻が必要）",
+      "noChannels": "適切なチャンネルがありません。サーバーメニューから作成してください。",
+      "selectChannel": "チャンネルを選択",
+      "channelPlaceholder": "チャンネル",
+      "next": "次へ",
+      "topicLabel": "イベントのトピック *",
+      "start": "開始",
+      "end": "終了",
+      "endAfterStartError": "終了時刻は開始時刻より後である必要があります。",
+      "frequency": "繰り返し",
+      "freqNone": "繰り返さない",
+      "freqWeekly": "毎週",
+      "freqBiweekly": "2週間ごと",
+      "freqMonthly": "毎月",
+      "freqYearly": "毎年",
+      "descriptionOptional": "説明（任意）",
+      "coverOptional": "カバー画像 URL（任意）",
+      "reviewStart": "開始: {time}",
+      "reviewEnd": "終了: {time}",
+      "reviewNote": "イベントはサーバー API（オーナー/モデレーター）でスケジュールされます。",
+      "submit": "イベントを作成",
+      "created": "イベントを作成しました",
+      "createdWithLink": "イベントを作成しました — リンクをコピーしました",
+      "errorCreate": "作成できません: {error}"
     },
     "channelUserProfile": {
       "loading": "読み込み中…",
@@ -3445,6 +3565,12 @@
       "moreOptions": "その他のオプション"
     },
     "joinApplications": {
+      "mobileTitle": "参加申請",
+      "emptyApplications": "申請はありません。",
+      "mobileTabAll": "すべて",
+      "mobileTabPending": "保留中",
+      "mobileTabRejected": "却下",
+      "mobileTabApproved": "承認済み",
       "title": "メンバー — {serverName}",
       "tabAll": "全メンバー",
       "tabPending": "保留中",
