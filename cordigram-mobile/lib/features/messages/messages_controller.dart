@@ -183,6 +183,7 @@ class MessagesController extends ChangeNotifier {
       final settings = await DirectMessagesService.getUserSettings();
       _dmListFrom = (settings['dmListFrom'] ?? 'everyone').toString();
       _dmCallFrom = (settings['dmCallFrom'] ?? 'everyone').toString();
+      _myOnline = settings['sharePresence'] != false;
       _dmSidebarPeersMode = await DmSidebarPrefs.getPeersMode();
       final following = await DirectMessagesService.getFollowingAsConversations();
       _followingUserIds
@@ -212,7 +213,6 @@ class MessagesController extends ChangeNotifier {
       _myUsername =
           (data['chatUsername'] ?? data['username'] ?? '').toString().trim();
       _myAvatarUrl = (data['avatarUrl'] ?? data['avatar'])?.toString();
-      _myOnline = true;
       notifyListeners();
     } catch (_) {}
   }

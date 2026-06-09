@@ -9006,7 +9006,9 @@ export default function MessagesPage() {
                             "U"}
                         </span>
                       )}
-                      <div className={styles.onlineStatus}></div>
+                      {chatUserSettings?.sharePresence !== false ? (
+                        <div className={styles.onlineStatus}></div>
+                      ) : null}
                     </div>
                     <div className={styles.userTextInfo}>
                       <div
@@ -9707,7 +9709,9 @@ export default function MessagesPage() {
                             "U"}
                         </span>
                       )}
-                      <div className={styles.onlineStatus}></div>
+                      {chatUserSettings?.sharePresence !== false ? (
+                        <div className={styles.onlineStatus}></div>
+                      ) : null}
                     </div>
                     <div className={styles.userTextInfo}>
                       <div

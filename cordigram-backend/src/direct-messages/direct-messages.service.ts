@@ -58,7 +58,7 @@ export class DirectMessagesService {
 
     const users = await this.userModel
       .find({ _id: { $in: objectIds } })
-      .select('loginDevices')
+      .select('loginDevices settings.sharePresence')
       .lean()
       .exec();
 
@@ -66,15 +66,20 @@ export class DirectMessagesService {
     for (const u of users as Array<{
       _id: Types.ObjectId;
       loginDevices?: Array<{ lastSeenAt?: Date }>;
+      settings?: { sharePresence?: boolean };
     }>) {
+      const uid = u._id.toString();
+      if (u.settings?.sharePresence === false) {
+        out[uid] = null;
+        continue;
+      }
       let lastMs = 0;
       for (const d of u.loginDevices ?? []) {
         if (d?.lastSeenAt) {
           lastMs = Math.max(lastMs, new Date(d.lastSeenAt).getTime());
         }
       }
-      out[u._id.toString()] =
-        lastMs > 0 ? new Date(lastMs).toISOString() : null;
+      out[uid] = lastMs > 0 ? new Date(lastMs).toISOString() : null;
     }
     return out;
   }
@@ -950,7 +955,7 @@ export class DirectMessagesService {
 
       const presenceUsers = await this.userModel
         .find({ _id: { $in: userObjectIds } })
-        .select('loginDevices')
+        .select('loginDevices settings.sharePresence')
         .lean()
         .exec();
       const now = Date.now();
@@ -960,18 +965,21 @@ export class DirectMessagesService {
       for (const u of presenceUsers as Array<{
         _id: Types.ObjectId;
         loginDevices?: Array<{ lastSeenAt?: Date }>;
+        settings?: { sharePresence?: boolean };
       }>) {
+        const uid = u._id.toString();
+        const sharePresence = u.settings?.sharePresence !== false;
         let last = 0;
         for (const d of u.loginDevices ?? []) {
           if (d?.lastSeenAt) {
             last = Math.max(last, new Date(d.lastSeenAt).getTime());
           }
         }
-        const uid = u._id.toString();
-        onlineById.set(uid, last > 0 && last >= devicePresenceAgo);
+        const deviceOnline = last > 0 && last >= devicePresenceAgo;
+        onlineById.set(uid, sharePresence && deviceOnline);
         lastActiveAtById.set(
           uid,
-          last > 0 ? new Date(last).toISOString() : null,
+          sharePresence && last > 0 ? new Date(last).toISOString() : null,
         );
       }
 

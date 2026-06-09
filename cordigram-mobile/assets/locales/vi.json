@@ -444,6 +444,7 @@
       "light": "Sáng",
       "dark": "Tối",
       "mutualHint": "Messages chỉ lưu một màu giao diện: preset Nền và màu chủ đề Boost dùng chung một giá trị, không chồng trong storage. Mỗi ô tô lại toàn bộ chrome Messages (nền, panel, accent). Chưa Boost chỉ dùng Nền; có Boost có thể chuyển sang Màu chủ đề.",
+      "mutualHintShort": "Messages chỉ lưu một màu. Nền và Màu chủ đề Boost không chồng nhau; mỗi ô đổi toàn bộ giao diện.",
       "modeBackground": "Đang dùng: Nền có sẵn",
       "modeAccent": "Đang dùng: Màu chủ đề (Boost)",
       "modeFollowSocial": "Đang dùng: Giống Social",
@@ -485,13 +486,23 @@
   },
   "auth": {
     "login": {
+      "title": "Đăng nhập",
       "email": "Email",
       "password": "Mật khẩu",
+      "passwordHint": "Nhập mật khẩu",
       "forgotPassword": "Quên mật khẩu?",
       "continueWithGoogle": "Tiếp tục với Google",
       "deleteAll": "Xóa tất cả",
       "button": "Đăng nhập",
-      "cancel": "Hủy"
+      "cancel": "Hủy",
+      "noAccount": "Chưa có tài khoản?",
+      "signUp": "Đăng ký",
+      "recentAccounts": "Tài khoản gần đây",
+      "removeAccount": "Xóa tài khoản",
+      "errorEmailRequired": "Vui lòng nhập email",
+      "errorEmailInvalid": "Email không hợp lệ",
+      "errorPasswordRequired": "Vui lòng nhập mật khẩu",
+      "errorPasswordShort": "Mật khẩu tối thiểu 8 ký tự"
     },
     "signup": {
       "cropPhoto": "Cắt ảnh",

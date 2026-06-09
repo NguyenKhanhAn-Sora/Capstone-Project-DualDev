@@ -437,6 +437,7 @@
       "light": "ライト",
       "dark": "ダーク",
       "mutualHint": "メッセージUIの色は1つだけ保存されます。背景プリセットとブーストのテーマカラーは同じ値に書き込まれ、重なりません。各色は背景・パネル・アクセントまでまとめて再配色されます。ブーストなしは背景のみ。ブーストありでテーマカラーに切り替え可能。",
+      "mutualHintShort": "メッセージは1色のみ保存。背景とブーストのテーマカラーは重ならず、各スウォッチでUI全体が変わります。",
       "modeBackground": "有効: 背景プリセット",
       "modeAccent": "有効: テーマカラー（ブースト）",
       "modeFollowSocial": "有効: Socialに合わせる",
@@ -478,13 +479,23 @@
   },
   "auth": {
     "login": {
+      "title": "ログイン",
       "email": "メールアドレス",
       "password": "パスワード",
+      "passwordHint": "パスワードを入力",
       "forgotPassword": "パスワードを忘れた？",
       "continueWithGoogle": "Googleで続ける",
       "deleteAll": "すべて削除",
       "button": "ログイン",
-      "cancel": "キャンセル"
+      "cancel": "キャンセル",
+      "noAccount": "アカウントをお持ちでないですか？",
+      "signUp": "新規登録",
+      "recentAccounts": "最近のアカウント",
+      "removeAccount": "アカウントを削除",
+      "errorEmailRequired": "メールアドレスを入力してください",
+      "errorEmailInvalid": "メール形式が正しくありません",
+      "errorPasswordRequired": "パスワードを入力してください",
+      "errorPasswordShort": "パスワードは8文字以上必要です"
     },
     "signup": {
       "cropPhoto": "写真をトリミング",

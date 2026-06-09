@@ -443,6 +443,7 @@
       "light": "Light",
       "dark": "Dark",
       "mutualHint": "Messages saves one UI tint: Background presets and Boost theme colors share the same value, so they never stack in storage. Each swatch repaints the whole Messages chrome (backgrounds, panels, and accents). Without Boost you only use Background; with Boost you can switch to Theme colors.",
+      "mutualHintShort": "Messages saves one tint. Background and Boost theme colors do not stack; each swatch repaints the whole UI.",
       "modeBackground": "Active: Background presets",
       "modeAccent": "Active: Theme colors (Boost)",
       "modeFollowSocial": "Active: Match Social",
@@ -484,13 +485,23 @@
   },
   "auth": {
     "login": {
+      "title": "Log in",
       "email": "Email",
       "password": "Password",
+      "passwordHint": "Enter your password",
       "forgotPassword": "Forgot password?",
       "continueWithGoogle": "Continue with Google",
       "deleteAll": "Delete all",
       "button": "Log in",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign up",
+      "recentAccounts": "Recent accounts",
+      "removeAccount": "Remove account",
+      "errorEmailRequired": "Please enter your email",
+      "errorEmailInvalid": "Email format is invalid",
+      "errorPasswordRequired": "Please enter your password",
+      "errorPasswordShort": "Password must be at least 8 characters"
     },
     "signup": {
       "cropPhoto": "Crop photo",
