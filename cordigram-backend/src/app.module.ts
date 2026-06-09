@@ -44,6 +44,7 @@ import { MessagingProfilesModule } from './messaging-profiles/messaging-profiles
 import { AppUpdateModule } from './app-update/app-update.module';
 import { LinkPreviewModule } from './link-preview/link-preview.module';
 import { StoriesModule } from './stories/stories.module';
+import { MusicModule } from './music/music.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { StoriesModule } from './stories/stories.module';
     AppUpdateModule,
     LinkPreviewModule,
     StoriesModule,
+    MusicModule,
   ],
   controllers: [AppController],
   providers: [AppService],

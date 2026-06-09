@@ -25,6 +25,12 @@ function getPreviewStyle(story: StoryItem | undefined): React.CSSProperties {
   return {};
 }
 
+function hasUnviewedStories(group: StoryFeedGroup): boolean {
+  // backend flag takes precedence; fall back to per-story viewed flag
+  if (group.hasUnviewed) return true;
+  return group.stories.some((s) => !s.viewed);
+}
+
 function StoryPreview({ story }: { story: StoryItem | undefined }) {
   if (!story) return null;
   if (story.type === "media" && story.mediaType === "video" && story.mediaUrl) {
@@ -133,7 +139,7 @@ export default function StoryBar({
           <div className={styles.cardPreview} style={getPreviewStyle(myGroup.stories[0])} />
           <StoryPreview story={myGroup.stories[0]} />
           <div className={styles.cardGradient} />
-          <div className={`${styles.ringWrap} ${myGroup.hasUnviewed ? styles.ringUnviewed : styles.ringViewed}`}>
+          <div className={`${styles.ringWrap} ${hasUnviewedStories(myGroup) ? styles.ringUnviewed : styles.ringViewed}`}>
             <div className={styles.avatarInner}>
               {viewerAvatarUrl ? (
                 <img src={viewerAvatarUrl} alt="avatar" className={styles.avatarImg} />
@@ -164,7 +170,7 @@ export default function StoryBar({
             <div className={styles.cardPreview} style={getPreviewStyle(group.stories[0])} />
             <StoryPreview story={group.stories[0]} />
             <div className={styles.cardGradient} />
-            <div className={`${styles.ringWrap} ${group.hasUnviewed ? styles.ringUnviewed : styles.ringViewed}`}>
+            <div className={`${styles.ringWrap} ${hasUnviewedStories(group) ? styles.ringUnviewed : styles.ringViewed}`}>
               <div className={styles.avatarInner}>
                 {group.avatarUrl ? (
                   <img src={group.avatarUrl} alt={group.username} className={styles.avatarImg} />

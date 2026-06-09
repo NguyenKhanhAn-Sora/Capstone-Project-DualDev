@@ -2145,7 +2145,19 @@
     "user": "ユーザー",
     "volume": "音量",
     "mute": "ミュート",
-    "unmute": "ミュート解除"
+    "unmute": "ミュート解除",
+    "editVisibility": "公開範囲を編集",
+    "visibilityTitle": "ストーリーの公開範囲",
+    "visibilityDesc": "このストーリーを見られる人を選択",
+    "visibilitySave": "変更を保存",
+    "visibilitySaving": "保存中...",
+    "visibilityPublic": "全員",
+    "visibilityPublicDesc": "誰でもこのストーリーを見られます",
+    "visibilityFollowers": "フォロワー",
+    "visibilityFollowersDesc": "フォロワーのみ見ることができます",
+    "visibilityPrivate": "自分のみ",
+    "visibilityPrivateDesc": "自分だけが見ることができます",
+    "visibilityUpdated": "公開範囲を更新しました"
   },
   "storyCreator": {
     "tabMedia": "写真 / 動画",

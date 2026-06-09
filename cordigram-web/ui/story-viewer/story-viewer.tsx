@@ -14,6 +14,9 @@ import {
   removeStoryReaction,
   deleteStory,
   fetchStoryViewers,
+  updateStoryVisibility,
+  followUser,
+  unfollowUser,
   type StoryFeedGroup,
   type StoryItem,
 } from "@/lib/api";
@@ -21,7 +24,7 @@ import { formatRelativeTime } from "@/lib/relative-time";
 import GalaxyBackground from "@/component/galaxy-background";
 import styles from "./story-viewer.module.css";
 
-const STORY_DURATION_MS = 6000;
+const STORY_DURATION_MS = 10000;
 const QUICK_REACTIONS = ["❤️", "😮", "😂", "😢", "😡", "👍"];
 
 type Props = {
@@ -49,8 +52,13 @@ export default function StoryViewer({
   const [showEmoji, setShowEmoji] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
+  const [showVisibility, setShowVisibility] = useState(false);
+  const [pendingVisibility, setPendingVisibility] = useState<'public' | 'followers' | 'private' | null>(null);
+  const [savingVisibility, setSavingVisibility] = useState(false);
   const [viewers, setViewers] = useState<any[]>([]);
   const [loadingViewers, setLoadingViewers] = useState(false);
+  const [followMap, setFollowMap] = useState<Record<string, boolean>>({});
+  const [followLoadingMap, setFollowLoadingMap] = useState<Record<string, boolean>>({});
   const [reactionLocal, setReactionLocal] = useState<string | null>(null);
   const [volume, setVolume] = useState<number>(() =>
     typeof window !== "undefined" ? parseFloat(localStorage.getItem("storyVolume") ?? "1") : 1
@@ -69,6 +77,7 @@ export default function StoryViewer({
   const mountedRef = useRef(true);
   const storyContentRef = useRef<HTMLDivElement>(null);
   const tapHoldRef = useRef(false); // true only when tap-zone hold is active
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const [contentH, setContentH] = useState(844);
   const contentW = Math.round(contentH * (9 / 16));
 
@@ -115,7 +124,7 @@ export default function StoryViewer({
     }
 
     const duration = story.mediaDurationMs && story.type === 'media' && story.mediaType === 'video'
-      ? Math.min(story.mediaDurationMs, 30000)
+      ? Math.min(story.mediaDurationMs, 20000)
       : STORY_DURATION_MS;
 
     const step = 100 / (duration / 50);
@@ -211,6 +220,36 @@ export default function StoryViewer({
     localStorage.setItem("storyMuted", String(muted));
   }, [volume, muted]);
 
+  // Music audio: load when story changes, play/pause with story timer
+  useEffect(() => {
+    const prev = musicAudioRef.current;
+    if (prev) { prev.pause(); prev.src = ""; musicAudioRef.current = null; }
+    if (!story?.music?.audioUrl) return;
+    const audio = new Audio(story.music.audioUrl);
+    audio.volume = muted ? 0 : Math.min(volume * 0.8, 1);
+    audio.currentTime = story.music.startTime ?? 0;
+    audio.loop = true;
+    musicAudioRef.current = audio;
+    if (!paused) audio.play().catch(() => {});
+    return () => { audio.pause(); audio.src = ""; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story?.id]);
+
+  // Sync music play/pause with story paused state
+  useEffect(() => {
+    const audio = musicAudioRef.current;
+    if (!audio) return;
+    if (paused) audio.pause();
+    else audio.play().catch(() => {});
+  }, [paused]);
+
+  // Sync music volume/muted
+  useEffect(() => {
+    const audio = musicAudioRef.current;
+    if (!audio) return;
+    audio.volume = muted ? 0 : Math.min(volume * 0.8, 1);
+  }, [volume, muted]);
+
   // Seek to trimStartMs when story changes, enforce trimEndMs
   useEffect(() => {
     const vid = videoRef.current;
@@ -299,9 +338,17 @@ export default function StoryViewer({
     setShowViewers(true);
     setPaused(true);
     setLoadingViewers(true);
+    setFollowMap({});
+    setFollowLoadingMap({});
     try {
       const res = await fetchStoryViewers({ token, storyId: story.id });
       setViewers(res.viewers);
+      // pre-populate followMap from isFollowing if backend returns it
+      const map: Record<string, boolean> = {};
+      res.viewers.forEach((v: any) => {
+        if (typeof v.isFollowing === "boolean") map[v.userId] = v.isFollowing;
+      });
+      setFollowMap(map);
     } catch {
       setViewers([]);
     } finally {
@@ -312,6 +359,55 @@ export default function StoryViewer({
   const closeViewers = () => {
     setShowViewers(false);
     setPaused(false);
+  };
+
+  const handleToggleFollow = async (userId: string) => {
+    if (!token) return;
+    const isFollowing = followMap[userId] ?? false;
+    // optimistic update
+    setFollowMap((prev) => ({ ...prev, [userId]: !isFollowing }));
+    setFollowLoadingMap((prev) => ({ ...prev, [userId]: true }));
+    try {
+      if (isFollowing) {
+        await unfollowUser({ token, userId });
+      } else {
+        await followUser({ token, userId });
+      }
+    } catch {
+      // revert on error
+      setFollowMap((prev) => ({ ...prev, [userId]: isFollowing }));
+    } finally {
+      setFollowLoadingMap((prev) => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const openVisibility = () => {
+    setShowMenu(false);
+    setPendingVisibility(story?.visibility ?? 'public');
+    setShowVisibility(true);
+    setPaused(true);
+  };
+
+  const closeVisibility = () => {
+    setShowVisibility(false);
+    setPendingVisibility(null);
+    setPaused(false);
+  };
+
+  const handleSaveVisibility = async () => {
+    if (!token || !story || !pendingVisibility) return;
+    if (pendingVisibility === (story.visibility ?? 'public')) return;
+    setSavingVisibility(true);
+    try {
+      await updateStoryVisibility({ token, storyId: story.id, visibility: pendingVisibility });
+      // update local story visibility so the panel reflects new state
+      story.visibility = pendingVisibility;
+      closeVisibility();
+    } catch {
+      // keep panel open on error
+    } finally {
+      setSavingVisibility(false);
+    }
   };
 
   if (!group || !story) return null;
@@ -393,15 +489,17 @@ export default function StoryViewer({
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
               )}
             </button>
-            <button
-              className={styles.iconBtn}
-              onClick={() => { setShowMenu((m) => !m); setPaused(true); }}
-              aria-label={t("options")}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/>
-              </svg>
-            </button>
+            {isOwner && (
+              <button
+                className={styles.iconBtn}
+                onClick={() => { setShowMenu((m) => !m); setPaused(true); }}
+                aria-label={t("options")}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/>
+                </svg>
+              </button>
+            )}
             <button className={`${styles.iconBtn} ${styles.iconBtnClose}`} onClick={onClose} aria-label={t("close")}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
             </button>
@@ -509,56 +607,60 @@ export default function StoryViewer({
           </div>
         )}
 
-        {/* Footer */}
+        {/* Music sticker — positioned by stored stickerX/Y/Width */}
+        {story.music && (
+          <div
+            className={styles.musicSticker}
+            style={{
+              left:  `${story.music.stickerX ?? 5}%`,
+              top:   `${story.music.stickerY ?? 72}%`,
+              width: `${story.music.stickerWidth ?? 90}%`,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={story.music.coverUrl} alt={story.music.title} className={styles.musicStickerCover} />
+            <div className={styles.musicStickerInfo}>
+              <span className={styles.musicStickerLabel}>♪ Nhạc nền</span>
+              <span className={styles.musicStickerTitle}>{story.music.title}</span>
+              <span className={styles.musicStickerArtist}>{story.music.artist}</span>
+            </div>
+            <div className={styles.musicStickerWave}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className={`${styles.musicStickerBar} ${paused ? styles.musicStickerBarPaused : ""}`} style={{ animationDelay: `${i * 0.12}s` }} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Footer — reaction bar for non-owners */}
         {!isOwner && (
           <div className={styles.footer}>
-            <input
-              className={styles.replyInput}
-              placeholder={t("replyPlaceholder", { name: group.displayName || group.username })}
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              onFocus={() => setPaused(true)}
-              onBlur={() => setPaused(false)}
-            />
-            <button
-              className={`${styles.reactionBtn} ${reactionLocal ? styles.active : ""}`}
-              onClick={() => { setShowEmoji((v) => !v); setPaused(true); }}
-              aria-label={t("react")}
-            >
-              {reactionLocal ?? "😊"}
-            </button>
+            <div className={styles.reactionBar} onClick={(e) => e.stopPropagation()}>
+              {QUICK_REACTIONS.map((em) => {
+                const isActive = reactionLocal === em;
+                const hasPicked = !!reactionLocal;
+                return (
+                  <button
+                    key={em}
+                    className={`${styles.reactionChip} ${isActive ? styles.reactionChipActive : ""} ${hasPicked && !isActive ? styles.reactionChipDimmed : ""}`}
+                    onClick={() => isActive ? handleUnreact() : handleReact(em)}
+                  >
+                    {em}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
         {isOwner && (
           <div className={styles.footer}>
-            <button
-              className={styles.replyInput}
-              style={{ cursor: "pointer", textAlign: "left" }}
-              onClick={handleShowViewers}
-            >
-              <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
-                👁 {t("viewCount", { count: story.viewCount ?? 0 })}
-              </span>
+            <button className={styles.viewCountBtn} onClick={handleShowViewers}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              {t("viewCount", { count: story.viewCount ?? 0 })}
             </button>
-          </div>
-        )}
-
-        {/* Emoji picker */}
-        {showEmoji && (
-          <div className={styles.emojiPicker}>
-            {reactionLocal && (
-              <span className={styles.emojiOption} onClick={handleUnreact} title={t("removeReaction")}>✕</span>
-            )}
-            {QUICK_REACTIONS.map((em) => (
-              <span
-                key={em}
-                className={styles.emojiOption}
-                onClick={() => handleReact(em)}
-              >
-                {em}
-              </span>
-            ))}
           </div>
         )}
 
@@ -572,6 +674,12 @@ export default function StoryViewer({
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
                   </svg>
                   {t("viewViewers")}
+                </button>
+                <button className={styles.dotsMenuItem} onClick={openVisibility}>
+                  <svg className={styles.dotsMenuIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                  </svg>
+                  {t("editVisibility")}
                 </button>
                 <button className={`${styles.dotsMenuItem} ${styles.danger}`} onClick={handleDelete}>
                   <svg className={styles.dotsMenuIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -616,20 +724,98 @@ export default function StoryViewer({
               {!loadingViewers && viewers.length === 0 && (
                 <div style={{ padding: 24, textAlign: "center", color: "rgba(255,255,255,0.5)" }}>{t("noViewers")}</div>
               )}
-              {viewers.map((v) => (
-                <div key={v.userId} className={styles.viewerRow}>
-                  {v.avatarUrl ? (
-                    <img src={v.avatarUrl} alt="" className={styles.viewerAvatar} />
-                  ) : (
-                    <div className={styles.viewerAvatarPlaceholder}>
-                      {(v.displayName || v.username || "U")[0]?.toUpperCase()}
+              {viewers.map((v) => {
+                const isMe = v.userId === viewerId;
+                const isFollowing = followMap[v.userId] ?? false;
+                const isLoading = followLoadingMap[v.userId] ?? false;
+                return (
+                  <div key={v.userId} className={styles.viewerRow}>
+                    {v.avatarUrl ? (
+                      <img src={v.avatarUrl} alt="" className={styles.viewerAvatar} />
+                    ) : (
+                      <div className={styles.viewerAvatarPlaceholder}>
+                        {(v.displayName || v.username || "U")[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div className={styles.viewerInfo}>
+                      <span className={styles.viewerName}>{v.displayName || v.username || t("user")}</span>
+                      {v.username && <span className={styles.viewerUsername}>@{v.username}</span>}
                     </div>
-                  )}
-                  <span className={styles.viewerName}>{v.displayName || v.username || t("user")}</span>
-                  <span className={styles.viewerTime}>{formatRelativeTime(v.viewedAt)}</span>
-                </div>
-              ))}
+                    {v.reaction && (
+                      <span className={styles.viewerReaction}>{v.reaction}</span>
+                    )}
+                    {isMe ? (
+                      <span className={styles.viewerYouBadge}>You</span>
+                    ) : (
+                      <button
+                        className={`${styles.viewerFollowBtn} ${isFollowing ? styles.viewerFollowingBtn : ""}`}
+                        onClick={() => handleToggleFollow(v.userId)}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <span className={styles.viewerFollowSpinner} />
+                        ) : isFollowing ? "Following" : "Follow"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+          </div>
+        )}
+
+        {/* Visibility panel */}
+        {showVisibility && (
+          <div className={styles.visibilityPanel} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.visibilityHeader}>
+              <span className={styles.visibilityTitle}>{t("visibilityTitle")}</span>
+              <button className={styles.iconBtn} onClick={closeVisibility} aria-label={t("close")}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+            <p className={styles.visibilityDesc}>{t("visibilityDesc")}</p>
+            <div className={styles.visibilityOptions}>
+              {(["public", "followers", "private"] as const).map((v) => {
+                const selected = pendingVisibility === v;
+                return (
+                  <button
+                    key={v}
+                    className={`${styles.visibilityOption} ${selected ? styles.visibilityOptionSelected : ""}`}
+                    onClick={() => setPendingVisibility(v)}
+                  >
+                    <div className={styles.visibilityOptionIcon}>
+                      {v === "public" && (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                      )}
+                      {v === "followers" && (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                      )}
+                      {v === "private" && (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                      )}
+                    </div>
+                    <div className={styles.visibilityOptionText}>
+                      <span className={styles.visibilityOptionLabel}>{t(`visibility${v.charAt(0).toUpperCase() + v.slice(1)}` as any)}</span>
+                      <span className={styles.visibilityOptionDesc}>{t(`visibility${v.charAt(0).toUpperCase() + v.slice(1)}Desc` as any)}</span>
+                    </div>
+                    <div className={`${styles.visibilityRadio} ${selected ? styles.visibilityRadioSelected : ""}`} />
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              className={styles.visibilitySaveBtn}
+              disabled={savingVisibility || pendingVisibility === (story.visibility ?? 'public')}
+              onClick={handleSaveVisibility}
+            >
+              {savingVisibility ? t("visibilitySaving") : t("visibilitySave")}
+            </button>
           </div>
         )}
       </div>

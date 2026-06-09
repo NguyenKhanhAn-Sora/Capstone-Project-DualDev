@@ -3,9 +3,11 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import EmojiPicker from "emoji-picker-react";
-import { uploadStoryMedia, createStory, type StoryItem } from "@/lib/api";
+import { uploadStoryMedia, createStory, type StoryItem, type StoryMusic } from "@/lib/api";
 import VideoTrimmer from "./video-trimmer";
 import PhotoTextEditor, { type PhotoOverlay, OVERLAY_COLORS } from "./photo-text-editor";
+import MusicPicker from "@/ui/music-picker/music-picker";
+import MusicTrimmer from "@/ui/music-picker/music-trimmer";
 import styles from "./story-creator.module.css";
 
 /* ── Color extraction helpers ───────────────────────── */
@@ -171,6 +173,106 @@ export default function StoryCreator({ token, onCreated }: Props) {
   const [error,            setError]            = useState("");
   const [emojiPickerOpen,  setEmojiPickerOpen]  = useState(false);
   const [addTextTrigger,   setAddTextTrigger]   = useState(0);
+  const [selectedMusic,    setSelectedMusic]    = useState<StoryMusic | null>(null);
+  const [showMusicPicker,  setShowMusicPicker]  = useState(false);
+
+  const handleMusicStartTime = useCallback((startTime: number) => {
+    setSelectedMusic((prev) => prev ? { ...prev, startTime } : null);
+  }, []);
+
+  const MIN_STICKER_WIDTH = 28; // % of canvas
+
+  const handleStickerDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!previewRef.current || !selectedMusic) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = previewRef.current.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const startX = selectedMusic.stickerX;
+    const startY = selectedMusic.stickerY;
+    const w = selectedMusic.stickerWidth;
+    const stickerH = stickerElRef.current
+      ? (stickerElRef.current.offsetHeight / rect.height) * 100
+      : 10;
+
+    let curX = startX, curY = startY;
+
+    const onMove = (me: PointerEvent) => {
+      const dx = ((me.clientX - startClientX) / rect.width) * 100;
+      const dy = ((me.clientY - startClientY) / rect.height) * 100;
+      curX = Math.max(0, Math.min(100 - w, startX + dx));
+      curY = Math.max(0, Math.min(100 - stickerH, startY + dy));
+      if (stickerElRef.current) {
+        stickerElRef.current.style.left = `${curX}%`;
+        stickerElRef.current.style.top  = `${curY}%`;
+      }
+    };
+    const onUp = () => {
+      setSelectedMusic((prev) => prev ? { ...prev, stickerX: Math.round(curX * 10) / 10, stickerY: Math.round(curY * 10) / 10 } : null);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [selectedMusic]);
+
+  const handleStickerResizeRight = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!previewRef.current || !selectedMusic) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = previewRef.current.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const startW = selectedMusic.stickerWidth;
+    const x = selectedMusic.stickerX;
+
+    let curW = startW;
+    const onMove = (me: PointerEvent) => {
+      const dw = ((me.clientX - startClientX) / rect.width) * 100;
+      curW = Math.max(MIN_STICKER_WIDTH, Math.min(100 - x, startW + dw));
+      if (stickerElRef.current) stickerElRef.current.style.width = `${curW}%`;
+    };
+    const onUp = () => {
+      setSelectedMusic((prev) => prev ? { ...prev, stickerWidth: Math.round(curW * 10) / 10 } : null);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [selectedMusic]);
+
+  const handleStickerResizeLeft = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!previewRef.current || !selectedMusic) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = previewRef.current.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const startX = selectedMusic.stickerX;
+    const startW = selectedMusic.stickerWidth;
+    const rightEdge = startX + startW; // fixed during left-handle resize
+
+    let curX = startX, curW = startW;
+    const onMove = (me: PointerEvent) => {
+      const dx = ((me.clientX - startClientX) / rect.width) * 100;
+      curX = Math.max(0, Math.min(rightEdge - MIN_STICKER_WIDTH, startX + dx));
+      curW = rightEdge - curX;
+      if (stickerElRef.current) {
+        stickerElRef.current.style.left  = `${curX}%`;
+        stickerElRef.current.style.width = `${curW}%`;
+      }
+    };
+    const onUp = () => {
+      setSelectedMusic((prev) => prev ? {
+        ...prev,
+        stickerX: Math.round(curX * 10) / 10,
+        stickerWidth: Math.round(curW * 10) / 10,
+      } : null);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [selectedMusic]);
 
   /* refs */
   const fileInputRef        = useRef<HTMLInputElement>(null);
@@ -184,6 +286,8 @@ export default function StoryCreator({ token, onCreated }: Props) {
   const photoImgRef         = useRef<HTMLImageElement>(null);
   const photoCanvasRef      = useRef<HTMLDivElement>(null);
   const trimPreviewVideoRef = useRef<HTMLVideoElement>(null);
+  const previewRef          = useRef<HTMLDivElement>(null);
+  const stickerElRef        = useRef<HTMLDivElement>(null);
   const photoOffsetXRef     = useRef(0);
   const photoOffsetYRef     = useRef(0);
   const photoRotationRef    = useRef(0);
@@ -280,6 +384,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) { setError(t("errMediaType")); return; }
     const isVid = file.type.startsWith("video/");
     setMediaType(isVid ? "video" : "image");
+    if (isVid) { setSelectedMusic(null); setShowMusicPicker(false); }
     setMediaFile(file);
     const url = URL.createObjectURL(file);
     setMediaPreviewUrl(url);
@@ -412,6 +517,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
     setTextInputColor("#ffffff"); setTextInputFontSize(28);
     setTrimStart(0); setTrimEnd(0);
     setMediaSubStep("editor"); setAddTextTrigger(0);
+    setSelectedMusic(null); setShowMusicPicker(false);
   };
 
   const handleTextSelectChange = useCallback((id: string | null) => {
@@ -445,7 +551,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
               x: Math.round(o.x * 10) / 10, y: Math.round(o.y * 10) / 10,
             }))
           : [];
-        const story = await createStory({ token, payload: { type: "media", mediaType: uploaded.type, mediaUrl: uploaded.url, mediaDurationMs, trimStartMs, trimEndMs, textOverlays: overlaysPayload, visibility } });
+        const story = await createStory({ token, payload: { type: "media", mediaType: uploaded.type, mediaUrl: uploaded.url, mediaDurationMs, trimStartMs, trimEndMs, textOverlays: overlaysPayload, visibility, music: selectedMusic ?? undefined } });
         onCreated(story); goBack();
       } catch (err: any) {
         setError(err?.message || t("errUploadFailed"));
@@ -455,7 +561,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
       if (!text) { setError(t("errTextRequired")); return; }
       setUploading(true);
       try {
-        const story = await createStory({ token, payload: { type: "text", textContent: text, backgroundStyle: bgStyle, visibility } });
+        const story = await createStory({ token, payload: { type: "text", textContent: text, backgroundStyle: bgStyle, visibility, music: selectedMusic ?? undefined } });
         onCreated(story); goBack();
       } catch (err: any) {
         setError(err?.message || t("errUploadFailed"));
@@ -722,6 +828,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
           <div className={styles.previewColumn}>
             <div className={styles.previewGlowWrap}>
               <div
+                ref={previewRef}
                 className={styles.preview}
                 style={step === "text" ? { background: bgStyle } : {}}
                 onDragOver={(e) => e.preventDefault()}
@@ -760,6 +867,56 @@ export default function StoryCreator({ token, onCreated }: Props) {
                     )}
                   </>
                 )}
+                {/* Music sticker overlay — draggable + resizable */}
+                {selectedMusic && (
+                  <div
+                    ref={stickerElRef}
+                    className={styles.musicSticker}
+                    style={{
+                      left: `${selectedMusic.stickerX}%`,
+                      top:  `${selectedMusic.stickerY}%`,
+                      width: `${selectedMusic.stickerWidth}%`,
+                    }}
+                    onPointerDown={handleStickerDrag}
+                  >
+                    {/* X remove button */}
+                    <button
+                      className={styles.musicStickerRemove}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); setSelectedMusic(null); }}
+                      aria-label="Gỡ nhạc"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                    </button>
+
+                    {/* Left resize handle */}
+                    <div
+                      className={styles.musicStickerResizeLeft}
+                      onPointerDown={(e) => { e.stopPropagation(); handleStickerResizeLeft(e); }}
+                    />
+
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={selectedMusic.coverUrl} alt={selectedMusic.title} className={styles.musicStickerCover} />
+                    <div className={styles.musicStickerInfo}>
+                      <span className={styles.musicStickerTitle}>{selectedMusic.title}</span>
+                      <span className={styles.musicStickerArtist}>{selectedMusic.artist}</span>
+                    </div>
+                    <div className={styles.musicStickerWave}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className={styles.musicStickerBar} style={{ animationDelay: `${i * 0.1}s` }} />
+                      ))}
+                    </div>
+
+                    {/* Right resize handle */}
+                    <div
+                      className={styles.musicStickerResizeRight}
+                      onPointerDown={(e) => { e.stopPropagation(); handleStickerResizeRight(e); }}
+                    />
+                  </div>
+                )}
+
                 {step === "text" && (
                   <>
                     <div ref={textWrapperRef} className={styles.textEditWrapper} onClick={() => textEditRef.current?.focus()}>
@@ -797,10 +954,31 @@ export default function StoryCreator({ token, onCreated }: Props) {
               </div>
             </div>
 
+            {/* Music trimmer — shown below preview when music selected (image/text only) */}
+            {selectedMusic && (step === "text" || (step === "media" && mediaType === "image")) && !showMusicPicker && (
+              <MusicTrimmer music={selectedMusic} onUpdate={handleMusicStartTime} />
+            )}
           </div>
 
-          {/* Options panel */}
-          <div className={styles.optionsSection}>
+          {/* Music picker panel */}
+          {showMusicPicker && (
+            <MusicPicker
+              token={token}
+              selected={selectedMusic}
+              onSelect={(m) => {
+                if (m) {
+                  setSelectedMusic({ ...m, startTime: m.startTime ?? 0, stickerX: selectedMusic?.stickerX ?? 5, stickerY: selectedMusic?.stickerY ?? 72, stickerWidth: selectedMusic?.stickerWidth ?? 90 });
+                  setShowMusicPicker(false);
+                } else {
+                  setSelectedMusic(null);
+                }
+              }}
+              onClose={() => setShowMusicPicker(false)}
+            />
+          )}
+
+          {/* Options panel — hidden while music picker is open */}
+          <div className={styles.optionsSection} style={showMusicPicker ? { display: "none" } : undefined}>
             {/* Action buttons — Edit, Add Text, Change Photo */}
             {step === "media" && (
               <div className={styles.optionCard}>
@@ -825,6 +1003,20 @@ export default function StoryCreator({ token, onCreated }: Props) {
                     </svg>
                     <span>{mediaType === "image" ? t("btnChangePhoto") : t("btnChangeVideo")}</span>
                   </button>
+                  {mediaType === "image" && (
+                    <button
+                      className={`${styles.toolbarBtn} ${selectedMusic ? styles.toolbarBtnActive : ""}`}
+                      onClick={() => setShowMusicPicker((o) => !o)}
+                      title="Thêm nhạc"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M9 18V6l12-2v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
+                        <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="2" />
+                      </svg>
+                      <span>{selectedMusic ? "Đổi nhạc" : "Thêm nhạc"}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -878,6 +1070,33 @@ export default function StoryCreator({ token, onCreated }: Props) {
               </div>
             )}
 
+            {step === "text" && (
+              <div className={styles.optionCard}>
+                <p className={styles.optionCardLabel}>Nhạc nền</p>
+                <div className={styles.actionBtnsRow}>
+                  <button
+                    className={`${styles.toolbarBtn} ${selectedMusic ? styles.toolbarBtnActive : ""}`}
+                    onClick={() => setShowMusicPicker((o) => !o)}
+                    title="Thêm nhạc"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M9 18V6l12-2v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
+                      <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                    <span>{selectedMusic ? selectedMusic.title : "Thêm nhạc"}</span>
+                  </button>
+                  {selectedMusic && (
+                    <button className={styles.toolbarBtn} onClick={() => setSelectedMusic(null)}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                      <span>Gỡ</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             {step === "text" && (
               <div className={styles.optionCard}>
                 <p className={styles.optionCardLabel}>{t("labelBackground")}</p>

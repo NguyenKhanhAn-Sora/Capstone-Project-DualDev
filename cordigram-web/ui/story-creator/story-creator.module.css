@@ -912,6 +912,154 @@
   flex-shrink: 0;
 }
 
+/* ── Toolbar active state ───────────────────────────── */
+.toolbarBtnActive {
+  background: rgba(139,92,246,0.25) !important;
+  border-color: rgba(139,92,246,0.7) !important;
+  color: #c4b5fd !important;
+}
+
+/* ── Music sticker on canvas (draggable/resizable) ──── */
+.musicSticker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 7px 10px;
+  z-index: 10;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  box-sizing: border-box;
+  animation: musicStickerIn 0.3s ease;
+}
+.musicSticker:active {
+  cursor: grabbing;
+}
+
+/* Drag-active state applied during drag */
+.musicStickerDragging {
+  cursor: grabbing !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* X remove button */
+.musicStickerRemove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 1.5px solid rgba(255,255,255,0.3);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 2;
+  transition: background 0.15s, transform 0.15s;
+}
+.musicStickerRemove:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+/* Resize handles */
+.musicStickerResizeLeft,
+.musicStickerResizeRight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: col-resize;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.musicStickerResizeLeft  { left: 0;  border-radius: 12px 0 0 12px; }
+.musicStickerResizeRight { right: 0; border-radius: 0 12px 12px 0; }
+
+.musicStickerResizeLeft::after,
+.musicStickerResizeRight::after {
+  content: "";
+  width: 2px;
+  height: 14px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.35);
+}
+
+@keyframes musicStickerIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.musicStickerCover {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.musicStickerInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.musicStickerTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.musicStickerArtist {
+  font-size: 10px;
+  color: rgba(255,255,255,0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.musicStickerWave {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.musicStickerBar {
+  width: 3px;
+  border-radius: 2px;
+  background: #a78bfa;
+  animation: waveBar 0.8s ease-in-out infinite alternate;
+}
+.musicStickerBar:nth-child(1) { height: 8px; }
+.musicStickerBar:nth-child(2) { height: 14px; }
+.musicStickerBar:nth-child(3) { height: 18px; }
+.musicStickerBar:nth-child(4) { height: 12px; }
+.musicStickerBar:nth-child(5) { height: 7px; }
+
+@keyframes waveBar {
+  from { transform: scaleY(0.4); }
+  to   { transform: scaleY(1); }
+}
+
 /* ── Discard modal ──────────────────────────────────── */
 .modalOverlay {
   position: fixed;

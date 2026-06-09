@@ -1394,11 +1394,49 @@ export default function CreatePostPage() {
 
       {mode === "story" ? (
         storyCreated ? (
-          <div style={{ textAlign: "center", padding: "48px 24px" }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
-            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>{t("storyPosted")}</div>
+          <div className={styles.storySuccess}>
+            {/* Illustration */}
+            <div className={styles.successIllustration}>
+              <div className={styles.successOrbit} />
+              <div className={styles.successGlowRing} />
+              <div className={styles.successCircle}>
+                <svg className={styles.successCheck} viewBox="0 0 48 48" fill="none">
+                  <path
+                    className={styles.successCheckPath}
+                    d="M13 25l8 8 14-16"
+                    stroke="url(#checkGrad)"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <defs>
+                    <linearGradient id="checkGrad" x1="13" y1="24" x2="35" y2="33" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#a78bfa" />
+                      <stop offset="1" stopColor="#60a5fa" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              {/* Floating sparks */}
+              <div className={styles.successSparks}>
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+                <span className={styles.spark} />
+              </div>
+            </div>
+
+            {/* Text */}
+            <div className={styles.successText}>
+              <div className={styles.successTitle}>{t("storyPosted")}</div>
+              <div className={styles.successSub}>Story của bạn đã được chia sẻ với mọi người</div>
+            </div>
+
+            {/* CTA */}
             <button
-              style={{ background: "var(--color-primary,#6366f1)", color: "#fff", border: "none", borderRadius: 12, padding: "11px 28px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+              className={styles.successBtn}
               onClick={() => { setStoryCreated(false); setMode("story"); }}
             >
               {t("postAnother")}

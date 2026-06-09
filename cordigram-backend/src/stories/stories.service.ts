@@ -43,6 +43,7 @@ export type StoryItem = {
   textOverlays: any[];
   stickers: any[];
   location: string | null;
+  music: { trackId: string; title: string; artist: string; coverUrl: string; audioUrl: string; startTime: number; stickerX: number; stickerY: number; stickerWidth: number } | null;
   viewCount: number;
   reactionCount: number;
   viewed: boolean;
@@ -107,6 +108,17 @@ export class StoriesService {
       stickers: dto.stickers ?? [],
       visibility: dto.visibility ?? 'followers',
       location: dto.location ?? null,
+      music: dto.music ? {
+        trackId: dto.music.trackId,
+        title: dto.music.title,
+        artist: dto.music.artist,
+        coverUrl: dto.music.coverUrl,
+        audioUrl: dto.music.audioUrl,
+        startTime: dto.music.startTime ?? 0,
+        stickerX: dto.music.stickerX ?? 5,
+        stickerY: dto.music.stickerY ?? 72,
+        stickerWidth: dto.music.stickerWidth ?? 90,
+      } : null,
       views: [],
       reactions: [],
     });
@@ -207,6 +219,10 @@ export class StoriesService {
     const profiles = await this.profileModel.find({ userId: { $in: viewerIds } }).lean();
     const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
 
+    const reactionMap = new Map(
+      ((story as any).reactions ?? []).map((r: any) => [r.userId.toString(), r.emoji as string]),
+    );
+
     const viewers = (story as any).views.map((v: any) => {
       const profile = profileMap.get(v.userId.toString());
       return {
@@ -215,6 +231,7 @@ export class StoriesService {
         username: (profile as any)?.username ?? null,
         displayName: (profile as any)?.displayName ?? null,
         avatarUrl: (profile as any)?.avatarUrl ?? null,
+        reaction: reactionMap.get(v.userId.toString()) ?? null,
       };
     });
 
@@ -295,6 +312,19 @@ export class StoriesService {
       textOverlays: story.textOverlays ?? [],
       stickers: story.stickers ?? [],
       location: story.location,
+      music: (story as any).music
+        ? {
+            trackId: (story as any).music.trackId,
+            title: (story as any).music.title,
+            artist: (story as any).music.artist,
+            coverUrl: (story as any).music.coverUrl,
+            audioUrl: (story as any).music.audioUrl,
+            startTime: (story as any).music.startTime ?? 0,
+            stickerX: (story as any).music.stickerX ?? 5,
+            stickerY: (story as any).music.stickerY ?? 72,
+            stickerWidth: (story as any).music.stickerWidth ?? 90,
+          }
+        : null,
       viewCount: story.views?.length ?? 0,
       reactionCount: story.reactions?.length ?? 0,
       viewed,

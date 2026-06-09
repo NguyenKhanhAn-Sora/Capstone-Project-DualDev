@@ -30,9 +30,9 @@
 .card {
   position: relative;
   flex-shrink: 0;
-  width: 96px;
+  width: 110px;
   height: 164px;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
   scroll-snap-align: start;

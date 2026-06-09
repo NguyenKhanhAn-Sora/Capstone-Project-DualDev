@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsIn, Max, Min } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsIn, Max, Min, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { StoryVisibility } from '../story.schema';
 
@@ -39,6 +39,35 @@ export class StickerDto {
   size?: number;
 }
 
+export class MusicDto {
+  @IsString()
+  trackId: string;
+
+  @IsString()
+  title: string;
+
+  @IsString()
+  artist: string;
+
+  @IsString()
+  coverUrl: string;
+
+  @IsString()
+  audioUrl: string;
+
+  @IsOptional() @IsNumber() @Min(0)
+  startTime?: number;
+
+  @IsOptional() @IsNumber() @Min(0) @Max(100)
+  stickerX?: number;
+
+  @IsOptional() @IsNumber() @Min(0) @Max(100)
+  stickerY?: number;
+
+  @IsOptional() @IsNumber() @Min(0) @Max(100)
+  stickerWidth?: number;
+}
+
 export class CreateStoryDto {
   @IsOptional() @IsEnum(['media', 'text'])
   type?: 'media' | 'text';
@@ -75,4 +104,7 @@ export class CreateStoryDto {
 
   @IsOptional() @IsString()
   location?: string;
+
+  @IsOptional() @ValidateNested() @Type(() => MusicDto)
+  music?: MusicDto;
 }

@@ -1354,7 +1354,19 @@
     "user": "User",
     "volume": "Volume",
     "mute": "Mute",
-    "unmute": "Unmute"
+    "unmute": "Unmute",
+    "editVisibility": "Edit visibility",
+    "visibilityTitle": "Story visibility",
+    "visibilityDesc": "Choose who can see this story",
+    "visibilitySave": "Save changes",
+    "visibilitySaving": "Saving...",
+    "visibilityPublic": "Public",
+    "visibilityPublicDesc": "Anyone can see this story",
+    "visibilityFollowers": "Followers",
+    "visibilityFollowersDesc": "Only your followers can see this",
+    "visibilityPrivate": "Private",
+    "visibilityPrivateDesc": "Only you can see this",
+    "visibilityUpdated": "Visibility updated"
   },
   "storyCreator": {
     "tabMedia": "Photo / Video",

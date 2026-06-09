@@ -1354,7 +1354,19 @@
     "user": "Người dùng",
     "volume": "Âm lượng",
     "mute": "Tắt tiếng",
-    "unmute": "Bật tiếng"
+    "unmute": "Bật tiếng",
+    "editVisibility": "Chỉnh sửa quyền xem",
+    "visibilityTitle": "Quyền xem story",
+    "visibilityDesc": "Chọn ai có thể xem story này",
+    "visibilitySave": "Lưu thay đổi",
+    "visibilitySaving": "Đang lưu...",
+    "visibilityPublic": "Công khai",
+    "visibilityPublicDesc": "Tất cả mọi người đều có thể xem",
+    "visibilityFollowers": "Người theo dõi",
+    "visibilityFollowersDesc": "Chỉ người theo dõi mới xem được",
+    "visibilityPrivate": "Riêng tư",
+    "visibilityPrivateDesc": "Chỉ mình bạn xem được",
+    "visibilityUpdated": "Đã cập nhật quyền xem"
   },
   "storyCreator": {
     "tabMedia": "Ảnh / Video",

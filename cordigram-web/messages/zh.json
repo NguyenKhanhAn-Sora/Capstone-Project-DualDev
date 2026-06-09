@@ -2145,7 +2145,19 @@
     "user": "用户",
     "volume": "音量",
     "mute": "静音",
-    "unmute": "取消静音"
+    "unmute": "取消静音",
+    "editVisibility": "编辑可见范围",
+    "visibilityTitle": "故事可见范围",
+    "visibilityDesc": "选择谁可以看到这个故事",
+    "visibilitySave": "保存更改",
+    "visibilitySaving": "保存中...",
+    "visibilityPublic": "公开",
+    "visibilityPublicDesc": "所有人都可以看到此故事",
+    "visibilityFollowers": "关注者",
+    "visibilityFollowersDesc": "仅关注者可以查看",
+    "visibilityPrivate": "私密",
+    "visibilityPrivateDesc": "仅自己可见",
+    "visibilityUpdated": "可见范围已更新"
   },
   "storyCreator": {
     "tabMedia": "照片 / 视频",

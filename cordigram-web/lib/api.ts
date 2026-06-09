@@ -4712,6 +4712,29 @@ export type StorySticker = {
   size?: number;
 };
 
+export type StoryMusic = {
+  trackId: string;
+  title: string;
+  artist: string;
+  coverUrl: string;
+  audioUrl: string;
+  startTime: number;
+  stickerX: number;
+  stickerY: number;
+  stickerWidth: number;
+};
+
+export type JamendoTrack = {
+  id: string;
+  name: string;
+  artist_name: string;
+  image: string;
+  audio: string;
+  audiodownload: string;
+  duration: number;
+  shareurl: string;
+};
+
 export type StoryItem = {
   id: string;
   type: 'media' | 'text';
@@ -4725,12 +4748,14 @@ export type StoryItem = {
   textOverlays: StoryTextOverlay[];
   stickers: StorySticker[];
   location: string | null;
+  music: StoryMusic | null;
   viewCount: number;
   reactionCount: number;
   viewed: boolean;
   myReaction: string | null;
   createdAt: string;
   expiresAt: string;
+  visibility?: 'public' | 'followers' | 'private';
 };
 
 export type StoryFeedGroup = {
@@ -4781,6 +4806,7 @@ export async function createStory(opts: {
     stickers?: StorySticker[];
     visibility?: 'public' | 'followers' | 'private';
     location?: string;
+    music?: StoryMusic;
   };
 }): Promise<StoryItem> {
   return apiFetch<StoryItem>({
@@ -4839,7 +4865,7 @@ export async function markStoryViewed(opts: {
 export async function fetchStoryViewers(opts: {
   token: string;
   storyId: string;
-}): Promise<{ viewers: { userId: string; viewedAt: string; username: string | null; displayName: string | null; avatarUrl: string | null }[]; totalViews: number }> {
+}): Promise<{ viewers: { userId: string; viewedAt: string; username: string | null; displayName: string | null; avatarUrl: string | null; reaction?: string | null }[]; totalViews: number }> {
   return apiFetch({
     path: `/stories/${opts.storyId}/viewers`,
     method: 'GET',
@@ -4870,6 +4896,49 @@ export async function removeStoryReaction(opts: {
   return apiFetch<{ ok: boolean }>({
     path: `/stories/${opts.storyId}/react`,
     method: 'DELETE',
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function updateStoryVisibility(opts: {
+  token: string;
+  storyId: string;
+  visibility: 'public' | 'followers' | 'private';
+}): Promise<{ visibility: 'public' | 'followers' | 'private'; updated?: boolean }> {
+  return apiFetch({
+    path: `/stories/${opts.storyId}/visibility`,
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ visibility: opts.visibility }),
+  });
+}
+
+export async function fetchMusicTrending(opts: {
+  token: string;
+  limit?: number;
+  offset?: number;
+}): Promise<JamendoTrack[]> {
+  const params = new URLSearchParams({ limit: String(opts.limit ?? 20), offset: String(opts.offset ?? 0) });
+  return apiFetch<JamendoTrack[]>({
+    path: `/music/trending?${params}`,
+    method: 'GET',
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
+
+export async function fetchMusicSearch(opts: {
+  token: string;
+  q: string;
+  limit?: number;
+  offset?: number;
+}): Promise<JamendoTrack[]> {
+  const params = new URLSearchParams({ q: opts.q, limit: String(opts.limit ?? 20), offset: String(opts.offset ?? 0) });
+  return apiFetch<JamendoTrack[]>({
+    path: `/music/search?${params}`,
+    method: 'GET',
     headers: { Authorization: `Bearer ${opts.token}` },
   });
 }

@@ -60,6 +60,37 @@ export class StoryReaction {
 const StoryReactionSchema = SchemaFactory.createForClass(StoryReaction);
 
 @Schema({ _id: false })
+export class StoryMusic {
+  @Prop({ type: String, required: true })
+  trackId: string;
+
+  @Prop({ type: String, required: true })
+  title: string;
+
+  @Prop({ type: String, required: true })
+  artist: string;
+
+  @Prop({ type: String, required: true })
+  coverUrl: string;
+
+  @Prop({ type: String, required: true })
+  audioUrl: string;
+
+  @Prop({ type: Number, default: 0 })
+  startTime: number;
+
+  @Prop({ type: Number, default: 5 })
+  stickerX: number;
+
+  @Prop({ type: Number, default: 75 })
+  stickerY: number;
+
+  @Prop({ type: Number, default: 90 })
+  stickerWidth: number;
+}
+const StoryMusicSchema = SchemaFactory.createForClass(StoryMusic);
+
+@Schema({ _id: false })
 export class StoryView {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
@@ -115,6 +146,9 @@ export class Story extends Document {
 
   @Prop({ type: [StoryReactionSchema], default: [] })
   reactions: StoryReaction[];
+
+  @Prop({ type: StoryMusicSchema, default: null })
+  music: StoryMusic | null;
 
   @Prop({ type: String, maxlength: 160, default: null })
   location: string | null;
