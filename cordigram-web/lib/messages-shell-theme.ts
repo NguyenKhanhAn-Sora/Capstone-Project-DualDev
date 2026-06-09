@@ -42,6 +42,12 @@ export function setMessagesShellTheme(mode: MessagesShellTheme): void {
   window.dispatchEvent(new Event("cordigram-messages-shell-theme"));
 }
 
+export function hasMessagesShellThemeOverride(): boolean {
+  if (typeof window === "undefined") return false;
+  const v = localStorage.getItem(STORAGE_KEY);
+  return v === "light" || v === "dark";
+}
+
 export function clearMessagesShellThemeOverride(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_KEY);

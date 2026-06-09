@@ -752,9 +752,11 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Text(
-            _appearanceSource == 'accent' && _boostUnlocked
-                ? _t('settings.appearance.modeAccent')
-                : _t('settings.appearance.modeBackground'),
+            AccentColorController.instance.isFollowingSocialAppearance
+                ? _t('settings.appearance.modeFollowSocial')
+                : _appearanceSource == 'accent' && _boostUnlocked
+                    ? _t('settings.appearance.modeAccent')
+                    : _t('settings.appearance.modeBackground'),
             style: TextStyle(
               color: c.accent,
               fontSize: 12,
@@ -763,6 +765,24 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
             ),
           ),
         ),
+        _sectionTitle(context, _t('settings.appearance.followSocialTitle')),
+        _hint(context, _t('settings.appearance.followSocialHint')),
+        _cardWidget(context, [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: _socialFollowSwatch(
+              active: AccentColorController.instance.isFollowingSocialAppearance,
+              onTap: () async {
+                await AccentColorController.instance.resetToSocialAppearance();
+                setState(() {
+                  _syncAppearanceFromController();
+                  _dirty = true;
+                });
+              },
+            ),
+          ),
+        ]),
+        const SizedBox(height: 20),
         _sectionTitle(context, _t('settings.appearanceBg.title')),
         _hint(context, _t('settings.appearanceBg.hintShort')),
         _cardWidget(context, [
@@ -852,6 +872,40 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _socialFollowSwatch({
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: active ? Colors.white : Colors.white24,
+            width: active ? 2.5 : 1,
+          ),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFF6F8FB),
+              Color(0xFF0C1220),
+              Color(0xFF2A1A5E),
+              Color(0xFF5865F2),
+            ],
+            stops: [0, 0.42, 0.78, 1],
+          ),
+        ),
+        child: active
+            ? const Icon(Icons.sync_rounded, color: Colors.white, size: 22)
+            : Icon(Icons.sync_rounded, color: Colors.white.withValues(alpha: 0.75), size: 20),
+      ),
     );
   }
 

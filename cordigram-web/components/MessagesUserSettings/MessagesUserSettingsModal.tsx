@@ -20,12 +20,14 @@ import {
 import {
   DEFAULT_MESSAGES_CHROME_HEX,
   flushMessagesChromeToRoot,
+  isMessagesFollowingSocialAppearance,
   migrateMessagesChromeStorageOnce,
   normalizeMessagesChromeHex,
   persistMessagesAppearanceSource,
   persistMessagesChromeHex,
   readMessagesAppearanceSource,
   readMessagesChromeHex,
+  resetMessagesToSocialAppearance,
   type MessagesAppearanceSource,
 } from "@/lib/messages-appearance-chrome";
 import {
@@ -628,10 +630,54 @@ export default function MessagesUserSettingsModal({
                   {t("settings.appearance.mutualHint")}
                 </p>
                 <p className={styles.appearanceModeBadge} aria-live="polite">
-                  {appearanceSource === "accent" && boostUnlocked
-                    ? t("settings.appearance.modeAccent")
-                    : t("settings.appearance.modeBackground")}
+                  {isMessagesFollowingSocialAppearance(currentUserId)
+                    ? t("settings.appearance.modeFollowSocial")
+                    : appearanceSource === "accent" && boostUnlocked
+                      ? t("settings.appearance.modeAccent")
+                      : t("settings.appearance.modeBackground")}
                 </p>
+
+                <div className={styles.appearanceBlock}>
+                  <div className={styles.appearanceBgSection}>
+                    <div className={styles.appearanceBgHeader}>
+                      <div>
+                        <div className={styles.appearanceBgTitle}>
+                          {t("settings.appearance.followSocialTitle")}
+                        </div>
+                        <div className={styles.hint} style={{ margin: 0 }}>
+                          {t("settings.appearance.followSocialHint")}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={styles.appearanceBgLockedWrap}>
+                      <div className={styles.appearanceBgRow}>
+                        <div className={styles.appearanceBgSwatches}>
+                          <button
+                            type="button"
+                            className={`${styles.appearanceBgSwatch} ${styles.appearanceBgSwatchSocial} ${
+                              isMessagesFollowingSocialAppearance(currentUserId)
+                                ? styles.appearanceBgSwatchActive
+                                : ""
+                            }`}
+                            title={t("settings.appearance.followSocialPick")}
+                            aria-label={t("settings.appearance.followSocialPick")}
+                            onClick={() => {
+                              resetMessagesToSocialAppearance(currentUserId);
+                              setAppearanceSource("background");
+                              setChromeHex(DEFAULT_MESSAGES_CHROME_HEX);
+                              setMessagesShellTheme(getMessagesShellTheme());
+                              flushMessagesChromeToRoot(currentUserId);
+                            }}
+                          >
+                            <span className={styles.appearanceBgSocialIcon} aria-hidden>
+                              ↻
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <div className={styles.appearanceBlock}>
                   <div className={styles.appearanceBgSection}>

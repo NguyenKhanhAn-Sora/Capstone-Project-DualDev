@@ -5,7 +5,11 @@
  */
 import { applyAccentColor } from "@/component/theme-provider";
 import type { MessagesShellTheme } from "@/lib/messages-shell-theme";
-import { getMessagesShellTheme } from "@/lib/messages-shell-theme";
+import {
+  clearMessagesShellThemeOverride,
+  getMessagesShellTheme,
+  hasMessagesShellThemeOverride,
+} from "@/lib/messages-shell-theme";
 
 export const DEFAULT_MESSAGES_CHROME_HEX = "#5865F2";
 
@@ -147,10 +151,22 @@ export function isMessagesFollowingSocialAppearance(userId: string): boolean {
   const u = String(userId || "").trim();
   if (!u) return true;
   migrateMessagesChromeStorageOnce(u);
+  if (hasMessagesShellThemeOverride()) return false;
   const source = readMessagesAppearanceSource(u);
   if (source === "accent") return false;
   const stored = normalizeMessagesChromeHex(readMessagesChromeHex(u));
   return stored === DEFAULT_MESSAGES_CHROME_HEX || stored === "#0C1220";
+}
+
+/** Reset Messages chrome → follow Social (không đổi cài đặt Social). */
+export function resetMessagesToSocialAppearance(userId: string): void {
+  if (typeof window === "undefined") return;
+  const u = String(userId || "").trim();
+  if (!u) return;
+  migrateMessagesChromeStorageOnce(u);
+  persistMessagesAppearanceSource(u, "background");
+  persistMessagesChromeHex(u, DEFAULT_MESSAGES_CHROME_HEX);
+  clearMessagesShellThemeOverride();
 }
 
 export function applyMessagesRootChromeFromStorage(

@@ -1852,7 +1852,11 @@
       "dark": "ダーク",
       "mutualHint": "メッセージUIの色は1つだけ保存されます。背景プリセットとブーストのテーマカラーは同じ値に書き込まれ、重なりません。各色は背景・パネル・アクセントまでまとめて再配色されます。ブーストなしは背景のみ。ブーストありでテーマカラーに切り替え可能。",
       "modeBackground": "有効: 背景プリセット",
-      "modeAccent": "有効: テーマカラー（ブースト）"
+      "modeAccent": "有効: テーマカラー（ブースト）",
+      "modeFollowSocial": "有効: Socialに合わせる",
+      "followSocialTitle": "Socialに合わせる",
+      "followSocialHint": "Socialのライト・ダーク・ギャラクシーに追従。メッセージのみ。Socialは変更しません。",
+      "followSocialPick": "Socialの外観を使う"
     },
     "appearanceBg": {
       "title": "背景",
