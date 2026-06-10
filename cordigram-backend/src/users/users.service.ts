@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   NotFoundException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from './user.schema';
@@ -33,6 +34,7 @@ import { ReportUser } from '../reportuser/reportuser.schema';
 import { DirectMessage } from '../direct-messages/direct-message.schema';
 import { type SupportedLanguage } from './language.constants';
 import { Server } from '../servers/server.schema';
+import { DirectMessagesGateway } from '../direct-messages/direct-messages.gateway';
 
 type NotificationCategoryKey =
   | 'follow'
@@ -108,6 +110,7 @@ export class UsersService {
     private readonly activityLogService: ActivityLogService,
     private readonly config: ConfigService,
     private readonly boostService: BoostService,
+    private readonly moduleRef: ModuleRef,
   ) {
     this.passwordChangeWindowMs = this.initPasswordChangeWindow();
   }
@@ -2504,6 +2507,13 @@ export class UsersService {
     await this.userModel
       .updateOne({ _id: params.userId }, { $set: update })
       .exec();
+
+    if (params.sharePresence !== undefined) {
+      const gateway = this.moduleRef.get(DirectMessagesGateway, {
+        strict: false,
+      });
+      gateway?.applySharePresenceSetting(params.userId, params.sharePresence);
+    }
 
     return this.getSettings(params.userId);
   }

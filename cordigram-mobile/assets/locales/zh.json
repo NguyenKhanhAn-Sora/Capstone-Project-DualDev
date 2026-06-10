@@ -437,6 +437,7 @@
       "light": "浅色",
       "dark": "深色",
       "mutualHint": "消息界面只保存一套配色：背景预设与 Boost 主题色写入同一值，不会叠加。每个色块会重绘整个消息界面（背景、侧栏、强调色等）。未订阅 Boost 仅可用背景；订阅后可切换到主题色。",
+      "mutualHintShort": "消息界面只保存一种配色。背景与 Boost 主题色不会叠加；每个色块会重绘整个界面。",
       "modeBackground": "当前：背景预设",
       "modeAccent": "当前：主题色（Boost）",
       "modeFollowSocial": "当前：与 Social 一致",
@@ -478,13 +479,23 @@
   },
   "auth": {
     "login": {
+      "title": "登录",
       "email": "邮箱",
       "password": "密码",
+      "passwordHint": "输入密码",
       "forgotPassword": "忘记密码？",
       "continueWithGoogle": "使用Google继续",
       "deleteAll": "全部删除",
       "button": "登录",
-      "cancel": "取消"
+      "cancel": "取消",
+      "noAccount": "还没有账号？",
+      "signUp": "注册",
+      "recentAccounts": "最近账号",
+      "removeAccount": "移除账号",
+      "errorEmailRequired": "请输入邮箱",
+      "errorEmailInvalid": "邮箱格式无效",
+      "errorPasswordRequired": "请输入密码",
+      "errorPasswordShort": "密码至少8个字符"
     },
     "signup": {
       "cropPhoto": "裁剪照片",

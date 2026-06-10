@@ -10,7 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { DirectMessagesService } from './direct-messages.service';
 import { JwtService } from '@nestjs/jwt';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Profile } from '../profiles/profile.schema';
@@ -225,16 +225,72 @@ export class DirectMessagesGateway
   }
 
   private async getSharePresence(userId: string): Promise<boolean> {
+    const map = await this.getSharePresenceMap([userId]);
+    return map.get(userId) ?? true;
+  }
+
+  private async getSharePresenceMap(
+    userIds: string[],
+  ): Promise<Map<string, boolean>> {
+    const map = new Map<string, boolean>();
+    const objectIds = userIds.filter((id) => /^[a-f\d]{24}$/i.test(id));
+    if (objectIds.length === 0) return map;
     try {
-      const u = await this.userModel
-        .findById(userId)
+      const rows = await this.userModel
+        .find({ _id: { $in: objectIds } })
         .select('settings.sharePresence')
         .lean()
         .exec();
-      const v = (u as any)?.settings?.sharePresence;
-      return v !== false;
+      for (const u of rows as Array<{
+        _id: { toString(): string };
+        settings?: { sharePresence?: boolean };
+      }>) {
+        map.set(u._id.toString(), u.settings?.sharePresence !== false);
+      }
     } catch {
-      return true;
+      // default allow sharing when DB lookup fails
+    }
+    return map;
+  }
+
+  /** Called when user toggles sharePresence in settings — refresh cache + notify watchers. */
+  applySharePresenceSetting(userId: string, sharePresence: boolean): void {
+    const prev = this.presence.get(userId);
+    const connected = Boolean(
+      this.connectedUsers.get(userId) && this.connectedUsers.get(userId)!.size > 0,
+    );
+
+    if (prev) {
+      if (prev.idleTimer) clearTimeout(prev.idleTimer);
+      this.presence.set(userId, {
+        ...prev,
+        sharePresence,
+        idleTimer: undefined,
+      });
+    } else {
+      this.presence.set(userId, {
+        status: connected ? 'online' : 'offline',
+        lastActiveAt: Date.now(),
+        sharePresence,
+      });
+    }
+
+    if (sharePresence === false) {
+      this.notifyPresenceToSubscribers(userId, 'offline');
+      this.server.emit('user-offline', { userId, status: 'offline' });
+      this.server.emit('presence-updated', {
+        userId,
+        status: 'offline',
+        lastActiveAt: null,
+      });
+      return;
+    }
+
+    if (connected) {
+      const rec = this.presence.get(userId);
+      const nextStatus =
+        rec?.status && rec.status !== 'offline' ? rec.status : 'online';
+      this.setPresence(userId, nextStatus, { bumpActivity: false });
     }
   }
 
@@ -421,6 +477,7 @@ export class DirectMessagesGateway
   }
 
   constructor(
+    @Inject(forwardRef(() => DirectMessagesService))
     private readonly directMessagesService: DirectMessagesService,
     private readonly jwtService: JwtService,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
@@ -517,12 +574,28 @@ export class DirectMessagesGateway
     for (const id of ids) set.add(id);
     this.dmPresenceSubs.set(watcherId, set);
 
+    const shareMap = await this.getSharePresenceMap(ids);
+    for (const targetId of ids) {
+      const rec = this.presence.get(targetId);
+      const sharePresence = shareMap.get(targetId) ?? rec?.sharePresence ?? true;
+      if (rec) {
+        this.presence.set(targetId, { ...rec, sharePresence });
+      } else {
+        this.presence.set(targetId, {
+          status: 'offline',
+          lastActiveAt: Date.now(),
+          sharePresence,
+        });
+      }
+    }
+
     const needDbLastSeen: string[] = [];
     const snapshot = ids.map((targetId) => {
-      const rec = this.presence.get(targetId);
+      const sharePresence = shareMap.get(targetId) ?? true;
       const status = this.effectiveStatusForViewer(targetId);
-      let lastActiveAt = this.presenceLastActiveIso(targetId);
-      if (!lastActiveAt && status === 'offline') {
+      let lastActiveAt =
+        sharePresence === false ? null : this.presenceLastActiveIso(targetId);
+      if (!lastActiveAt && status === 'offline' && sharePresence !== false) {
         needDbLastSeen.push(targetId);
       }
       return { userId: targetId, status, lastActiveAt };
@@ -535,7 +608,12 @@ export class DirectMessagesGateway
             needDbLastSeen,
           );
         for (const item of snapshot) {
-          if (!item.lastActiveAt && fromDb[item.userId]) {
+          const sharePresence = shareMap.get(item.userId) ?? true;
+          if (
+            sharePresence !== false &&
+            !item.lastActiveAt &&
+            fromDb[item.userId]
+          ) {
             item.lastActiveAt = fromDb[item.userId];
           }
         }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_radii.dart';
+import '../theme/app_spacing.dart';
 import '../theme/messages_chrome_palette.dart';
 
 @immutable
@@ -481,30 +483,139 @@ class AppTheme {
   }
 
   static ThemeData _baseTheme(ColorScheme scheme) {
+    final inputShape = OutlineInputBorder(borderRadius: AppRadii.lgAll);
+    final buttonShape = RoundedRectangleBorder(borderRadius: AppRadii.lgAll);
+
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      textTheme: TextTheme(
+        displaySmall: TextStyle(
+          color: scheme.onSurface,
+          fontWeight: FontWeight.w800,
+          fontSize: 28,
+          height: 1.15,
+          letterSpacing: -0.4,
+        ),
+        headlineSmall: TextStyle(
+          color: scheme.onSurface,
+          fontWeight: FontWeight.w700,
+          fontSize: 22,
+          height: 1.2,
+        ),
+        titleLarge: TextStyle(
+          color: scheme.onSurface,
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+          height: 1.25,
+        ),
+        titleMedium: TextStyle(
+          color: scheme.onSurface,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+          height: 1.3,
+        ),
+        bodyLarge: TextStyle(
+          color: scheme.onSurface,
+          fontSize: 16,
+          height: 1.45,
+        ),
+        bodyMedium: TextStyle(
+          color: scheme.onSurface,
+          fontSize: 14,
+          height: 1.45,
+        ),
+        bodySmall: TextStyle(
+          color: scheme.onSurfaceVariant,
+          fontSize: 13,
+          height: 1.4,
+        ),
+        labelLarge: TextStyle(
+          color: scheme.onSurface,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+        labelMedium: TextStyle(
+          color: scheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.lg,
+        ),
+        border: inputShape,
+        enabledBorder: inputShape.copyWith(
+          borderSide: BorderSide(color: scheme.outline),
+        ),
+        focusedBorder: inputShape.copyWith(
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
+        ),
+        errorBorder: inputShape.copyWith(
+          borderSide: BorderSide(color: scheme.error),
+        ),
+        focusedErrorBorder: inputShape.copyWith(
+          borderSide: BorderSide(color: scheme.error, width: 1.5),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(64, AppSpacing.minTouchTarget),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          shape: buttonShape,
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minimumSize: const Size(64, AppSpacing.minTouchTarget),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          shape: buttonShape,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minimumSize: const Size(64, AppSpacing.minTouchTarget),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          shape: buttonShape,
+          side: BorderSide(color: scheme.outline),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: const Size(48, AppSpacing.minTouchTarget),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          shape: buttonShape,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        shape: RoundedRectangleBorder(borderRadius: AppRadii.lgAll),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadii.mdAll,
+          side: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
         ),
       ),
       listTileTheme: const ListTileThemeData(
-        contentPadding: EdgeInsets.zero,
-        minLeadingWidth: 0,
-        minVerticalPadding: 0,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.sm,
+        ),
+        minVerticalPadding: AppSpacing.sm,
       ),
     );
   }

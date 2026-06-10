@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/theme/app_theme_context.dart';
 import 'models/server_models.dart';
 import 'server_settings/server_settings_ui.dart';
@@ -198,13 +200,18 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
           body: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.sm,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
                 child: Row(
                   children: [
                     _stepChip(context, 0, _t('chat.createEvent.stepLocation')),
-                    Icon(Icons.chevron_right, color: chrome.textMuted),
+                    Icon(Icons.chevron_right, color: chrome.textMuted, size: 18),
                     _stepChip(context, 1, _t('chat.createEvent.stepDetails')),
-                    Icon(Icons.chevron_right, color: chrome.textMuted),
+                    Icon(Icons.chevron_right, color: chrome.textMuted, size: 18),
                     _stepChip(context, 2, _t('chat.createEvent.stepReview')),
                   ],
                 ),
@@ -232,21 +239,30 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
     final on = _step == idx;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        constraints: const BoxConstraints(minHeight: AppSpacing.touch),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.sm,
+        ),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: on ? c.surface : c.surfaceMuted,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppSpacing.sm),
           border: Border.all(
             color: on ? c.accent : c.border,
+            width: on ? 1.5 : 1,
           ),
         ),
         child: Text(
           label,
           textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: on ? c.text : c.textMuted,
             fontWeight: on ? FontWeight.w800 : FontWeight.w500,
-            fontSize: 12,
+            fontSize: 11,
+            height: 1.2,
           ),
         ),
       ),
@@ -351,23 +367,15 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
             onChanged: (v) => setState(() => _channelId = v ?? ''),
           ),
         ],
-        const SizedBox(height: 28),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _canStep1
-                ? () {
-                    setState(() => _step = 1);
-                    _pageCtrl.jumpToPage(1);
-                  }
-                : null,
-            style: FilledButton.styleFrom(
-              backgroundColor: c.accent,
-              foregroundColor: c.onAccent,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            child: Text(_t('chat.createEvent.next')),
-          ),
+        const SizedBox(height: AppSpacing.xxl),
+        AppButton(
+          label: _t('chat.createEvent.next'),
+          onPressed: _canStep1
+              ? () {
+                  setState(() => _step = 1);
+                  _pageCtrl.jumpToPage(1);
+                }
+              : null,
         ),
       ],
     );
@@ -484,32 +492,30 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
           style: TextStyle(color: c.text),
           decoration: _dec(context, _t('chat.createEvent.coverOptional')),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xxl),
         Row(
           children: [
-            TextButton(
-              onPressed: () {
-                setState(() => _step = 0);
-                _pageCtrl.jumpToPage(0);
-              },
-              child: Text(
-                _t('common.back'),
-                style: TextStyle(color: c.accent),
+            Expanded(
+              child: AppButton(
+                label: _t('common.back'),
+                onPressed: () {
+                  setState(() => _step = 0);
+                  _pageCtrl.jumpToPage(0);
+                },
+                variant: AppButtonVariant.ghost,
               ),
             ),
-            const Spacer(),
-            FilledButton(
-              onPressed: _canStep2
-                  ? () {
-                      setState(() => _step = 2);
-                      _pageCtrl.jumpToPage(2);
-                    }
-                  : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: c.accent,
-                foregroundColor: c.onAccent,
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: AppButton(
+                label: _t('chat.createEvent.next'),
+                onPressed: _canStep2
+                    ? () {
+                        setState(() => _step = 2);
+                        _pageCtrl.jumpToPage(2);
+                      }
+                    : null,
               ),
-              child: Text(_t('chat.createEvent.next')),
             ),
           ],
         ),
@@ -561,38 +567,26 @@ class _CreateServerEventScreenState extends State<CreateServerEventScreen> {
           _t('chat.createEvent.reviewNote'),
           style: TextStyle(color: c.textMuted, fontSize: 13),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xxl),
         Row(
           children: [
-            TextButton(
-              onPressed: () {
-                setState(() => _step = 1);
-                _pageCtrl.jumpToPage(1);
-              },
-              child: Text(
-                _t('common.back'),
-                style: TextStyle(color: c.accent),
+            Expanded(
+              child: AppButton(
+                label: _t('common.back'),
+                onPressed: () {
+                  setState(() => _step = 1);
+                  _pageCtrl.jumpToPage(1);
+                },
+                variant: AppButtonVariant.ghost,
               ),
             ),
-            const Spacer(),
-            FilledButton(
-              onPressed: _submitting || !_canStep2 ? null : _submit,
-              style: FilledButton.styleFrom(
-                backgroundColor: c.accent,
-                foregroundColor: c.onAccent,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: AppButton(
+                label: _t('chat.createEvent.submit'),
+                onPressed: _submitting || !_canStep2 ? null : _submit,
+                loading: _submitting,
               ),
-              child: _submitting
-                  ? SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: c.onAccent,
-                      ),
-                    )
-                  : Text(_t('chat.createEvent.submit')),
             ),
           ],
         ),

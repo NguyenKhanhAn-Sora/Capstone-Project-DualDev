@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/services/accent_color_controller.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme_context.dart';
 import '../../core/theme/messages_chrome_palette.dart';
 import '../../core/services/language_controller.dart';
@@ -265,10 +267,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
 
   void _backToHub() => setState(() => _detailSection = null);
 
-  double _horizontalPad(BuildContext context) {
-    final w = MediaQuery.sizeOf(context).width;
-    return w > 520 ? 24 : 14;
-  }
+  double _horizontalPad(BuildContext context) =>
+      AppSpacing.screenPadding(context).horizontal / 2;
 
   @override
   Widget build(BuildContext context) {
@@ -459,11 +459,14 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
 
   Widget _buildDetail(BuildContext context, double hPad) {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
       padding: EdgeInsets.fromLTRB(
         hPad,
-        4,
+        AppSpacing.sm,
         hPad,
-        MediaQuery.paddingOf(context).bottom + 24,
+        MediaQuery.paddingOf(context).bottom + AppSpacing.huge,
       ),
       child: _buildSectionContent(context, _detailSection!),
     );
@@ -579,10 +582,22 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
             context,
             label: _t('settings.privacy.sharePresence'),
             value: _sharePresence,
-            onChanged: (v) => setState(() {
-              _sharePresence = v;
-              _dirty = true;
-            }),
+            onChanged: (v) async {
+              setState(() {
+                _sharePresence = v;
+                _dirty = true;
+              });
+              try {
+                await DirectMessagesService.updateUserSettings(
+                  sharePresence: v,
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${_t('settings.errorSave')}: $e')),
+                );
+              }
+            },
           ),
         ]),
       ],
@@ -743,206 +758,303 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
         .toList();
     final accents = AccentColorController.accentOptions;
     final chromeHex = AccentColorController.instance.chromeHex;
-
     final c = context.chrome;
+    final modeLabel = AccentColorController.instance.isFollowingSocialAppearance
+        ? _t('settings.appearance.modeFollowSocial')
+        : _appearanceSource == 'accent' && _boostUnlocked
+            ? _t('settings.appearance.modeAccent')
+            : _t('settings.appearance.modeBackground');
+
+    final screenW = MediaQuery.sizeOf(context).width;
+    final accentColumns = screenW < 380 ? 5 : 6;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _hint(context, _t('settings.appearance.mutualHint')),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Text(
-            AccentColorController.instance.isFollowingSocialAppearance
-                ? _t('settings.appearance.modeFollowSocial')
-                : _appearanceSource == 'accent' && _boostUnlocked
-                    ? _t('settings.appearance.modeAccent')
-                    : _t('settings.appearance.modeBackground'),
-            style: TextStyle(
-              color: c.accent,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.4,
-            ),
+        _hint(context, _t('settings.appearance.mutualHintShort')),
+        const SizedBox(height: AppSpacing.md),
+        _appearanceStatusChip(context, modeLabel),
+        const SizedBox(height: AppSpacing.lg),
+        _appearanceSection(
+          context,
+          title: _t('settings.appearance.followSocialTitle'),
+          hint: _t('settings.appearance.followSocialHint'),
+          child: _socialFollowTile(
+            context,
+            active: AccentColorController.instance.isFollowingSocialAppearance,
+            onTap: () async {
+              await AccentColorController.instance.resetToSocialAppearance();
+              setState(() {
+                _syncAppearanceFromController();
+                _dirty = true;
+              });
+            },
           ),
         ),
-        _sectionTitle(context, _t('settings.appearance.followSocialTitle')),
-        _hint(context, _t('settings.appearance.followSocialHint')),
-        _cardWidget(context, [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: _socialFollowSwatch(
-              active: AccentColorController.instance.isFollowingSocialAppearance,
-              onTap: () async {
-                await AccentColorController.instance.resetToSocialAppearance();
-                setState(() {
-                  _syncAppearanceFromController();
-                  _dirty = true;
-                });
-              },
-            ),
+        const SizedBox(height: AppSpacing.xl),
+        _appearanceSection(
+          context,
+          title: _t('settings.appearanceBg.title'),
+          hint: _t('settings.appearanceBg.hintShort'),
+          child: _backgroundPresetRow(
+            context,
+            presetEntries.map((entry) {
+              final color =
+                  MessagesChromePalette.hexToColor(entry.value) ??
+                  const Color(0xFF111827);
+              final shellCustom =
+                  MessagesShellThemeController.instance.hasOverride;
+              final active = _appearanceSource == 'background' &&
+                  shellCustom &&
+                  MessagesShellThemeController.instance.theme ==
+                      MessagesShellTheme.dark &&
+                  MessagesChromePalette.normalizeHex(
+                        AccentColorController.instance.chromeHex,
+                      ) ==
+                      MessagesChromePalette.normalizeHex(entry.value);
+              return _SwatchSpec(
+                color: color,
+                active: active,
+                onTap: () async {
+                  await AccentColorController.instance.setPreset(entry.key);
+                  setState(() {
+                    _syncAppearanceFromController();
+                    _dirty = true;
+                  });
+                },
+              );
+            }).toList(),
           ),
-        ]),
-        const SizedBox(height: 20),
-        _sectionTitle(context, _t('settings.appearanceBg.title')),
-        _hint(context, _t('settings.appearanceBg.hintShort')),
-        _cardWidget(context, [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: presetEntries.map((entry) {
-                final color =
-                    MessagesChromePalette.hexToColor(entry.value) ??
-                    const Color(0xFF111827);
-                final shellCustom =
-                    MessagesShellThemeController.instance.hasOverride;
-                final active = _appearanceSource == 'background' &&
-                    shellCustom &&
-                    MessagesShellThemeController.instance.theme ==
-                        MessagesShellTheme.dark &&
-                    MessagesChromePalette.normalizeHex(
-                          AccentColorController.instance.chromeHex,
-                        ) ==
-                        MessagesChromePalette.normalizeHex(entry.value);
-                return _colorSwatch(
-                  color: color,
-                  active: active,
-                  size: 52,
-                  onTap: () async {
-                    await AccentColorController.instance.setPreset(entry.key);
-                    setState(() {
-                      _syncAppearanceFromController();
-                      _dirty = true;
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 20),
-        _sectionTitle(context, _t('settings.themeColors.title')),
-        if (!_boostUnlocked)
-          _hint(context, _t('settings.themeColors.lockedHint')),
-        _cardWidget(context, [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Opacity(
-              opacity: _boostUnlocked ? 1 : 0.45,
-              child: IgnorePointer(
-                ignoring: !_boostUnlocked,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: accents.map((opt) {
-                    final primary = opt['color'] as Color;
-                    final secondary = opt['secondary'] as Color?;
-                    final hex = AccentColorController.hexFromColor(primary);
-                    final active = _appearanceSource == 'accent' &&
-                        MessagesChromePalette.normalizeHex(
-                              _accentHex ?? '',
-                            ) ==
-                            MessagesChromePalette.normalizeHex(hex);
-                    return _colorSwatch(
-                      color: primary,
-                      secondary: secondary,
-                      active: active,
-                      size: 42,
-                      onTap: () async {
-                        await AccentColorController.instance.setAccentHex(hex);
-                        setState(() {
-                          _syncAppearanceFromController();
-                          _dirty = true;
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        _appearanceSection(
+          context,
+          title: _t('settings.themeColors.title'),
+          hint: _boostUnlocked
+              ? _t('settings.themeColors.hint')
+              : _t('settings.themeColors.lockedHint'),
+          child: Opacity(
+            opacity: _boostUnlocked ? 1 : 0.45,
+            child: IgnorePointer(
+              ignoring: !_boostUnlocked,
+              child: _responsiveSwatchGrid(
+                context,
+                minCellSize: 36,
+                maxCellSize: 40,
+                maxColumns: accentColumns,
+                items: accents.map((opt) {
+                  final primary = opt['color'] as Color;
+                  final secondary = opt['secondary'] as Color?;
+                  final hex = AccentColorController.hexFromColor(primary);
+                  final active = _appearanceSource == 'accent' &&
+                      MessagesChromePalette.normalizeHex(_accentHex ?? '') ==
+                          MessagesChromePalette.normalizeHex(hex);
+                  return _SwatchSpec(
+                    color: primary,
+                    secondary: secondary,
+                    active: active,
+                    onTap: () async {
+                      await AccentColorController.instance.setAccentHex(hex);
+                      setState(() {
+                        _syncAppearanceFromController();
+                        _dirty = true;
+                      });
+                    },
+                  );
+                }).toList(),
               ),
             ),
           ),
-        ]),
+        ),
         if (_boostUnlocked && _appearanceSource == 'accent')
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
             child: Text(
               _t('settings.appearance.currentColor', {'hex': chromeHex}),
               style: TextStyle(color: c.textMuted, fontSize: 12),
+            ),
+          ),
+        const SizedBox(height: AppSpacing.lg),
+      ],
+    );
+  }
+
+  Widget _appearanceStatusChip(BuildContext context, String label) {
+    final c = context.chrome;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: c.accentSoft,
+        borderRadius: AppRadii.mdAll,
+        border: Border.all(color: c.accent.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: c.accent,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _appearanceSection(
+    BuildContext context, {
+    required String title,
+    required String hint,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(context, title),
+        _hint(context, hint),
+        _cardWidget(context, [
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: child,
+          ),
+        ]),
+      ],
+    );
+  }
+
+  /// Ba preset nền — chia đều hàng ngang, không tràn.
+  Widget _backgroundPresetRow(
+    BuildContext context,
+    List<_SwatchSpec> items,
+  ) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final gap = AppSpacing.sm;
+    return Row(
+      children: [
+        for (var i = 0; i < items.length; i++)
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: i == 0 ? 0 : gap / 2,
+                right: i == items.length - 1 ? 0 : gap / 2,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 72),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: _ColorSwatchCell.fromSpec(items[i]),
+                ),
+              ),
             ),
           ),
       ],
     );
   }
 
-  Widget _socialFollowSwatch({
-    required bool active,
-    required VoidCallback onTap,
+  /// Lưới màu responsive — không tràn ngang trên màn hình nhỏ.
+  Widget _responsiveSwatchGrid(
+    BuildContext context, {
+    required List<_SwatchSpec> items,
+    required double minCellSize,
+    required double maxCellSize,
+    required int maxColumns,
+    double gap = AppSpacing.sm,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: active ? Colors.white : Colors.white24,
-            width: active ? 2.5 : 1,
-          ),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFF6F8FB),
-              Color(0xFF0C1220),
-              Color(0xFF2A1A5E),
-              Color(0xFF5865F2),
-            ],
-            stops: [0, 0.42, 0.78, 1],
-          ),
-        ),
-        child: active
-            ? const Icon(Icons.sync_rounded, color: Colors.white, size: 22)
-            : Icon(Icons.sync_rounded, color: Colors.white.withValues(alpha: 0.75), size: 20),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxW = constraints.maxWidth;
+        var cols = maxColumns;
+
+        while (cols > 4) {
+          final minRowW = cols * minCellSize + (cols - 1) * gap;
+          if (minRowW <= maxW) break;
+          cols--;
+        }
+
+        var cell = (maxW - (cols - 1) * gap) / cols;
+        if (cell < minCellSize && cols > 4) {
+          cols--;
+          cell = (maxW - (cols - 1) * gap) / cols;
+        }
+        cell = cell.clamp(minCellSize, maxCellSize);
+
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: items
+              .map(
+                (spec) => SizedBox(
+                  width: cell,
+                  height: cell,
+                  child: _ColorSwatchCell.fromSpec(spec),
+                ),
+              )
+              .toList(),
+        );
+      },
     );
   }
 
-  Widget _colorSwatch({
-    required Color color,
-    Color? secondary,
+  Widget _socialFollowTile(
+    BuildContext context, {
     required bool active,
-    required double size,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(size > 44 ? 10 : 8),
-          border: Border.all(
-            color: active ? Colors.white : Colors.transparent,
-            width: 2.5,
+    final c = context.chrome;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppRadii.lgAll,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadii.lgAll,
+        child: Ink(
+          height: AppSpacing.minTouchTarget,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.lgAll,
+            gradient: const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                Color(0xFFF6F8FB),
+                Color(0xFF0C1220),
+                Color(0xFF2A1A5E),
+                Color(0xFF5865F2),
+              ],
+              stops: [0, 0.35, 0.72, 1],
+            ),
+            border: Border.all(
+              color: active ? c.accent : c.border,
+              width: active ? 2 : 1,
+            ),
           ),
-          gradient: secondary != null
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [color, secondary],
-                )
-              : null,
-          color: secondary == null ? color : null,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.sync_rounded,
+                color: Colors.white.withValues(alpha: active ? 1 : 0.85),
+                size: 20,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: Text(
+                  _t('settings.appearance.followSocialPick'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: active
-            ? Icon(
-                Icons.check_rounded,
-                color: Colors.white,
-                size: size > 44 ? 22 : 18,
-              )
-            : null,
       ),
     );
   }
@@ -1247,6 +1359,78 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
         borderSide: BorderSide.none,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    );
+  }
+}
+
+class _SwatchSpec {
+  const _SwatchSpec({
+    required this.color,
+    required this.active,
+    required this.onTap,
+    this.secondary,
+  });
+
+  final Color color;
+  final Color? secondary;
+  final bool active;
+  final VoidCallback onTap;
+}
+
+class _ColorSwatchCell extends StatelessWidget {
+  const _ColorSwatchCell({
+    required this.color,
+    required this.active,
+    required this.onTap,
+    this.secondary,
+  });
+
+  factory _ColorSwatchCell.fromSpec(_SwatchSpec spec) => _ColorSwatchCell(
+    color: spec.color,
+    secondary: spec.secondary,
+    active: spec.active,
+    onTap: spec.onTap,
+  );
+
+  final Color color;
+  final Color? secondary;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.chrome;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppRadii.mdAll,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadii.mdAll,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.mdAll,
+            border: Border.all(
+              color: active ? c.accent : Colors.transparent,
+              width: 2.5,
+            ),
+            gradient: secondary != null
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [color, secondary!],
+                  )
+                : null,
+            color: secondary == null ? color : null,
+          ),
+          child: active
+              ? Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: MediaQuery.sizeOf(context).width < 360 ? 16 : 18,
+                )
+              : null,
+        ),
+      ),
     );
   }
 }
