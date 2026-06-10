@@ -3,7 +3,7 @@
 import { Fragment, JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
 import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
@@ -498,6 +498,8 @@ export default function HomePage({
   const t = useTranslations("home");
   const tCommon = useTranslations("common");
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const newAdFlag = searchParams.get("newAd");
   const pageSize = pageSizeOverride ?? PAGE_SIZE;
   const [items, setItems] = useState<PostViewState[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1102,7 +1104,27 @@ export default function HomePage({
         }));
         if (nextPage === 1) {
           // Fresh load — replace entire list
-          setItems(mapped);
+          // If user just created a new ad, pin it to the top of the feed
+          const pendingAdPostId =
+            typeof window !== "undefined"
+              ? localStorage.getItem("pendingNewAdPostId")
+              : null;
+          if (pendingAdPostId && newAdFlag) {
+            const adIdx = mapped.findIndex(
+              (p) =>
+                p.item.id === pendingAdPostId ||
+                p.item.repostOf === pendingAdPostId,
+            );
+            const pinned =
+              adIdx > 0
+                ? [mapped[adIdx], ...mapped.slice(0, adIdx), ...mapped.slice(adIdx + 1)]
+                : mapped;
+            localStorage.removeItem("pendingNewAdPostId");
+            router.replace("/", { scroll: false });
+            setItems(pinned);
+          } else {
+            setItems(mapped);
+          }
         } else {
           // Append, deduplicating by id to handle any feed overlap between pages
           setItems((prev) => {

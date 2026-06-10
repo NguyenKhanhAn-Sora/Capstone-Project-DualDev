@@ -9,7 +9,7 @@
   padding: 16px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  animation: likesBackdropIn 200ms ease forwards;
+  animation: likesBackdropIn 200ms ease forwards
 }
 
 @keyframes likesBackdropIn {

@@ -884,7 +884,8 @@
         "paymentStatus": "Trạng thái thanh toán",
         "amount": "Số tiền",
         "backToCreate": "Quay lại tạo quảng cáo",
-        "goToDashboard": "Đến trang tổng quan quảng cáo"
+        "goToDashboard": "Đến trang tổng quan quảng cáo",
+        "viewInFeed": "Xem trong Feed"
       },
       "cancel": {
         "title": "Thanh toán đã hủy",

@@ -965,7 +965,8 @@
         "paymentStatus": "支払いステータス",
         "amount": "金額",
         "backToCreate": "作成に戻る",
-        "goToDashboard": "広告ダッシュボードへ"
+        "goToDashboard": "広告ダッシュボードへ",
+        "viewInFeed": "フィードで見る"
       },
       "cancel": {
         "title": "支払いがキャンセルされました",

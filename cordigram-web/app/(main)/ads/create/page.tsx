@@ -820,6 +820,9 @@ export default function AdsCreatePage() {
         return;
       }
 
+      if (typeof window !== "undefined" && promotedPostId) {
+        localStorage.setItem("pendingNewAdPostId", promotedPostId);
+      }
       window.location.href = session.url;
     } catch (error) {
       const message =
@@ -1358,7 +1361,6 @@ export default function AdsCreatePage() {
                       <span className={styles.quickBudgetLabel}>{t("package.days", { count: item.days })}</span>
                     </div>
                     <span className={styles.quickBudgetAmount}>{toCurrency(item.price)}</span>
-                    <span className={styles.quickBudgetHint}>{item.note}</span>
                   </button>
                 );
               })}

@@ -127,7 +127,10 @@ export default function AdsPaymentSuccessPage() {
           <Link className={styles.secondaryBtn} href="/ads/create">
             {t("backToCreate")}
           </Link>
-          <Link className={styles.primaryBtn} href="/ads">
+          <Link className={styles.primaryBtn} href="/?newAd=1">
+            {t("viewInFeed")}
+          </Link>
+          <Link className={styles.secondaryBtn} href="/ads">
             {t("goToDashboard")}
           </Link>
         </div>

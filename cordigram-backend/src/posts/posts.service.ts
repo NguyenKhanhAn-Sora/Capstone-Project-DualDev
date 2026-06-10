@@ -1143,7 +1143,7 @@ export class PostsService {
 
   private async getSponsoredBoostByPostId(postIds: string[], now: Date) {
     if (!postIds.length) {
-      return new Map<string, number>();
+      return { boostByPostId: new Map<string, number>(), ownerByPostId: new Map<string, string>() };
     }
 
     await this.paymentTransactionModel
@@ -1176,10 +1176,11 @@ export class PostsService {
           { checkoutStatus: 'complete' },
         ],
       })
-      .select('promotedPostId boostWeight')
+      .select('promotedPostId boostWeight userId')
       .lean();
 
     const boostByPostId = new Map<string, number>();
+    const ownerByPostId = new Map<string, string>();
     activeSponsored.forEach((item) => {
       const postId = item.promotedPostId?.toString?.();
       if (!postId) return;
@@ -1192,9 +1193,12 @@ export class PostsService {
       if (weight > current) {
         boostByPostId.set(postId, weight);
       }
+      if (item.userId && !ownerByPostId.has(postId)) {
+        ownerByPostId.set(postId, item.userId.toString());
+      }
     });
 
-    return boostByPostId;
+    return { boostByPostId, ownerByPostId };
   }
 
   private async getSponsoredCtaByPostId(postIds: string[], now: Date) {
@@ -1636,6 +1640,8 @@ export class PostsService {
     >,
     now: Date,
     boostByPostId: Map<string, number>,
+    ownerByPostId: Map<string, string>,
+    currentUserId: string,
   ) {
     if (!scored.length || !sponsoredPostIds.size) {
       return scored;
@@ -1653,6 +1659,12 @@ export class PostsService {
           : '';
 
       if (!promotedId) {
+        return true;
+      }
+
+      // Ad owner always sees their own ad regardless of frequency cap
+      if (ownerByPostId.get(promotedId) === currentUserId) {
+        shownInThisResponse.set(promotedId, (shownInThisResponse.get(promotedId) ?? 0) + 1);
         return true;
       }
 
@@ -2205,10 +2217,8 @@ export class PostsService {
       .map((p) => p._id?.toString?.())
       .filter((id): id is string => Boolean(id));
 
-    const sponsoredBoostByPostId = await this.getSponsoredBoostByPostId(
-      mergedIds,
-      now,
-    );
+    const { boostByPostId: sponsoredBoostByPostId, ownerByPostId: sponsoredOwnerByPostId } =
+      await this.getSponsoredBoostByPostId(mergedIds, now);
     const sponsoredCtaByPostId = await this.getSponsoredCtaByPostId(
       mergedIds,
       now,
@@ -2319,6 +2329,8 @@ export class PostsService {
       impressionSignals,
       now,
       sponsoredBoostByPostId,
+      sponsoredOwnerByPostId,
+      userId,
     );
 
     let prioritized = this.applySponsoredSpacing(
