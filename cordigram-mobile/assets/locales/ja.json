@@ -521,7 +521,9 @@
       "reportProblem": "問題を報告",
       "logout": "ログアウト",
       "switchLight": "ライトモードに切り替え",
-      "switchDark": "ダークモードに切り替え"
+      "switchDark": "ダークモードに切り替え",
+      "switchGalaxy": "ギャラクシーモード",
+      "exitGalaxy": "ギャラクシーモードを終了"
     },
     "visibility": {
       "public": "公開",

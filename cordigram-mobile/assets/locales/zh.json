@@ -521,7 +521,9 @@
       "reportProblem": "报告问题",
       "logout": "退出登录",
       "switchLight": "切换到浅色模式",
-      "switchDark": "切换到深色模式"
+      "switchDark": "切换到深色模式",
+      "switchGalaxy": "星河模式",
+      "exitGalaxy": "退出星河模式"
     },
     "visibility": {
       "public": "公开",

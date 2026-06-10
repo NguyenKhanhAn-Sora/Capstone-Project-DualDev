@@ -1366,7 +1366,13 @@
     "visibilityFollowersDesc": "Chỉ người theo dõi mới xem được",
     "visibilityPrivate": "Riêng tư",
     "visibilityPrivateDesc": "Chỉ mình bạn xem được",
-    "visibilityUpdated": "Đã cập nhật quyền xem"
+    "visibilityUpdated": "Đã cập nhật quyền xem",
+    "storiesCount": "Stories ({count})",
+    "storyCardCount": "{count} thẻ",
+    "musicBg": "♪ Nhạc nền",
+    "you": "Bạn",
+    "follow": "Follow",
+    "following": "Đang theo dõi"
   },
   "storyCreator": {
     "tabMedia": "Ảnh / Video",
@@ -1399,6 +1405,30 @@
     "btnEditPhoto": "Chỉnh sửa",
     "btnEditVideo": "Cắt",
     "labelRotate": "Xoay",
-    "labelZoom": "Zoom"
+    "labelZoom": "Zoom",
+    "createStoryTitle": "Tạo Story",
+    "createStorySub": "Chọn định dạng để bắt đầu",
+    "dragToReposition": "Kéo để đặt lại vị trí",
+    "loading": "Đang tải…",
+    "btnRemoveMusic": "Gỡ nhạc",
+    "labelActions": "Thao tác",
+    "btnAddText": "Thêm văn bản",
+    "btnAddMusic": "Thêm nhạc",
+    "btnChangeMusic": "Đổi nhạc",
+    "labelAddText": "Thêm văn bản",
+    "labelEditText": "Chỉnh văn bản",
+    "labelMusicSection": "Nhạc nền",
+    "btnRemove": "Gỡ",
+    "labelVisibility": "Hiển thị với",
+    "labelUploading": "Đang tải lên…",
+    "trimTitle": "Cắt video",
+    "trimCancel": "Hủy",
+    "trimConfirm": "Xác nhận",
+    "trimPlay": "Phát",
+    "trimPause": "Tạm dừng",
+    "trimDragPlayhead": "Kéo để tua video",
+    "trimTotal": "Tổng",
+    "trimWillUse": "(sẽ dùng)",
+    "trimSeconds": "{s} giây"
   }
 }

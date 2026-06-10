@@ -528,7 +528,9 @@
       "reportProblem": "Báo cáo sự cố",
       "logout": "Đăng xuất",
       "switchLight": "Chuyển sang chế độ sáng",
-      "switchDark": "Chuyển sang chế độ tối"
+      "switchDark": "Chuyển sang chế độ tối",
+      "switchGalaxy": "Chế độ thiên hà",
+      "exitGalaxy": "Thoát chế độ thiên hà"
     },
     "visibility": {
       "public": "Công khai",

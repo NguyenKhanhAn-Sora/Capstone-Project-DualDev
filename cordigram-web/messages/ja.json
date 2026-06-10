@@ -2157,7 +2157,13 @@
     "visibilityFollowersDesc": "フォロワーのみ見ることができます",
     "visibilityPrivate": "自分のみ",
     "visibilityPrivateDesc": "自分だけが見ることができます",
-    "visibilityUpdated": "公開範囲を更新しました"
+    "visibilityUpdated": "公開範囲を更新しました",
+    "storiesCount": "ストーリー ({count})",
+    "storyCardCount": "{count} 件",
+    "musicBg": "♪ BGM",
+    "you": "あなた",
+    "follow": "フォロー",
+    "following": "フォロー中"
   },
   "storyCreator": {
     "tabMedia": "写真 / 動画",
@@ -2190,6 +2196,30 @@
     "btnEditPhoto": "編集",
     "btnEditVideo": "カット",
     "labelRotate": "回転",
-    "labelZoom": "ズーム"
+    "labelZoom": "ズーム",
+    "createStoryTitle": "ストーリーを作成",
+    "createStorySub": "形式を選択して始めましょう",
+    "dragToReposition": "ドラッグして位置を変更",
+    "loading": "読み込み中…",
+    "btnRemoveMusic": "音楽を削除",
+    "labelActions": "操作",
+    "btnAddText": "テキストを追加",
+    "btnAddMusic": "音楽を追加",
+    "btnChangeMusic": "音楽を変更",
+    "labelAddText": "テキストを追加",
+    "labelEditText": "テキストを編集",
+    "labelMusicSection": "BGM",
+    "btnRemove": "削除",
+    "labelVisibility": "公開範囲",
+    "labelUploading": "アップロード中…",
+    "trimTitle": "動画をトリミング",
+    "trimCancel": "キャンセル",
+    "trimConfirm": "確認",
+    "trimPlay": "再生",
+    "trimPause": "一時停止",
+    "trimDragPlayhead": "ドラッグしてシーク",
+    "trimTotal": "合計",
+    "trimWillUse": "（使用される）",
+    "trimSeconds": "{s}秒"
   }
 }

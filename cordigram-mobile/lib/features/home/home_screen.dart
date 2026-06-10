@@ -1931,6 +1931,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Navigator.pop(ctx);
           ThemeController.instance.toggle();
         },
+        onToggleGalaxy: () {
+          Navigator.pop(ctx);
+          ThemeController.instance.toggleGalaxy();
+        },
         onReportProblem: () {
           Navigator.pop(ctx);
           Navigator.of(context).push(
@@ -2603,6 +2607,7 @@ class _ProfileMenuSheet extends StatelessWidget {
     required this.onProfile,
     required this.onSaved,
     required this.onToggleTheme,
+    required this.onToggleGalaxy,
     required this.onSettings,
     required this.onAds,
     this.avatarUrl,
@@ -2618,6 +2623,7 @@ class _ProfileMenuSheet extends StatelessWidget {
   final VoidCallback onProfile;
   final VoidCallback onSaved;
   final VoidCallback onToggleTheme;
+  final VoidCallback onToggleGalaxy;
   final VoidCallback onSettings;
   final VoidCallback onAds;
 
@@ -2718,6 +2724,21 @@ class _ProfileMenuSheet extends StatelessWidget {
                       ? LanguageController.instance.t('home.menu.switchLight')
                       : LanguageController.instance.t('home.menu.switchDark'),
                   onTap: onToggleTheme,
+                );
+              },
+            ),
+            AnimatedBuilder(
+              animation: ThemeController.instance,
+              builder: (_, __) {
+                final isGalaxy = ThemeController.instance.isGalaxyMode;
+                return _SheetItem(
+                  icon: Icons.auto_awesome,
+                  label: isGalaxy
+                      ? LanguageController.instance.t('home.menu.exitGalaxy')
+                      : LanguageController.instance.t('home.menu.switchGalaxy'),
+                  iconColor: isGalaxy ? const Color(0xFF22D3EE) : null,
+                  labelColor: isGalaxy ? const Color(0xFF22D3EE) : null,
+                  onTap: onToggleGalaxy,
                 );
               },
             ),

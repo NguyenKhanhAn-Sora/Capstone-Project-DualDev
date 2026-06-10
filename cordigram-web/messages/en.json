@@ -1366,7 +1366,13 @@
     "visibilityFollowersDesc": "Only your followers can see this",
     "visibilityPrivate": "Private",
     "visibilityPrivateDesc": "Only you can see this",
-    "visibilityUpdated": "Visibility updated"
+    "visibilityUpdated": "Visibility updated",
+    "storiesCount": "Stories ({count})",
+    "storyCardCount": "{count, plural, one {# story} other {# stories}}",
+    "musicBg": "♪ Background music",
+    "you": "You",
+    "follow": "Follow",
+    "following": "Following"
   },
   "storyCreator": {
     "tabMedia": "Photo / Video",
@@ -1399,6 +1405,30 @@
     "btnEditPhoto": "Edit",
     "btnEditVideo": "Trim",
     "labelRotate": "Rotate",
-    "labelZoom": "Zoom"
+    "labelZoom": "Zoom",
+    "createStoryTitle": "Create Story",
+    "createStorySub": "Choose a format to get started",
+    "dragToReposition": "Drag to reposition",
+    "loading": "Loading…",
+    "btnRemoveMusic": "Remove music",
+    "labelActions": "Actions",
+    "btnAddText": "Add Text",
+    "btnAddMusic": "Add music",
+    "btnChangeMusic": "Change music",
+    "labelAddText": "Add text",
+    "labelEditText": "Edit text",
+    "labelMusicSection": "Background music",
+    "btnRemove": "Remove",
+    "labelVisibility": "Visibility",
+    "labelUploading": "Uploading…",
+    "trimTitle": "Trim video",
+    "trimCancel": "Cancel",
+    "trimConfirm": "Confirm",
+    "trimPlay": "Play",
+    "trimPause": "Pause",
+    "trimDragPlayhead": "Drag to seek",
+    "trimTotal": "Total",
+    "trimWillUse": "(will use)",
+    "trimSeconds": "{s}s"
   }
 }

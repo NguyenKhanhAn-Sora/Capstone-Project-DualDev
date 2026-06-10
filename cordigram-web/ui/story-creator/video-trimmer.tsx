@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./video-trimmer.module.css";
 
 const THUMB_COUNT = 18;
@@ -29,6 +30,7 @@ export default function VideoTrimmer({
   onConfirm,
   onCancel,
 }: Props) {
+  const t = useTranslations("storyCreator");
   const getVid = () => previewVideoRef?.current ?? null;
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [thumbsReady, setThumbsReady] = useState(false);
@@ -261,22 +263,22 @@ export default function VideoTrimmer({
   const fmt = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = (sec % 60).toFixed(1);
-    return m > 0 ? `${m}:${s.padStart(4, "0")}` : `${s} giây`;
+    return m > 0 ? `${m}:${s.padStart(4, "0")}` : t("trimSeconds", { s });
   };
 
   return (
     <div className={styles.trimmerRoot}>
       {/* Header */}
       <div className={styles.trimmerHeader}>
-        <button className={styles.trimmerCancel} onClick={onCancel} aria-label="Hủy">
+        <button className={styles.trimmerCancel} onClick={onCancel} aria-label={t("trimCancel")}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" strokeWidth="2"
               strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <span className={styles.trimmerTitle}>Cắt video</span>
+        <span className={styles.trimmerTitle}>{t("trimTitle")}</span>
         <button className={styles.trimmerConfirm}
-          onClick={() => onConfirm(trimStartSec, effectiveEndSec)} aria-label="Xác nhận">
+          onClick={() => onConfirm(trimStartSec, effectiveEndSec)} aria-label={t("trimConfirm")}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.2"
               strokeLinecap="round" strokeLinejoin="round" />
@@ -288,7 +290,7 @@ export default function VideoTrimmer({
       <div className={styles.trimmerWrap}>
         {/* Play button */}
         <button className={styles.playBtn} onClick={togglePlay}
-          aria-label={playing ? "Tạm dừng" : "Phát"}>
+          aria-label={playing ? t("trimPause") : t("trimPlay")}>
           {playing ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <rect x="5" y="4" width="4" height="16" rx="1" />
@@ -352,7 +354,7 @@ export default function VideoTrimmer({
             style={{ left: `${playFrac * 100}%` }}
             onMouseDown={onPlayheadMouseDown}
             onTouchStart={onPlayheadMouseDown}
-            aria-label="Kéo để tua video"
+            aria-label={t("trimDragPlayhead")}
           >
             <div className={styles.playheadLine} />
             <div className={styles.playheadHandle} />
@@ -370,11 +372,11 @@ export default function VideoTrimmer({
       <div className={styles.trimInfo}>
         <span>{fmt(trimStartSec)}</span>
         <span style={{ color: "var(--color-text-muted,#888)", fontSize: 11 }}>
-          tổng: {fmt(duration)}
+          {t("trimTotal")}: {fmt(duration)}
         </span>
         <span className={endExceedsMax ? styles.trimInfoEffective : undefined}>
           {fmt(effectiveEndSec)}
-          {endExceedsMax && <span className={styles.trimInfoEffectiveLabel}> (sẽ dùng)</span>}
+          {endExceedsMax && <span className={styles.trimInfoEffectiveLabel}> {t("trimWillUse")}</span>}
         </span>
       </div>
     </div>

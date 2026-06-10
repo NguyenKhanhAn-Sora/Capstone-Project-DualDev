@@ -13,6 +13,7 @@ import 'core/services/accent_color_controller.dart';
 import 'core/services/language_controller.dart';
 import 'core/services/messages_shell_theme_controller.dart';
 import 'core/services/theme_controller.dart';
+import 'core/widgets/galaxy_background.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/messages/call/dm_call_manager.dart';
@@ -104,22 +105,29 @@ class _MyAppState extends State<MyApp> {
       animation: LanguageController.instance,
       builder: (_, __) => AnimatedBuilder(
         animation: ThemeController.instance,
-        builder: (context, _) => MaterialApp(
-          navigatorKey: appNavigatorKey,
-          title: 'Cordigram Mobile',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeController.instance.themeMode,
-          locale: Locale(LanguageController.instance.language),
-          // Wrap every route with the global call overlay so ring-ins show up
-          // on top of home, feed, profile, settings — everywhere.
-          builder: (ctx, child) =>
-              GlobalCallOverlay(child: child ?? const SizedBox.shrink()),
-          home: AuthStorage.accessToken != null
-              ? HomeScreen()
-              : LoginScreen(),
-        ),
+        builder: (context, _) {
+          final isGalaxy = ThemeController.instance.isGalaxyMode;
+          return MaterialApp(
+            navigatorKey: appNavigatorKey,
+            title: 'Cordigram Mobile',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: isGalaxy ? AppTheme.galaxy : AppTheme.dark,
+            themeMode: ThemeController.instance.themeMode,
+            locale: Locale(LanguageController.instance.language),
+            // Wrap every route with the global call overlay so ring-ins show up
+            // on top of home, feed, profile, settings — everywhere.
+            builder: (ctx, child) {
+              final inner = GlobalCallOverlay(
+                child: child ?? const SizedBox.shrink(),
+              );
+              return isGalaxy ? GalaxyBackground(child: inner) : inner;
+            },
+            home: AuthStorage.accessToken != null
+                ? HomeScreen()
+                : LoginScreen(),
+          );
+        },
       ),
     );
   }

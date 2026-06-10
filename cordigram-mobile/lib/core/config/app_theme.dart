@@ -38,6 +38,18 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     chatBubbleText: Color(0xFFFFFFFF),
   );
 
+  static const AppSemanticColors galaxy = AppSemanticColors(
+    panel: Color(0xFF0B1035),
+    panelMuted: Color(0xFF0D1540),
+    panelBorder: Color(0xFF1A2A6B),
+    text: Color(0xFFE2E8F0),
+    textMuted: Color(0xFF7A90B8),
+    primary: Color(0xFF22D3EE),
+    primarySoft: Color(0xFF0C4A6E),
+    chatBubble: Color(0xFF1A2855),
+    chatBubbleText: Color(0xFFFFFFFF),
+  );
+
   static const AppSemanticColors light = AppSemanticColors(
     panel: Color(0xFFFFFFFF),
     panelMuted: Color(0xFFF5F7FB),
@@ -344,6 +356,71 @@ class AppTheme {
         semantic,
         MessagesChromeTheme(p),
       ],
+    );
+  }
+
+  static ThemeData get galaxy {
+    const scheme = ColorScheme.dark(
+      primary: Color(0xFF22D3EE),
+      onPrimary: Color(0xFF020817),
+      primaryContainer: Color(0xFF0C4A6E),
+      onPrimaryContainer: Color(0xFFE2E8F0),
+      secondary: Color(0xFF7C3AED),
+      onSecondary: Color(0xFFE2E8F0),
+      surface: Color(0xFF0B1035),
+      onSurface: Color(0xFFE2E8F0),
+      onSurfaceVariant: Color(0xFF7A90B8),
+      surfaceContainerHighest: Color(0xFF0D1540),
+      outline: Color(0xFF1A2A6B),
+      outlineVariant: Color(0xFF1A2A6B),
+      error: Color(0xFFE53935),
+      onError: Colors.white,
+    );
+
+    return _baseTheme(scheme).copyWith(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: Colors.transparent,
+      canvasColor: Colors.transparent,
+      cardColor: const Color(0xFF0B1035),
+      dividerColor: const Color(0xFF1A2A6B),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Color(0xFFE2E8F0),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        iconTheme: IconThemeData(color: Color(0xFFE2E8F0)),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Color(0xFF0B1035),
+        modalBackgroundColor: Color(0xFF0B1035),
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: Color(0xFF0B1035),
+        surfaceTintColor: Colors.transparent,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: const Color(0xFF08112A),
+        indicatorColor: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            color: selected
+                ? const Color(0xFF22D3EE)
+                : const Color(0xFF7A90B8),
+            fontSize: 12,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected
+                ? const Color(0xFF22D3EE)
+                : const Color(0xFF7A90B8),
+          );
+        }),
+      ),
+      extensions: const <ThemeExtension<dynamic>>[AppSemanticColors.galaxy],
     );
   }
 

@@ -527,7 +527,9 @@
       "reportProblem": "Report a problem",
       "logout": "Log out",
       "switchLight": "Switch to light mode",
-      "switchDark": "Switch to dark mode"
+      "switchDark": "Switch to dark mode",
+      "switchGalaxy": "Galaxy mode",
+      "exitGalaxy": "Exit galaxy mode"
     },
     "visibility": {
       "public": "Public",

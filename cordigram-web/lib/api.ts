@@ -4865,7 +4865,7 @@ export async function markStoryViewed(opts: {
 export async function fetchStoryViewers(opts: {
   token: string;
   storyId: string;
-}): Promise<{ viewers: { userId: string; viewedAt: string; username: string | null; displayName: string | null; avatarUrl: string | null; reaction?: string | null }[]; totalViews: number }> {
+}): Promise<{ viewers: { userId: string; viewedAt: string; username: string | null; displayName: string | null; avatarUrl: string | null; reaction?: string | null; isFollowing: boolean }[]; totalViews: number }> {
   return apiFetch({
     path: `/stories/${opts.storyId}/viewers`,
     method: 'GET',

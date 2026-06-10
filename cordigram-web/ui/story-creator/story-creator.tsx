@@ -580,8 +580,8 @@ export default function StoryCreator({ token, onCreated }: Props) {
     return (
       <div className={styles.selectScreen}>
         <div className={styles.selectHeader}>
-          <h2 className={styles.selectTitle}>Create Story</h2>
-          <p className={styles.selectSub}>Choose a format to get started</p>
+          <h2 className={styles.selectTitle}>{t("createStoryTitle")}</h2>
+          <p className={styles.selectSub}>{t("createStorySub")}</p>
         </div>
         <div className={styles.selectCards}>
           <button className={styles.selectCard} onClick={selectMedia}>
@@ -660,7 +660,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
       <>
         <div className={styles.editorRoot}>
           <div className={styles.editorHeader}>
-            <button className={styles.editorBackBtn} onClick={handleBack} aria-label="Back">
+            <button className={styles.editorBackBtn} onClick={handleBack} aria-label={t("btnBack")}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -704,7 +704,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
                     <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M3 12h18M12 3v18"
                       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <span>Drag to reposition</span>
+                  <span>{t("dragToReposition")}</span>
                 </div>
               )}
 
@@ -803,7 +803,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
       <>
         <div className={styles.editorPlaceholder}>
           <div className={styles.editorPlaceholderInner}>
-            <p style={{ color: "var(--color-text-muted,#888)" }}>Loading…</p>
+            <p style={{ color: "var(--color-text-muted,#888)" }}>{t("loading")}</p>
           </div>
           <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={handleFileInput} />
         </div>
@@ -884,7 +884,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
                       className={styles.musicStickerRemove}
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); setSelectedMusic(null); }}
-                      aria-label="Gỡ nhạc"
+                      aria-label={t("btnRemoveMusic")}
                     >
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                         <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
@@ -982,7 +982,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
             {/* Action buttons — Edit, Add Text, Change Photo */}
             {step === "media" && (
               <div className={styles.optionCard}>
-                <p className={styles.optionCardLabel}>Actions</p>
+                <p className={styles.optionCardLabel}>{t("labelActions")}</p>
                 <div className={styles.actionBtnsRow}>
                   <button className={styles.toolbarBtn} onClick={() => setMediaSubStep("editor")} title={mediaType === "image" ? t("btnEditPhoto") : t("btnEditVideo")}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -992,9 +992,9 @@ export default function StoryCreator({ token, onCreated }: Props) {
                     <span>{mediaType === "image" ? t("btnEditPhoto") : t("btnEditVideo")}</span>
                   </button>
                   {mediaType === "image" && (
-                    <button className={`${styles.toolbarBtn} ${styles.toolbarBtnAaWrap}`} onClick={() => setAddTextTrigger((n) => n + 1)} title="Add Text">
+                    <button className={`${styles.toolbarBtn} ${styles.toolbarBtnAaWrap}`} onClick={() => setAddTextTrigger((n) => n + 1)} title={t("btnAddText")}>
                       <span className={styles.toolbarBtnAa}>Aa</span>
-                      <span>Add Text</span>
+                      <span>{t("btnAddText")}</span>
                     </button>
                   )}
                   <button className={styles.toolbarBtn} onClick={() => fileInputRef.current?.click()} title={mediaType === "image" ? t("btnChangePhoto") : t("btnChangeVideo")}>
@@ -1007,14 +1007,14 @@ export default function StoryCreator({ token, onCreated }: Props) {
                     <button
                       className={`${styles.toolbarBtn} ${selectedMusic ? styles.toolbarBtnActive : ""}`}
                       onClick={() => setShowMusicPicker((o) => !o)}
-                      title="Thêm nhạc"
+                      title={t("btnAddMusic")}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                         <path d="M9 18V6l12-2v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
                         <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="2" />
                       </svg>
-                      <span>{selectedMusic ? "Đổi nhạc" : "Thêm nhạc"}</span>
+                      <span>{selectedMusic ? t("btnChangeMusic") : t("btnAddMusic")}</span>
                     </button>
                   )}
                 </div>
@@ -1024,7 +1024,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
             {/* Text overlay controls — shown when an overlay is selected or in input mode */}
             {step === "media" && mediaType === "image" && (textSelectedId !== null || textInputMode) && (
               <div className={styles.optionCard}>
-                <p className={styles.optionCardLabel}>{textInputMode ? "Thêm văn bản" : "Chỉnh văn bản"}</p>
+                <p className={styles.optionCardLabel}>{textInputMode ? t("labelAddText") : t("labelEditText")}</p>
                 <div className={styles.textSwatches}>
                   {OVERLAY_COLORS.map((c) => {
                     const active = textSelectedId
@@ -1072,26 +1072,26 @@ export default function StoryCreator({ token, onCreated }: Props) {
 
             {step === "text" && (
               <div className={styles.optionCard}>
-                <p className={styles.optionCardLabel}>Nhạc nền</p>
+                <p className={styles.optionCardLabel}>{t("labelMusicSection")}</p>
                 <div className={styles.actionBtnsRow}>
                   <button
                     className={`${styles.toolbarBtn} ${selectedMusic ? styles.toolbarBtnActive : ""}`}
                     onClick={() => setShowMusicPicker((o) => !o)}
-                    title="Thêm nhạc"
+                    title={t("btnAddMusic")}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                       <path d="M9 18V6l12-2v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
                       <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="2" />
                     </svg>
-                    <span>{selectedMusic ? selectedMusic.title : "Thêm nhạc"}</span>
+                    <span>{selectedMusic ? selectedMusic.title : t("btnAddMusic")}</span>
                   </button>
                   {selectedMusic && (
                     <button className={styles.toolbarBtn} onClick={() => setSelectedMusic(null)}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                         <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       </svg>
-                      <span>Gỡ</span>
+                      <span>{t("btnRemove")}</span>
                     </button>
                   )}
                 </div>
@@ -1110,7 +1110,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
             )}
 
             <div className={styles.optionCard}>
-              <p className={styles.optionCardLabel}>Visibility</p>
+              <p className={styles.optionCardLabel}>{t("labelVisibility")}</p>
               <div className={styles.visWrapper} ref={visDropRef}>
                 <button className={styles.visButton} onClick={() => setVisDropOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={visDropOpen}>
                   <span className={styles.visIcon}><selectedVis.Icon /></span>
@@ -1142,7 +1142,7 @@ export default function StoryCreator({ token, onCreated }: Props) {
             {uploading && (
               <div className={styles.progressCard}>
                 <div className={styles.progressHeader}>
-                  <span className={styles.progressLabel}>Uploading…</span>
+                  <span className={styles.progressLabel}>{t("labelUploading")}</span>
                   <span className={styles.progressPct}>{uploadProgress}%</span>
                 </div>
                 <div className={styles.progressTrack}>
