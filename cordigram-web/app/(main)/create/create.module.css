@@ -536,10 +536,10 @@
 .primaryButton {
   padding: 13px 22px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #0369a1, #0ea5e9 50%, #22d3ee);
+  background: linear-gradient(135deg, var(--color-primary, #4aa3e4) 0%, #7c3aed 100%);
   color: #fff;
   box-shadow:
-    0 12px 32px rgba(14, 165, 233, 0.32),
+    0 12px 32px rgba(99, 102, 241, 0.32),
     0 1px 0 rgba(255, 255, 255, 0.18) inset;
   position: relative;
   overflow: hidden;
@@ -575,17 +575,17 @@
 }
 
 .secondaryButton:hover {
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: rgba(99, 102, 241, 0.35);
   background: var(--color-surface-muted);
 }
 
 .primaryGhost {
   padding: 10px 16px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #0369a1, #0ea5e9 50%, #22d3ee);
+  background: linear-gradient(135deg, var(--color-primary, #4aa3e4) 0%, #7c3aed 100%);
   color: #fff;
   box-shadow:
-    0 8px 22px rgba(14, 165, 233, 0.28),
+    0 8px 22px rgba(99, 102, 241, 0.28),
     0 1px 0 rgba(255, 255, 255, 0.15) inset;
 }
 

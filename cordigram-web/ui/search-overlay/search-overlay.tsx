@@ -15,6 +15,7 @@ import {
   addSearchHistory,
   clearSearchHistory,
   deleteSearchHistoryItem,
+  fetchProfileDetail,
   fetchSearchHistory,
   searchPosts,
   searchProfiles,
@@ -238,7 +239,65 @@ export default function SearchOverlay(props: {
     setHistoryLoading(true);
     fetchSearchHistory({ token })
       .then((res) => {
-        setHistory(res.items ?? []);
+        const items = res.items ?? [];
+        setHistory(items);
+
+        const profileItems = items.filter(
+          (x) => x.kind === "profile" && x.refId,
+        );
+        if (profileItems.length > 0) {
+          Promise.allSettled(
+            profileItems.map(async (item) => {
+              const fresh = await fetchProfileDetail({ token, id: item.refId });
+
+              const newImageUrl = fresh.avatarUrl || item.imageUrl;
+              const newLabel = fresh.displayName || item.label;
+              const newSubtitle = fresh.username
+                ? `@${fresh.username}`
+                : item.subtitle;
+
+              const changed =
+                newImageUrl !== item.imageUrl ||
+                newLabel !== item.label ||
+                newSubtitle !== item.subtitle;
+
+              if (!changed) return null;
+
+              // Write fresh data back to backend so next open loads it directly
+              const saved = await addSearchHistory({
+                token,
+                item: {
+                  kind: "profile",
+                  userId: item.refId,
+                  username: fresh.username || item.refSlug,
+                  displayName: fresh.displayName || item.label,
+                  avatarUrl: fresh.avatarUrl || item.imageUrl,
+                },
+              });
+
+              return { oldId: item.id, saved };
+            }),
+          ).then((results) => {
+            const updates: Array<{
+              oldId: string;
+              saved: SearchHistoryItem;
+            }> = [];
+            for (const r of results) {
+              if (r.status === "fulfilled" && r.value) updates.push(r.value);
+            }
+            if (updates.length > 0) {
+              setHistory((prev) => {
+                let next = [...prev];
+                for (const { oldId, saved } of updates) {
+                  next = next.map((item) =>
+                    item.id === oldId || item.id === saved.id ? saved : item,
+                  );
+                }
+                return next;
+              });
+            }
+          });
+        }
       })
       .catch((err: any) => {
         setHistoryError(err?.message || t("recent.loadFailed"));
@@ -536,6 +595,7 @@ export default function SearchOverlay(props: {
     const trimmed = query.trim();
     if (!trimmed) return;
     e.preventDefault();
+    void addToHistory({ kind: "query", query: trimmed });
     router.push(`/search?q=${encodeURIComponent(trimmed)}`);
     onClose();
   };
@@ -635,9 +695,6 @@ export default function SearchOverlay(props: {
                 ) : null}
               </div>
 
-              {historyLoading ? (
-                <div className={styles.loading}>{t("recent.loading")}</div>
-              ) : null}
               {historyError ? (
                 <div className={styles.error}>{historyError}</div>
               ) : null}

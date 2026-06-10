@@ -9,10 +9,49 @@ import {
   apiFetch,
   suggestCompanies,
   updateMyProfile,
+  upsertRecentAccount,
   type CompanySuggestItem,
   type ProfileDetailResponse,
   type UpdateMyProfilePayload,
 } from "@/lib/api";
+
+function syncRecentAccountProfile(opts: {
+  token: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+}) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem("recentAccounts");
+    if (!raw) return;
+    const items = JSON.parse(raw) as Array<{
+      email: string;
+      username?: string;
+      displayName?: string;
+      avatarUrl?: string;
+      lastUsed: number;
+    }>;
+    if (!Array.isArray(items)) return;
+    const match = items.find((x) => x.username === opts.username);
+    if (!match) return;
+    const updated = items.map((item) =>
+      item.email === match.email
+        ? { ...item, displayName: opts.displayName, avatarUrl: opts.avatarUrl, username: opts.username }
+        : item,
+    );
+    window.localStorage.setItem("recentAccounts", JSON.stringify(updated));
+    upsertRecentAccount({
+      token: opts.token,
+      payload: {
+        email: match.email,
+        displayName: opts.displayName,
+        username: opts.username,
+        avatarUrl: opts.avatarUrl,
+      },
+    }).catch(() => {});
+  } catch (_err) {}
+}
 
 const USERNAME_REGEX = /^(?!.*\.\.)[a-z0-9][a-z0-9_.]{1,18}[a-z0-9]$/;
 type GeoStatus = "idle" | "requesting" | "granted" | "denied" | "error";
@@ -769,6 +808,14 @@ export default function ProfileEditOverlay({
 
       const updated = await updateMyProfile({ token, payload });
       onSaved(updated);
+      if (token) {
+        syncRecentAccountProfile({
+          token,
+          username: updated.username,
+          displayName: updated.displayName,
+          avatarUrl: updated.avatarUrl,
+        });
+      }
       onClose();
     } catch (err) {
       const message =

@@ -2157,7 +2157,13 @@
     "visibilityFollowersDesc": "仅关注者可以查看",
     "visibilityPrivate": "私密",
     "visibilityPrivateDesc": "仅自己可见",
-    "visibilityUpdated": "可见范围已更新"
+    "visibilityUpdated": "可见范围已更新",
+    "storiesCount": "故事 ({count})",
+    "storyCardCount": "{count} 条",
+    "musicBg": "♪ 背景音乐",
+    "you": "你",
+    "follow": "关注",
+    "following": "已关注"
   },
   "storyCreator": {
     "tabMedia": "照片 / 视频",
@@ -2190,6 +2196,30 @@
     "btnEditPhoto": "编辑",
     "btnEditVideo": "裁剪",
     "labelRotate": "旋转",
-    "labelZoom": "缩放"
+    "labelZoom": "缩放",
+    "createStoryTitle": "创建故事",
+    "createStorySub": "选择一种格式开始",
+    "dragToReposition": "拖动以重新定位",
+    "loading": "加载中…",
+    "btnRemoveMusic": "移除音乐",
+    "labelActions": "操作",
+    "btnAddText": "添加文字",
+    "btnAddMusic": "添加音乐",
+    "btnChangeMusic": "更换音乐",
+    "labelAddText": "添加文字",
+    "labelEditText": "编辑文字",
+    "labelMusicSection": "背景音乐",
+    "btnRemove": "移除",
+    "labelVisibility": "可见范围",
+    "labelUploading": "上传中…",
+    "trimTitle": "裁剪视频",
+    "trimCancel": "取消",
+    "trimConfirm": "确认",
+    "trimPlay": "播放",
+    "trimPause": "暂停",
+    "trimDragPlayhead": "拖动以定位",
+    "trimTotal": "总计",
+    "trimWillUse": "（将使用）",
+    "trimSeconds": "{s}秒"
   }
 }

@@ -42,6 +42,7 @@ import 'services/post_interaction_service.dart';
 import 'widgets/post_card.dart';
 import 'widgets/people_you_may_know.dart';
 import 'widgets/upload_progress_banner.dart';
+import '../story/widgets/story_bar.dart';
 import '../../core/services/language_controller.dart';
 import '../../core/services/post_upload_controller.dart';
 import '../../core/services/app_update_service.dart';
@@ -1931,6 +1932,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Navigator.pop(ctx);
           ThemeController.instance.toggle();
         },
+        onToggleGalaxy: () {
+          Navigator.pop(ctx);
+          ThemeController.instance.toggleGalaxy();
+        },
         onReportProblem: () {
           Navigator.pop(ctx);
           Navigator.of(context).push(
@@ -2122,6 +2127,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(
+                child: StoryBar(viewerId: _viewerId, avatarUrl: _avatarUrl),
+              ),
+              SliverToBoxAdapter(
                 child: PeopleYouMayKnow(onOpenProfile: _openUserProfile),
               ),
               SliverToBoxAdapter(child: _buildLiveNowSection()),
@@ -2147,6 +2155,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          // Story bar
+          SliverToBoxAdapter(
+            child: StoryBar(viewerId: _viewerId, avatarUrl: _avatarUrl),
+          ),
           // People you may know strip
           SliverToBoxAdapter(
             child: PeopleYouMayKnow(onOpenProfile: _openUserProfile),
@@ -2603,6 +2615,7 @@ class _ProfileMenuSheet extends StatelessWidget {
     required this.onProfile,
     required this.onSaved,
     required this.onToggleTheme,
+    required this.onToggleGalaxy,
     required this.onSettings,
     required this.onAds,
     this.avatarUrl,
@@ -2618,6 +2631,7 @@ class _ProfileMenuSheet extends StatelessWidget {
   final VoidCallback onProfile;
   final VoidCallback onSaved;
   final VoidCallback onToggleTheme;
+  final VoidCallback onToggleGalaxy;
   final VoidCallback onSettings;
   final VoidCallback onAds;
 
@@ -2718,6 +2732,21 @@ class _ProfileMenuSheet extends StatelessWidget {
                       ? LanguageController.instance.t('home.menu.switchLight')
                       : LanguageController.instance.t('home.menu.switchDark'),
                   onTap: onToggleTheme,
+                );
+              },
+            ),
+            AnimatedBuilder(
+              animation: ThemeController.instance,
+              builder: (_, __) {
+                final isGalaxy = ThemeController.instance.isGalaxyMode;
+                return _SheetItem(
+                  icon: Icons.auto_awesome,
+                  label: isGalaxy
+                      ? LanguageController.instance.t('home.menu.exitGalaxy')
+                      : LanguageController.instance.t('home.menu.switchGalaxy'),
+                  iconColor: isGalaxy ? const Color(0xFF22D3EE) : null,
+                  labelColor: isGalaxy ? const Color(0xFF22D3EE) : null,
+                  onTap: onToggleGalaxy,
                 );
               },
             ),

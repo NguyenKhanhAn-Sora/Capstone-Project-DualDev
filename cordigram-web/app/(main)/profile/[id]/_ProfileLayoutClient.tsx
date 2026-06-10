@@ -28,6 +28,7 @@ import {
   fetchUserPosts,
   fetchUserReels,
   fetchSavedItems,
+  upsertRecentAccount,
   type FeedItem,
   type ProfileDetailResponse,
   resetProfileAvatar,
@@ -1015,13 +1016,25 @@ export default function ProfileLayoutClient({
         lastUsed?: number;
       }>;
       if (!Array.isArray(accounts)) return;
+      const match = accounts.find((a) => a.username === profile.username);
+      if (!match) return;
       const updated = accounts.map((a) =>
-        a.username === profile.username ? { ...a, avatarUrl: newAvatarUrl } : a,
+        a.email === match.email ? { ...a, avatarUrl: newAvatarUrl } : a,
       );
       window.localStorage.setItem("recentAccounts", JSON.stringify(updated));
-    } catch (_err) {
-      // ignore
-    }
+      const t = getStoredAccessToken();
+      if (t) {
+        upsertRecentAccount({
+          token: t,
+          payload: {
+            email: match.email,
+            displayName: match.displayName,
+            username: match.username,
+            avatarUrl: newAvatarUrl,
+          },
+        }).catch(() => {});
+      }
+    } catch (_err) {}
   };
 
   const handleAvatarUploadSelect = () => {

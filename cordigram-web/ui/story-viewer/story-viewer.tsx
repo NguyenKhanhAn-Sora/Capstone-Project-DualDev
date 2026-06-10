@@ -46,10 +46,10 @@ export default function StoryViewer({
 }: Props) {
   const [groupIdx, setGroupIdx] = useState(initialGroupIndex);
   const [storyIdx, setStoryIdx] = useState(0);
+  const [listVisible, setListVisible] = useState(15);
   const [progress, setProgress] = useState(0); // 0-100
   const [paused, setPaused] = useState(false);
   const [reply, setReply] = useState("");
-  const [showEmoji, setShowEmoji] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
   const [showVisibility, setShowVisibility] = useState(false);
@@ -76,8 +76,8 @@ export default function StoryViewer({
   const viewedRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
   const storyContentRef = useRef<HTMLDivElement>(null);
-  const tapHoldRef = useRef(false); // true only when tap-zone hold is active
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [contentH, setContentH] = useState(844);
   const contentW = Math.round(contentH * (9 / 16));
 
@@ -104,8 +104,8 @@ export default function StoryViewer({
     progressValRef.current = 0;
     setProgress(0);
     setReply("");
-    setShowEmoji(false);
     setShowMenu(false);
+    setPaused(false);
     setReactionLocal(story.myReaction);
 
     // Mark viewed
@@ -172,24 +172,6 @@ export default function StoryViewer({
       resetProgress();
     }
   }, [groupIdx, storyIdx, groups]);
-
-  const goPrevGroup = useCallback(() => {
-    if (groupIdx > 0) {
-      setGroupIdx((g) => g - 1);
-      setStoryIdx(0);
-      resetProgress();
-    }
-  }, [groupIdx]);
-
-  const goNextGroup = useCallback(() => {
-    if (groupIdx < groups.length - 1) {
-      setGroupIdx((g) => g + 1);
-      setStoryIdx(0);
-      resetProgress();
-    } else {
-      onClose();
-    }
-  }, [groupIdx, groups, onClose]);
 
   // Keyboard nav
   useEffect(() => {
@@ -285,7 +267,6 @@ export default function StoryViewer({
 
   const handleReact = async (emoji: string) => {
     if (!token || !story) return;
-    setShowEmoji(false);
     const prev = reactionLocal;
     setReactionLocal(emoji);
     try {
@@ -412,13 +393,75 @@ export default function StoryViewer({
 
   if (!group || !story) return null;
 
+  const handleListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+      setListVisible((v) => Math.min(v + 15, groups.length));
+    }
+  };
+
+  const jumpToGroup = (idx: number) => {
+    setGroupIdx(idx);
+    setStoryIdx(0);
+  };
+
   const content = (
     <div className={styles.overlay} role="dialog" aria-modal>
       <GalaxyBackground scoped />
 
-      {/* Desktop nav buttons */}
-      {groupIdx > 0 && (
-        <button className={styles.navPrev} onClick={goPrevGroup} aria-label={t("prevGroup")}>
+      {/* Story user list sidebar */}
+      <div className={styles.storyList}>
+        <div className={styles.storyListHeader}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+            <circle cx="12" cy="12" r="3.5" fill="currentColor"/>
+            <path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+          <span>{t("storiesCount", { count: groups.length })}</span>
+        </div>
+        <div ref={listRef} className={styles.storyListScroll} onScroll={handleListScroll}>
+          {groups.slice(0, listVisible).map((g, idx) => {
+            const isActive = idx === groupIdx;
+            const unviewed = g.hasUnviewed;
+            return (
+              <button
+                key={g.userId}
+                className={`${styles.storyListItem} ${isActive ? styles.storyListItemActive : ""}`}
+                onClick={() => jumpToGroup(idx)}
+              >
+                <div className={unviewed ? styles.avatarRingGalaxy : styles.avatarRingViewed}>
+                  {g.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={g.avatarUrl} alt="" className={styles.storyListAvatar} />
+                  ) : (
+                    <div className={styles.storyListAvatarPlaceholder}>
+                      {(g.username || "U")[0].toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className={styles.storyListInfo}>
+                  <span className={styles.storyListUsername}>@{g.username}</span>
+                  <span className={styles.storyListMeta}>
+                    {t("storyCardCount", { count: g.stories.length })}
+                    {" · "}{formatRelativeTime(g.latestStoryAt)}
+                  </span>
+                </div>
+                {isActive && <div className={styles.storyListActiveDot} />}
+              </button>
+            );
+          })}
+          {listVisible < groups.length && (
+            <div className={styles.storyListLoadMore}>
+              <span />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Desktop nav buttons — position: absolute so they never affect container centering */}
+      {(storyIdx > 0 || groupIdx > 0) && (
+        <button className={styles.navPrev} onClick={goPrev} aria-label={t("prevStory")}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
       )}
@@ -573,31 +616,6 @@ export default function StoryViewer({
           ))}
         </div>
 
-        {/* Tap zones */}
-        <div className={styles.tapZones}>
-          <div
-            className={styles.tapLeft}
-            onPointerDown={() => { if (showMenu || showEmoji) return; tapHoldRef.current = true; setPaused(true); }}
-            onPointerUp={() => {
-              if (showMenu) { setShowMenu(false); setPaused(false); return; }
-              if (showEmoji) { setShowEmoji(false); setPaused(false); return; }
-              tapHoldRef.current = false; setPaused(false); goPrev();
-            }}
-            onPointerLeave={() => { if (tapHoldRef.current) { tapHoldRef.current = false; setPaused(false); } }}
-            aria-label={t("prevStory")}
-          />
-          <div
-            className={styles.tapRight}
-            onPointerDown={() => { if (showMenu || showEmoji) return; tapHoldRef.current = true; setPaused(true); }}
-            onPointerUp={() => {
-              if (showMenu) { setShowMenu(false); setPaused(false); return; }
-              if (showEmoji) { setShowEmoji(false); setPaused(false); return; }
-              tapHoldRef.current = false; setPaused(false); goNext();
-            }}
-            onPointerLeave={() => { if (tapHoldRef.current) { tapHoldRef.current = false; setPaused(false); } }}
-            aria-label={t("nextStory")}
-          />
-        </div>
 
         {/* Location tag */}
         {story.location && (
@@ -620,7 +638,7 @@ export default function StoryViewer({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={story.music.coverUrl} alt={story.music.title} className={styles.musicStickerCover} />
             <div className={styles.musicStickerInfo}>
-              <span className={styles.musicStickerLabel}>♪ Nhạc nền</span>
+              <span className={styles.musicStickerLabel}>{t("musicBg")}</span>
               <span className={styles.musicStickerTitle}>{story.music.title}</span>
               <span className={styles.musicStickerArtist}>{story.music.artist}</span>
             </div>
@@ -745,7 +763,7 @@ export default function StoryViewer({
                       <span className={styles.viewerReaction}>{v.reaction}</span>
                     )}
                     {isMe ? (
-                      <span className={styles.viewerYouBadge}>You</span>
+                      <span className={styles.viewerYouBadge}>{t("you")}</span>
                     ) : (
                       <button
                         className={`${styles.viewerFollowBtn} ${isFollowing ? styles.viewerFollowingBtn : ""}`}
@@ -754,7 +772,7 @@ export default function StoryViewer({
                       >
                         {isLoading ? (
                           <span className={styles.viewerFollowSpinner} />
-                        ) : isFollowing ? "Following" : "Follow"}
+                        ) : isFollowing ? t("following") : t("follow")}
                       </button>
                     )}
                   </div>
@@ -820,8 +838,8 @@ export default function StoryViewer({
         )}
       </div>
 
-      {groupIdx < groups.length - 1 && (
-        <button className={styles.navNext} onClick={goNextGroup} aria-label={t("nextGroup")}>
+      {(storyIdx < group.stories.length - 1 || groupIdx < groups.length - 1) && (
+        <button className={styles.navNext} onClick={goNext} aria-label={t("nextStory")}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
       )}

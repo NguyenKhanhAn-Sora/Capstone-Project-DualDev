@@ -339,35 +339,39 @@
   gap: 6px;
   padding: 7px 14px;
   border-radius: 20px;
-  border: 1px solid rgba(99,102,241,0.35);
-  background: rgba(10,10,30,0.7);
-  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.12);
+  background: linear-gradient(135deg, var(--color-primary, #4aa3e4) 0%, #7c3aed 100%);
+  color: #fff;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.15s, box-shadow 0.18s;
+  transition: opacity 0.18s, transform 0.15s, box-shadow 0.18s;
   box-shadow:
-    0 2px 10px rgba(0,0,0,0.35),
-    inset 0 1px 0 rgba(255,255,255,0.08);
+    0 2px 10px rgba(99,102,241,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.14);
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
 }
 
-[data-theme="dark"] .toolbarBtn {
-  background: rgba(8,8,24,0.8);
-  border-color: rgba(99,102,241,0.4);
+.toolbarBtn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.45s ease;
+  pointer-events: none;
 }
+
+.toolbarBtn:hover::after { transform: translateX(120%); }
 
 .toolbarBtn:hover {
-  background: rgba(99,102,241,0.2);
-  border-color: rgba(99,102,241,0.7);
-  color: #fff;
+  opacity: 0.9;
   transform: translateY(-2px);
   box-shadow:
-    0 0 16px rgba(99,102,241,0.3),
-    0 4px 16px rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255,255,255,0.12);
+    0 4px 16px rgba(99,102,241,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.18);
 }
 
 .toolbarBtn:active {
@@ -1223,7 +1227,7 @@
 }
 
 .uploadBtn {
-  background: var(--color-primary, #6366f1);
+  background: linear-gradient(135deg, var(--color-primary, #4aa3e4) 0%, #7c3aed 100%);
   color: #fff;
   border: none;
   border-radius: 24px;
@@ -1313,7 +1317,7 @@
   padding: 8px 22px;
   border-radius: 20px;
   border: none;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--color-primary, #4aa3e4) 0%, #7c3aed 100%);
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -1650,4 +1654,130 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Light mode overrides  ([data-theme="light"])
+   Dark / galaxy modes are untouched — these rules only
+   kick in when the html element carries data-theme="light"
+═══════════════════════════════════════════════════════ */
+
+/* Toolbar action buttons (Edit, Add Text, Change photo, Thêm nhạc) */
+[data-theme="light"] .toolbarBtn {
+  box-shadow: 0 2px 8px rgba(99,102,241,0.22), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+
+[data-theme="light"] .toolbarBtn:hover {
+  opacity: 0.88;
+  box-shadow: 0 3px 12px rgba(99,102,241,0.32);
+}
+
+[data-theme="light"] .toolbarBtnActive {
+  opacity: 0.85 !important;
+  box-shadow: 0 1px 6px rgba(99,102,241,0.2) !important;
+}
+
+/* Photo editor tools panel */
+[data-theme="light"] .photoEditorTools {
+  background: rgba(248,249,255,0.97);
+  border-color: rgba(99,102,241,0.18);
+  box-shadow:
+    0 4px 20px rgba(0,0,0,0.07),
+    0 1px 4px rgba(0,0,0,0.05);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+[data-theme="light"] .photoEditorTools::before {
+  opacity: 0.25;
+}
+
+/* Section labels inside tools panel */
+[data-theme="light"] .photoToolLabel {
+  color: rgba(99,102,241,0.65);
+}
+
+/* Rotate / action icon buttons inside tools panel */
+[data-theme="light"] .photoToolBtn {
+  background: rgba(255,255,255,0.85);
+  border-color: rgba(99,102,241,0.22);
+  color: #6366f1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+}
+
+[data-theme="light"] .photoToolBtn:hover {
+  background: rgba(99,102,241,0.08);
+  border-color: rgba(99,102,241,0.5);
+  color: #4f46e5;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.14);
+}
+
+/* Reset button */
+[data-theme="light"] .photoResetBtn {
+  background: rgba(255,255,255,0.85);
+  border-color: rgba(99,102,241,0.22);
+  color: #6366f1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+}
+
+[data-theme="light"] .photoResetBtn:hover {
+  background: rgba(99,102,241,0.08);
+  border-color: rgba(99,102,241,0.5);
+  color: #4f46e5;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.14);
+}
+
+/* Back (←) circle button in editor header */
+[data-theme="light"] .editorBackBtn {
+  background: rgba(255,255,255,0.9);
+  border-color: rgba(99,102,241,0.22);
+  color: #6366f1;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] .editorBackBtn:hover {
+  background: rgba(99,102,241,0.08);
+  border-color: rgba(99,102,241,0.45);
+  color: #4f46e5;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.14);
+}
+
+/* Glow wrap around preview in light mode — softer shadow */
+[data-theme="light"] .previewGlowWrap {
+  box-shadow:
+    0 0 18px rgba(99,102,241,0.14),
+    0 16px 48px rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] .previewGlowWrap:hover {
+  box-shadow:
+    0 0 28px rgba(99,102,241,0.22),
+    0 20px 56px rgba(0,0,0,0.13);
+}
+
+/* Photo editor canvas wrap — softer glow in light mode */
+[data-theme="light"] .photoEditorCanvasWrap {
+  box-shadow:
+    0 0 18px rgba(99,102,241,0.14),
+    0 12px 36px rgba(0,0,0,0.1);
+}
+
+/* Zoom slider track in light mode */
+[data-theme="light"] .zoomSlider {
+  background: rgba(99,102,241,0.12);
+}
+
+/* Select screen cards — reduce dark shadow in light */
+[data-theme="light"] .selectCardBg {
+  box-shadow:
+    0 12px 36px rgba(0,0,0,0.16),
+    0 4px 10px rgba(0,0,0,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+}
+
+[data-theme="light"] .selectCard:hover .selectCardBg {
+  box-shadow:
+    0 18px 48px rgba(0,0,0,0.22),
+    0 6px 16px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.4);
 }

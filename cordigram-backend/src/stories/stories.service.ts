@@ -223,6 +223,11 @@ export class StoriesService {
       ((story as any).reactions ?? []).map((r: any) => [r.userId.toString(), r.emoji as string]),
     );
 
+    const followDocs = await this.followModel
+      .find({ followerId: new Types.ObjectId(requesterId), followeeId: { $in: viewerIds.map((id: any) => new Types.ObjectId(id.toString())) } })
+      .lean();
+    const followingSet = new Set(followDocs.map((f) => f.followeeId.toString()));
+
     const viewers = (story as any).views.map((v: any) => {
       const profile = profileMap.get(v.userId.toString());
       return {
@@ -232,6 +237,7 @@ export class StoriesService {
         displayName: (profile as any)?.displayName ?? null,
         avatarUrl: (profile as any)?.avatarUrl ?? null,
         reaction: reactionMap.get(v.userId.toString()) ?? null,
+        isFollowing: followingSet.has(v.userId.toString()),
       };
     });
 
