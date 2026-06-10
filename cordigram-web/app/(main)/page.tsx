@@ -498,6 +498,7 @@ export default function HomePage({
   const t = useTranslations("home");
   const tCommon = useTranslations("common");
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const newAdFlag = searchParams.get("newAd");
   const pageSize = pageSizeOverride ?? PAGE_SIZE;
