@@ -965,7 +965,8 @@
         "paymentStatus": "支付状态",
         "amount": "金额",
         "backToCreate": "返回创建广告",
-        "goToDashboard": "前往广告仪表盘"
+        "goToDashboard": "前往广告仪表盘",
+        "viewInFeed": "在 Feed 中查看"
       },
       "cancel": {
         "title": "支付已取消",

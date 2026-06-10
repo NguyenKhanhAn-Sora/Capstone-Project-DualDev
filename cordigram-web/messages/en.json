@@ -884,7 +884,8 @@
         "paymentStatus": "Payment status",
         "amount": "Amount",
         "backToCreate": "Back to create",
-        "goToDashboard": "Go to Ads dashboard"
+        "goToDashboard": "Go to Ads dashboard",
+        "viewInFeed": "View in Feed"
       },
       "cancel": {
         "title": "Payment Canceled",
