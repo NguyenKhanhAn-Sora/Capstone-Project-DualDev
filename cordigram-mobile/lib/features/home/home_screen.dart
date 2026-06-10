@@ -42,6 +42,7 @@ import 'services/post_interaction_service.dart';
 import 'widgets/post_card.dart';
 import 'widgets/people_you_may_know.dart';
 import 'widgets/upload_progress_banner.dart';
+import '../story/widgets/story_bar.dart';
 import '../../core/services/language_controller.dart';
 import '../../core/services/post_upload_controller.dart';
 import '../../core/services/app_update_service.dart';
@@ -2126,6 +2127,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(
+                child: StoryBar(viewerId: _viewerId, avatarUrl: _avatarUrl),
+              ),
+              SliverToBoxAdapter(
                 child: PeopleYouMayKnow(onOpenProfile: _openUserProfile),
               ),
               SliverToBoxAdapter(child: _buildLiveNowSection()),
@@ -2151,6 +2155,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          // Story bar
+          SliverToBoxAdapter(
+            child: StoryBar(viewerId: _viewerId, avatarUrl: _avatarUrl),
+          ),
           // People you may know strip
           SliverToBoxAdapter(
             child: PeopleYouMayKnow(onOpenProfile: _openUserProfile),
