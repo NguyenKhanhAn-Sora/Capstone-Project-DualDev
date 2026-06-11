@@ -2609,21 +2609,26 @@ export default function MessagesPage() {
 
         setIncomingCall(null);
 
+        const entry: OutgoingCallEntry = {
+          to: peerId,
+          toUser: {
+            displayName:
+              selectedDirectMessageFriend.displayName ||
+              selectedDirectMessageFriend.username,
+            username: selectedDirectMessageFriend.username,
+            avatarUrl: selectedDirectMessageFriend.avatarUrl,
+          },
+          type: isVideo ? "video" : "audio",
+          status: "calling",
+          roomName,
+        };
+        outgoingCallsByPeerRef.current = {
+          ...outgoingCallsByPeerRef.current,
+          [peerId]: entry,
+        };
         setOutgoingCallsByPeer((prev) => ({
           ...prev,
-          [peerId]: {
-            to: peerId,
-            toUser: {
-              displayName:
-                selectedDirectMessageFriend.displayName ||
-                selectedDirectMessageFriend.username,
-              username: selectedDirectMessageFriend.username,
-              avatarUrl: selectedDirectMessageFriend.avatarUrl,
-            },
-            type: isVideo ? "video" : "audio",
-            status: "calling",
-            roomName,
-          },
+          [peerId]: entry,
         }));
 
         initiateCall(peerId, isVideo ? "video" : "audio");
@@ -2657,18 +2662,54 @@ export default function MessagesPage() {
     [currentUserProfile, token],
   );
 
+  const dismissOutgoingCallPopup = useCallback((peerId: string) => {
+    setOutgoingCallsByPeer((prev) => {
+      if (!prev[peerId]) return prev;
+      const next = { ...prev };
+      delete next[peerId];
+      outgoingCallsByPeerRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const markOutgoingCallAnswered = useCallback(
+    (peerId: string, roomName?: string) => {
+      setOutgoingCallsByPeer((prev) => {
+        const cur = prev[peerId];
+        if (!cur) return prev;
+        const next = {
+          ...prev,
+          [peerId]: {
+            ...cur,
+            status: "answered" as const,
+            roomName: roomName || cur.roomName,
+          },
+        };
+        outgoingCallsByPeerRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+
   const openCallTabForPeer = useCallback(
-    (peerId: string, roomNameOverride?: string) => {
-      if (!currentUserProfile || !token) return;
-      if (openedCallTabPeersRef.current.has(peerId)) return;
+    (peerId: string, roomNameOverride?: string): boolean => {
+      if (!currentUserProfile || !token) return false;
 
       const outgoing = outgoingCallsByPeerRef.current[peerId];
-      const tabId = callTabIdRef.current || getCallTabId();
       const roomName = roomNameOverride || outgoing?.roomName;
       if (!roomName) {
         console.warn("[CALL] Missing roomName for outgoing call");
-        return;
+        return false;
       }
+
+      // Call tab already open for this peer — just close the ringing popup.
+      if (openedCallTabPeersRef.current.has(peerId)) {
+        dismissOutgoingCallPopup(peerId);
+        return true;
+      }
+
+      const tabId = callTabIdRef.current || getCallTabId();
       const callType = outgoing?.type ?? "audio";
       if (!ownsOutboundCallLock(tabId, peerId)) {
         tryAcquireOutboundCallLock(tabId, peerId);
@@ -2678,20 +2719,20 @@ export default function MessagesPage() {
         const callUrl = buildCallUrl(peerId, roomName, callType);
         const win = window.open(callUrl, "_blank", "noopener,noreferrer");
         if (!win) {
+          markOutgoingCallAnswered(peerId, roomName);
           showTransientError(
             "Trình duyệt chặn cửa sổ mới. Hãy bấm Tham gia cuộc gọi trên popup.",
           );
-          return;
+          return false;
         }
         markCallTabOpen(peerId);
-        setOutgoingCallsByPeer((prev) => {
-          const next = { ...prev };
-          delete next[peerId];
-          return next;
-        });
+        dismissOutgoingCallPopup(peerId);
+        return true;
       } catch (error) {
         console.error("❌ [CALLER] Failed to open call window:", error);
+        markOutgoingCallAnswered(peerId, roomName);
         showTransientError("Không thể mở tab cuộc gọi");
+        return false;
       }
     },
     [
@@ -2700,7 +2741,35 @@ export default function MessagesPage() {
       buildCallUrl,
       showTransientError,
       markCallTabOpen,
+      dismissOutgoingCallPopup,
+      markOutgoingCallAnswered,
     ],
+  );
+
+  const handlePeerAnsweredCall = useCallback(
+    (peerId: string, roomFromAnswer?: string) => {
+      const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
+      if (!hasOutgoing && !roomFromAnswer) return;
+
+      if (roomFromAnswer) {
+        const cur = outgoingCallsByPeerRef.current[peerId];
+        if (cur) {
+          const updated = { ...cur, roomName: roomFromAnswer };
+          outgoingCallsByPeerRef.current = {
+            ...outgoingCallsByPeerRef.current,
+            [peerId]: updated,
+          };
+          setOutgoingCallsByPeer((prev) => {
+            const existing = prev[peerId];
+            if (!existing) return prev;
+            return { ...prev, [peerId]: { ...existing, roomName: roomFromAnswer } };
+          });
+        }
+      }
+
+      openCallTabForPeer(peerId, roomFromAnswer);
+    },
+    [openCallTabForPeer],
   );
 
   // ✅ Accept incoming call — notify caller and open dedicated /call tab
@@ -2863,7 +2932,7 @@ export default function MessagesPage() {
     // out and back in, or called a different person earlier) would
     // re-fire here the moment the user sets up a NEW outgoingCall and
     // auto-open a call tab, skipping the accept/reject step entirely.
-    if (isCallAnswerEvent(callEvent) && callEvent.sdpOffer) {
+    if (isCallAnswerEvent(callEvent)) {
       const peerId = String(callEvent.from);
       const roomFromAnswer =
         typeof callEvent.sdpOffer === "object" &&
@@ -2871,24 +2940,11 @@ export default function MessagesPage() {
         typeof (callEvent.sdpOffer as { roomName?: string }).roomName === "string"
           ? String((callEvent.sdpOffer as { roomName: string }).roomName)
           : undefined;
-      const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
-      if (hasOutgoing || roomFromAnswer) {
-        if (roomFromAnswer && hasOutgoing) {
-          setOutgoingCallsByPeer((prev) => {
-            const cur = prev[peerId];
-            if (!cur) return prev;
-            return {
-              ...prev,
-              [peerId]: { ...cur, roomName: roomFromAnswer },
-            };
-          });
-        }
-        void openCallTabForPeer(peerId, roomFromAnswer);
-      }
+      handlePeerAnsweredCall(peerId, roomFromAnswer);
       return;
     }
     // Do NOT list incomingCall in deps — setIncomingCall updates it and would retrigger this effect forever.
-  }, [callEvent, openCallTabForPeer]);
+  }, [callEvent, handlePeerAnsweredCall]);
 
   // Open caller tab immediately on call-answer (bypasses React state batching / short TTL).
   useEffect(() => {
@@ -2902,20 +2958,11 @@ export default function MessagesPage() {
         typeof detail.sdpOffer.roomName === "string"
           ? detail.sdpOffer.roomName
           : undefined;
-      const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
-      if (!hasOutgoing && !roomFromAnswer) return;
-      if (roomFromAnswer && hasOutgoing) {
-        setOutgoingCallsByPeer((prev) => {
-          const cur = prev[peerId];
-          if (!cur) return prev;
-          return { ...prev, [peerId]: { ...cur, roomName: roomFromAnswer } };
-        });
-      }
-      void openCallTabForPeer(peerId, roomFromAnswer);
+      handlePeerAnsweredCall(peerId, roomFromAnswer);
     };
     window.addEventListener(DM_CALL_ANSWER_EVENT, onAnswer);
     return () => window.removeEventListener(DM_CALL_ANSWER_EVENT, onAnswer);
-  }, [openCallTabForPeer]);
+  }, [handlePeerAnsweredCall]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
@@ -3001,7 +3048,18 @@ export default function MessagesPage() {
       if (ringingPeers.has(prev.from)) return prev;
       return null;
     });
-  }, [callSessionsSync]);
+
+    for (const session of callSessionsSync.sessions) {
+      if (session.role !== "caller") continue;
+      if (session.state !== "connected" && session.state !== "connecting") {
+        continue;
+      }
+      const peerId = session.peerId;
+      const out = outgoingCallsByPeerRef.current[peerId];
+      if (!out || out.status !== "calling") continue;
+      handlePeerAnsweredCall(peerId, session.roomId);
+    }
+  }, [callSessionsSync, handlePeerAnsweredCall]);
 
   // ✅ Listen for the call tab telling us the user ended the call.
   //
