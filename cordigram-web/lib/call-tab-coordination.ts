@@ -74,6 +74,15 @@ export function hasOutboundCallLock(peerId: string): boolean {
   return Boolean(readLock(peerId));
 }
 
+/** True when another browser tab owns the outbound lock for this peer. */
+export function hasForeignOutboundCallLock(
+  tabId: string,
+  peerId: string,
+): boolean {
+  const lock = readLock(peerId);
+  return Boolean(lock && lock.tabId !== tabId);
+}
+
 export function ownsOutboundCallLock(tabId: string, peerId: string): boolean {
   const lock = readLock(peerId);
   return Boolean(

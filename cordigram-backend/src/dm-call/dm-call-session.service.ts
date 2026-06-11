@@ -254,12 +254,17 @@ export class DmCallSessionService implements OnModuleDestroy {
         existingPair.state === 'ringing' &&
         existingPair.initiatorId === initiatorId
       ) {
-        existingPair.initiatorSocketId = initiatorSocketId;
-        existingPair.initiatorPlatform = platform;
-        existingPair.ringExpiresAt = Date.now() + DM_CALL_RING_TTL_SEC * 1000;
-        await this.saveSession(existingPair);
-        this.scheduleRingTimeout(existingPair, onRingTimeout);
-        return { ok: true, callId: existingPair.callId, session: existingPair };
+        const sameSocket =
+          existingPair.initiatorSocketId === initiatorSocketId;
+        if (sameSocket || !webCaller) {
+          existingPair.initiatorSocketId = initiatorSocketId;
+          existingPair.initiatorPlatform = platform;
+          existingPair.ringExpiresAt = Date.now() + DM_CALL_RING_TTL_SEC * 1000;
+          await this.saveSession(existingPair);
+          this.scheduleRingTimeout(existingPair, onRingTimeout);
+          return { ok: true, callId: existingPair.callId, session: existingPair };
+        }
+        return { ok: false, code: 'already_in_call', peerId: calleeId };
       }
       return { ok: false, code: 'already_in_call', peerId: calleeId };
     }

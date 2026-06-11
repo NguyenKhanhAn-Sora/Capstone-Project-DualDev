@@ -824,7 +824,9 @@ class DmCallManager extends ChangeNotifier {
     final ctx = _navigatorKey?.currentState?.overlay?.context;
     if (ctx == null) return;
     final messenger = ScaffoldMessenger.maybeOf(ctx);
-    messenger?.showSnackBar(SnackBar(content: Text(message)));
+    messenger?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
+    );
   }
 
   /// Resolves the name we send to LiveKit as the `participantName`. Order of
