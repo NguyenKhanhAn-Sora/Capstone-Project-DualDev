@@ -77,9 +77,9 @@ describe('DmCallSessionService (in-memory)', () => {
     expect(withC.ok).toBe(true);
   });
 
-  it('blocks mobile caller from second call while active', async () => {
+  it('allows mobile caller to initiate with another peer while in call', async () => {
     const noop = () => undefined;
-    const first = await service.tryInitiate({
+    const withB = await service.tryInitiate({
       initiatorId: 'user-a',
       calleeId: 'user-b',
       type: 'audio',
@@ -87,9 +87,9 @@ describe('DmCallSessionService (in-memory)', () => {
       platform: 'mobile',
       onRingTimeout: noop,
     });
-    expect(first.ok).toBe(true);
+    expect(withB.ok).toBe(true);
 
-    const second = await service.tryInitiate({
+    const withC = await service.tryInitiate({
       initiatorId: 'user-a',
       calleeId: 'user-c',
       type: 'audio',
@@ -97,8 +97,7 @@ describe('DmCallSessionService (in-memory)', () => {
       platform: 'mobile',
       onRingTimeout: noop,
     });
-    expect(second.ok).toBe(false);
-    if (!second.ok) expect(second.code).toBe('already_in_call');
+    expect(withC.ok).toBe(true);
   });
 
   it('blocks duplicate pair when call is already connected', async () => {

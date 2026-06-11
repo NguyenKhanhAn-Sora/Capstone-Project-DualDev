@@ -29,6 +29,7 @@ import {
 import {
   getCallTabId,
   tryAcquireOutboundCallLock,
+  ownsOutboundCallLock,
   hasForeignOutboundCallLock,
   releaseOutboundCallLock,
   subscribeOutboundCallLock,
@@ -82,9 +83,6 @@ import { CURRENT_PROFILE_UPDATED_EVENT } from "@/lib/events";
 import { getLiveKitToken, getDMRoomName, getVoiceChannelParticipants } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 import OutgoingCallPopup from "@/components/OutgoingCallPopup";
-import DmActiveCallsLayer, {
-  type ActiveDmCallSession,
-} from "@/components/DmActiveCallsLayer";
 import { CallMessageCard } from "@/components/CallMessageCard";
 import { extractDmCallFields } from "@/lib/dm-call-message";
 import GiphyPicker, {
@@ -2003,14 +2001,8 @@ export default function MessagesPage() {
     setNoticePopupMessage(message);
   }, []);
 
-  // Call states — multiple concurrent DM calls (different peers only)
-  const [activeCallsByPeer, setActiveCallsByPeer] = useState<
-    Record<string, ActiveDmCallSession>
-  >({});
-  const [focusedCallPeerId, setFocusedCallPeerId] = useState<string | null>(
-    null,
-  );
-  const activeCallsByPeerRef = useRef(activeCallsByPeer);
+  // Call states — each active call lives in its own /call tab (per peer)
+  const [activeCallTabPeers, setActiveCallTabPeers] = useState<string[]>([]);
   const errorDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -2059,12 +2051,19 @@ export default function MessagesPage() {
     callTabIdRef.current = getCallTabId();
   }
   const currentUserIdRef = useRef(currentUserId);
+  const markCallTabOpen = useCallback((peerId: string) => {
+    openedCallTabPeersRef.current.add(peerId);
+    setActiveCallTabPeers((prev) =>
+      prev.includes(peerId) ? prev : [...prev, peerId],
+    );
+  }, []);
+  const markCallTabClosed = useCallback((peerId: string) => {
+    openedCallTabPeersRef.current.delete(peerId);
+    setActiveCallTabPeers((prev) => prev.filter((id) => id !== peerId));
+  }, []);
   useEffect(() => {
     outgoingCallsByPeerRef.current = outgoingCallsByPeer;
   }, [outgoingCallsByPeer]);
-  useEffect(() => {
-    activeCallsByPeerRef.current = activeCallsByPeer;
-  }, [activeCallsByPeer]);
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
   }, [currentUserId]);
@@ -2591,7 +2590,7 @@ export default function MessagesPage() {
       callTabIdRef.current = tabId;
       const peerId = selectedDirectMessageFriend._id;
 
-      if (activeCallsByPeerRef.current[peerId]) {
+      if (openedCallTabPeersRef.current.has(peerId)) {
         showTransientError("Bạn đã có cuộc gọi đang diễn ra với người này.");
         return;
       }
@@ -2637,102 +2636,74 @@ export default function MessagesPage() {
     [selectedDirectMessageFriend, token, currentUserProfile, initiateCall, showTransientError],
   );
 
-  const handleEndActiveCall = useCallback(
-    (peerId: string) => {
-      endCall(peerId);
-      releaseOutboundCallLock(callTabIdRef.current, peerId);
-      openedCallTabPeersRef.current.delete(peerId);
-      setActiveCallsByPeer((prev) => {
-        const next = { ...prev };
-        delete next[peerId];
-        return next;
-      });
-      setFocusedCallPeerId((current) => {
-        if (current !== peerId) return current;
-        const remaining = Object.keys(activeCallsByPeerRef.current).filter(
-          (id) => id !== peerId,
-        );
-        return remaining[0] ?? null;
-      });
+  const buildCallUrl = useCallback(
+    (peerId: string, roomName: string, callType: "audio" | "video") => {
+      const participantName =
+        currentUserProfile?.username ||
+        currentUserProfile?.displayName ||
+        "Người dùng";
+      const callAuthToken = getTabAccessToken() || token;
+      const qpToken = callAuthToken
+        ? `&accessToken=${encodeURIComponent(callAuthToken)}`
+        : "";
+      return (
+        `/call?roomName=${encodeURIComponent(roomName)}` +
+        `&participantName=${encodeURIComponent(participantName)}` +
+        `&audioOnly=${callType === "audio"}` +
+        `&peerId=${encodeURIComponent(peerId)}` +
+        qpToken
+      );
     },
-    [endCall],
+    [currentUserProfile, token],
   );
 
-  const joinInlineCallForPeer = useCallback(
-    async (
-      peerId: string,
-      roomName: string,
-      callType: "audio" | "video",
-      peerMeta?: {
-        displayName?: string;
-        username?: string;
-        avatarUrl?: string;
-      },
-    ) => {
-      if (!token || !currentUserProfile) return;
-      if (activeCallsByPeerRef.current[peerId]) {
-        setFocusedCallPeerId(peerId);
-        setActiveCallsByPeer((prev) => ({
-          ...prev,
-          [peerId]: { ...prev[peerId], minimized: false },
-        }));
-        return;
-      }
+  const openCallTabForPeer = useCallback(
+    (peerId: string, roomNameOverride?: string) => {
+      if (!currentUserProfile || !token) return;
+      if (openedCallTabPeersRef.current.has(peerId)) return;
 
       const outgoing = outgoingCallsByPeerRef.current[peerId];
-      const peerName =
-        peerMeta?.displayName ||
-        peerMeta?.username ||
-        outgoing?.toUser.displayName ||
-        outgoing?.toUser.username ||
-        "Người dùng";
+      const tabId = callTabIdRef.current || getCallTabId();
+      const roomName = roomNameOverride || outgoing?.roomName;
+      if (!roomName) {
+        console.warn("[CALL] Missing roomName for outgoing call");
+        return;
+      }
+      const callType = outgoing?.type ?? "audio";
+      if (!ownsOutboundCallLock(tabId, peerId)) {
+        tryAcquireOutboundCallLock(tabId, peerId);
+      }
 
       try {
-        const participantName =
-          currentUserProfile.username ||
-          currentUserProfile.displayName ||
-          "Người dùng";
-        const { token: lkToken, url } = await getLiveKitToken(
-          roomName,
-          participantName,
-          token,
-        );
-
-        setActiveCallsByPeer((prev) => {
-          const next: Record<string, ActiveDmCallSession> = {};
-          for (const [id, session] of Object.entries(prev)) {
-            next[id] = { ...session, minimized: true };
-          }
-          next[peerId] = {
-            peerId,
-            peerName,
-            peerAvatarUrl: peerMeta?.avatarUrl || outgoing?.toUser.avatarUrl,
-            roomName,
-            callToken: lkToken,
-            serverUrl: url,
-            isAudioOnly: callType === "audio",
-            minimized: false,
-          };
-          return next;
-        });
-        setFocusedCallPeerId(peerId);
-        openedCallTabPeersRef.current.add(peerId);
+        const callUrl = buildCallUrl(peerId, roomName, callType);
+        const win = window.open(callUrl, "_blank", "noopener,noreferrer");
+        if (!win) {
+          showTransientError(
+            "Trình duyệt chặn cửa sổ mới. Hãy bấm Tham gia cuộc gọi trên popup.",
+          );
+          return;
+        }
+        markCallTabOpen(peerId);
         setOutgoingCallsByPeer((prev) => {
-          if (!prev[peerId]) return prev;
           const next = { ...prev };
           delete next[peerId];
           return next;
         });
       } catch (error) {
-        console.error("❌ [CALL] Failed to join inline call:", error);
-        showTransientError("Không thể tham gia cuộc gọi");
-        releaseOutboundCallLock(callTabIdRef.current, peerId);
+        console.error("❌ [CALLER] Failed to open call window:", error);
+        showTransientError("Không thể mở tab cuộc gọi");
       }
     },
-    [token, currentUserProfile, showTransientError],
+    [
+      currentUserProfile,
+      token,
+      buildCallUrl,
+      showTransientError,
+      markCallTabOpen,
+    ],
   );
 
-  // ✅ Accept incoming call - notify caller and open tabs for both
+  // ✅ Accept incoming call — notify caller and open dedicated /call tab
   const handleAcceptCall = useCallback(async () => {
     if (!incomingCall || !token || !currentUserProfile) {
       console.error("Cannot accept call: missing data");
@@ -2740,30 +2711,36 @@ export default function MessagesPage() {
     }
 
     try {
-
-      // Get room name
       const { roomName } = await getDMRoomName(incomingCall.from, token);
-
-      // Notify caller that call was answered (this will open tab on caller's side)
       answerCall(incomingCall.from, { roomName });
 
-      await joinInlineCallForPeer(
+      const callUrl = buildCallUrl(
         incomingCall.from,
         roomName,
         incomingCall.type,
-        {
-          displayName: incomingCall.callerInfo.displayName,
-          username: incomingCall.callerInfo.username,
-          avatarUrl: incomingCall.callerInfo.avatar,
-        },
       );
-
+      const win = window.open(callUrl, "_blank", "noopener,noreferrer");
+      if (!win) {
+        showTransientError(
+          "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi thử lại.",
+        );
+        return;
+      }
+      markCallTabOpen(incomingCall.from);
       setIncomingCall(null);
     } catch (error) {
       console.error("❌ [ACCEPT] Failed to accept call:", error);
       showTransientError("Không thể chấp nhận cuộc gọi");
     }
-  }, [incomingCall, token, currentUserProfile, answerCall, joinInlineCallForPeer, showTransientError]);
+  }, [
+    incomingCall,
+    token,
+    currentUserProfile,
+    answerCall,
+    buildCallUrl,
+    showTransientError,
+    markCallTabOpen,
+  ]);
 
   // ✅ Reject incoming call — clear UI + ringtone first, then notify caller
   const handleRejectCall = useCallback(() => {
@@ -2782,36 +2759,21 @@ export default function MessagesPage() {
 
       endCall(peerId);
       releaseOutboundCallLock(callTabIdRef.current, peerId);
-      openedCallTabPeersRef.current.delete(peerId);
+      markCallTabClosed(peerId);
       setOutgoingCallsByPeer((prev) => {
         const next = { ...prev };
         delete next[peerId];
         return next;
       });
     },
-    [endCall],
-  );
-
-  const openInlineCallForPeer = useCallback(
-    (peerId: string, roomNameOverride?: string) => {
-      if (openedCallTabPeersRef.current.has(peerId)) return;
-      const outgoing = outgoingCallsByPeerRef.current[peerId];
-      const roomName = roomNameOverride || outgoing?.roomName;
-      if (!roomName) {
-        console.warn("[CALL] Missing roomName for outgoing call");
-        return;
-      }
-      const callType = outgoing?.type ?? "audio";
-      void joinInlineCallForPeer(peerId, roomName, callType);
-    },
-    [joinInlineCallForPeer],
+    [endCall, markCallTabClosed],
   );
 
   const handleJoinCall = useCallback(
     (peerId: string) => {
-      openInlineCallForPeer(peerId);
+      openCallTabForPeer(peerId);
     },
-    [openInlineCallForPeer],
+    [openCallTabForPeer],
   );
 
   useEffect(() => {
@@ -2921,12 +2883,12 @@ export default function MessagesPage() {
             };
           });
         }
-        void openInlineCallForPeer(peerId, roomFromAnswer);
+        void openCallTabForPeer(peerId, roomFromAnswer);
       }
       return;
     }
     // Do NOT list incomingCall in deps — setIncomingCall updates it and would retrigger this effect forever.
-  }, [callEvent, openInlineCallForPeer]);
+  }, [callEvent, openCallTabForPeer]);
 
   // Open caller tab immediately on call-answer (bypasses React state batching / short TTL).
   useEffect(() => {
@@ -2949,11 +2911,11 @@ export default function MessagesPage() {
           return { ...prev, [peerId]: { ...cur, roomName: roomFromAnswer } };
         });
       }
-      void openInlineCallForPeer(peerId, roomFromAnswer);
+      void openCallTabForPeer(peerId, roomFromAnswer);
     };
     window.addEventListener(DM_CALL_ANSWER_EVENT, onAnswer);
     return () => window.removeEventListener(DM_CALL_ANSWER_EVENT, onAnswer);
-  }, [openInlineCallForPeer]);
+  }, [openCallTabForPeer]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
@@ -2983,16 +2945,7 @@ export default function MessagesPage() {
 
     const endedPeer = String(callEnded.from);
     releaseOutboundCallLock(callTabIdRef.current, endedPeer);
-    openedCallTabPeersRef.current.delete(endedPeer);
-    setActiveCallsByPeer((prev) => {
-      if (!prev[endedPeer]) return prev;
-      const next = { ...prev };
-      delete next[endedPeer];
-      return next;
-    });
-    setFocusedCallPeerId((current) =>
-      current === endedPeer ? null : current,
-    );
+    markCallTabClosed(endedPeer);
     setOutgoingCallsByPeer((prev) => {
       if (!prev[endedPeer]) return prev;
       const next = { ...prev };
@@ -3014,7 +2967,7 @@ export default function MessagesPage() {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [callEnded]); // ✅ Only depend on callEnded, not incomingCall
+  }, [callEnded, markCallTabClosed]); // ✅ Only depend on callEnded, not incomingCall
 
   // Đóng popup incoming trên tab/thiết bị khác khi đã accept/reject ở nơi khác.
   useEffect(() => {
@@ -3069,7 +3022,9 @@ export default function MessagesPage() {
         | null;
       if (!data || typeof data !== "object") return;
       if (data.type === "self-ended" && data.peerId) {
-        handleEndActiveCall(data.peerId);
+        endCall(data.peerId);
+        releaseOutboundCallLock(callTabIdRef.current, data.peerId);
+        markCallTabClosed(data.peerId);
         setIncomingCall(null);
         setOutgoingCallsByPeer((prev) => {
           if (!prev[data.peerId!]) return prev;
@@ -3084,7 +3039,7 @@ export default function MessagesPage() {
       channel.removeEventListener("message", onMessage);
       channel.close();
     };
-  }, [handleEndActiveCall]);
+  }, [endCall, markCallTabClosed]);
 
   // ✅ Listen for call-rejected event
   useEffect(() => {
@@ -8264,9 +8219,9 @@ export default function MessagesPage() {
     if (!selectedDmPeerId) return false;
     const tabId = callTabIdRef.current || getCallTabId();
     if (outgoingCallsByPeer[selectedDmPeerId]) return true;
-    if (activeCallsByPeer[selectedDmPeerId]) return true;
+    if (activeCallTabPeers.includes(selectedDmPeerId)) return true;
     return hasForeignOutboundCallLock(tabId, selectedDmPeerId);
-  }, [selectedDmPeerId, outgoingCallsByPeer, activeCallsByPeer]);
+  }, [selectedDmPeerId, outgoingCallsByPeer, activeCallTabPeers]);
 
   /** Chủ server hoặc quản lý kênh — chỉnh sửa/xóa kênh & danh mục */
   const canManageChannelsStructure = useMemo(() => {
@@ -8662,29 +8617,6 @@ export default function MessagesPage() {
           </div>
         </div>
       ) : null}
-      <DmActiveCallsLayer
-        activeCallsByPeer={activeCallsByPeer}
-        focusedPeerId={focusedCallPeerId}
-        participantName={
-          selfMessagingIdentity.chatUsername ||
-          selfMessagingIdentity.displayName ||
-          "Người dùng"
-        }
-        onEndCall={handleEndActiveCall}
-        onFocusCall={(peerId) => {
-          setFocusedCallPeerId(peerId);
-          setActiveCallsByPeer((prev) => ({
-            ...prev,
-            [peerId]: { ...prev[peerId], minimized: false },
-          }));
-        }}
-        onMinimizeCall={(peerId) => {
-          setActiveCallsByPeer((prev) => ({
-            ...prev,
-            [peerId]: { ...prev[peerId], minimized: true },
-          }));
-        }}
-      />
 
       {/* Left Sidebar - Logo & Create Group */}
       <div className={styles.leftSidebar}>

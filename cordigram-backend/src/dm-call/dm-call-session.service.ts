@@ -282,16 +282,6 @@ export class DmCallSessionService implements OnModuleDestroy {
       }
     }
 
-    if (!webCaller) {
-      const initiatorCallIds = await this.getUserCallIds(initiatorId);
-      for (const callId of initiatorCallIds) {
-        const initiatorSession = await this.getSession(callId);
-        if (initiatorSession && ACTIVE_STATES.includes(initiatorSession.state)) {
-          return { ok: false, code: 'already_in_call', peerId: calleeId };
-        }
-      }
-    }
-
     const now = Date.now();
     const session: DmCallSessionRecord = {
       callId: randomUUID(),
