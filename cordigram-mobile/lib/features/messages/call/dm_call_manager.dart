@@ -398,6 +398,10 @@ class DmCallManager extends ChangeNotifier {
   Future<void> acceptIncoming() async {
     final inc = _incoming;
     if (inc == null) return;
+    if (_actives.isNotEmpty && !_actives.containsKey(inc.callerUserId)) {
+      rejectIncoming();
+      return;
+    }
     try {
       await _ensurePermissions(video: inc.video);
     } catch (err) {
@@ -612,7 +616,12 @@ class DmCallManager extends ChangeNotifier {
   }
 
   void _handleIncoming(DmCallEvent event) {
-    if (_actives.containsKey(event.fromUserId)) return;
+    if (_actives.isNotEmpty) {
+      if (!_actives.containsKey(event.fromUserId)) {
+        DirectMessagesRealtimeService.rejectCall(event.fromUserId);
+      }
+      return;
+    }
     // If we're already ringing the same person, just refresh; otherwise the
     // newer ring wins (matches web behavior).
     _incomingTimer?.cancel();
@@ -653,9 +662,11 @@ class DmCallManager extends ChangeNotifier {
       );
       return;
     }
-    _showSnack(
-      'Bạn đang gọi người này từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
-    );
+    if (event.code == 'peer_busy') {
+      _showSnack('Người dùng này đang bận cuộc gọi khác.');
+      return;
+    }
+    _showSnack('Không thể bắt đầu cuộc gọi. Vui lòng thử lại.');
   }
 
   Future<void> _handleAnswer(DmCallEvent event) async {

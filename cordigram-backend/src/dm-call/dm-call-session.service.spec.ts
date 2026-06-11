@@ -11,6 +11,36 @@ describe('DmCallSessionService (in-memory)', () => {
     service = new DmCallSessionService(mockRedisService);
   });
 
+  it('blocks peer_busy when callee is connected in another call', async () => {
+    const noop = () => undefined;
+
+    const first = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'audio',
+      initiatorSocketId: 'sock-1',
+      onRingTimeout: noop,
+    });
+    expect(first.ok).toBe(true);
+
+    await service.markAnswered({
+      userId: 'user-b',
+      callerId: 'user-a',
+      answeringSocketId: 'sock-b',
+      roomId: 'room-ab',
+    });
+
+    const second = await service.tryInitiate({
+      initiatorId: 'user-c',
+      calleeId: 'user-b',
+      type: 'video',
+      initiatorSocketId: 'sock-2',
+      onRingTimeout: noop,
+    });
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.code).toBe('peer_busy');
+  });
+
   it('blocks peer_busy when callee is in another call', async () => {
     const noop = () => undefined;
 

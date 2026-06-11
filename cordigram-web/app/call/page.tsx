@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStoredAccessToken, setStoredAccessToken } from "@/lib/auth";
 import { getLiveKitToken } from "@/lib/livekit-api";
+import { addActiveDmCallPeer, removeActiveDmCallPeer } from "@/lib/dm-call-active-peers";
 import styles from "./call.module.css";
 
 const CallRoom = dynamic(() => import("@/components/CallRoom"), {
@@ -127,6 +128,12 @@ export default function CallPage() {
     }
     const channel = new BroadcastChannel("cordigram-call");
     channelRef.current = channel;
+    if (peerId) {
+      addActiveDmCallPeer(peerId);
+      try {
+        channel.postMessage({ type: "call-active", peerId });
+      } catch (_) {}
+    }
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; peerId?: string } | null;
       if (!data) return;
@@ -147,6 +154,9 @@ export default function CallPage() {
       channel.removeEventListener("message", onMessage);
       channel.close();
       channelRef.current = null;
+      if (peerId) {
+        removeActiveDmCallPeer(peerId);
+      }
     };
   }, [embedded, peerId]);
 
@@ -162,6 +172,9 @@ export default function CallPage() {
       try {
         channelRef.current.postMessage({ type: "self-ended", peerId });
       } catch (_) {}
+    }
+    if (peerId) {
+      removeActiveDmCallPeer(peerId);
     }
     window.close();
 
