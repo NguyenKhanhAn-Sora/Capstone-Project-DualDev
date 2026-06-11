@@ -53,4 +53,80 @@ describe('DmCallSessionService (in-memory)', () => {
     expect(a.ok && b.ok).toBe(true);
     if (a.ok && b.ok) expect(a.callId).toBe(b.callId);
   });
+
+  it('allows web caller to initiate with another peer while in call', async () => {
+    const noop = () => undefined;
+    const withB = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'audio',
+      initiatorSocketId: 'sock-1',
+      platform: 'web',
+      onRingTimeout: noop,
+    });
+    expect(withB.ok).toBe(true);
+
+    const withC = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-c',
+      type: 'audio',
+      initiatorSocketId: 'sock-2',
+      platform: 'web',
+      onRingTimeout: noop,
+    });
+    expect(withC.ok).toBe(true);
+  });
+
+  it('blocks mobile caller from second call while active', async () => {
+    const noop = () => undefined;
+    const first = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'audio',
+      initiatorSocketId: 'sock-1',
+      platform: 'mobile',
+      onRingTimeout: noop,
+    });
+    expect(first.ok).toBe(true);
+
+    const second = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-c',
+      type: 'audio',
+      initiatorSocketId: 'sock-2',
+      platform: 'mobile',
+      onRingTimeout: noop,
+    });
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.code).toBe('already_in_call');
+  });
+
+  it('blocks duplicate pair when call is already connected', async () => {
+    const noop = () => undefined;
+    const first = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'audio',
+      initiatorSocketId: 'sock-1',
+      platform: 'web',
+      onRingTimeout: noop,
+    });
+    expect(first.ok).toBe(true);
+    await service.markAnswered({
+      userId: 'user-b',
+      callerId: 'user-a',
+      answeringSocketId: 'sock-callee',
+    });
+
+    const duplicate = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'video',
+      initiatorSocketId: 'sock-2',
+      platform: 'web',
+      onRingTimeout: noop,
+    });
+    expect(duplicate.ok).toBe(false);
+    if (!duplicate.ok) expect(duplicate.code).toBe('already_in_call');
+  });
 });

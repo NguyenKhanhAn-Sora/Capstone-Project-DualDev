@@ -98,6 +98,7 @@ export default function ServerContextMenu({
   const submenuRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notifications" | null>(null);
   const [submenuPos, setSubmenuPos] = useState({ top: 0, left: 0 });
+  const [menuPos, setMenuPos] = useState({ left: x, top: y });
 
   // Sử dụng permissions, fallback về isOwner prop cũ nếu có
   const isOwner = permissions?.isOwner ?? isOwnerProp ?? false;
@@ -120,6 +121,25 @@ export default function ServerContextMenu({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
+
+  useEffect(() => {
+    setMenuPos({ left: x, top: y });
+  }, [x, y]);
+
+  useLayoutEffect(() => {
+    if (!menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    const pad = 8;
+    let left = x;
+    let top = y;
+    if (left + rect.width > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - pad - rect.width);
+    }
+    if (top + rect.height > window.innerHeight - pad) {
+      top = Math.max(pad, window.innerHeight - pad - rect.height);
+    }
+    setMenuPos({ left, top });
+  }, [x, y, submenu, canManageServer, canManageChannels, canManageEvents, canCreateInvite, isOwner]);
 
   useLayoutEffect(() => {
     if (!submenu || !menuRef.current) return;
@@ -151,7 +171,7 @@ export default function ServerContextMenu({
       <div
         ref={menuRef}
         className={styles.menu}
-        style={{ left: x, top: y }}
+        style={{ left: menuPos.left, top: menuPos.top }}
         role="menu"
         aria-label={t("chat.serverContextMenu.aria")}
       >

@@ -147,6 +147,7 @@ class ChannelMessagesRealtimeService {
       socket.off('channel-notification');
       socket.off('server-updated');
       socket.off('server-membership-updated');
+      socket.off('join-application-updated');
       socket.off('connect');
       socket.disconnect();
       socket.dispose();

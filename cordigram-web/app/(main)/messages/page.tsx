@@ -30,6 +30,7 @@ import {
   getCallTabId,
   tryAcquireOutboundCallLock,
   ownsOutboundCallLock,
+  hasOutboundCallLock,
   releaseOutboundCallLock,
   subscribeOutboundCallLock,
 } from "@/lib/call-tab-coordination";
@@ -2749,15 +2750,11 @@ export default function MessagesPage() {
         }
 
         openedCallTabPeersRef.current.add(peerId);
-        releaseOutboundCallLock(tabId, peerId);
         setOutgoingCallsByPeer((prev) => {
           const next = { ...prev };
           delete next[peerId];
           return next;
         });
-        window.setTimeout(() => {
-          openedCallTabPeersRef.current.delete(peerId);
-        }, 15000);
       } catch (error) {
         console.error("❌ [CALLER] Failed to open call window:", error);
       }
@@ -2777,15 +2774,11 @@ export default function MessagesPage() {
       const callUrl = buildCallUrl(peerId, roomName, callType);
       window.open(callUrl, "_blank", "noopener,noreferrer");
       openedCallTabPeersRef.current.add(peerId);
-      releaseOutboundCallLock(tabId, peerId);
       setOutgoingCallsByPeer((prev) => {
         const next = { ...prev };
         delete next[peerId];
         return next;
       });
-      window.setTimeout(() => {
-        openedCallTabPeersRef.current.delete(peerId);
-      }, 15000);
     },
     [buildCallUrl],
   );
@@ -2817,7 +2810,9 @@ export default function MessagesPage() {
       });
     }
     setError(
-      "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
+      callBusy.code === "peer_busy"
+        ? "Người dùng này đang bận cuộc gọi khác."
+        : "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
     );
   }, [callBusy]);
 
@@ -2954,9 +2949,8 @@ export default function MessagesPage() {
     }
 
     const endedPeer = String(callEnded.from);
-    if (outgoingCallsByPeerRef.current[endedPeer]) {
-      releaseOutboundCallLock(callTabIdRef.current, endedPeer);
-    }
+    releaseOutboundCallLock(callTabIdRef.current, endedPeer);
+    openedCallTabPeersRef.current.delete(endedPeer);
     setOutgoingCallsByPeer((prev) => {
       if (!prev[endedPeer]) return prev;
       const next = { ...prev };
@@ -8224,12 +8218,19 @@ export default function MessagesPage() {
     [servers, selectedServer],
   );
 
-  /** Chủ server hoặc (quản lý máy chủ và quản lý kênh) — chỉnh sửa/xóa kênh & danh mục */
+  const selectedDmPeerId = selectedDirectMessageFriend?._id;
+  const isSamePeerCallBlocked = useMemo(() => {
+    if (!selectedDmPeerId) return false;
+    if (outgoingCallsByPeer[selectedDmPeerId]) return true;
+    return hasOutboundCallLock(selectedDmPeerId);
+  }, [selectedDmPeerId, outgoingCallsByPeer]);
+
+  /** Chủ server hoặc quản lý kênh — chỉnh sửa/xóa kênh & danh mục */
   const canManageChannelsStructure = useMemo(() => {
     if (!currentUserId || !selectedServerEntity) return false;
     const p = currentServerPermissions;
     if (p?.isOwner) return true;
-    return !!(p?.canManageServer && p?.canManageChannels);
+    return Boolean(p?.canManageChannels);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
   const canAccessPrivateChannel = useMemo(() => {
@@ -8243,6 +8244,12 @@ export default function MessagesPage() {
     if (!currentUserId || !selectedServerEntity) return false;
     if (currentServerPermissions?.isOwner) return true;
     return Boolean(currentServerPermissions?.canManageServer);
+  }, [currentUserId, selectedServerEntity, currentServerPermissions]);
+
+  const canManageEventsOnServer = useMemo(() => {
+    if (!currentUserId || !selectedServerEntity) return false;
+    if (currentServerPermissions?.isOwner) return true;
+    return Boolean(currentServerPermissions?.canManageEvents);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
   const ownedServersForPicker = useMemo(() => {
@@ -10759,7 +10766,7 @@ export default function MessagesPage() {
                           type="button"
                           title={t("chat.composer.voiceCall")}
                           onClick={() => handleStartCall(false)}
-                          disabled={isInCall}
+                          disabled={isSamePeerCallBlocked}
                         >
                           <svg
                             width="20"
@@ -10776,7 +10783,7 @@ export default function MessagesPage() {
                           type="button"
                           title={t("chat.composer.videoCall")}
                           onClick={() => handleStartCall(true)}
-                          disabled={isInCall}
+                          disabled={isSamePeerCallBlocked}
                         >
                           <svg
                             width="20"
@@ -12583,6 +12590,7 @@ export default function MessagesPage() {
         onClose={() => setShowEventsPopup(false)}
         serverId={selectedServer}
         onOpenCreateWizard={openCreateEventWizard}
+        canManageEvents={canManageEventsOnServer}
       />
 
       {inviteToServerTarget && (
@@ -13236,7 +13244,7 @@ export default function MessagesPage() {
         }}
       />
 
-      {selectedServer && (
+      {selectedServer && canManageEventsOnServer && (
         <CreateEventWizard
           isOpen={showCreateEventWizard}
           onClose={() => setShowCreateEventWizard(false)}

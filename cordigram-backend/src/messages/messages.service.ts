@@ -1928,6 +1928,7 @@ export class MessagesService {
   }
 
   async searchMessages(params: {
+    viewerId: string;
     serverId?: string;
     channelId?: string;
     q?: string;
@@ -1947,6 +1948,7 @@ export class MessagesService {
     parsed?: ParsedMessageSearch;
   }> {
     const {
+      viewerId,
       serverId,
       channelId: channelIdParam,
       q,
@@ -1959,6 +1961,10 @@ export class MessagesService {
       fuzzy = false,
       parseQuery = true,
     } = params;
+
+    if (!viewerId) {
+      throw new ForbiddenException('Unauthorized');
+    }
 
     const parsed: ParsedMessageSearch =
       parseQuery && q
@@ -1983,17 +1989,42 @@ export class MessagesService {
     }
 
     if (resolvedChannelId) {
+      const canView = await this.userCanJoinChannelRoom(
+        resolvedChannelId,
+        viewerId,
+      );
+      if (!canView) {
+        throw new ForbiddenException('Bạn không được phép tìm kiếm trong kênh này');
+      }
       match.channelId = new Types.ObjectId(resolvedChannelId);
     } else if (serverId) {
+      const isMember = await this.serverModel.exists({
+        _id: new Types.ObjectId(serverId),
+        'members.userId': new Types.ObjectId(viewerId),
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      });
+      if (!isMember) {
+        throw new ForbiddenException('Bạn không thuộc máy chủ này');
+      }
       const channels = await this.channelModel
         .find({ serverId: new Types.ObjectId(serverId) })
         .select('_id')
         .lean()
         .exec();
-      const channelIds = channels.map((c) => c._id);
-      if (channelIds.length === 0)
+      const accessibleChannelIds: Types.ObjectId[] = [];
+      for (const channel of channels) {
+        const channelIdStr = channel._id.toString();
+        if (await this.userCanJoinChannelRoom(channelIdStr, viewerId)) {
+          accessibleChannelIds.push(channel._id);
+        }
+      }
+      if (accessibleChannelIds.length === 0)
         return { results: [], totalCount: 0, parsed };
-      match.channelId = { $in: channelIds };
+      match.channelId = { $in: accessibleChannelIds };
+    } else {
+      throw new ForbiddenException(
+        'Cần serverId hoặc channelId để tìm kiếm tin nhắn kênh',
+      );
     }
 
     let resolvedSenderId = senderIdParam;

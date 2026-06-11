@@ -70,6 +70,10 @@ export function tryAcquireOutboundCallLock(
   }
 }
 
+export function hasOutboundCallLock(peerId: string): boolean {
+  return Boolean(readLock(peerId));
+}
+
 export function ownsOutboundCallLock(tabId: string, peerId: string): boolean {
   const lock = readLock(peerId);
   return Boolean(

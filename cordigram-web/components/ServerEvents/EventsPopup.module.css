@@ -36,13 +36,23 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 20px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .titleRow {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .title {
@@ -73,9 +83,6 @@
 }
 
 .closeBtn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
   background: transparent;
   border: none;
   color: var(--color-panel-text-muted);
@@ -88,6 +95,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .closeBtn:hover {

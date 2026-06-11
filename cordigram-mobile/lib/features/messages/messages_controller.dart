@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'models/display_name_style.dart';
 import 'models/dm_message.dart';
 import 'models/message_reaction.dart';
 import 'models/message_thread.dart';
@@ -55,6 +56,7 @@ class MessagesController extends ChangeNotifier {
   String? _myDisplayName;
   String? _myUsername;
   String? _myAvatarUrl;
+  DisplayNameStyle _myDisplayNameStyle = const DisplayNameStyle();
   bool _myOnline = true;
   String _languageCode = 'vi';
 
@@ -93,6 +95,7 @@ class MessagesController extends ChangeNotifier {
   String? get myDisplayName => _myDisplayName;
   String? get myUsername => _myUsername;
   String? get myAvatarUrl => _myAvatarUrl;
+  DisplayNameStyle get myDisplayNameStyle => _myDisplayNameStyle;
   bool get myOnline => _myOnline;
   String get languageCode => _languageCode;
 
@@ -213,6 +216,7 @@ class MessagesController extends ChangeNotifier {
       _myUsername =
           (data['chatUsername'] ?? data['username'] ?? '').toString().trim();
       _myAvatarUrl = (data['avatarUrl'] ?? data['avatar'])?.toString();
+      _myDisplayNameStyle = DisplayNameStyle.fromProfile(data);
       notifyListeners();
     } catch (_) {}
   }
@@ -640,6 +644,25 @@ class MessagesController extends ChangeNotifier {
   }
 
   void _onProfileStyleUpdated(DmProfileStyleUpdatedEvent event) {
+    final myId = _myUserId ?? DirectMessagesService.currentUserId;
+    if (myId != null && event.userId == myId) {
+      if (event.displayName != null) {
+        _myDisplayName = event.displayName!.trim();
+      }
+      if (event.username != null) {
+        _myUsername = event.username!.trim();
+      }
+      if (event.avatarUrl != null) {
+        _myAvatarUrl = event.avatarUrl;
+      }
+      _myDisplayNameStyle = _myDisplayNameStyle.copyWith(
+        fontId: event.displayNameFontId,
+        effectId: event.displayNameEffectId,
+        primaryHex: event.displayNamePrimaryHex,
+        accentHex: event.displayNameAccentHex,
+      );
+    }
+
     final idx = _threads.indexWhere((t) => t.id == event.userId);
     if (idx != -1) {
       final t = _threads[idx];

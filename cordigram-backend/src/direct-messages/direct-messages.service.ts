@@ -28,6 +28,7 @@ import { MessagingProfilesService } from '../messaging-profiles/messaging-profil
 import { Server } from '../servers/server.schema';
 import { BoostService } from '../boost/boost.service';
 import { LinkPreviewService } from '../comment/link-preview.service';
+import { BlocksService } from '../users/blocks.service';
 
 @Injectable()
 export class DirectMessagesService {
@@ -45,6 +46,7 @@ export class DirectMessagesService {
     @Inject(forwardRef(() => BoostService))
     private readonly boostService: BoostService,
     private readonly linkPreviewService: LinkPreviewService,
+    private readonly blocksService: BlocksService,
   ) {}
 
   /** Lần hoạt động gần nhất từ thiết bị đăng nhập (fallback khi không có socket presence). */
@@ -186,6 +188,10 @@ export class DirectMessagesService {
     receiverId: string,
     createDirectMessageDto: CreateDirectMessageDto,
   ): Promise<DirectMessage> {
+    if (await this.blocksService.isBlockedEither(senderId, receiverId)) {
+      throw new ForbiddenException('Không thể nhắn tin với người dùng này');
+    }
+
     const hasCustomStickerFields = !!(
       createDirectMessageDto.customStickerUrl?.trim() ||
       createDirectMessageDto.serverStickerId?.trim()
@@ -873,6 +879,12 @@ export class DirectMessagesService {
 
     if (!message) {
       throw new NotFoundException(`Message with id ${messageId} not found`);
+    }
+
+    const sender = message.senderId.toString();
+    const receiver = message.receiverId.toString();
+    if (userId !== sender && userId !== receiver) {
+      throw new ForbiddenException('Bạn không thể phản ứng với tin nhắn này');
     }
 
     const userObjectId = new Types.ObjectId(userId);

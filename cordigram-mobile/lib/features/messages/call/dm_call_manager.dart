@@ -9,6 +9,7 @@ import '../services/channel_messages_realtime_service.dart';
 import '../services/direct_messages_realtime_service.dart';
 import '../services/direct_messages_service.dart';
 import 'calls_api_service.dart';
+import '../services/voice_channel_session_controller.dart';
 import 'native_call_screen.dart';
 
 /// App-wide call lifecycle manager for 1:1 direct-message calls.
@@ -218,6 +219,9 @@ class DmCallManager extends ChangeNotifier {
   Future<void> onAuthChanged() async {
     if (!_initialized) return;
     _stopCallHeartbeat();
+    if (VoiceChannelSessionController.instance.active) {
+      await VoiceChannelSessionController.instance.leave();
+    }
     await _dismissSub?.cancel();
     _dismissSub = null;
     await _callSub?.cancel();
@@ -300,6 +304,18 @@ class DmCallManager extends ChangeNotifier {
   }) async {
     if (_incoming != null) return;
     if (_outgoings.containsKey(peerUserId)) return;
+    if (_active != null) {
+      _showSnack(
+        'Bạn đang trong cuộc gọi. Hãy kết thúc cuộc gọi hiện tại trước khi gọi người khác.',
+      );
+      return;
+    }
+    if (_outgoings.isNotEmpty) {
+      _showSnack(
+        'Bạn đang trong cuộc gọi. Hãy kết thúc cuộc gọi hiện tại trước khi gọi người khác.',
+      );
+      return;
+    }
     if ((AuthStorage.accessToken ?? '').isEmpty) {
       await AuthStorage.loadAll();
     }
@@ -606,6 +622,12 @@ class DmCallManager extends ChangeNotifier {
     if (peerId == null || peerId.isEmpty) return;
     if (!_outgoings.containsKey(peerId)) return;
     _cancelOutgoingFor(peerId);
+    if (event.code == 'already_in_call') {
+      _showSnack(
+        'Bạn đang trong cuộc gọi. Hãy kết thúc cuộc gọi hiện tại trước khi gọi người khác.',
+      );
+      return;
+    }
     _showSnack(
       'Bạn đang gọi người này từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
     );

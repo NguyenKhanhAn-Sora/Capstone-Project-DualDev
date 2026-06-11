@@ -25,12 +25,20 @@ class DmProfileStyleUpdatedEvent {
     this.displayName,
     this.username,
     this.avatarUrl,
+    this.displayNameFontId,
+    this.displayNameEffectId,
+    this.displayNamePrimaryHex,
+    this.displayNameAccentHex,
   });
 
   final String userId;
   final String? displayName;
   final String? username;
   final String? avatarUrl;
+  final String? displayNameFontId;
+  final String? displayNameEffectId;
+  final String? displayNamePrimaryHex;
+  final String? displayNameAccentHex;
 }
 
 class DmUnreadCountEvent {
@@ -119,6 +127,7 @@ class DirectMessagesRealtimeService {
       StreamController<DmProfileStyleUpdatedEvent>.broadcast();
 
   static Timer? _presencePingTimer;
+  static final Set<String> _presencePeerIds = <String>{};
 
   static Stream<DmMessage> get newMessages => _newMessageController.stream;
   static Stream<DmUnreadCountEvent> get unreadCounts =>
@@ -138,6 +147,11 @@ class DirectMessagesRealtimeService {
   static Stream<DmUserTypingEvent> get userTyping => _typingController.stream;
   static Stream<DmProfileStyleUpdatedEvent> get profileStyleUpdated =>
       _profileStyleController.stream;
+
+  /// Local-only emit (e.g. after saving style in profile editor).
+  static void emitLocalProfileStyleUpdated(DmProfileStyleUpdatedEvent event) {
+    _profileStyleController.add(event);
+  }
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -318,11 +332,18 @@ class DirectMessagesRealtimeService {
           displayName: payload['displayName']?.toString(),
           username: payload['username']?.toString(),
           avatarUrl: (payload['avatarUrl'] ?? payload['avatar'])?.toString(),
+          displayNameFontId: payload['displayNameFontId']?.toString(),
+          displayNameEffectId: payload['displayNameEffectId']?.toString(),
+          displayNamePrimaryHex: payload['displayNamePrimaryHex']?.toString(),
+          displayNameAccentHex: payload['displayNameAccentHex']?.toString(),
         ),
       );
     });
 
-    socket.on('connect', (_) => _startPresenceHeartbeat());
+    socket.on('connect', (_) {
+      _startPresenceHeartbeat();
+      _resubscribePresence();
+    });
     socket.on('disconnect', (_) => _stopPresenceHeartbeat());
 
     socket.connect();
@@ -364,8 +385,17 @@ class DirectMessagesRealtimeService {
     _reactionController.add(Map<String, dynamic>.from(payload));
   }
 
+  static void _resubscribePresence() {
+    if (_presencePeerIds.isEmpty || _socket == null) return;
+    _socket!.emit('presence-subscribe', {
+      'userIds': _presencePeerIds.toList(),
+    });
+  }
+
   static void subscribePresence(List<String> userIds) {
-    if (userIds.isEmpty || _socket == null) return;
+    if (userIds.isEmpty) return;
+    _presencePeerIds.addAll(userIds.where((id) => id.isNotEmpty));
+    if (_socket == null) return;
     _socket!.emit('presence-subscribe', {'userIds': userIds});
   }
 
@@ -452,6 +482,10 @@ class DirectMessagesRealtimeService {
       socket.off('call-incoming-dismiss');
       socket.off('message-deleted');
       socket.off('messages-read');
+      socket.off('user-typing');
+      socket.off('user-profile-style-updated');
+      socket.off('connect');
+      socket.off('disconnect');
       socket.disconnect();
       socket.dispose();
     }

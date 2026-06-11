@@ -633,10 +633,14 @@ export class ServersService {
     const server = await this.serverModel.findById(serverId);
     if (!server) throw new NotFoundException('Server not found');
 
-    const member = server.members.find((m) => m.userId.toString() === userId);
-    if (!member || member.role === 'member') {
+    const canManage = await this.rolesService.hasPermission(
+      serverId,
+      userId,
+      'manageChannels',
+    );
+    if (!canManage) {
       throw new ForbiddenException(
-        'Only owner or moderator can create categories',
+        'Chỉ thành viên có quyền Quản Lý Kênh mới được tạo danh mục',
       );
     }
 

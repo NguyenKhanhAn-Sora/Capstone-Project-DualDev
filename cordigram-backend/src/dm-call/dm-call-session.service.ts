@@ -20,18 +20,22 @@ const ACTIVE_STATES: DmCallState[] = [
   'reconnecting',
 ];
 
+function isWebPlatform(platform?: DmCallClientPlatform): boolean {
+  return platform === 'web';
+}
+
 @Injectable()
 export class DmCallSessionService implements OnModuleDestroy {
   private readonly logger = new Logger(DmCallSessionService.name);
   private readonly redis: IORedis | null;
   private readonly memorySessions = new Map<string, DmCallSessionRecord>();
-  private readonly memoryUserCall = new Map<string, string>();
+  private readonly memoryPairCall = new Map<string, string>();
+  private readonly memoryUserCalls = new Map<string, Set<string>>();
   private readonly ringTimers = new Map<string, NodeJS.Timeout>();
   /** Prevents duplicate Mongo call-log writes for the same callId. */
   private readonly persistedCallIds = new Set<string>();
 
   constructor(private readonly redisService: RedisService) {
-    // Reuse the shared queue connection — avoids adding a new connection slot
     this.redis = process.env.REDIS_URL?.trim()
       ? redisService.queueConnection
       : null;
@@ -45,23 +49,22 @@ export class DmCallSessionService implements OnModuleDestroy {
   onModuleDestroy(): void {
     for (const t of this.ringTimers.values()) clearTimeout(t);
     this.ringTimers.clear();
-    // Do NOT quit — connection is owned by RedisService
   }
 
   pairKey(userA: string, userB: string): string {
     return [userA, userB].sort().join(':');
   }
 
-  private userKey(userId: string): string {
-    return `user:${userId}`;
+  private pairCallKey(userA: string, userB: string): string {
+    return `pair:${this.pairKey(userA, userB)}`;
+  }
+
+  private userCallsKey(userId: string): string {
+    return `user:${userId}:calls`;
   }
 
   private callKey(callId: string): string {
     return `call:${callId}`;
-  }
-
-  private lockKey(userId: string): string {
-    return `lock:user:${userId}`;
   }
 
   private serialize(session: DmCallSessionRecord): string {
@@ -86,11 +89,35 @@ export class DmCallSessionService implements OnModuleDestroy {
     return this.memorySessions.get(callId) ?? null;
   }
 
-  private async getUserCallId(userId: string): Promise<string | null> {
+  private async getUserCallIds(userId: string): Promise<string[]> {
     if (this.redis) {
-      return (await this.redis.get(this.userKey(userId))) || null;
+      return (await this.redis.smembers(this.userCallsKey(userId))) || [];
     }
-    return this.memoryUserCall.get(userId) ?? null;
+    return Array.from(this.memoryUserCalls.get(userId) ?? []);
+  }
+
+  private async getPairCallId(
+    userA: string,
+    userB: string,
+  ): Promise<string | null> {
+    const key = this.pairCallKey(userA, userB);
+    if (this.redis) {
+      return (await this.redis.get(key)) || null;
+    }
+    return this.memoryPairCall.get(this.pairKey(userA, userB)) ?? null;
+  }
+
+  private trackUserCall(userId: string, callId: string): void {
+    const set = this.memoryUserCalls.get(userId) ?? new Set<string>();
+    set.add(callId);
+    this.memoryUserCalls.set(userId, set);
+  }
+
+  private untrackUserCall(userId: string, callId: string): void {
+    const set = this.memoryUserCalls.get(userId);
+    if (!set) return;
+    set.delete(callId);
+    if (set.size === 0) this.memoryUserCalls.delete(userId);
   }
 
   private async saveSession(session: DmCallSessionRecord): Promise<void> {
@@ -99,31 +126,22 @@ export class DmCallSessionService implements OnModuleDestroy {
       session.state === 'connected' || session.state === 'connecting'
         ? DM_CALL_CONNECTED_TTL_SEC
         : DM_CALL_RING_TTL_SEC;
+    const pairKey = this.pairKey(session.initiatorId, session.calleeId);
 
     if (this.redis) {
       const pipe = this.redis.pipeline();
       pipe.set(this.callKey(session.callId), this.serialize(session), 'EX', ttl);
-      pipe.set(this.userKey(session.initiatorId), session.callId, 'EX', ttl);
-      pipe.set(this.userKey(session.calleeId), session.callId, 'EX', ttl);
-      pipe.set(
-        this.lockKey(session.initiatorId),
-        session.callId,
-        'EX',
-        ttl,
-        'NX',
-      );
-      pipe.set(
-        this.lockKey(session.calleeId),
-        session.callId,
-        'EX',
-        ttl,
-        'NX',
-      );
+      pipe.set(this.pairCallKey(session.initiatorId, session.calleeId), session.callId, 'EX', ttl);
+      pipe.sadd(this.userCallsKey(session.initiatorId), session.callId);
+      pipe.sadd(this.userCallsKey(session.calleeId), session.callId);
+      pipe.expire(this.userCallsKey(session.initiatorId), ttl);
+      pipe.expire(this.userCallsKey(session.calleeId), ttl);
       await pipe.exec();
     } else {
       this.memorySessions.set(session.callId, session);
-      this.memoryUserCall.set(session.initiatorId, session.callId);
-      this.memoryUserCall.set(session.calleeId, session.callId);
+      this.memoryPairCall.set(pairKey, session.callId);
+      this.trackUserCall(session.initiatorId, session.callId);
+      this.trackUserCall(session.calleeId, session.callId);
     }
   }
 
@@ -133,25 +151,27 @@ export class DmCallSessionService implements OnModuleDestroy {
       clearTimeout(t);
       this.ringTimers.delete(session.callId);
     }
+    const pairKey = this.pairKey(session.initiatorId, session.calleeId);
 
     if (this.redis) {
       const pipe = this.redis.pipeline();
       pipe.del(this.callKey(session.callId));
-      const initiatorCall = await this.redis.get(this.userKey(session.initiatorId));
-      if (initiatorCall === session.callId) pipe.del(this.userKey(session.initiatorId));
-      const calleeCall = await this.redis.get(this.userKey(session.calleeId));
-      if (calleeCall === session.callId) pipe.del(this.userKey(session.calleeId));
-      pipe.del(this.lockKey(session.initiatorId));
-      pipe.del(this.lockKey(session.calleeId));
+      const pairCallId = await this.redis.get(
+        this.pairCallKey(session.initiatorId, session.calleeId),
+      );
+      if (pairCallId === session.callId) {
+        pipe.del(this.pairCallKey(session.initiatorId, session.calleeId));
+      }
+      pipe.srem(this.userCallsKey(session.initiatorId), session.callId);
+      pipe.srem(this.userCallsKey(session.calleeId), session.callId);
       await pipe.exec();
     } else {
       this.memorySessions.delete(session.callId);
-      if (this.memoryUserCall.get(session.initiatorId) === session.callId) {
-        this.memoryUserCall.delete(session.initiatorId);
+      if (this.memoryPairCall.get(pairKey) === session.callId) {
+        this.memoryPairCall.delete(pairKey);
       }
-      if (this.memoryUserCall.get(session.calleeId) === session.callId) {
-        this.memoryUserCall.delete(session.calleeId);
-      }
+      this.untrackUserCall(session.initiatorId, session.callId);
+      this.untrackUserCall(session.calleeId, session.callId);
     }
   }
 
@@ -175,33 +195,39 @@ export class DmCallSessionService implements OnModuleDestroy {
     this.ringTimers.set(session.callId, timer);
   }
 
-  async getSessionsForUser(userId: string): Promise<DmCallSessionSyncItem[]> {
-    const callId = await this.getUserCallId(userId);
-    if (!callId) return [];
-    const session = await this.getSession(callId);
-    if (!session || !ACTIVE_STATES.includes(session.state)) return [];
+  async hasActiveSessionBetween(
+    userA: string,
+    userB: string,
+  ): Promise<boolean> {
+    const session = await this.getByPair(userA, userB);
+    return Boolean(session && ACTIVE_STATES.includes(session.state));
+  }
 
-    const peerId =
-      session.initiatorId === userId ? session.calleeId : session.initiatorId;
-    return [
-      {
+  async getSessionsForUser(userId: string): Promise<DmCallSessionSyncItem[]> {
+    const callIds = await this.getUserCallIds(userId);
+    const items: DmCallSessionSyncItem[] = [];
+    for (const callId of callIds) {
+      const session = await this.getSession(callId);
+      if (!session || !ACTIVE_STATES.includes(session.state)) continue;
+      const peerId =
+        session.initiatorId === userId ? session.calleeId : session.initiatorId;
+      items.push({
         callId: session.callId,
         peerId,
         role: session.initiatorId === userId ? 'caller' : 'callee',
         state: session.state,
         type: session.type,
         roomId: session.roomId,
-      },
-    ];
+      });
+    }
+    return items;
   }
 
   async getByPair(
     userA: string,
     userB: string,
   ): Promise<DmCallSessionRecord | null> {
-    const callIdA = await this.getUserCallId(userA);
-    const callIdB = await this.getUserCallId(userB);
-    const callId = callIdA && callIdA === callIdB ? callIdA : callIdA ?? callIdB;
+    const callId = await this.getPairCallId(userA, userB);
     if (!callId) return null;
     const session = await this.getSession(callId);
     if (!session) return null;
@@ -220,37 +246,44 @@ export class DmCallSessionService implements OnModuleDestroy {
   }): Promise<DmCallInitiateOutcome> {
     const { initiatorId, calleeId, type, initiatorSocketId, platform, onRingTimeout } =
       params;
+    const webCaller = isWebPlatform(platform);
 
-    const calleeCallId = await this.getUserCallId(calleeId);
-    if (calleeCallId) {
-      const calleeSession = await this.getSession(calleeCallId);
-      if (calleeSession && ACTIVE_STATES.includes(calleeSession.state)) {
-        const calleePeer =
-          calleeSession.initiatorId === calleeId
-            ? calleeSession.calleeId
-            : calleeSession.initiatorId;
-        if (calleePeer !== initiatorId) {
-          return { ok: false, code: 'peer_busy', peerId: calleeId };
-        }
+    const existingPair = await this.getByPair(initiatorId, calleeId);
+    if (existingPair && ACTIVE_STATES.includes(existingPair.state)) {
+      if (
+        existingPair.state === 'ringing' &&
+        existingPair.initiatorId === initiatorId
+      ) {
+        existingPair.initiatorSocketId = initiatorSocketId;
+        existingPair.initiatorPlatform = platform;
+        existingPair.ringExpiresAt = Date.now() + DM_CALL_RING_TTL_SEC * 1000;
+        await this.saveSession(existingPair);
+        this.scheduleRingTimeout(existingPair, onRingTimeout);
+        return { ok: true, callId: existingPair.callId, session: existingPair };
+      }
+      return { ok: false, code: 'already_in_call', peerId: calleeId };
+    }
+
+    const calleeCallIds = await this.getUserCallIds(calleeId);
+    for (const callId of calleeCallIds) {
+      const calleeSession = await this.getSession(callId);
+      if (!calleeSession || !ACTIVE_STATES.includes(calleeSession.state)) continue;
+      const calleePeer =
+        calleeSession.initiatorId === calleeId
+          ? calleeSession.calleeId
+          : calleeSession.initiatorId;
+      if (calleePeer !== initiatorId) {
+        return { ok: false, code: 'peer_busy', peerId: calleeId };
       }
     }
 
-    const initiatorCallId = await this.getUserCallId(initiatorId);
-    if (initiatorCallId) {
-      const initiatorSession = await this.getSession(initiatorCallId);
-      if (initiatorSession && ACTIVE_STATES.includes(initiatorSession.state)) {
-        const samePair =
-          this.pairKey(initiatorSession.initiatorId, initiatorSession.calleeId) ===
-          this.pairKey(initiatorId, calleeId);
-        if (samePair && initiatorSession.state === 'ringing') {
-          initiatorSession.initiatorSocketId = initiatorSocketId;
-          initiatorSession.initiatorPlatform = platform;
-          initiatorSession.ringExpiresAt = Date.now() + DM_CALL_RING_TTL_SEC * 1000;
-          await this.saveSession(initiatorSession);
-          this.scheduleRingTimeout(initiatorSession, onRingTimeout);
-          return { ok: true, callId: initiatorSession.callId, session: initiatorSession };
+    if (!webCaller) {
+      const initiatorCallIds = await this.getUserCallIds(initiatorId);
+      for (const callId of initiatorCallIds) {
+        const initiatorSession = await this.getSession(callId);
+        if (initiatorSession && ACTIVE_STATES.includes(initiatorSession.state)) {
+          return { ok: false, code: 'already_in_call', peerId: calleeId };
         }
-        return { ok: false, code: 'already_in_call', peerId: calleeId };
       }
     }
 
@@ -339,35 +372,36 @@ export class DmCallSessionService implements OnModuleDestroy {
   }
 
   async releaseUser(userId: string): Promise<void> {
-    const callId = await this.getUserCallId(userId);
-    if (!callId) return;
-    const session = await this.getSession(callId);
-    if (!session) return;
-    if (!session.logged) {
-      session.logged = true;
-      session.state = 'disconnected';
+    const callIds = await this.getUserCallIds(userId);
+    for (const callId of callIds) {
+      const session = await this.getSession(callId);
+      if (!session) continue;
+      if (!session.logged) {
+        session.logged = true;
+        session.state = 'disconnected';
+      }
+      await this.deleteSession(session);
     }
-    await this.deleteSession(session);
   }
 
   async onInitiatorFullyOffline(
     initiatorId: string,
   ): Promise<DmCallSessionRecord[]> {
     const ended: DmCallSessionRecord[] = [];
-    const callId = await this.getUserCallId(initiatorId);
-    if (!callId) return ended;
-    const session = await this.getSession(callId);
-    if (
-      !session ||
-      session.initiatorId !== initiatorId ||
-      session.answeredAt
-    ) {
-      return ended;
+    const callIds = await this.getUserCallIds(initiatorId);
+    for (const callId of callIds) {
+      const session = await this.getSession(callId);
+      if (
+        !session ||
+        session.initiatorId !== initiatorId ||
+        session.answeredAt
+      ) {
+        continue;
+      }
+      session.state = 'cancelled';
+      await this.deleteSession(session);
+      ended.push(session);
     }
-    session.state = 'cancelled';
-    await this.deleteSession(session);
-    ended.push(session);
     return ended;
   }
 }
-  

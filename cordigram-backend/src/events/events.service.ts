@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -10,6 +12,7 @@ import { ServerEvent, EventFrequency } from './event.schema';
 import { Server } from '../servers/server.schema';
 import { CreateEventDto } from './dto/create-event.dto';
 import { randomBytes } from 'crypto';
+import { RolesService } from '../roles/roles.service';
 
 const INVITE_EXPIRES_DAYS = 7;
 const ONE_TIME_EVENT_DURATION_MS = 24 * 60 * 60 * 1000;
@@ -19,7 +22,25 @@ export class EventsService {
   constructor(
     @InjectModel(ServerEvent.name) private eventModel: Model<ServerEvent>,
     @InjectModel(Server.name) private serverModel: Model<Server>,
+    @Inject(forwardRef(() => RolesService))
+    private readonly rolesService: RolesService,
   ) {}
+
+  private async assertCanManageEvents(
+    serverId: string,
+    userId: string,
+  ): Promise<void> {
+    const allowed = await this.rolesService.hasPermission(
+      serverId,
+      userId,
+      'manageEvents',
+    );
+    if (!allowed) {
+      throw new ForbiddenException(
+        'Bạn không có quyền quản lý sự kiện trên máy chủ này',
+      );
+    }
+  }
 
   private generateInviteCode(): string {
     return randomBytes(6).toString('base64url');
@@ -37,10 +58,7 @@ export class EventsService {
     if (!server) {
       throw new NotFoundException('Server not found');
     }
-    const member = server.members.find((m) => m.userId.toString() === userId);
-    if (!member || !['owner', 'moderator'].includes(member.role)) {
-      throw new ForbiddenException('Only owner or moderator can create events');
-    }
+    await this.assertCanManageEvents(serverId, userId);
 
     const startAt = new Date(dto.startAt);
     if (isNaN(startAt.getTime())) {
@@ -84,8 +102,33 @@ export class EventsService {
     return event.save();
   }
 
+  private async assertServerMember(
+    serverId: string,
+    userId: string,
+  ): Promise<void> {
+    const server = await this.serverModel.findById(serverId).select('members').lean();
+    if (!server) throw new NotFoundException('Server not found');
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === userId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không thuộc máy chủ này');
+    }
+  }
+
+  async assertServerMemberForUser(
+    serverId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.assertServerMember(serverId, userId);
+  }
+
   /** Events that are currently "live" (owner started the event) */
-  async getActiveByServer(serverId: string): Promise<ServerEvent[]> {
+  async getActiveByServer(
+    serverId: string,
+    userId: string,
+  ): Promise<ServerEvent[]> {
+    await this.assertServerMember(serverId, userId);
     const now = new Date();
     return this.eventModel
       .find({
@@ -99,7 +142,11 @@ export class EventsService {
   }
 
   /** Upcoming events (scheduled or no status, startAt > now) */
-  async getUpcomingByServer(serverId: string): Promise<ServerEvent[]> {
+  async getUpcomingByServer(
+    serverId: string,
+    userId: string,
+  ): Promise<ServerEvent[]> {
+    await this.assertServerMember(serverId, userId);
     const now = new Date();
     return this.eventModel
       .find({
@@ -120,12 +167,7 @@ export class EventsService {
   ): Promise<ServerEvent> {
     const server = await this.serverModel.findById(serverId);
     if (!server) throw new NotFoundException('Server not found');
-    const member = server.members.find((m) => m.userId.toString() === userId);
-    if (!member || !['owner', 'moderator'].includes(member.role)) {
-      throw new ForbiddenException(
-        'Only owner or moderator can start the event',
-      );
-    }
+    await this.assertCanManageEvents(serverId, userId);
     const event = await this.eventModel.findById(eventId).exec();
     if (!event) throw new NotFoundException('Event not found');
     if (event.serverId.toString() !== serverId)
@@ -137,7 +179,7 @@ export class EventsService {
     return event.save();
   }
 
-  /** End event (owner/moderator) */
+  /** End event (requires manageEvents) */
   async endEvent(
     serverId: string,
     eventId: string,
@@ -145,10 +187,7 @@ export class EventsService {
   ): Promise<ServerEvent> {
     const server = await this.serverModel.findById(serverId);
     if (!server) throw new NotFoundException('Server not found');
-    const member = server.members.find((m) => m.userId.toString() === userId);
-    if (!member || !['owner', 'moderator'].includes(member.role)) {
-      throw new ForbiddenException('Only owner or moderator can end the event');
-    }
+    await this.assertCanManageEvents(serverId, userId);
     const event = await this.eventModel.findById(eventId).exec();
     if (!event) throw new NotFoundException('Event not found');
     if (event.serverId.toString() !== serverId)

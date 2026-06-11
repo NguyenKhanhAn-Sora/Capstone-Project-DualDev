@@ -5,14 +5,15 @@ import {
 } from "./cordigram-upload-context";
 
 export { apiBaseUrl as API_BASE_URL } from "./api";
+import { apiBaseUrl } from "./api";
+
+const API_BASE_URL = apiBaseUrl;
 
 function getToken(): string {
   return (
     localStorage.getItem("accessToken") || localStorage.getItem("token") || ""
   );
 }
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "https://api.cordigram.com";
 
 export function getHeaders() {
   return {
@@ -1235,7 +1236,7 @@ export async function getCurrentUserPermissions(
         canManageChannels: membersResponse.currentUserPermissions.isOwner,
         canManageEvents: membersResponse.currentUserPermissions.isOwner,
         canManageExpressions: membersResponse.currentUserPermissions.isOwner,
-        canCreateInvite: true,
+        canCreateInvite: membersResponse.currentUserPermissions.isOwner,
         mentionEveryone: membersResponse.currentUserPermissions.isOwner,
       };
     } catch {
@@ -1249,7 +1250,7 @@ export async function getCurrentUserPermissions(
         canManageChannels: false,
         canManageEvents: false,
         canManageExpressions: false,
-        canCreateInvite: true,
+        canCreateInvite: false,
         mentionEveryone: false,
       };
     }

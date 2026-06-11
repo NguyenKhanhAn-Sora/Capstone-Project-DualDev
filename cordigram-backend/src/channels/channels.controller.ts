@@ -25,26 +25,43 @@ export class ChannelsController {
   async createCategory(
     @Param('serverId') serverId: string,
     @Body() body: { name: string; type?: 'text' | 'voice' | 'mixed' },
+    @Request() req: any,
   ) {
-    return this.channelsService.createCategory(serverId, body.name, body.type);
+    return this.channelsService.createCategory(
+      serverId,
+      body.name,
+      body.type,
+      req.user.userId,
+    );
   }
 
   @Get('categories/list')
-  async getCategories(@Param('serverId') serverId: string) {
-    return this.channelsService.getCategories(serverId);
+  async getCategories(
+    @Param('serverId') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.channelsService.getCategories(serverId, req.user.userId);
   }
 
   @Patch('categories/:categoryId')
   async updateCategory(
     @Param('categoryId') categoryId: string,
     @Body() body: { name: string },
+    @Request() req: any,
   ) {
-    return this.channelsService.updateCategory(categoryId, body.name);
+    return this.channelsService.updateCategory(
+      categoryId,
+      body.name,
+      req.user.userId,
+    );
   }
 
   @Delete('categories/:categoryId')
-  async deleteCategory(@Param('categoryId') categoryId: string) {
-    await this.channelsService.deleteCategory(categoryId);
+  async deleteCategory(
+    @Param('categoryId') categoryId: string,
+    @Request() req: any,
+  ) {
+    await this.channelsService.deleteCategory(categoryId, req.user.userId);
     return { message: 'Category deleted successfully' };
   }
 
@@ -97,17 +114,25 @@ export class ChannelsController {
   @Get()
   async getChannels(
     @Param('serverId') serverId: string,
+    @Request() req: any,
     @Query('type') type?: 'text' | 'voice',
   ) {
     if (type) {
-      return this.channelsService.getChannelsByType(serverId, type);
+      return this.channelsService.getChannelsByType(
+        serverId,
+        type,
+        req.user.userId,
+      );
     }
-    return this.channelsService.getChannelsByServerId(serverId);
+    return this.channelsService.getChannelsByServerId(serverId, req.user.userId);
   }
 
   @Get(':id')
-  async getChannel(@Param('id') channelId: string) {
-    return this.channelsService.getChannelById(channelId);
+  async getChannel(
+    @Param('id') channelId: string,
+    @Request() req: any,
+  ) {
+    return this.channelsService.getChannelById(channelId, req.user.userId);
   }
 
   @Patch(':id')

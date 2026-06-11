@@ -1,8 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+
+import '../../../core/config/app_config.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
+import 'messages_media_service.dart';
 import '../models/dm_conversation.dart';
 import '../models/dm_message.dart';
 import 'dm_mute_prefs_store.dart';
@@ -324,6 +329,50 @@ class DirectMessagesService {
       '/messaging-profiles/me',
       extraHeaders: _authHeaders,
       body: payload,
+    );
+  }
+
+  static const _messagesUploadHeader = {
+    'x-cordigram-upload-context': 'messages',
+  };
+
+  static Future<Map<String, dynamic>> uploadMessagingProfileAvatar(
+    String filePath, {
+    String? contentType,
+  }) async {
+    final ct = MessagesMediaService.resolveUploadContentType(
+      filePath: filePath,
+      hintedContentType: contentType,
+    );
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/messaging-profiles/avatar/upload');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll({..._authHeaders, ..._messagesUploadHeader})
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'original',
+          filePath,
+          contentType: MediaType.parse(ct),
+        ),
+      )
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'cropped',
+          filePath,
+          contentType: MediaType.parse(ct),
+        ),
+      );
+    final streamed = await request.send().timeout(const Duration(seconds: 120));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Avatar upload failed (${response.statusCode})');
+  }
+
+  static Future<Map<String, dynamic>> resetMessagingProfileAvatar() async {
+    return ApiService.delete(
+      '/messaging-profiles/avatar',
+      extraHeaders: _authHeaders,
     );
   }
 

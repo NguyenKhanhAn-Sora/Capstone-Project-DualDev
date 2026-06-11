@@ -15,6 +15,7 @@ import 'utils/dm_sidebar_prefs.dart';
 import 'utils/messages_navigator.dart';
 import 'widgets/messages_boost_store_screen.dart';
 import 'widgets/messages_chrome_builder.dart';
+import 'widgets/messages_profile_editor.dart';
 import '../../core/services/messages_shell_theme_controller.dart';
 
 /// Cài đặt Messages — 6 mục giống web, bố cục tối ưu cho mobile.
@@ -59,11 +60,6 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
   String? _accentHex;
   String _appearanceSource = 'background';
   bool _boostUnlocked = false;
-
-  final _displayNameCtrl = TextEditingController();
-  final _usernameCtrl = TextEditingController();
-  final _pronounsCtrl = TextEditingController();
-  final _bioCtrl = TextEditingController();
 
   bool _loading = true;
   bool _saving = false;
@@ -112,10 +108,6 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
 
   @override
   void dispose() {
-    _displayNameCtrl.dispose();
-    _usernameCtrl.dispose();
-    _pronounsCtrl.dispose();
-    _bioCtrl.dispose();
     super.dispose();
   }
 
@@ -127,13 +119,11 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     try {
       final results = await Future.wait([
         DirectMessagesService.getUserSettings(),
-        DirectMessagesService.getMyMessagingProfile(),
         DmSidebarPrefs.getPeersMode(),
       ]);
       if (!mounted) return;
       final settings = results[0] as Map<String, dynamic>;
-      final profile = results[1] as Map<String, dynamic>;
-      final peers = results[2] as DmSidebarPeersMode;
+      final peers = results[1] as DmSidebarPeersMode;
 
       _peersMode = peers;
       _showMemberSince = settings['showCordigramMemberSince'] != false;
@@ -151,13 +141,6 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
       );
       await _syncFollowSocialShellIfNeeded();
       _syncAppearanceFromController();
-      _displayNameCtrl.text =
-          (profile['displayName'] ?? profile['name'] ?? '').toString();
-      _usernameCtrl.text =
-          (profile['chatUsername'] ?? profile['username'] ?? '').toString();
-      _pronounsCtrl.text = (profile['pronouns'] ?? '').toString();
-      _bioCtrl.text = (profile['bio'] ?? '').toString();
-
       setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
@@ -179,14 +162,6 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
         showCordigramMemberSince: _showMemberSince,
       );
       await DmSidebarPrefs.setPeersMode(_peersMode);
-      final dn = _displayNameCtrl.text.trim();
-      final un = _usernameCtrl.text.trim();
-      await DirectMessagesService.updateMyMessagingProfile({
-        if (dn.isNotEmpty) 'displayName': dn,
-        if (un.isNotEmpty) 'chatUsername': un,
-        'bio': _bioCtrl.text.trim(),
-        'pronouns': _pronounsCtrl.text.trim(),
-      });
       if (!mounted) return;
       setState(() => _dirty = false);
       Navigator.of(context).pop(true);
@@ -319,7 +294,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: chrome.accent),
                 ),
               )
-            else
+            else if (_detailSection != 'profile')
               TextButton(
                 onPressed: _saveAll,
                 child: Text(
@@ -1091,68 +1066,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
   }
 
   Widget _buildProfile(BuildContext context) {
-    final c = context.chrome;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _cardWidget(context, [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _fieldLabel(
-                  context,
-                  _t('chat.profileEditor.displayNameLabel').toUpperCase(),
-                ),
-                _textField(
-                  context,
-                  _displayNameCtrl,
-                  _t('chat.profileEditor.displayNameLabel'),
-                ),
-                const SizedBox(height: 12),
-                _fieldLabel(
-                  context,
-                  _t('chat.profileEditor.usernameLabel').toUpperCase(),
-                ),
-                _textField(
-                  context,
-                  _usernameCtrl,
-                  _t('chat.profileEditor.usernameLabel'),
-                ),
-                const SizedBox(height: 12),
-                _fieldLabel(
-                  context,
-                  _t('chat.profileEditor.pronounsLabel').toUpperCase(),
-                ),
-                _textField(
-                  context,
-                  _pronounsCtrl,
-                  _t('chat.profileEditor.pronounsPlaceholder'),
-                ),
-                const SizedBox(height: 12),
-                _fieldLabel(
-                  context,
-                  _t('chat.profileEditor.bioLabel').toUpperCase(),
-                ),
-                _hint(context, _t('chat.profileEditor.bioHint')),
-                TextField(
-                  controller: _bioCtrl,
-                  maxLines: 4,
-                  maxLength: 300,
-                  style: TextStyle(color: c.text),
-                  decoration: _inputDec(
-                    context,
-                    _t('chat.profileEditor.bioLabel'),
-                  ),
-                  onChanged: (_) => setState(() => _dirty = true),
-                ),
-              ],
-            ),
-          ),
-        ]),
-      ],
-    );
+    return const MessagesProfileEditor();
   }
 
   Widget _radioRow(

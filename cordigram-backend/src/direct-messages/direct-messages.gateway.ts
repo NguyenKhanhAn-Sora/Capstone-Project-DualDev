@@ -494,11 +494,29 @@ export class DirectMessagesGateway
         return;
       }
 
-      const payload = this.jwtService.verify(token, {
-        secret: process.env.JWT_SECRET || 'your_secret_key',
-      });
+      const secret = process.env.JWT_SECRET;
+      if (!secret) {
+        console.error('JWT_SECRET is not configured');
+        socket.disconnect();
+        return;
+      }
+
+      const payload = this.jwtService.verify(token, { secret }) as {
+        userId?: string;
+        sub?: string;
+        type?: string;
+      };
+
+      if (payload.type !== 'access') {
+        socket.disconnect();
+        return;
+      }
 
       const userId = payload.userId || payload.sub;
+      if (!userId) {
+        socket.disconnect();
+        return;
+      }
       socket.data.userId = userId;
       const set = this.connectedUsers.get(userId) ?? new Set<string>();
       set.add(socket.id);
@@ -998,6 +1016,10 @@ export class DirectMessagesGateway
     @MessageBody() data: { callerId: string },
   ) {
     const userId = socket.data.userId;
+    if (!userId || !data?.callerId) return;
+
+    const session = await this.dmCallSessions.getByPair(userId, data.callerId);
+    if (!session || session.calleeId !== userId) return;
 
     this.emitToAllUserSockets(data.callerId, 'call-rejected', {
       from: userId,
@@ -1008,18 +1030,19 @@ export class DirectMessagesGateway
       'call-incoming-dismiss',
       {
         peerId: data.callerId,
+        callId: session.callId,
         reason: 'rejected_elsewhere',
       },
       socket.id,
     );
 
-    const session = await this.dmCallSessions.markEnded({
+    const ended = await this.dmCallSessions.markEnded({
       userId,
       peerId: data.callerId,
       explicitStatus: 'declined',
     });
-    if (session) {
-      await this.finalizeFromSession(session, userId, 'declined');
+    if (ended) {
+      await this.finalizeFromSession(ended, userId, 'declined');
     }
   }
 
@@ -1037,13 +1060,20 @@ export class DirectMessagesGateway
   }
 
   @SubscribeMessage('ice-candidate')
-  handleIceCandidate(
+  async handleIceCandidate(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: { peerId: string; candidate: any },
   ) {
     const userId = socket.data.userId;
-    const peerSocket = this.connectedUsers.get(data.peerId);
+    if (!userId || !data?.peerId) return;
 
+    const hasSession = await this.dmCallSessions.hasActiveSessionBetween(
+      userId,
+      data.peerId,
+    );
+    if (!hasSession) return;
+
+    const peerSocket = this.connectedUsers.get(data.peerId);
     if (peerSocket && peerSocket.size) {
       for (const sid of peerSocket) {
         this.server.to(sid).emit('ice-candidate', {
