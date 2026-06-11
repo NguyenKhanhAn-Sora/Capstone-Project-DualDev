@@ -1053,10 +1053,7 @@ export class DirectMessagesGateway
   ) {
     const userId = socket.data.userId;
     if (!data?.callId) return;
-    const ok = await this.dmCallSessions.heartbeat(data.callId, userId);
-    if (!ok) {
-      socket.emit('call-ended', { from: null, reason: 'session_gone' });
-    }
+    await this.dmCallSessions.heartbeat(data.callId, userId);
   }
 
   @SubscribeMessage('ice-candidate')

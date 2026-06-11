@@ -95,6 +95,9 @@ class DmCallManager extends ChangeNotifier {
   }
 
   bool get hasActiveCall => _actives.isNotEmpty;
+
+  bool isActiveCallForPeer(String peerUserId) =>
+      _actives.containsKey(peerUserId);
   bool get isCallMinimized => _isCallMinimized;
   bool get isMiniCallTuckedToCorner => _miniCallTuckedToCorner;
   Offset get miniCallOffset => _miniCallOffset;
@@ -698,12 +701,14 @@ class DmCallManager extends ChangeNotifier {
     }
 
     _outgoings.remove(event.fromUserId);
+    final callId = event.payload?['callId']?.toString();
     _startActiveCall(
       session: session,
       peerUserId: out.peerUserId,
       peerName: out.peerName,
       peerAvatarUrl: out.peerAvatarUrl,
       video: out.video,
+      callId: callId,
     );
   }
 
@@ -804,6 +809,7 @@ class DmCallManager extends ChangeNotifier {
             fullscreenDialog: true,
             builder: (_) => NativeCallScreen(
               session: act.session,
+              peerUserId: peerUserId,
               title: act.peerName.isNotEmpty ? act.peerName : 'Cuộc gọi',
               peerAvatarUrl: act.peerAvatarUrl,
               localDisplayName: _myName,

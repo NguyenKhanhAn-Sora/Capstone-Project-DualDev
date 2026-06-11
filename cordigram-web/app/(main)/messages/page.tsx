@@ -2728,22 +2728,20 @@ export default function MessagesPage() {
     (peerId: string, roomNameOverride?: string) => {
       const outgoing = outgoingCallsByPeerRef.current[peerId];
       const roomName = roomNameOverride || outgoing?.roomName;
-      const callType = outgoing?.type ?? "audio";
       if (!roomName) return;
 
       const opened = openCallTabForPeer(peerId, roomName);
       if (!opened) {
-        markCallTabOpen(peerId);
-        router.push(buildCallUrl(peerId, roomName, callType));
+        showTransientError(
+          "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi gọi lại hoặc mở tab cuộc gọi từ biểu tượng trình duyệt.",
+        );
       }
       dismissOutgoingCallPopup(peerId);
     },
     [
       openCallTabForPeer,
-      buildCallUrl,
-      markCallTabOpen,
       dismissOutgoingCallPopup,
-      router,
+      showTransientError,
     ],
   );
 
@@ -2799,7 +2797,9 @@ export default function MessagesPage() {
       if (!win) {
         markCallTabOpen(incomingCall.from);
         setIncomingCall(null);
-        router.push(callUrl);
+        showTransientError(
+          "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi thử lại.",
+        );
         return;
       }
       markCallTabOpen(incomingCall.from);

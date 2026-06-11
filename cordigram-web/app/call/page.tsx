@@ -154,9 +154,6 @@ export default function CallPage() {
       channel.removeEventListener("message", onMessage);
       channel.close();
       channelRef.current = null;
-      if (peerId) {
-        removeActiveDmCallPeer(peerId);
-      }
     };
   }, [embedded, peerId]);
 
