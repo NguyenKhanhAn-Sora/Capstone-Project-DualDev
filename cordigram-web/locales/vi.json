@@ -2304,6 +2304,8 @@
       "viewLikes": "Xem ai đã thích",
       "dropHint": "Thả ảnh hoặc video vào đây",
       "reply": "Trả lời",
+      "likeComment": "Thích bình luận",
+      "unlikeComment": "Bỏ thích bình luận",
       "replyingTo": "Đang trả lời @{username}",
       "editingComment": "Đang chỉnh sửa bình luận",
       "commentsTitle": "Bình luận ({count})",
@@ -2827,7 +2829,11 @@
     "saveChanges": "Lưu thay đổi",
     "postUpdated": "Bài viết đã được cập nhật",
     "signInRequired": "Vui lòng đăng nhập để chỉnh sửa bài viết",
-    "updateFailed": "Cập nhật bài viết thất bại"
+    "updateFailed": "Cập nhật bài viết thất bại",
+    "pollOptionsLabel": "Lựa chọn bình chọn",
+    "pollOptionPlaceholder": "Lựa chọn {n}",
+    "allowMultiple": "Cho phép chọn nhiều",
+    "allowMultipleDesc": "Người dùng có thể chọn nhiều lựa chọn cùng lúc"
   },
   "player": {
     "captionOff": "Tắt",
@@ -2880,5 +2886,166 @@
     "error": "Không thể bình chọn. Vui lòng thử lại.",
     "timeLeftHM": "Còn {h}g {m}p",
     "timeLeftM": "Còn {m} phút"
+  },
+  "postMenu": {
+    "goToAds": "Đến trang quảng cáo",
+    "detailAds": "Chi tiết quảng cáo",
+    "copyLink": "Sao chép liên kết",
+    "editPost": "Chỉnh sửa bài viết",
+    "editVisibility": "Chỉnh sửa quyền xem",
+    "turnOnNotification": "Bật thông báo",
+    "muteNotifications": "Tắt thông báo",
+    "turnOnComments": "Bật bình luận",
+    "turnOffComments": "Tắt bình luận",
+    "showLike": "Hiện lượt thích",
+    "hideLike": "Ẩn lượt thích",
+    "deletePost": "Xóa bài viết",
+    "saveThisPost": "Lưu bài viết này",
+    "unsaveThisPost": "Bỏ lưu bài viết này",
+    "saveThisAds": "Lưu quảng cáo này",
+    "unsaveThisAds": "Bỏ lưu quảng cáo này",
+    "follow": "Theo dõi",
+    "unfollow": "Bỏ theo dõi",
+    "downloadThisMedia": "Tải xuống nội dung này",
+    "report": "Báo cáo",
+    "goToThisAccount": "Đến trang tài khoản này"
+  },
+  "commentMenu": {
+    "translating": "Đang dịch...",
+    "hideTranslation": "Ẩn bản dịch",
+    "translateComment": "Dịch bình luận",
+    "editComment": "Chỉnh sửa bình luận",
+    "unpinComment": "Bỏ ghim bình luận",
+    "pinComment": "Ghim bình luận",
+    "deleteComment": "Xóa bình luận",
+    "reportComment": "Báo cáo bình luận",
+    "blockUser": "Chặn người dùng này"
+  },
+  "reportOverlay": {
+    "titlePost": "Báo cáo bài viết này",
+    "titleComment": "Báo cáo bình luận này",
+    "subtitlePost": "Hãy cho chúng tôi biết vấn đề với nội dung này.",
+    "subtitleComment": "Hãy cho chúng tôi biết vấn đề với bình luận này.",
+    "back": "Quay lại",
+    "close": "Đóng",
+    "labelCancel": "Hủy",
+    "labelSubmit": "Gửi báo cáo",
+    "labelSubmitting": "Đang gửi...",
+    "labelSelectReason": "Chọn lý do cụ thể",
+    "labelPickCategory": "Vui lòng chọn danh mục trước.",
+    "labelNotes": "Ghi chú thêm (không bắt buộc)",
+    "labelNotesPlaceholder": "Thêm thông tin ngắn gọn nếu cần...",
+    "groups": {
+      "abuse": {
+        "label": "Quấy rối / Ngôn từ thù địch",
+        "harassment": "Nhắm vào cá nhân để quấy rối",
+        "hate_speech": "Ngôn từ thù địch hoặc phân biệt đối xử",
+        "offensive_discrimination": "Tấn công các nhóm dễ bị tổn thương"
+      },
+      "violence": {
+        "label": "Bạo lực / Đe dọa",
+        "violence_threats": "Đe dọa hoặc kích động bạo lực",
+        "graphic_violence": "Hình ảnh bạo lực phản cảm",
+        "extremism": "Chủ nghĩa cực đoan hoặc khủng bố",
+        "self_harm": "Tự làm hại bản thân hoặc tự tử"
+      },
+      "sensitive": {
+        "label": "Nội dung nhạy cảm",
+        "nudity": "Nội dung khỏa thân hoặc người lớn",
+        "minor_nudity": "Nguy cơ an toàn trẻ em",
+        "sexual_solicitation": "Mời gọi tình dục"
+      },
+      "misinfo": {
+        "label": "Mạo danh / Thông tin sai lệch",
+        "fake_news": "Thông tin sai lệch hoặc gây hiểu nhầm",
+        "impersonation": "Mạo danh cá nhân hoặc tổ chức"
+      },
+      "spam": {
+        "label": "Spam / Lừa đảo",
+        "spam": "Nội dung spam hoặc không liên quan",
+        "financial_scam": "Lừa đảo tài chính",
+        "unsolicited_ads": "Quảng cáo không mong muốn"
+      },
+      "ip": {
+        "label": "Sở hữu trí tuệ",
+        "copyright": "Vi phạm bản quyền",
+        "trademark": "Vi phạm nhãn hiệu",
+        "brand_impersonation": "Mạo danh thương hiệu"
+      },
+      "illegal": {
+        "label": "Hoạt động bất hợp pháp",
+        "contraband": "Hàng cấm",
+        "illegal_transaction": "Giao dịch bất hợp pháp"
+      },
+      "privacy": {
+        "label": "Vi phạm quyền riêng tư",
+        "doxxing": "Tiết lộ thông tin cá nhân",
+        "nonconsensual_intimate": "Nội dung thân mật không được đồng ý"
+      },
+      "other": {
+        "label": "Khác",
+        "other": "Lý do khác"
+      }
+    }
+  },
+  "muteOverlay": {
+    "title": "Tắt thông báo",
+    "subtitle": "Chọn thời gian tạm dừng thông báo cho bài viết này.",
+    "labelSave": "Lưu",
+    "labelSaving": "Đang lưu...",
+    "labelDate": "Ngày",
+    "labelTime": "Giờ",
+    "options": {
+      "5m": "5 phút",
+      "10m": "10 phút",
+      "15m": "15 phút",
+      "30m": "30 phút",
+      "1h": "1 giờ",
+      "1d": "1 ngày",
+      "until": "Cho đến khi tôi bật lại",
+      "custom": "Chọn ngày & giờ"
+    }
+  },
+  "visibilityOverlay": {
+    "title": "Chỉnh sửa quyền xem",
+    "subtitle": "Chọn ai có thể xem bài viết này.",
+    "labelSave": "Cập nhật quyền xem",
+    "labelSaving": "Đang cập nhật...",
+    "labelCancel": "Hủy",
+    "options": {
+      "public": {
+        "title": "Công khai",
+        "description": "Bất kỳ ai cũng có thể xem bài viết này"
+      },
+      "followers": {
+        "title": "Bạn bè / Người theo dõi",
+        "description": "Chỉ người theo dõi mới có thể xem"
+      },
+      "private": {
+        "title": "Riêng tư",
+        "description": "Chỉ mình bạn có thể xem"
+      }
+    }
+  },
+  "confirmDeletePost": {
+    "title": "Xóa bài viết này?",
+    "body": "Xóa bài viết này sẽ xóa nó với tất cả mọi người. Hành động này không thể hoàn tác.",
+    "labelConfirm": "Xóa",
+    "labelConfirming": "Đang xóa...",
+    "labelCancel": "Hủy"
+  },
+  "confirmDeleteComment": {
+    "title": "Xóa bình luận này?",
+    "body": "Xóa bình luận này cũng sẽ xóa các trả lời của nó. Hành động này không thể hoàn tác.",
+    "labelConfirm": "Xóa",
+    "labelConfirming": "Đang xóa...",
+    "labelCancel": "Hủy"
+  },
+  "confirmBlockUser": {
+    "title": "Chặn tài khoản này?",
+    "body": "Bạn sắp chặn @{label}. Họ sẽ không còn có thể tương tác với bạn.",
+    "labelConfirm": "Chặn",
+    "labelConfirming": "Đang chặn...",
+    "labelCancel": "Hủy"
   }
 }

@@ -102,6 +102,8 @@
     "changePassword": "Đổi mật khẩu",
     "viewDevices": "Xem thiết bị",
     "unhide": "Bỏ ẩn",
+    "unhideTitle": "Bỏ ẩn bài viết này?",
+    "unhideMessage": "Bài viết này sẽ xuất hiện lại trong nguồn cấp của bạn.",
     "unblock": "Bỏ chặn",
     "accountEmail": "Email tài khoản",
     "manageSignInEmail": "Quản lý email đăng nhập và các bước xác minh.",
@@ -568,6 +570,7 @@
       "postDeleted": "Đã xóa bài viết",
       "deleteError": "Không thể xóa bài viết",
       "postHidden": "Đã ẩn bài viết",
+      "hideError": "Không thể ẩn bài viết",
       "signInFirst": "Vui lòng đăng nhập trước",
       "reportSubmitted": "Đã gửi báo cáo",
       "accountBlocked": "Đã chặn tài khoản",
@@ -642,7 +645,8 @@
       "saveAds": "Lưu quảng cáo này",
       "unsaveAds": "Bỏ lưu quảng cáo này",
       "hidePost": "Ẩn bài viết này",
-      "hideAds": "Ẩn quảng cáo này"
+      "hideAds": "Ẩn quảng cáo này",
+      "seeLikes": "Xem ai đã thích"
     },
     "actions": {
       "like": "Thích",
@@ -726,6 +730,9 @@
       "allowComments": "Cho phép bình luận",
       "allowDownload": "Cho phép tải xuống",
       "hideLikeCount": "Ẩn số lượt thích",
+      "pollQuestionHint": "Đặt câu hỏi…",
+      "pollOptionHint": "Lựa chọn {n}",
+      "voteFailed": "Bình chọn thất bại",
       "cancel": "Hủy",
       "done": "Xong"
     },
@@ -768,9 +775,18 @@
       "caption": "Chú thích",
       "location": "Vị trí (tuỳ chọn)",
       "hashtags": "Hashtag (vd: #âm nhạc #flutter)",
+      "settings": "Cài đặt",
+      "searchPlace": "Tìm kiếm địa điểm…",
+      "pollOptions": "Các lựa chọn",
+      "pollOption": "Lựa chọn {n}",
       "allowComments": "Cho phép bình luận",
+      "allowCommentsSub": "Cho phép người khác bình luận bài viết này",
+      "allowMultipleAnswers": "Cho phép nhiều câu trả lời",
+      "allowMultipleAnswersSub": "Người bình chọn có thể chọn nhiều hơn một tùy chọn",
       "allowDownload": "Cho phép tải xuống",
+      "allowDownloadSub": "Cho phép người khác lưu nội dung từ bài viết này",
       "hideLikeCount": "Ẩn số lượt thích",
+      "hideLikeCountSub": "Người xem sẽ không thấy số lượt thích",
       "saveChanges": "Lưu thay đổi",
       "saveVisibility": "Lưu hiển thị"
     },
@@ -799,7 +815,8 @@
         "edit": "Chỉnh sửa bình luận",
         "delete": "Xóa bình luận",
         "report": "Báo cáo bình luận",
-        "block": "Chặn người dùng này"
+        "block": "Chặn người dùng này",
+        "seeLikes": "Xem ai đã thích"
       },
       "comments": {
         "title": "Bình luận",
@@ -819,8 +836,15 @@
         "replyingTo": "Đang trả lời @{username}",
         "searchingUsers": "Đang tìm người dùng…",
         "noUsers": "Không tìm thấy người dùng",
-        "placeholder": "Viết bình luận…"
+        "placeholder": "Viết bình luận…",
+        "editHint": "Chỉnh sửa bình luận của bạn...",
+        "editSuccess": "Đã cập nhật bình luận",
+        "editError": "Không thể cập nhật bình luận"
       }
+    },
+    "likesSheet": {
+      "search": "Tìm kiếm tên đăng nhập",
+      "noLikes": "Chưa có lượt thích"
     }
   },
   "reels": {
@@ -937,14 +961,35 @@
       "edit": "Chỉnh sửa bình luận",
       "delete": "Xóa bình luận",
       "report": "Báo cáo bình luận",
-      "block": "Chặn người dùng này"
+      "block": "Chặn người dùng này",
+      "seeLikes": "Xem ai đã thích"
     }
+  },
+  "postMute": {
+    "5m": "5 phút",
+    "10m": "10 phút",
+    "15m": "15 phút",
+    "30m": "30 phút",
+    "1h": "1 giờ",
+    "1d": "1 ngày",
+    "until": "Cho đến khi tôi tắt",
+    "custom": "Chọn ngày & giờ",
+    "title": "Tắt thông báo {kindLabel} này",
+    "subtitle": "Chọn thời gian tạm dừng thông báo.",
+    "selectDate": "Chọn ngày",
+    "selectTime": "Chọn giờ",
+    "invalidDateTime": "Vui lòng chọn ngày và giờ hợp lệ.",
+    "futureTimeError": "Vui lòng chọn thời gian trong tương lai.",
+    "saveError": "Không thể cập nhật thông báo",
+    "saving": "Đang lưu..."
   },
   "profile": {
     "cannotRender": {
       "title": "Không thể hiển thị hồ sơ",
       "message": "Dữ liệu hồ sơ không khả dụng. Vui lòng thử lại."
     },
+    "removePhotoTitle": "Xóa ảnh đại diện",
+    "removePhotoMessage": "Bạn có chắc chắn muốn xóa ảnh đại diện hiện tại không? Nó sẽ được thay thế bằng ảnh mặc định.",
     "cropPhoto": "Cắt ảnh",
     "tabs": {
       "posts": "Bài viết",
@@ -1309,6 +1354,7 @@
     "viewImage": "Xem ảnh",
     "retry": "Thử lại",
     "refresh": "Làm mới",
+    "noPostsFor": "Không tìm thấy bài viết cho #{tag}",
     "deletePost": {
       "title": "Xóa bài viết",
       "message": "Hành động này không thể hoàn tác."
@@ -1365,9 +1411,23 @@
       "endLive": "Kết thúc live",
       "endLiveDialog": {
         "title": "Kết thúc livestream?",
+        "content": "Livestream sẽ dừng ngay lập tức với tất cả người xem.",
         "cancel": "Hủy",
         "confirm": "Kết thúc live"
       },
+      "deleteComment": {
+        "title": "Xóa bình luận?",
+        "content": "Bình luận sẽ bị xóa với tất cả người xem và không thể hoàn tác."
+      },
+      "blockUser": {
+        "title": "Chặn {author}?",
+        "message": "Họ sẽ không thể xem nội dung hoặc tương tác với bạn nữa."
+      },
+      "latencyMode": "Chế độ độ trễ",
+      "saveChanges": "Lưu thay đổi",
+      "saving": "Đang lưu...",
+      "unableToUpdate": "Không thể cập nhật cài đặt livestream.",
+      "backToHome": "Về trang chủ",
       "retryConnect": "Thử kết nối lại",
       "back": "Quay lại",
       "liveNow": "Đang live",
@@ -2372,8 +2432,8 @@
       },
       "memberProfile": {
         "aria": "Hồ sơ thành viên",
-        "follow": "Follow",
-        "following": "Đã follow",
+        "follow": "Theo dõi",
+        "following": "Đang theo dõi",
         "message": "Nhắn tin",
         "messageAria": "Nhắn tin",
         "optionsAria": "Tùy chọn",
@@ -3658,8 +3718,21 @@
     "deleteStory": "Xóa story",
     "report": "Báo cáo",
     "you": "Bạn",
-    "follow": "Follow",
+    "follow": "Theo dõi",
     "following": "Đang theo dõi",
-    "user": "Người dùng"
+    "user": "Người dùng",
+    "labelMusic": "Nhạc nền",
+    "btnAddMusic": "Thêm nhạc",
+    "btnRemoveMusic": "Gỡ nhạc",
+    "btnChangeMusic": "Đổi nhạc",
+    "musicTrending": "Thịnh hành",
+    "musicSearch": "Tìm kiếm",
+    "musicSearchHint": "Tìm bài hát...",
+    "musicNoResults": "Không tìm thấy kết quả",
+    "musicSelect": "Dùng",
+    "timeNow": "vừa xong",
+    "timeMinutes": "{n}ph",
+    "timeHours": "{n}g",
+    "timeDays": "{n}n"
   }
 }

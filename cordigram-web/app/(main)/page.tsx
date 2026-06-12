@@ -500,6 +500,7 @@ export default function HomePage({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const newAdFlag = searchParams.get("newAd");
+  const pinnedAdPostIdRef = useRef<string | null>(null);
   const pageSize = pageSizeOverride ?? PAGE_SIZE;
   const [items, setItems] = useState<PostViewState[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1103,24 +1104,19 @@ export default function HomePage({
           },
         }));
         if (nextPage === 1) {
-          // Fresh load — replace entire list
-          // If user just created a new ad, pin it to the top of the feed
-          const pendingAdPostId =
-            typeof window !== "undefined"
-              ? localStorage.getItem("pendingNewAdPostId")
-              : null;
-          if (pendingAdPostId && newAdFlag) {
+          // Fresh load — replace entire list.
+          // If the user just created an ad, pinnedAdPostIdRef holds the promoted
+          // post ID (set by the ?newAd useEffect above). Re-check on every page-1
+          // load so background cache-hydration refreshes don't undo the pin.
+          const pinId = pinnedAdPostIdRef.current;
+          if (pinId) {
             const adIdx = mapped.findIndex(
-              (p) =>
-                p.item.id === pendingAdPostId ||
-                p.item.repostOf === pendingAdPostId,
+              (p) => p.item.id === pinId || p.item.repostOf === pinId,
             );
             const pinned =
               adIdx > 0
                 ? [mapped[adIdx], ...mapped.slice(0, adIdx), ...mapped.slice(adIdx + 1)]
                 : mapped;
-            localStorage.removeItem("pendingNewAdPostId");
-            router.replace("/", { scroll: false });
             setItems(pinned);
           } else {
             setItems(mapped);
@@ -1240,6 +1236,20 @@ export default function HomePage({
     }
     void loadRef.current(1);
   }, [canRender, isSearchMode, tryHydrateFromCache]);
+
+  // When user lands from ?newAd=1, capture the pending ad ID into a ref so all
+  // subsequent feed reloads (including cache-hydration background refreshes) keep
+  // the ad pinned. window.history.replaceState cleans the URL without triggering
+  // a Next.js re-render that would re-run the feed load useEffect above.
+  useEffect(() => {
+    if (!newAdFlag || typeof window === "undefined") return;
+    const stored = localStorage.getItem("pendingNewAdPostId");
+    if (stored) {
+      pinnedAdPostIdRef.current = stored;
+      localStorage.removeItem("pendingNewAdPostId");
+      window.history.replaceState(null, "", "/");
+    }
+  }, [newAdFlag]);
 
   const onLike = async (postId: string, liked: boolean) => {
     if (!token) { showLoginOverlay(); return; }

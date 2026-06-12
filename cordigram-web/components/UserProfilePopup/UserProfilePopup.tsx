@@ -158,11 +158,17 @@ export default function UserProfilePopup({
 
         <div className={styles.banner} style={bannerStyle} />
         <div className={styles.body}>
-          <img
-            className={styles.avatar}
-            src={detail?.avatarUrl || ""}
-            alt=""
-          />
+          {detail?.avatarUrl ? (
+            <img
+              className={styles.avatar}
+              src={detail.avatarUrl}
+              alt=""
+            />
+          ) : (
+            <div className={styles.avatar} style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, fontWeight: 800, color: "#fff" }}>
+              {(detail?.displayName || detail?.username || "?").charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className={styles.statusPill}>
             {t("chat.profileEditor.statusPlaceholder")}
           </div>
@@ -226,8 +232,14 @@ export default function UserProfilePopup({
                 <div>
                   {mutualFollowers.slice(0, 24).map((u) => (
                     <div key={u.userId} className={styles.listRow}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={u.avatarUrl} alt="" className={styles.listAv} style={{ borderRadius: 999 }} />
+                      {u.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={u.avatarUrl} alt="" className={styles.listAv} style={{ borderRadius: 999 }} />
+                      ) : (
+                        <div className={styles.listAv} style={{ borderRadius: 999, background: "linear-gradient(135deg, #5865f2, #7c3aed)", display: "grid", placeItems: "center", color: "#fff", fontSize: 11, fontWeight: 800 }}>
+                          {(u.displayName || u.username || "?").charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div className={styles.listName}>{u.displayName || u.username}</div>
                     </div>
                   ))}

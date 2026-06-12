@@ -691,32 +691,32 @@ export default function MessagesProfileEditor({
           <div className={styles.left}>
             <div className={styles.boostPromo}>
               <div className={styles.boostPromoRow}>
-                <div>
-                  <div className={styles.boostPromoTitle}>
+                <div className={styles.boostPromoTop}>
+                  <span className={styles.boostPromoTitle}>
                     {boostUnlocked
                       ? t("chat.profileEditor.boostPromoTitleActive")
                       : t("chat.profileEditor.boostPromoTitleDemo")}
-                    {!boostUnlocked ? (
-                      <span className={styles.lockedTag}>
-                        <span className={styles.lockedTagDot} aria-hidden />
-                        {t("chat.profileEditor.boostPromoTagLocked")}
-                      </span>
-                    ) : (
-                      <span className={styles.lockedTag}>
-                        <span className={styles.lockedTagDot} aria-hidden />
-                        {t("chat.profileEditor.boostPromoTagUnlock")}
-                      </span>
-                    )}
-                  </div>
-                  <div className={styles.boostPromoDesc}>
-                    {boostUnlocked
-                      ? t("chat.profileEditor.boostPromoDescActive")
-                      : t("chat.profileEditor.boostPromoDescDemo")}
-                  </div>
+                  </span>
+                  {!boostUnlocked ? (
+                    <span className={styles.lockedTag}>
+                      <span className={styles.lockedTagDot} aria-hidden />
+                      {t("chat.profileEditor.boostPromoTagLocked")}
+                    </span>
+                  ) : (
+                    <span className={styles.lockedTag}>
+                      <span className={styles.lockedTagDot} aria-hidden />
+                      {t("chat.profileEditor.boostPromoTagUnlock")}
+                    </span>
+                  )}
+                </div>
+                <div className={styles.boostPromoDesc}>
+                  {boostUnlocked
+                    ? t("chat.profileEditor.boostPromoDescActive")
+                    : t("chat.profileEditor.boostPromoDescDemo")}
                 </div>
                 <button
                   type="button"
-                  className={styles.btnGhost}
+                  className={styles.btnBoost}
                   onClick={openDisplayNameStyleModal}
                 >
                   {boostUnlocked

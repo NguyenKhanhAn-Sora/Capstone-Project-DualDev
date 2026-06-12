@@ -880,6 +880,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       case PostMenuAction.detailAds:
         _showSnack(LanguageController.instance.t('post.detail.adsFromFeed'), error: true);
         return;
+      case PostMenuAction.seeLikes:
+        if (!mounted) return;
+        showPostLikesSheet(
+          context,
+          postId: post.id,
+          viewerId: _viewerId,
+          title: LanguageController.instance.t('post.menu.seeLikes'),
+        );
+        return;
     }
   }
 
@@ -1482,6 +1491,20 @@ class _CommentTileState extends State<_CommentTile> {
               : lc.t('post.detail.comments.pin'),
           onTap: _onPinComment,
         ),
+      CommentSheetAction(
+        icon: Icons.favorite_border_rounded,
+        label: lc.t('post.detail.commentMenu.seeLikes'),
+        onTap: () {
+          Navigator.of(context).pop();
+          showCommentLikesSheet(
+            context,
+            postId: widget.postId,
+            commentId: widget.comment.id,
+            viewerId: widget.viewerId,
+            title: lc.t('post.detail.commentMenu.seeLikes'),
+          );
+        },
+      ),
       if (_isOwnComment) ...[
         CommentSheetAction(
           icon: Icons.edit_outlined,
@@ -1541,7 +1564,7 @@ class _CommentTileState extends State<_CommentTile> {
       context,
       title: lc.t('post.detail.deleteComment.title'),
       message: lc.t('post.detail.deleteComment.message'),
-      confirmLabel: 'Delete',
+      confirmLabel: lc.t('common.delete'),
       danger: true,
     );
     if (confirmed != true || !mounted) return;
@@ -1600,7 +1623,7 @@ class _CommentTileState extends State<_CommentTile> {
       context,
       title: lc.t('post.detail.blockUser.title', {'username': username}),
       message: lc.t('post.detail.blockUser.message', {'username': username}),
-      confirmLabel: 'Block',
+      confirmLabel: lc.t('common.block'),
       danger: true,
     );
     if (confirmed != true || !mounted) return;

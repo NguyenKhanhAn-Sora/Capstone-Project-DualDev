@@ -185,7 +185,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password updated! Please sign in.')),
+        SnackBar(content: Text(LanguageController.instance.t('auth.forgotPassword.passwordUpdated'))),
       );
       Navigator.of(
         context,
@@ -354,7 +354,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text('Resend code'),
+                child: Text(LanguageController.instance.t('auth.forgotPassword.resendCode')),
               ),
           ],
         ),

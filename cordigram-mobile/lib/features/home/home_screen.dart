@@ -6,6 +6,7 @@ import 'package:video_player/video_player.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/theme_controller.dart';
+import '../../core/services/user_notifier.dart';
 import '../ads/ads_campaign_detail_screen.dart';
 import '../ads/ads_entry_screen.dart';
 import '../ads/ads_service.dart';
@@ -134,6 +135,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _tabController.addListener(_onTabChanged);
     PostUploadController.instance.addListener(_onUploadStateChanged);
     LanguageController.instance.addListener(_onLanguageChanged);
+    UserNotifier.avatarUrl.addListener(_onAvatarChanged);
     _loadFeed();
     _loadLiveStreams();
     _fetchProfile();
@@ -237,6 +239,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void dispose() {
     PostUploadController.instance.removeListener(_onUploadStateChanged);
     LanguageController.instance.removeListener(_onLanguageChanged);
+    UserNotifier.avatarUrl.removeListener(_onAvatarChanged);
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _topNavAnimController.dispose();
@@ -504,6 +507,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _username = data['username'] as String?;
       });
     } catch (_) {}
+  }
+
+  void _onAvatarChanged() {
+    if (!mounted) return;
+    final newUrl = UserNotifier.avatarUrl.value;
+    final oldUrl = _avatarUrl;
+    if (oldUrl != null && oldUrl.isNotEmpty) {
+      imageCache.evict(NetworkImage(oldUrl));
+    }
+    setState(() => _avatarUrl = newUrl);
   }
 
   // ── Unread counts ───────────────────────────────────────────────────────
@@ -1322,6 +1335,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             error: true,
           );
         }
+        return;
+      case PostMenuAction.seeLikes:
+        if (!mounted) return;
+        showPostLikesSheet(
+          context,
+          postId: post.id,
+          viewerId: _viewerId,
+          title: LanguageController.instance.t('post.menu.seeLikes'),
+        );
         return;
     }
   }

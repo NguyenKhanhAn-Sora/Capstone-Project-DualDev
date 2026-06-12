@@ -6,6 +6,7 @@ import 'package:video_player/video_player.dart';
 import '../../../core/services/language_controller.dart';
 import '../models/story_models.dart';
 import '../services/story_service.dart';
+import '../widgets/story_music_picker.dart';
 
 // ── Visibility option ─────────────────────────────────────────────────────────
 
@@ -74,6 +75,9 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
 
   // Tab: 0 = media, 1 = text
   late final TabController _tabCtrl;
+
+  // Music
+  StoryMusic? _selectedMusic;
 
   // Trim state
   double _trimStart = 0.0; // 0–1 fraction
@@ -153,6 +157,20 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
     });
   }
 
+  // ── Music ─────────────────────────────────────────────────────────────────
+
+  void _showMusicPicker() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showStoryMusicPicker(
+      context: context,
+      selected: _selectedMusic,
+      isDark: isDark,
+      onResult: (music) {
+        if (mounted) setState(() => _selectedMusic = music);
+      },
+    );
+  }
+
   // ── Submit ────────────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
@@ -179,6 +197,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
           'textContent': text,
           'backgroundStyle': _bgStyle,
           'visibility': _vis.key,
+          if (_selectedMusic != null) 'music': _selectedMusic!.toJson(),
         };
       } else {
         if (_mediaFile == null) {
@@ -206,6 +225,8 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
           if (_trimStartMs != null) 'trimStartMs': _trimStartMs,
           if (_trimEndMs != null) 'trimEndMs': _trimEndMs,
           'visibility': _vis.key,
+          if (_selectedMusic != null && _mediaType != 'video')
+            'music': _selectedMusic!.toJson(),
         };
       }
 
@@ -274,7 +295,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         if (_uploading) return;
-        final nav = Navigator.of(context);
+        final nav = Navigator.of(context, rootNavigator: true);
         if (await _confirmDiscard()) {
           if (mounted) nav.pop();
         }
@@ -302,7 +323,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
           child: Row(
             children: [
               GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () => Navigator.of(context, rootNavigator: true).pop(),
                 child: Container(
                   width: 38,
                   height: 38,
@@ -347,48 +368,57 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         ),
         const SizedBox(height: 24),
 
-        // Format cards
+        // Stack+Positioned: card1 anchored top, card2 anchored bottom → pixel-exact equal heights
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                // Media card
-                Expanded(
-                  child: _FormatCard(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF4361EE), Color(0xFF7B2FF7)],
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final cardHeight = (constraints.maxHeight - 12) / 2;
+                return Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: cardHeight,
+                      child: _FormatCard(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF4361EE), Color(0xFF7B2FF7)],
+                        ),
+                        icon: Icons.photo_library_outlined,
+                        label: t('story.tabMedia'),
+                        sub: t('story.dropHint'),
+                        onTap: () => _showMediaPicker(isDark),
+                        isDark: isDark,
+                      ),
                     ),
-                    icon: Icons.photo_library_outlined,
-                    label: t('story.tabMedia'),
-                    sub: t('story.dropHint'),
-                    onTap: () => _showMediaPicker(isDark),
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Text card
-                Expanded(
-                  child: _FormatCard(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFF953C6), Color(0xFFFF6B35)],
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: cardHeight,
+                      child: _FormatCard(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFF953C6), Color(0xFFFF6B35)],
+                        ),
+                        icon: Icons.title_rounded,
+                        label: t('story.tabText'),
+                        sub: t('story.placeholderText'),
+                        onTap: () {
+                          _tabCtrl.index = 1;
+                          setState(() => _step = 'editor');
+                        },
+                        isDark: isDark,
+                      ),
                     ),
-                    icon: Icons.title_rounded,
-                    label: t('story.tabText'),
-                    sub: t('story.placeholderText'),
-                    onTap: () {
-                      _tabCtrl.index = 1;
-                      setState(() => _step = 'editor');
-                    },
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -639,6 +669,14 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
               ),
             ),
           ),
+          // Music sticker overlay
+          if (_selectedMusic != null)
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 64,
+              child: StoryMusicSticker(music: _selectedMusic!),
+            ),
         ],
       ),
     );
@@ -709,7 +747,15 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.file(_mediaFile!, fit: BoxFit.contain),
+        // cover = fills the entire preview with no black bars, matching how the viewer displays it
+        Image.file(_mediaFile!, fit: BoxFit.cover),
+        if (_selectedMusic != null)
+          Positioned(
+            bottom: 16,
+            left: 16,
+            right: 64,
+            child: StoryMusicSticker(music: _selectedMusic!),
+          ),
       ],
     );
   }
@@ -771,6 +817,9 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         children: [
           // Text bg selector (only for text tab)
           if (_isText) _buildBgStrip(isDark),
+          // Music row (text and image stories — not video)
+          if (_mediaType != 'video')
+            _buildMusicRow(t, isDark),
           // Media action buttons
           if (!_isText && _mediaFile != null)
             _buildActionRow(t, isDark),
@@ -806,6 +855,103 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildMusicRow(
+      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
+    final hasMusic = _selectedMusic != null;
+    return GestureDetector(
+      onTap: _showMusicPicker,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: hasMusic
+              ? const Color(0xFF4AA3E4).withValues(alpha: 0.08)
+              : (isDark
+                  ? const Color(0xFF1A2435)
+                  : const Color(0xFFF0F4FA)),
+          border: hasMusic
+              ? Border.all(
+                  color: const Color(0xFF4AA3E4).withValues(alpha: 0.4))
+              : Border.all(
+                  color: isDark
+                      ? const Color(0xFF1E2D48)
+                      : const Color(0xFFE3EAF5)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 30, height: 30,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: hasMusic
+                    ? const LinearGradient(
+                        colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)])
+                    : null,
+                color: hasMusic
+                    ? null
+                    : (isDark
+                        ? const Color(0xFF253347)
+                        : const Color(0xFFE3EAF5)),
+              ),
+              child: Icon(
+                hasMusic
+                    ? Icons.music_note_rounded
+                    : Icons.music_note_outlined,
+                color: hasMusic ? Colors.white : const Color(0xFF7A8BB0),
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: hasMusic
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _selectedMusic!.title,
+                          style: const TextStyle(
+                            color: Color(0xFF4AA3E4),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          _selectedMusic!.artist,
+                          style: const TextStyle(
+                              color: Color(0xFF7A8BB0), fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    )
+                  : Text(
+                      t('story.btnAddMusic'),
+                      style: const TextStyle(
+                        color: Color(0xFF7A8BB0),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                      ),
+                    ),
+            ),
+            Icon(
+              hasMusic
+                  ? Icons.swap_horiz_rounded
+                  : Icons.add_rounded,
+              color: hasMusic
+                  ? const Color(0xFF4AA3E4)
+                  : const Color(0xFF7A8BB0),
+              size: 18,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -904,70 +1050,70 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
 
   Widget _buildVisibilityRow(
       String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
-    return Row(
+    final labelColor =
+        isDark ? const Color(0xFF7A8BB0) : const Color(0xFF5B6378);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.remove_red_eye_outlined,
-            color: isDark
-                ? const Color(0xFF7A8BB0)
-                : const Color(0xFF5B6378),
-            size: 16),
-        const SizedBox(width: 6),
-        Text(
-          t('story.labelVisibility'),
-          style: TextStyle(
-            color: isDark
-                ? const Color(0xFF7A8BB0)
-                : const Color(0xFF5B6378),
-            fontSize: 13,
-          ),
-        ),
-        const Spacer(),
-        ..._Vis.values.map((v) {
-          final active = _vis == v;
-          return GestureDetector(
-            onTap: () => setState(() => _vis = v),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              margin: const EdgeInsets.only(left: 6),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: active
-                    ? const LinearGradient(
-                        colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
-                      )
-                    : null,
-                color: active
-                    ? null
-                    : (isDark
-                        ? const Color(0xFF1E2D48)
-                        : const Color(0xFFE3EAF5)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(v.icon,
-                      size: 13,
-                      color: active
-                          ? Colors.white
-                          : const Color(0xFF7A8BB0)),
-                  const SizedBox(width: 4),
-                  Text(
-                    v.label(t),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: active
-                          ? Colors.white
-                          : const Color(0xFF7A8BB0),
-                    ),
-                  ),
-                ],
-              ),
+        // Label row
+        Row(
+          children: [
+            Icon(Icons.remove_red_eye_outlined, color: labelColor, size: 15),
+            const SizedBox(width: 5),
+            Text(
+              t('story.labelVisibility'),
+              style: TextStyle(color: labelColor, fontSize: 12),
             ),
-          );
-        }),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Buttons row — wraps to prevent overflow on any screen width
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: _Vis.values.map((v) {
+            final active = _vis == v;
+            return GestureDetector(
+              onTap: () => setState(() => _vis = v),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: active
+                      ? const LinearGradient(
+                          colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
+                        )
+                      : null,
+                  color: active
+                      ? null
+                      : (isDark
+                          ? const Color(0xFF1E2D48)
+                          : const Color(0xFFE3EAF5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(v.icon,
+                        size: 12,
+                        color: active
+                            ? Colors.white
+                            : const Color(0xFF7A8BB0)),
+                    const SizedBox(width: 4),
+                    Text(
+                      v.label(t),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: active ? Colors.white : const Color(0xFF7A8BB0),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ],
     );
   }

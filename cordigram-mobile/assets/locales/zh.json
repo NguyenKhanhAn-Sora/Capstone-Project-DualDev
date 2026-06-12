@@ -110,6 +110,8 @@
     "changePassword": "更改密码",
     "viewDevices": "查看设备",
     "unhide": "取消隐藏",
+    "unhideTitle": "取消隐藏此帖子？",
+    "unhideMessage": "此帖子将重新出现在您的动态中。",
     "unblock": "取消屏蔽",
     "accountEmail": "账号邮箱",
     "manageSignInEmail": "管理您的登录邮箱和验证步骤。",
@@ -561,6 +563,7 @@
       "postDeleted": "帖子已删除",
       "deleteError": "删除帖子失败",
       "postHidden": "帖子已隐藏",
+      "hideError": "隐藏帖子失败",
       "signInFirst": "请先登录",
       "reportSubmitted": "举报已提交",
       "accountBlocked": "账号已屏蔽",
@@ -635,7 +638,8 @@
       "saveAds": "保存此广告",
       "unsaveAds": "取消保存此广告",
       "hidePost": "隐藏此帖子",
-      "hideAds": "隐藏此广告"
+      "hideAds": "隐藏此广告",
+      "seeLikes": "查看点赞用户"
     },
     "actions": {
       "like": "点赞",
@@ -719,6 +723,9 @@
       "allowComments": "允许评论",
       "allowDownload": "允许下载",
       "hideLikeCount": "隐藏点赞数",
+      "pollQuestionHint": "提问…",
+      "pollOptionHint": "选项 {n}",
+      "voteFailed": "投票失败",
       "cancel": "取消",
       "done": "完成"
     },
@@ -761,9 +768,18 @@
       "caption": "说明文字",
       "location": "位置（可选）",
       "hashtags": "话题标签（例如 #音乐 #flutter）",
+      "settings": "设置",
+      "searchPlace": "搜索地点…",
+      "pollOptions": "投票选项",
+      "pollOption": "选项 {n}",
       "allowComments": "允许评论",
+      "allowCommentsSub": "允许他人评论此帖子",
+      "allowMultipleAnswers": "允许多选",
+      "allowMultipleAnswersSub": "投票者可以选择多个选项",
       "allowDownload": "允许下载",
+      "allowDownloadSub": "允许他人保存此帖子的媒体",
       "hideLikeCount": "隐藏点赞数",
+      "hideLikeCountSub": "查看者将看不到点赞数量",
       "saveChanges": "保存更改",
       "saveVisibility": "保存可见性"
     },
@@ -792,7 +808,8 @@
         "edit": "编辑评论",
         "delete": "删除评论",
         "report": "举报评论",
-        "block": "屏蔽此用户"
+        "block": "屏蔽此用户",
+        "seeLikes": "查看点赞用户"
       },
       "comments": {
         "title": "评论",
@@ -812,8 +829,15 @@
         "replyingTo": "正在回复 @{username}",
         "searchingUsers": "正在搜索用户…",
         "noUsers": "未找到用户",
-        "placeholder": "写评论…"
+        "placeholder": "写评论…",
+        "editHint": "编辑您的评论...",
+        "editSuccess": "评论已更新",
+        "editError": "评论更新失败"
       }
+    },
+    "likesSheet": {
+      "search": "搜索用户名",
+      "noLikes": "暂无点赞"
     }
   },
   "reels": {
@@ -930,14 +954,35 @@
       "edit": "编辑评论",
       "delete": "删除评论",
       "report": "举报评论",
-      "block": "屏蔽此用户"
+      "block": "屏蔽此用户",
+      "seeLikes": "查看点赞用户"
     }
+  },
+  "postMute": {
+    "5m": "5分钟",
+    "10m": "10分钟",
+    "15m": "15分钟",
+    "30m": "30分钟",
+    "1h": "1小时",
+    "1d": "1天",
+    "until": "直到我关闭",
+    "custom": "选择日期和时间",
+    "title": "屏蔽此{kindLabel}的通知",
+    "subtitle": "选择暂停通知的时长。",
+    "selectDate": "选择日期",
+    "selectTime": "选择时间",
+    "invalidDateTime": "请选择有效的日期和时间。",
+    "futureTimeError": "请选择未来的时间。",
+    "saveError": "更新通知失败",
+    "saving": "保存中..."
   },
   "profile": {
     "cannotRender": {
       "title": "无法显示个人主页",
       "message": "个人主页数据不可用。请重试。"
     },
+    "removePhotoTitle": "删除头像",
+    "removePhotoMessage": "您确定要删除当前头像吗？它将被默认头像替换。",
     "cropPhoto": "裁剪照片",
     "tabs": {
       "posts": "帖子",
@@ -1297,6 +1342,7 @@
     "viewImage": "查看图片",
     "retry": "重试",
     "refresh": "刷新",
+    "noPostsFor": "未找到 #{tag} 的帖子",
     "deletePost": {
       "title": "删除帖子",
       "message": "此操作无法撤销。"
@@ -1353,9 +1399,23 @@
       "endLive": "结束直播",
       "endLiveDialog": {
         "title": "结束直播？",
+        "content": "所有观看者的直播将立即停止。",
         "cancel": "取消",
         "confirm": "结束直播"
       },
+      "deleteComment": {
+        "title": "删除评论？",
+        "content": "此评论将对所有观看者删除且无法撤销。"
+      },
+      "blockUser": {
+        "title": "拉黑 {author}？",
+        "message": "他们将无法再查看您的内容或与您互动。"
+      },
+      "latencyMode": "延迟模式",
+      "saveChanges": "保存更改",
+      "saving": "保存中...",
+      "unableToUpdate": "无法更新直播设置。",
+      "backToHome": "返回首页",
       "retryConnect": "重新连接",
       "back": "返回",
       "liveNow": "正在直播",
@@ -3648,6 +3708,19 @@
     "you": "你",
     "follow": "关注",
     "following": "已关注",
-    "user": "用户"
+    "user": "用户",
+    "labelMusic": "音乐",
+    "btnAddMusic": "添加音乐",
+    "btnRemoveMusic": "删除",
+    "btnChangeMusic": "更换",
+    "musicTrending": "热门",
+    "musicSearch": "搜索",
+    "musicSearchHint": "搜索歌曲...",
+    "musicNoResults": "没有找到结果",
+    "musicSelect": "使用",
+    "timeNow": "刚才",
+    "timeMinutes": "{n}分钟",
+    "timeHours": "{n}小时",
+    "timeDays": "{n}天"
   }
 }

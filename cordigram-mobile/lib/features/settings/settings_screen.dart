@@ -1709,9 +1709,9 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _surface,
-        title: Text('Unhide this post?', style: TextStyle(color: _textPrimary)),
+        title: Text(lc.t('settings.unhideTitle'), style: TextStyle(color: _textPrimary)),
         content: Text(
-          'This post will appear in your feed again.',
+          lc.t('settings.unhideMessage'),
           style: TextStyle(color: _textSecondary),
         ),
         actions: [

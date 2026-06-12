@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/config/app_theme.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/language_controller.dart';
 import '../../notifications/services/notification_service.dart';
 
 const List<Map<String, dynamic>> _muteOptions = [
@@ -70,6 +71,7 @@ Future<bool> showPostMuteOverlay(
       (theme.brightness == Brightness.dark
           ? AppSemanticColors.dark
           : AppSemanticColors.light);
+  final lc = LanguageController.instance;
   String selected = '5m';
   String customDate = '';
   String customTime = '';
@@ -101,7 +103,7 @@ Future<bool> showPostMuteOverlay(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Mute this $kindLabel',
+                              lc.t('postMute.title').replaceAll('{kindLabel}', kindLabel),
                               style: TextStyle(
                                 color: tokens.text,
                                 fontSize: 20,
@@ -110,7 +112,7 @@ Future<bool> showPostMuteOverlay(
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Choose how long to pause notifications.',
+                              lc.t('postMute.subtitle'),
                               style: TextStyle(
                                 color: tokens.textMuted,
                                 fontSize: 14,
@@ -163,7 +165,7 @@ Future<bool> showPostMuteOverlay(
                                   : Colors.transparent,
                             ),
                             child: Text(
-                              opt['label'] as String,
+                              lc.t('postMute.${opt['key'] as String}'),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -247,7 +249,7 @@ Future<bool> showPostMuteOverlay(
                               size: 16,
                             ),
                             label: Text(
-                              customDate.isEmpty ? 'Select date' : customDate,
+                              customDate.isEmpty ? lc.t('postMute.selectDate') : customDate,
                             ),
                           ),
                         ),
@@ -269,7 +271,7 @@ Future<bool> showPostMuteOverlay(
                                   },
                             icon: const Icon(Icons.schedule_rounded, size: 16),
                             label: Text(
-                              customTime.isEmpty ? 'Select time' : customTime,
+                              customTime.isEmpty ? lc.t('postMute.selectTime') : customTime,
                             ),
                           ),
                         ),
@@ -294,7 +296,7 @@ Future<bool> showPostMuteOverlay(
                         onPressed: saving
                             ? null
                             : () => Navigator.of(dialogCtx).pop(),
-                        child: const Text('Cancel'),
+                        child: Text(lc.t('common.cancel')),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
@@ -322,8 +324,7 @@ Future<bool> showPostMuteOverlay(
                                     if (iso == null) {
                                       setModalState(() {
                                         saving = false;
-                                        error =
-                                            'Please select a valid date and time.';
+                                        error = lc.t('postMute.invalidDateTime');
                                       });
                                       return;
                                     }
@@ -331,7 +332,7 @@ Future<bool> showPostMuteOverlay(
                                     if (!dt.isAfter(DateTime.now().toUtc())) {
                                       setModalState(() {
                                         saving = false;
-                                        error = 'Please choose a future time.';
+                                        error = lc.t('postMute.futureTimeError');
                                       });
                                       return;
                                     }
@@ -362,11 +363,11 @@ Future<bool> showPostMuteOverlay(
                                     saving = false;
                                     error = e is ApiException
                                         ? e.message
-                                        : 'Failed to update notifications';
+                                        : lc.t('postMute.saveError');
                                   });
                                 }
                               },
-                        child: Text(saving ? 'Saving...' : 'Save'),
+                        child: Text(saving ? lc.t('postMute.saving') : lc.t('common.save')),
                       ),
                     ],
                   ),

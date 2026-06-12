@@ -102,6 +102,8 @@
     "changePassword": "パスワード変更",
     "viewDevices": "デバイスを表示",
     "unhide": "表示に戻す",
+    "unhideTitle": "この投稿を再表示しますか？",
+    "unhideMessage": "この投稿がフィードに再び表示されます。",
     "unblock": "ブロック解除",
     "accountEmail": "アカウントメール",
     "manageSignInEmail": "サインイン用メールと確認手順を管理します。",
@@ -561,6 +563,7 @@
       "postDeleted": "投稿を削除しました",
       "deleteError": "投稿の削除に失敗しました",
       "postHidden": "投稿を非表示にしました",
+      "hideError": "投稿の非表示に失敗しました",
       "signInFirst": "先にサインインしてください",
       "reportSubmitted": "報告を送信しました",
       "accountBlocked": "アカウントをブロックしました",
@@ -635,7 +638,8 @@
       "saveAds": "この広告を保存",
       "unsaveAds": "この広告の保存を解除",
       "hidePost": "この投稿を非表示",
-      "hideAds": "この広告を非表示"
+      "hideAds": "この広告を非表示",
+      "seeLikes": "いいねした人を見る"
     },
     "actions": {
       "like": "いいね",
@@ -719,6 +723,9 @@
       "allowComments": "コメントを許可",
       "allowDownload": "ダウンロードを許可",
       "hideLikeCount": "いいね数を非表示",
+      "pollQuestionHint": "質問を入力…",
+      "pollOptionHint": "選択肢 {n}",
+      "voteFailed": "投票に失敗しました",
       "cancel": "キャンセル",
       "done": "完了"
     },
@@ -761,9 +768,18 @@
       "caption": "キャプション",
       "location": "場所（任意）",
       "hashtags": "ハッシュタグ（例: #音楽 #flutter）",
+      "settings": "設定",
+      "searchPlace": "場所を検索…",
+      "pollOptions": "投票の選択肢",
+      "pollOption": "選択肢 {n}",
       "allowComments": "コメントを許可",
+      "allowCommentsSub": "他のユーザーがこの投稿にコメントできるようにする",
+      "allowMultipleAnswers": "複数回答を許可",
+      "allowMultipleAnswersSub": "投票者は複数の選択肢を選べます",
       "allowDownload": "ダウンロードを許可",
+      "allowDownloadSub": "他のユーザーがこの投稿のメディアを保存できるようにする",
       "hideLikeCount": "いいね数を非表示",
+      "hideLikeCountSub": "閲覧者にいいね数が表示されません",
       "saveChanges": "変更を保存",
       "saveVisibility": "公開設定を保存"
     },
@@ -792,7 +808,8 @@
         "edit": "コメントを編集",
         "delete": "コメントを削除",
         "report": "コメントを報告",
-        "block": "このユーザーをブロック"
+        "block": "このユーザーをブロック",
+        "seeLikes": "いいねした人を見る"
       },
       "comments": {
         "title": "コメント",
@@ -812,8 +829,15 @@
         "replyingTo": "@{username}に返信中",
         "searchingUsers": "ユーザーを検索中…",
         "noUsers": "ユーザーが見つかりません",
-        "placeholder": "コメントを書く…"
+        "placeholder": "コメントを書く…",
+        "editHint": "コメントを編集...",
+        "editSuccess": "コメントを更新しました",
+        "editError": "コメントの更新に失敗しました"
       }
+    },
+    "likesSheet": {
+      "search": "ユーザー名で検索",
+      "noLikes": "まだいいねはありません"
     }
   },
   "reels": {
@@ -930,14 +954,35 @@
       "edit": "コメントを編集",
       "delete": "コメントを削除",
       "report": "コメントを報告",
-      "block": "このユーザーをブロック"
+      "block": "このユーザーをブロック",
+      "seeLikes": "いいねした人を見る"
     }
+  },
+  "postMute": {
+    "5m": "5分間",
+    "10m": "10分間",
+    "15m": "15分間",
+    "30m": "30分間",
+    "1h": "1時間",
+    "1d": "1日間",
+    "until": "オフにするまで",
+    "custom": "日時を選択",
+    "title": "この{kindLabel}をミュート",
+    "subtitle": "通知を一時停止する期間を選択してください。",
+    "selectDate": "日付を選択",
+    "selectTime": "時間を選択",
+    "invalidDateTime": "有効な日時を選択してください。",
+    "futureTimeError": "未来の時間を選択してください。",
+    "saveError": "通知の更新に失敗しました",
+    "saving": "保存中..."
   },
   "profile": {
     "cannotRender": {
       "title": "プロフィールを表示できません",
       "message": "プロフィールデータが利用できません。もう一度お試しください。"
     },
+    "removePhotoTitle": "プロフィール写真を削除",
+    "removePhotoMessage": "現在のプロフィール写真を削除してもよいですか？デフォルトのアバターに置き換えられます。",
     "cropPhoto": "写真をトリミング",
     "tabs": {
       "posts": "投稿",
@@ -1297,6 +1342,7 @@
     "viewImage": "画像を見る",
     "retry": "再試行",
     "refresh": "更新",
+    "noPostsFor": "#{tag}の投稿が見つかりません",
     "deletePost": {
       "title": "投稿を削除",
       "message": "この操作は元に戻せません。"
@@ -1353,9 +1399,23 @@
       "endLive": "ライブ終了",
       "endLiveDialog": {
         "title": "ライブストリームを終了？",
+        "content": "すべての視聴者のライブストリームが即座に停止します。",
         "cancel": "キャンセル",
         "confirm": "ライブ終了"
       },
+      "deleteComment": {
+        "title": "コメントを削除？",
+        "content": "このコメントはすべての視聴者から削除され、元に戻せません。"
+      },
+      "blockUser": {
+        "title": "{author}をブロック？",
+        "message": "このユーザーはあなたのコンテンツを見たり、やりとりできなくなります。"
+      },
+      "latencyMode": "レイテンシモード",
+      "saveChanges": "変更を保存",
+      "saving": "保存中...",
+      "unableToUpdate": "ライブストリーム設定を更新できません。",
+      "backToHome": "ホームに戻る",
       "retryConnect": "再接続",
       "back": "戻る",
       "liveNow": "配信中",
@@ -3648,6 +3708,19 @@
     "you": "あなた",
     "follow": "フォロー",
     "following": "フォロー中",
-    "user": "ユーザー"
+    "user": "ユーザー",
+    "labelMusic": "音楽",
+    "btnAddMusic": "音楽を追加",
+    "btnRemoveMusic": "削除",
+    "btnChangeMusic": "変更",
+    "musicTrending": "人気",
+    "musicSearch": "検索",
+    "musicSearchHint": "曲を検索...",
+    "musicNoResults": "結果がありません",
+    "musicSelect": "使用",
+    "timeNow": "たった今",
+    "timeMinutes": "{n}分",
+    "timeHours": "{n}時間",
+    "timeDays": "{n}日"
   }
 }

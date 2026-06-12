@@ -2306,6 +2306,8 @@
       "viewLikes": "See who liked this",
       "dropHint": "Drop image or video here",
       "reply": "Reply",
+      "likeComment": "Like comment",
+      "unlikeComment": "Unlike comment",
       "replyingTo": "Replying to @{username}",
       "editingComment": "Editing your comment",
       "commentsTitle": "Comments ({count})",
@@ -2829,7 +2831,11 @@
     "saveChanges": "Save changes",
     "postUpdated": "Post updated",
     "signInRequired": "Please sign in to edit posts",
-    "updateFailed": "Failed to update post"
+    "updateFailed": "Failed to update post",
+    "pollOptionsLabel": "Poll choices",
+    "pollOptionPlaceholder": "Choice {n}",
+    "allowMultiple": "Allow multiple choices",
+    "allowMultipleDesc": "Users can select multiple options at once"
   },
   "player": {
     "captionOff": "Off",
@@ -2882,5 +2888,166 @@
     "error": "Unable to vote. Please try again.",
     "timeLeftHM": "{h}h {m}m left",
     "timeLeftM": "{m}m left"
+  },
+  "postMenu": {
+    "goToAds": "Go to ads",
+    "detailAds": "Detail ads",
+    "copyLink": "Copy link",
+    "editPost": "Edit post",
+    "editVisibility": "Edit visibility",
+    "turnOnNotification": "Turn on notification",
+    "muteNotifications": "Mute notifications",
+    "turnOnComments": "Turn on comments",
+    "turnOffComments": "Turn off comments",
+    "showLike": "Show like",
+    "hideLike": "Hide like",
+    "deletePost": "Delete post",
+    "saveThisPost": "Save this post",
+    "unsaveThisPost": "Unsave this post",
+    "saveThisAds": "Save this ads",
+    "unsaveThisAds": "Unsave this ads",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "downloadThisMedia": "Download this media",
+    "report": "Report",
+    "goToThisAccount": "Go to this account"
+  },
+  "commentMenu": {
+    "translating": "Translating...",
+    "hideTranslation": "Hide translation",
+    "translateComment": "Translate comment",
+    "editComment": "Edit comment",
+    "unpinComment": "Unpin comment",
+    "pinComment": "Pin comment",
+    "deleteComment": "Delete comment",
+    "reportComment": "Report comment",
+    "blockUser": "Block this user"
+  },
+  "reportOverlay": {
+    "titlePost": "Report this post",
+    "titleComment": "Report this comment",
+    "subtitlePost": "Help us understand what is wrong with this content.",
+    "subtitleComment": "Help us understand what is wrong with this comment.",
+    "back": "Back",
+    "close": "Close",
+    "labelCancel": "Cancel",
+    "labelSubmit": "Submit report",
+    "labelSubmitting": "Submitting...",
+    "labelSelectReason": "Select a specific reason",
+    "labelPickCategory": "Pick a category first.",
+    "labelNotes": "Additional notes (optional)",
+    "labelNotesPlaceholder": "Add brief context if needed...",
+    "groups": {
+      "abuse": {
+        "label": "Harassment / Hate speech",
+        "harassment": "Targets an individual to harass",
+        "hate_speech": "Hate speech or discrimination",
+        "offensive_discrimination": "Attacks vulnerable groups"
+      },
+      "violence": {
+        "label": "Violence / Threats",
+        "violence_threats": "Threatens or promotes violence",
+        "graphic_violence": "Graphic violent imagery",
+        "extremism": "Extremism or terrorism",
+        "self_harm": "Self-harm or suicide"
+      },
+      "sensitive": {
+        "label": "Sensitive content",
+        "nudity": "Nudity or adult content",
+        "minor_nudity": "Minor safety risk",
+        "sexual_solicitation": "Sexual solicitation"
+      },
+      "misinfo": {
+        "label": "Impersonation / Misinformation",
+        "fake_news": "False or misleading information",
+        "impersonation": "Impersonation of a person or org"
+      },
+      "spam": {
+        "label": "Spam / Scam",
+        "spam": "Spam or irrelevant content",
+        "financial_scam": "Financial scam",
+        "unsolicited_ads": "Unwanted advertising"
+      },
+      "ip": {
+        "label": "Intellectual property",
+        "copyright": "Copyright infringement",
+        "trademark": "Trademark violation",
+        "brand_impersonation": "Brand impersonation"
+      },
+      "illegal": {
+        "label": "Illegal activity",
+        "contraband": "Contraband",
+        "illegal_transaction": "Illegal transaction"
+      },
+      "privacy": {
+        "label": "Privacy violation",
+        "doxxing": "Doxxing private information",
+        "nonconsensual_intimate": "Non-consensual intimate content"
+      },
+      "other": {
+        "label": "Other",
+        "other": "Other reason"
+      }
+    }
+  },
+  "muteOverlay": {
+    "title": "Mute notifications",
+    "subtitle": "Choose how long to pause alerts for this post.",
+    "labelSave": "Save",
+    "labelSaving": "Saving...",
+    "labelDate": "Date",
+    "labelTime": "Time",
+    "options": {
+      "5m": "5 minutes",
+      "10m": "10 minutes",
+      "15m": "15 minutes",
+      "30m": "30 minutes",
+      "1h": "1 hour",
+      "1d": "1 day",
+      "until": "Until I turn it back on",
+      "custom": "Choose date & time"
+    }
+  },
+  "visibilityOverlay": {
+    "title": "Edit visibility",
+    "subtitle": "Choose who can see this post.",
+    "labelSave": "Update visibility",
+    "labelSaving": "Updating...",
+    "labelCancel": "Cancel",
+    "options": {
+      "public": {
+        "title": "Public",
+        "description": "Anyone can view this post"
+      },
+      "followers": {
+        "title": "Friends / Following",
+        "description": "Only followers can view this post"
+      },
+      "private": {
+        "title": "Private",
+        "description": "Only you can view this post"
+      }
+    }
+  },
+  "confirmDeletePost": {
+    "title": "Delete this post?",
+    "body": "Removing this post will delete it for everyone. This action cannot be undone.",
+    "labelConfirm": "Delete",
+    "labelConfirming": "Deleting...",
+    "labelCancel": "Cancel"
+  },
+  "confirmDeleteComment": {
+    "title": "Delete this comment?",
+    "body": "Removing this comment will also delete its replies. This action cannot be undone.",
+    "labelConfirm": "Delete",
+    "labelConfirming": "Deleting...",
+    "labelCancel": "Cancel"
+  },
+  "confirmBlockUser": {
+    "title": "Block this account?",
+    "body": "You are about to block @{label}. They will no longer be able to interact with you.",
+    "labelConfirm": "Block",
+    "labelConfirming": "Blocking...",
+    "labelCancel": "Cancel"
   }
 }

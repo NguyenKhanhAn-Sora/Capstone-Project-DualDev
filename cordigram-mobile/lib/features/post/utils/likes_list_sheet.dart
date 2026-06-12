@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../../home/services/post_interaction_service.dart';
 import '../../profile/profile_screen.dart';
 
@@ -305,7 +306,7 @@ class _LikesListSheetState extends State<_LikesListSheet> {
               onChanged: (_) => setState(() {}),
               style: TextStyle(color: textPrimary),
               decoration: InputDecoration(
-                hintText: 'Search username',
+                hintText: LanguageController.instance.t('post.likesSheet.search'),
                 hintStyle: TextStyle(color: textSecondary),
                 prefixIcon: Icon(Icons.search_rounded, color: textSecondary),
                 filled: true,
@@ -343,7 +344,7 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                 : list.isEmpty
                 ? Center(
                     child: Text(
-                      'No likes yet',
+                      LanguageController.instance.t('post.likesSheet.noLikes'),
                       style: TextStyle(color: textSecondary),
                     ),
                   )
@@ -420,7 +421,7 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
-                                  'You',
+                                  LanguageController.instance.t('profile.followSheet.you'),
                                   style: TextStyle(
                                     color: scheme.onPrimaryContainer,
                                     fontWeight: FontWeight.w700,
@@ -448,8 +449,8 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                                     pending
                                         ? '...'
                                         : (item.isFollowing
-                                              ? 'Following'
-                                              : 'Follow'),
+                                              ? LanguageController.instance.t('post.following')
+                                              : LanguageController.instance.t('post.follow')),
                                     style: TextStyle(
                                       color: item.isFollowing
                                           ? textPrimary

@@ -2301,6 +2301,8 @@
       "viewLikes": "查看点赞用户",
       "dropHint": "将图片或视频拖放到此处",
       "reply": "回复",
+      "likeComment": "点赞评论",
+      "unlikeComment": "取消点赞评论",
       "replyingTo": "正在回复 @{username}",
       "editingComment": "正在编辑评论",
       "commentsTitle": "评论 ({count})",
@@ -2818,7 +2820,11 @@
     "saveChanges": "保存更改",
     "postUpdated": "帖子已更新",
     "signInRequired": "请登录以编辑帖子",
-    "updateFailed": "更新帖子失败"
+    "updateFailed": "更新帖子失败",
+    "pollOptionsLabel": "投票选项",
+    "pollOptionPlaceholder": "选项 {n}",
+    "allowMultiple": "允许多选",
+    "allowMultipleDesc": "用户可以同时选择多个选项"
   },
   "player": {
     "captionOff": "关闭",
@@ -2856,5 +2862,166 @@
     "error": "无法投票，请重试。",
     "timeLeftHM": "剩余{h}小时{m}分",
     "timeLeftM": "剩余{m}分钟"
+  },
+  "postMenu": {
+    "goToAds": "前往广告页面",
+    "detailAds": "广告详情",
+    "copyLink": "复制链接",
+    "editPost": "编辑帖子",
+    "editVisibility": "编辑可见范围",
+    "turnOnNotification": "开启通知",
+    "muteNotifications": "屏蔽通知",
+    "turnOnComments": "开启评论",
+    "turnOffComments": "关闭评论",
+    "showLike": "显示点赞数",
+    "hideLike": "隐藏点赞数",
+    "deletePost": "删除帖子",
+    "saveThisPost": "保存此帖子",
+    "unsaveThisPost": "取消保存此帖子",
+    "saveThisAds": "保存此广告",
+    "unsaveThisAds": "取消保存此广告",
+    "follow": "关注",
+    "unfollow": "取消关注",
+    "downloadThisMedia": "下载此媒体",
+    "report": "举报",
+    "goToThisAccount": "前往该账户"
+  },
+  "commentMenu": {
+    "translating": "翻译中...",
+    "hideTranslation": "隐藏翻译",
+    "translateComment": "翻译评论",
+    "editComment": "编辑评论",
+    "unpinComment": "取消置顶评论",
+    "pinComment": "置顶评论",
+    "deleteComment": "删除评论",
+    "reportComment": "举报评论",
+    "blockUser": "屏蔽此用户"
+  },
+  "reportOverlay": {
+    "titlePost": "举报此帖子",
+    "titleComment": "举报此评论",
+    "subtitlePost": "请告诉我们此内容存在的问题。",
+    "subtitleComment": "请告诉我们此评论存在的问题。",
+    "back": "返回",
+    "close": "关闭",
+    "labelCancel": "取消",
+    "labelSubmit": "提交举报",
+    "labelSubmitting": "提交中...",
+    "labelSelectReason": "选择具体原因",
+    "labelPickCategory": "请先选择一个类别。",
+    "labelNotes": "补充说明（可选）",
+    "labelNotesPlaceholder": "如有需要请添加简短说明...",
+    "groups": {
+      "abuse": {
+        "label": "骚扰 / 仇恨言论",
+        "harassment": "针对个人的骚扰",
+        "hate_speech": "仇恨言论或歧视",
+        "offensive_discrimination": "攻击弱势群体"
+      },
+      "violence": {
+        "label": "暴力 / 威胁",
+        "violence_threats": "威胁或煽动暴力",
+        "graphic_violence": "暴力图像",
+        "extremism": "极端主义或恐怖主义",
+        "self_harm": "自我伤害或自杀"
+      },
+      "sensitive": {
+        "label": "敏感内容",
+        "nudity": "裸露或成人内容",
+        "minor_nudity": "未成年人安全风险",
+        "sexual_solicitation": "性招揽"
+      },
+      "misinfo": {
+        "label": "冒充 / 虚假信息",
+        "fake_news": "虚假或误导性信息",
+        "impersonation": "冒充个人或组织"
+      },
+      "spam": {
+        "label": "垃圾信息 / 诈骗",
+        "spam": "垃圾或无关内容",
+        "financial_scam": "金融诈骗",
+        "unsolicited_ads": "未经请求的广告"
+      },
+      "ip": {
+        "label": "知识产权",
+        "copyright": "版权侵权",
+        "trademark": "商标侵权",
+        "brand_impersonation": "品牌冒充"
+      },
+      "illegal": {
+        "label": "违法活动",
+        "contraband": "违禁品",
+        "illegal_transaction": "非法交易"
+      },
+      "privacy": {
+        "label": "隐私侵犯",
+        "doxxing": "泄露私人信息",
+        "nonconsensual_intimate": "未经同意的亲密内容"
+      },
+      "other": {
+        "label": "其他",
+        "other": "其他原因"
+      }
+    }
+  },
+  "muteOverlay": {
+    "title": "屏蔽通知",
+    "subtitle": "选择暂停此帖子提醒的时长。",
+    "labelSave": "保存",
+    "labelSaving": "保存中...",
+    "labelDate": "日期",
+    "labelTime": "时间",
+    "options": {
+      "5m": "5分钟",
+      "10m": "10分钟",
+      "15m": "15分钟",
+      "30m": "30分钟",
+      "1h": "1小时",
+      "1d": "1天",
+      "until": "直到我手动开启",
+      "custom": "选择日期和时间"
+    }
+  },
+  "visibilityOverlay": {
+    "title": "编辑可见范围",
+    "subtitle": "选择谁可以查看此帖子。",
+    "labelSave": "更新可见范围",
+    "labelSaving": "更新中...",
+    "labelCancel": "取消",
+    "options": {
+      "public": {
+        "title": "公开",
+        "description": "任何人都可以查看此帖子"
+      },
+      "followers": {
+        "title": "好友 / 关注者",
+        "description": "只有关注者可以查看"
+      },
+      "private": {
+        "title": "私密",
+        "description": "只有自己可以查看"
+      }
+    }
+  },
+  "confirmDeletePost": {
+    "title": "删除此帖子？",
+    "body": "删除此帖子将对所有人删除。此操作无法撤销。",
+    "labelConfirm": "删除",
+    "labelConfirming": "删除中...",
+    "labelCancel": "取消"
+  },
+  "confirmDeleteComment": {
+    "title": "删除此评论？",
+    "body": "删除此评论也将删除其所有回复。此操作无法撤销。",
+    "labelConfirm": "删除",
+    "labelConfirming": "删除中...",
+    "labelCancel": "取消"
+  },
+  "confirmBlockUser": {
+    "title": "屏蔽此账户？",
+    "body": "您即将屏蔽 @{label}，他们将无法再与您互动。",
+    "labelConfirm": "屏蔽",
+    "labelConfirming": "屏蔽中...",
+    "labelCancel": "取消"
   }
 }

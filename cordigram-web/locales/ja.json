@@ -2301,6 +2301,8 @@
       "viewLikes": "いいねしたユーザーを見る",
       "dropHint": "画像または動画をここにドロップ",
       "reply": "返信",
+      "likeComment": "コメントにいいね",
+      "unlikeComment": "コメントのいいねを取り消す",
       "replyingTo": "@{username} に返信中",
       "editingComment": "コメントを編集中",
       "commentsTitle": "コメント ({count})",
@@ -2818,7 +2820,11 @@
     "saveChanges": "変更を保存",
     "postUpdated": "投稿が更新されました",
     "signInRequired": "投稿を編集するにはサインインしてください",
-    "updateFailed": "投稿の更新に失敗しました"
+    "updateFailed": "投稿の更新に失敗しました",
+    "pollOptionsLabel": "投票の選択肢",
+    "pollOptionPlaceholder": "選択肢 {n}",
+    "allowMultiple": "複数選択を許可",
+    "allowMultipleDesc": "ユーザーが複数の選択肢を同時に選べるようにします"
   },
   "player": {
     "captionOff": "オフ",
@@ -2856,5 +2862,166 @@
     "error": "投票できませんでした。もう一度お試しください。",
     "timeLeftHM": "残り{h}時間{m}分",
     "timeLeftM": "残り{m}分"
+  },
+  "postMenu": {
+    "goToAds": "広告ページへ",
+    "detailAds": "広告詳細",
+    "copyLink": "リンクをコピー",
+    "editPost": "投稿を編集",
+    "editVisibility": "公開範囲を編集",
+    "turnOnNotification": "通知をオンにする",
+    "muteNotifications": "通知をミュート",
+    "turnOnComments": "コメントをオンにする",
+    "turnOffComments": "コメントをオフにする",
+    "showLike": "いいね数を表示",
+    "hideLike": "いいね数を非表示",
+    "deletePost": "投稿を削除",
+    "saveThisPost": "この投稿を保存",
+    "unsaveThisPost": "この投稿の保存を解除",
+    "saveThisAds": "この広告を保存",
+    "unsaveThisAds": "この広告の保存を解除",
+    "follow": "フォロー",
+    "unfollow": "フォロー解除",
+    "downloadThisMedia": "このメディアをダウンロード",
+    "report": "報告",
+    "goToThisAccount": "このアカウントへ"
+  },
+  "commentMenu": {
+    "translating": "翻訳中...",
+    "hideTranslation": "翻訳を非表示",
+    "translateComment": "コメントを翻訳",
+    "editComment": "コメントを編集",
+    "unpinComment": "ピン留めを解除",
+    "pinComment": "コメントをピン留め",
+    "deleteComment": "コメントを削除",
+    "reportComment": "コメントを報告",
+    "blockUser": "このユーザーをブロック"
+  },
+  "reportOverlay": {
+    "titlePost": "この投稿を報告",
+    "titleComment": "このコメントを報告",
+    "subtitlePost": "このコンテンツの問題をお知らせください。",
+    "subtitleComment": "このコメントの問題をお知らせください。",
+    "back": "戻る",
+    "close": "閉じる",
+    "labelCancel": "キャンセル",
+    "labelSubmit": "報告を送信",
+    "labelSubmitting": "送信中...",
+    "labelSelectReason": "具体的な理由を選択",
+    "labelPickCategory": "先にカテゴリを選んでください。",
+    "labelNotes": "補足メモ（任意）",
+    "labelNotesPlaceholder": "必要に応じて簡単な説明を追加...",
+    "groups": {
+      "abuse": {
+        "label": "嫌がらせ / ヘイトスピーチ",
+        "harassment": "個人を標的にした嫌がらせ",
+        "hate_speech": "ヘイトスピーチまたは差別",
+        "offensive_discrimination": "脆弱なグループへの攻撃"
+      },
+      "violence": {
+        "label": "暴力 / 脅迫",
+        "violence_threats": "暴力の脅迫または扇動",
+        "graphic_violence": "過激な暴力的映像",
+        "extremism": "過激主義またはテロ",
+        "self_harm": "自傷行為または自殺"
+      },
+      "sensitive": {
+        "label": "センシティブなコンテンツ",
+        "nudity": "ヌードまたは成人向けコンテンツ",
+        "minor_nudity": "未成年者の安全リスク",
+        "sexual_solicitation": "性的な誘い"
+      },
+      "misinfo": {
+        "label": "なりすまし / 誤情報",
+        "fake_news": "虚偽または誤解を招く情報",
+        "impersonation": "個人または組織へのなりすまし"
+      },
+      "spam": {
+        "label": "スパム / 詐欺",
+        "spam": "スパムまたは無関係なコンテンツ",
+        "financial_scam": "金融詐欺",
+        "unsolicited_ads": "迷惑広告"
+      },
+      "ip": {
+        "label": "知的財産",
+        "copyright": "著作権侵害",
+        "trademark": "商標侵害",
+        "brand_impersonation": "ブランドのなりすまし"
+      },
+      "illegal": {
+        "label": "違法行為",
+        "contraband": "禁制品",
+        "illegal_transaction": "違法取引"
+      },
+      "privacy": {
+        "label": "プライバシー侵害",
+        "doxxing": "個人情報の暴露",
+        "nonconsensual_intimate": "同意のない親密なコンテンツ"
+      },
+      "other": {
+        "label": "その他",
+        "other": "その他の理由"
+      }
+    }
+  },
+  "muteOverlay": {
+    "title": "通知をミュート",
+    "subtitle": "この投稿の通知を一時停止する期間を選択してください。",
+    "labelSave": "保存",
+    "labelSaving": "保存中...",
+    "labelDate": "日付",
+    "labelTime": "時刻",
+    "options": {
+      "5m": "5分",
+      "10m": "10分",
+      "15m": "15分",
+      "30m": "30分",
+      "1h": "1時間",
+      "1d": "1日",
+      "until": "自分でオンにするまで",
+      "custom": "日時を指定"
+    }
+  },
+  "visibilityOverlay": {
+    "title": "公開範囲を編集",
+    "subtitle": "この投稿を見られる人を選択してください。",
+    "labelSave": "公開範囲を更新",
+    "labelSaving": "更新中...",
+    "labelCancel": "キャンセル",
+    "options": {
+      "public": {
+        "title": "公開",
+        "description": "誰でもこの投稿を見ることができます"
+      },
+      "followers": {
+        "title": "友達 / フォロワー",
+        "description": "フォロワーのみ閲覧できます"
+      },
+      "private": {
+        "title": "非公開",
+        "description": "自分だけが見ることができます"
+      }
+    }
+  },
+  "confirmDeletePost": {
+    "title": "この投稿を削除しますか？",
+    "body": "この投稿を削除すると、すべての人から削除されます。この操作は元に戻せません。",
+    "labelConfirm": "削除",
+    "labelConfirming": "削除中...",
+    "labelCancel": "キャンセル"
+  },
+  "confirmDeleteComment": {
+    "title": "このコメントを削除しますか？",
+    "body": "このコメントを削除すると、返信も削除されます。この操作は元に戻せません。",
+    "labelConfirm": "削除",
+    "labelConfirming": "削除中...",
+    "labelCancel": "キャンセル"
+  },
+  "confirmBlockUser": {
+    "title": "このアカウントをブロックしますか？",
+    "body": "@{label}をブロックしようとしています。以後、あなたとのやり取りができなくなります。",
+    "labelConfirm": "ブロック",
+    "labelConfirming": "ブロック中...",
+    "labelCancel": "キャンセル"
   }
 }

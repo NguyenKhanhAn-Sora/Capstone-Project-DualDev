@@ -356,7 +356,7 @@ const GiphyMessage = memo(
 
     if (loading) {
       return (
-        <div style={{ padding: "12px", color: "#b5bac1", fontSize: "14px" }}>
+        <div style={{ padding: "12px", color: "#7a8db8", fontSize: "14px" }}>
           {messageType === "gif"
             ? t("chat.loading.gif")
             : messageType === "sticker"
@@ -474,7 +474,16 @@ const PollMessage = memo(
     }, [pollData, selectedOptions, token, pollId, loadPoll, onError]);
 
     if (!pollData) {
-      return <div className={styles.pollMessage}>Đang tải khảo sát...</div>;
+      return (
+        <div className={styles.pollMessage}>
+          <div className={styles.loadingWrap}>
+            <div className={styles.cosmicSpinner} />
+            <div className={styles.loadingDots}>
+              <span /><span /><span />
+            </div>
+          </div>
+        </div>
+      );
     }
 
     return (
@@ -8861,6 +8870,10 @@ export default function MessagesPage() {
                     title={t("chat.messagesPage.searchButtonAria")}
                     aria-label={t("chat.messagesPage.searchButtonAria")}
                   >
+                    <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
                     {t("chat.messagesPage.searchButtonLabel")}
                   </button>
                 </div>
@@ -9812,19 +9825,19 @@ export default function MessagesPage() {
                 <div
                   style={{
                     width: "min(520px, 92vw)",
-                    borderRadius: 12,
-                    background: "#2b2d31",
-                    border: "1px solid #3f4147",
-                    boxShadow: "0 16px 48px rgba(0,0,0,.45)",
+                    borderRadius: 14,
+                    background: "rgba(9, 12, 28, 0.97)",
+                    border: "1px solid rgba(124, 58, 237, 0.22)",
+                    boxShadow: "0 16px 48px rgba(0,0,0,.55), 0 0 24px rgba(124,58,237,0.1)",
                     padding: 22,
                     textAlign: "center",
                   }}
                 >
                   <div style={{ fontSize: 28, marginBottom: 10 }}>⏳</div>
-                  <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "#f2f3f5" }}>
+                  <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "#dde2f0" }}>
                     {t("chat.applyPending.title").replace("{server}", currentServer.name || t("chat.popups.inbox.serverFallback"))}
                   </div>
-                  <div style={{ fontSize: 13, color: "#b5bac1", marginBottom: 18 }}>
+                  <div style={{ fontSize: 13, color: "#7a8db8", marginBottom: 18 }}>
                     {t("chat.applyPending.desc")}
                   </div>
                   <button
@@ -9846,12 +9859,13 @@ export default function MessagesPage() {
                     style={{
                       width: "100%",
                       border: "none",
-                      borderRadius: 6,
+                      borderRadius: 8,
                       padding: "10px 14px",
-                      background: "#ed4245",
+                      background: "linear-gradient(135deg, #ef4444 0%, #c62828 100%)",
                       color: "#fff",
                       fontWeight: 800,
                       cursor: "pointer",
+                      boxShadow: "0 2px 12px rgba(239,68,68,0.35)",
                     }}
                   >
                     {t("chat.applyPending.withdraw")}
@@ -11271,7 +11285,7 @@ export default function MessagesPage() {
                         style={{
                           border: 0,
                           background: "transparent",
-                          color: "#ff5c8d",
+                          color: "#a78bfa",
                           fontWeight: 700,
                           cursor: "pointer",
                         }}
@@ -11368,8 +11382,8 @@ export default function MessagesPage() {
                         justifyContent: "space-between",
                         gap: 14,
                         padding: "12px 16px",
-                        background: "#1e1f22",
-                        borderTop: "1px solid var(--color-border, #2b2d31)",
+                        background: "rgba(6, 8, 18, 0.98)",
+                        borderTop: "1px solid rgba(124, 58, 237, 0.18)",
                       }}
                     >
                       <p
@@ -11377,7 +11391,7 @@ export default function MessagesPage() {
                           margin: 0,
                           fontSize: 14,
                           lineHeight: 1.45,
-                          color: "#dbdee1",
+                          color: "#dde2f0",
                           flex: 1,
                         }}
                       >
@@ -11389,13 +11403,14 @@ export default function MessagesPage() {
                         style={{
                           flexShrink: 0,
                           border: "none",
-                          borderRadius: 4,
+                          borderRadius: 8,
                           padding: "8px 16px",
                           fontWeight: 700,
                           fontSize: 13,
                           cursor: "pointer",
-                          background: "#5865f2",
+                          background: "linear-gradient(135deg, #5865f2 0%, #7c3aed 100%)",
                           color: "#fff",
+                          boxShadow: "0 2px 10px rgba(88,101,242,0.35)",
                         }}
                       >
                         Hoàn thành
@@ -12060,9 +12075,10 @@ export default function MessagesPage() {
                 display: "flex",
                 width: "min(780px, 96vw)",
                 maxHeight: "min(680px, 90vh)",
-                background: "#313338",
-                borderRadius: 12,
-                boxShadow: "0 16px 48px rgba(0,0,0,.55)",
+                background: "rgba(8, 10, 22, 0.97)",
+                borderRadius: 16,
+                boxShadow: "0 24px 64px rgba(0,0,0,.65), 0 0 40px rgba(124,58,237,0.1)",
+                border: "1px solid rgba(124, 58, 237, 0.18)",
                 overflow: "hidden",
               }}
             >
@@ -12075,8 +12091,8 @@ export default function MessagesPage() {
                   flexDirection: "column",
                   alignItems: "center",
                   padding: "32px 16px 24px",
-                  background: "#2b2d31",
-                  borderRight: "1px solid #3f4147",
+                  background: "rgba(6, 8, 18, 0.98)",
+                  borderRight: "1px solid rgba(124, 58, 237, 0.18)",
                   gap: 10,
                 }}
               >
@@ -12097,16 +12113,16 @@ export default function MessagesPage() {
                 >
                   {!srv?.avatarUrl && (srv?.name?.charAt(0)?.toUpperCase() ?? "S")}
                 </div>
-                <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: "#f2f3f5", textAlign: "center" }}>
+                <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: "#dde2f0", textAlign: "center" }}>
                   {srv?.name ?? t("chat.chatPage.serverFallback")}
                 </p>
-                <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#b5bac1", marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#7a8db8", marginTop: 4 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3ba55d", display: "inline-block" }} />
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#23a55a", display: "inline-block" }} />
                     {t("chat.chatPage.memberCount").replace("{count}", String(srv?.members?.filter(() => true).length ?? 0))}
                   </span>
                 </div>
-                <p style={{ margin: "4px 0 0", fontSize: 11, color: "#949ba4" }}>
+                <p style={{ margin: "4px 0 0", fontSize: 11, color: "#4a5878" }}>
                   {t("chat.chatPage.foundedMonth").replace("{date}", srv?.createdAt ? new Date(srv.createdAt).toLocaleDateString(localeTagForLanguage(language), { month: "numeric", year: "numeric" }) : "")}
                 </p>
               </div>
@@ -12124,10 +12140,10 @@ export default function MessagesPage() {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#f2f3f5" }}>
+                    <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#dde2f0" }}>
                       {t("chat.verify.title")}
                     </h3>
-                    <p style={{ margin: "6px 0 0", fontSize: 14, color: "#b5bac1", lineHeight: 1.45 }}>
+                    <p style={{ margin: "6px 0 0", fontSize: 14, color: "#7a8db8", lineHeight: 1.45 }}>
                       {t("chat.verify.subtitle")}
                     </p>
                   </div>
@@ -12141,7 +12157,7 @@ export default function MessagesPage() {
                     style={{
                       border: "none",
                       background: "transparent",
-                      color: "#b5bac1",
+                      color: "#7a8db8",
                       fontSize: 22,
                       lineHeight: 1,
                       cursor: "pointer",
@@ -12156,24 +12172,24 @@ export default function MessagesPage() {
                 {/* Step 1: Rules (access tab) */}
                 {hasRulesContent && (
                   <div style={{ marginTop: 20 }}>
-                    <p style={{ margin: "0 0 10px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "#b5bac1", letterSpacing: "0.02em", display: "flex", alignItems: "center", gap: 8 }}>
+                    <p style={{ margin: "0 0 10px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "#7a8db8", letterSpacing: "0.02em", display: "flex", alignItems: "center", gap: 8 }}>
                       {t("chat.verify.agreeRules")}
-                      {rulesAccepted && <span style={{ color: "#3ba55d", fontSize: 14 }}>✓</span>}
+                      {rulesAccepted && <span style={{ color: "#23a55a", fontSize: 14 }}>✓</span>}
                     </p>
                     <div
                       style={{
                         padding: 16,
                         borderRadius: 8,
-                        background: "#1e1f22",
-                        border: "1px solid #3f4147",
+                        background: "rgba(6, 8, 18, 0.92)",
+                        border: "1px solid rgba(124, 58, 237, 0.18)",
                         fontSize: 14,
                         lineHeight: 1.65,
-                        color: "#dbdee1",
+                        color: "#dde2f0",
                       }}
                     >
                       <ol style={{ margin: 0, paddingLeft: 22 }}>
                         {verificationAccessSettings!.rules.map((r, i) => (
-                          <li key={r.id} style={{ marginBottom: i < verificationAccessSettings!.rules.length - 1 ? 12 : 0, color: "#dbdee1" }}>
+                          <li key={r.id} style={{ marginBottom: i < verificationAccessSettings!.rules.length - 1 ? 12 : 0, color: "#dde2f0" }}>
                             {r.content}
                           </li>
                         ))}
@@ -12189,7 +12205,7 @@ export default function MessagesPage() {
                           marginTop: 16,
                           fontSize: 14,
                           cursor: "pointer",
-                          color: "#dbdee1",
+                          color: "#dde2f0",
                         }}
                       >
                         <input
@@ -12207,23 +12223,23 @@ export default function MessagesPage() {
                 {/* Step 2: Verification (safety settings) - shown after rules accepted */}
                 {needsVerificationStep && rulesAccepted && (
                   <div style={{ marginTop: 20 }}>
-                    <p style={{ margin: "0 0 10px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "#b5bac1", letterSpacing: "0.02em" }}>
+                    <p style={{ margin: "0 0 10px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "#7a8db8", letterSpacing: "0.02em" }}>
                       {t("chat.verify.verificationLevel").replace("{level}", lvl === "low" ? t("chat.verify.levelLow") : lvl === "medium" ? t("chat.verify.levelMedium") : lvl === "high" ? t("chat.verify.levelHigh") : "")}
                     </p>
                     <div
                       style={{
                         padding: 16,
                         borderRadius: 8,
-                        background: "#1e1f22",
-                        border: "1px solid #3f4147",
+                        background: "rgba(6, 8, 18, 0.92)",
+                        border: "1px solid rgba(124, 58, 237, 0.18)",
                         fontSize: 14,
                         lineHeight: 1.7,
-                        color: "#dbdee1",
+                        color: "#dde2f0",
                       }}
                     >
                       <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
                         {(lvl === "low" || lvl === "medium" || lvl === "high") && (
-                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, color: chk.emailVerified ? "#3ba55d" : "#dbdee1" }}>
+                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, color: chk.emailVerified ? "#23a55a" : "#dde2f0" }}>
                             <span style={{ flexShrink: 0 }}>{chk.emailVerified ? "✓" : "○"}</span>
                             <div style={{ flex: 1 }}>
                               <span>{t("chat.verify.emailVerify")}</span>
@@ -12255,7 +12271,7 @@ export default function MessagesPage() {
                                         padding: "6px 16px",
                                         borderRadius: 4,
                                         border: "none",
-                                        background: emailOtpSending || emailOtpCooldown > 0 ? "#4e5058" : "#5865f2",
+                                        background: emailOtpSending || emailOtpCooldown > 0 ? "rgba(60, 65, 100, 0.45)" : "#5865f2",
                                         color: "#fff",
                                         fontWeight: 600,
                                         fontSize: 13,
@@ -12275,9 +12291,9 @@ export default function MessagesPage() {
                                         style={{
                                           padding: "6px 10px",
                                           borderRadius: 4,
-                                          border: "1px solid #4e5058",
-                                          background: "#1e1f22",
-                                          color: "#fff",
+                                          border: "1px solid rgba(124, 58, 237, 0.28)",
+                                          background: "rgba(7, 9, 22, 0.9)",
+                                          color: "#dde2f0",
                                           fontSize: 14,
                                           width: 100,
                                           letterSpacing: 4,
@@ -12306,7 +12322,7 @@ export default function MessagesPage() {
                                           padding: "6px 16px",
                                           borderRadius: 4,
                                           border: "none",
-                                          background: emailOtpVerifying || emailOtpCode.length < 4 ? "#4e5058" : "#3ba55d",
+                                          background: emailOtpVerifying || emailOtpCode.length < 4 ? "rgba(60, 65, 100, 0.45)" : "#23a55a",
                                           color: "#fff",
                                           fontWeight: 600,
                                           fontSize: 13,
@@ -12350,12 +12366,12 @@ export default function MessagesPage() {
                                         </button>
                                       )}
                                       {emailOtpCooldown > 0 && (
-                                        <span style={{ fontSize: 12, color: "#949ba4" }}>{t("chat.verify.resendAfter").replace("{sec}", String(emailOtpCooldown))}</span>
+                                        <span style={{ fontSize: 12, color: "#4a5878" }}>{t("chat.verify.resendAfter").replace("{sec}", String(emailOtpCooldown))}</span>
                                       )}
                                     </div>
                                   )}
                                   {emailOtpError && (
-                                    <div style={{ color: "#ed4245", fontSize: 12, marginTop: 4 }}>{emailOtpError}</div>
+                                    <div style={{ color: "#f06060", fontSize: 12, marginTop: 4 }}>{emailOtpError}</div>
                                   )}
                                 </div>
                               )}
@@ -12363,12 +12379,12 @@ export default function MessagesPage() {
                           </li>
                         )}
                         {(lvl === "medium" || lvl === "high") && (
-                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, color: chk.accountOver5Min ? "#3ba55d" : "#dbdee1" }}>
+                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, color: chk.accountOver5Min ? "#23a55a" : "#dde2f0" }}>
                             <span style={{ flexShrink: 0 }}>{chk.accountOver5Min ? "✓" : "○"}</span>
                             <span>
                               {t("chat.verify.account5min")}
                               {!chk.accountOver5Min && wait.waitAccountSec != null && wait.waitAccountSec > 0 && (
-                                <span style={{ color: "#949ba4", marginLeft: 6 }}>
+                                <span style={{ color: "#4a5878", marginLeft: 6 }}>
                                   {t("chat.verify.waitApprox").replace("{time}", fmt(wait.waitAccountSec) ?? "")}
                                 </span>
                               )}
@@ -12376,12 +12392,12 @@ export default function MessagesPage() {
                           </li>
                         )}
                         {lvl === "high" && (
-                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", color: chk.memberOver10Min ? "#3ba55d" : "#dbdee1" }}>
+                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", color: chk.memberOver10Min ? "#23a55a" : "#dde2f0" }}>
                             <span style={{ flexShrink: 0 }}>{chk.memberOver10Min ? "✓" : "○"}</span>
                             <span>
                               {t("chat.verify.member10min")}
                               {!chk.memberOver10Min && wait.waitMemberSec != null && wait.waitMemberSec > 0 && (
-                                <span style={{ color: "#949ba4", marginLeft: 6 }}>
+                                <span style={{ color: "#4a5878", marginLeft: 6 }}>
                                   {t("chat.verify.waitApprox").replace("{time}", fmt(wait.waitMemberSec) ?? "")}
                                 </span>
                               )}
@@ -12400,7 +12416,7 @@ export default function MessagesPage() {
                     disabled={submitDisabled}
                     style={{
                       border: "none",
-                      background: submitDisabled ? "#3ba55d80" : "#3ba55d",
+                      background: submitDisabled ? "#3ba55d80" : "#23a55a",
                       color: "white",
                       padding: "10px 20px",
                       borderRadius: 4,
@@ -13618,11 +13634,14 @@ export default function MessagesPage() {
             position: "fixed",
             bottom: "20px",
             left: "20px",
-            background: "#ff6b6b",
-            color: "white",
+            background: "rgba(239, 68, 68, 0.92)",
+            color: "#fff",
             padding: "12px 16px",
-            borderRadius: "4px",
+            borderRadius: "10px",
             zIndex: 1001,
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            boxShadow: "0 4px 16px rgba(239,68,68,0.3)",
           }}
         >
           {error}
@@ -13747,12 +13766,13 @@ export default function MessagesPage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "min(440px, 92vw)",
-              background: "#1f2228",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 14,
+              background: "rgba(8, 10, 22, 0.97)",
+              border: "1px solid rgba(124, 58, 237, 0.22)",
+              borderRadius: 16,
               padding: "16px 14px",
-              color: "#fff",
-              boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
+              color: "#dde2f0",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.5), 0 0 28px rgba(124,58,237,0.1)",
+              backdropFilter: "blur(16px)",
             }}
           >
             <div style={{ fontSize: 15, lineHeight: 1.5 }}>{noticePopupMessage}</div>
@@ -13763,11 +13783,12 @@ export default function MessagesPage() {
                 style={{
                   border: "none",
                   borderRadius: 8,
-                  background: "#5865f2",
+                  background: "linear-gradient(135deg, #5865f2 0%, #7c3aed 100%)",
                   color: "#fff",
                   fontWeight: 700,
                   padding: "8px 14px",
                   cursor: "pointer",
+                  boxShadow: "0 2px 10px rgba(88,101,242,0.35)",
                 }}
               >
                 Đóng
@@ -13783,7 +13804,9 @@ export default function MessagesPage() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.55)",
+            background: "rgba(3, 4, 12, 0.72)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             zIndex: 3100,
             display: "grid",
             placeItems: "center",
@@ -13791,48 +13814,38 @@ export default function MessagesPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(620px, 92vw)",
-              maxHeight: "80vh",
-              overflow: "auto",
-              background: "#1f2228",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 14,
-              padding: 16,
-              color: "#fff",
-            }}
+            className={styles.pinnedModal}
+            style={{ width: "min(620px, 92vw)", maxHeight: "80vh", overflow: "auto" }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <strong>{pinnedModalTitle}</strong>
+            <div className={styles.pinnedModalHeader}>
+              <p className={styles.pinnedModalTitle}>{pinnedModalTitle}</p>
               <button
                 type="button"
                 onClick={() => setPinnedModalOpen(false)}
-                style={{ background: "transparent", color: "#cfd3da", border: 0, cursor: "pointer" }}
+                className={styles.pinnedModalClose}
               >
-                X
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
             {pinnedModalLoading ? (
-              <div style={{ color: "#cfd3da" }}>Đang tải...</div>
+              <div className={styles.loadingWrap}>
+                <div className={styles.cosmicSpinnerLg} />
+              </div>
             ) : pinnedModalItems.length === 0 ? (
-              <div style={{ color: "#9aa1ad" }}>Chưa có tin nhắn được ghim.</div>
+              <div style={{ color: "rgba(120,140,185,0.7)", padding: "16px 0", textAlign: "center", fontSize: 14 }}>Chưa có tin nhắn được ghim.</div>
             ) : (
               pinnedModalItems.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => handlePinnedItemJump(item.id)}
-                  style={{
-                    padding: "10px 12px",
-                    marginBottom: 8,
-                    borderRadius: 10,
-                    background: "#2b2f36",
-                    cursor: "pointer",
-                  }}
+                  className={styles.pinnedItem}
                 >
-                  <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>
+                  <div className={styles.pinnedItemSender}>
                     {item.senderDisplayName || item.senderName || "Người dùng"}
                   </div>
-                  <div style={{ whiteSpace: "pre-wrap" }}>
+                  <div style={{ whiteSpace: "pre-wrap", color: "#dde2f0", fontSize: 14 }}>
                     {renderMessageContent(item)}
                   </div>
                 </div>
@@ -13844,36 +13857,13 @@ export default function MessagesPage() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "#2b2d31",
-            color: "#dbdee1",
-            padding: "12px 24px",
-            borderRadius: "8px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
-            zIndex: 3000,
-            animation: "slideUpFade 0.3s ease",
-            fontSize: "14px",
-            fontWeight: 500,
-          }}
-        >
+        <div className={styles.galaxyToast}>
           <span>{toastMessage}</span>
           {toastActionLabel && toastActionHandler && (
             <button
               type="button"
               onClick={toastActionHandler}
-              style={{
-                marginLeft: 10,
-                border: 0,
-                background: "transparent",
-                color: "#ff5c8d",
-                cursor: "pointer",
-                fontWeight: 700,
-              }}
+              className={styles.galaxyToastAction}
             >
               {toastActionLabel}
             </button>
