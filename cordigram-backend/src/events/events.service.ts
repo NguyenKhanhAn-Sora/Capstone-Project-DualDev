@@ -13,6 +13,7 @@ import { Server } from '../servers/server.schema';
 import { CreateEventDto } from './dto/create-event.dto';
 import { randomBytes } from 'crypto';
 import { RolesService } from '../roles/roles.service';
+import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 
 const INVITE_EXPIRES_DAYS = 7;
 const ONE_TIME_EVENT_DURATION_MS = 24 * 60 * 60 * 1000;
@@ -24,6 +25,8 @@ export class EventsService {
     @InjectModel(Server.name) private serverModel: Model<Server>,
     @Inject(forwardRef(() => RolesService))
     private readonly rolesService: RolesService,
+    @Inject(forwardRef(() => ChannelMessagesGateway))
+    private readonly channelMessagesGateway: ChannelMessagesGateway,
   ) {}
 
   private async assertCanManageEvents(
@@ -99,7 +102,48 @@ export class EventsService {
       inviteExpiresAt,
       status: 'scheduled',
     });
-    return event.save();
+    const saved = await event.save();
+    await saved.populate({ path: 'channelId', select: 'name type' });
+
+    try {
+      const memberIds = server.members.map((m) => m.userId.toString());
+      const channelRef = saved.channelId as
+        | { _id?: { toString(): string }; name?: string; type?: string }
+        | null
+        | undefined;
+      this.channelMessagesGateway.emitInboxForYouItem(
+        memberIds,
+        {
+          type: 'event',
+          _id: saved._id.toString(),
+          serverId,
+          serverName: server.name?.trim?.() ?? '',
+          serverAvatarUrl: (server as any).avatarUrl ?? null,
+          channelId: channelRef
+            ? {
+                _id: channelRef._id?.toString?.() ?? '',
+                name: channelRef.name ?? '',
+                type: channelRef.type ?? 'text',
+              }
+            : null,
+          topic: saved.topic,
+          startAt: saved.startAt.toISOString(),
+          endAt: saved.endAt.toISOString(),
+          status: saved.status,
+          description: saved.description ?? null,
+          coverImageUrl: saved.coverImageUrl ?? null,
+          createdAt:
+            (saved as any).createdAt?.toISOString?.() ??
+            new Date().toISOString(),
+          seen: false,
+        },
+        userId,
+      );
+    } catch (_) {
+      // non-critical: inbox still updates via polling
+    }
+
+    return saved;
   }
 
   private async assertServerMember(

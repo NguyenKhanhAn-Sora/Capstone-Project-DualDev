@@ -130,6 +130,26 @@ export class ChannelMessagesGateway
     });
   }
 
+  /**
+   * Realtime push for inbox «Dành cho bạn» items (events, role notifications).
+   * Delivered on the messages socket only — not the social notifications namespace.
+   */
+  emitInboxForYouItem(
+    recipientUserIds: string[],
+    payload: Record<string, unknown>,
+    excludeUserId?: string,
+  ): void {
+    const seen = new Set<string>();
+    const exclude = excludeUserId ? String(excludeUserId).trim() : '';
+    for (const raw of recipientUserIds) {
+      const uid = String(raw ?? '').trim();
+      if (!uid || seen.has(uid)) continue;
+      if (exclude && uid === exclude) continue;
+      seen.add(uid);
+      this.emitToUser(uid, 'inbox-for-you-item', payload);
+    }
+  }
+
   /** Join applications: notify connected owner/members/applicant without page reload. */
   emitJoinApplicationUpdated(
     recipientUserIds: string[],

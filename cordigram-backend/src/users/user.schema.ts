@@ -40,6 +40,8 @@ export type UserSettings = {
   socialAccountBoost?: boolean;
   /** Âm thanh thông báo tin (client có thể đọc). */
   chatSoundEnabled?: boolean;
+  /** Thông báo desktop trên trang Messages (sự kiện, thông báo vai trò). */
+  chatDesktopNotificationsEnabled?: boolean;
   notifications?: {
     mutedUntil?: Date | null;
     mutedIndefinitely?: boolean;
@@ -196,6 +198,7 @@ export class User extends Document {
       accountBoost: { type: Boolean, default: false },
       socialAccountBoost: { type: Boolean, default: false },
       chatSoundEnabled: { type: Boolean, default: true },
+      chatDesktopNotificationsEnabled: { type: Boolean, default: true },
       notifications: {
         mutedUntil: { type: Date, default: null },
         mutedIndefinitely: { type: Boolean, default: false },
@@ -233,6 +236,7 @@ export class User extends Document {
       accountBoost: false,
       socialAccountBoost: false,
       chatSoundEnabled: true,
+      chatDesktopNotificationsEnabled: true,
       notifications: {
         mutedUntil: null,
         mutedIndefinitely: false,

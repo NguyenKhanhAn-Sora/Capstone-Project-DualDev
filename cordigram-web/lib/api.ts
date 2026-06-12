@@ -1857,6 +1857,7 @@ export type UserSettingsResponse = {
   showCordigramMemberSince?: boolean;
   sharePresence?: boolean;
   chatSoundEnabled?: boolean;
+  chatDesktopNotificationsEnabled?: boolean;
 };
 
 export type NotificationCategoryKey =
@@ -2139,6 +2140,7 @@ export async function updateUserSettings(opts: {
   showCordigramMemberSince?: boolean;
   sharePresence?: boolean;
   chatSoundEnabled?: boolean;
+  chatDesktopNotificationsEnabled?: boolean;
 }): Promise<UserSettingsResponse> {
   const {
     token,
@@ -2152,6 +2154,7 @@ export async function updateUserSettings(opts: {
     showCordigramMemberSince,
     sharePresence,
     chatSoundEnabled,
+    chatDesktopNotificationsEnabled,
   } = opts;
   return apiFetch<UserSettingsResponse>({
     path: "/users/settings",
@@ -2170,6 +2173,7 @@ export async function updateUserSettings(opts: {
       showCordigramMemberSince,
       sharePresence,
       chatSoundEnabled,
+      chatDesktopNotificationsEnabled,
     }),
   });
 }

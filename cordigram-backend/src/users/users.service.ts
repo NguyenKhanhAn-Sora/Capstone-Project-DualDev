@@ -1785,6 +1785,7 @@ export class UsersService {
     sharePresence: boolean;
     accountBoost: boolean;
     chatSoundEnabled: boolean;
+    chatDesktopNotificationsEnabled: boolean;
   }> {
     const user = await this.userModel
       .findById(userId)
@@ -1818,6 +1819,8 @@ export class UsersService {
       sharePresence: (s?.sharePresence as boolean | undefined) !== false,
       accountBoost: (s?.accountBoost as boolean | undefined) === true,
       chatSoundEnabled: (s?.chatSoundEnabled as boolean | undefined) !== false,
+      chatDesktopNotificationsEnabled:
+        (s?.chatDesktopNotificationsEnabled as boolean | undefined) !== false,
     };
   }
 
@@ -2450,6 +2453,7 @@ export class UsersService {
     sharePresence?: boolean;
     accountBoost?: boolean;
     chatSoundEnabled?: boolean;
+    chatDesktopNotificationsEnabled?: boolean;
   }): Promise<{
     theme: 'light' | 'dark';
     language: 'vi' | 'en' | 'ja' | 'zh';
@@ -2462,6 +2466,7 @@ export class UsersService {
     sharePresence: boolean;
     accountBoost: boolean;
     chatSoundEnabled: boolean;
+    chatDesktopNotificationsEnabled: boolean;
   }> {
     const update: Record<string, unknown> = {};
     if (params.theme) {
@@ -2498,6 +2503,10 @@ export class UsersService {
     }
     if (params.chatSoundEnabled !== undefined) {
       update['settings.chatSoundEnabled'] = params.chatSoundEnabled;
+    }
+    if (params.chatDesktopNotificationsEnabled !== undefined) {
+      update['settings.chatDesktopNotificationsEnabled'] =
+        params.chatDesktopNotificationsEnabled;
     }
 
     if (!Object.keys(update).length) {

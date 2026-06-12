@@ -333,6 +333,7 @@ export class UsersController {
       sharePresence: dto.sharePresence,
       accountBoost: dto.accountBoost,
       chatSoundEnabled: dto.chatSoundEnabled,
+      chatDesktopNotificationsEnabled: dto.chatDesktopNotificationsEnabled,
       appearanceBackground: dto.appearanceBackground,
     });
   }

@@ -6,6 +6,7 @@ import { EventsService } from './events.service';
 import { EventsController } from './events.controller';
 import { EventsPublicController } from './events-public.controller';
 import { RolesModule } from '../roles/roles.module';
+import { MessagesModule } from '../messages/messages.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { RolesModule } from '../roles/roles.module';
       { name: Server.name, schema: ServerSchema },
     ]),
     forwardRef(() => RolesModule),
+    forwardRef(() => MessagesModule),
   ],
   providers: [EventsService],
   controllers: [EventsController, EventsPublicController],

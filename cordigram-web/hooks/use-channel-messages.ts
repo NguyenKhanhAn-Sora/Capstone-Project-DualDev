@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import io, { Socket } from "socket.io-client";
 import { apiBaseUrl as API_BASE } from "@/lib/api";
+import type { InboxForYouItem } from "@/lib/inbox-api";
 
 export interface ChannelMessagePayload {
   _id: string;
@@ -112,6 +113,8 @@ export interface ChannelMessageDeletedEvent {
   deletedAt?: string;
 }
 
+export type InboxForYouItemEvent = InboxForYouItem;
+
 interface UseChannelMessagesOptions {
   token: string | null;
 }
@@ -136,6 +139,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     useState<ServerMembershipUpdatedEvent | null>(null);
   const [channelMessageDeleted, setChannelMessageDeleted] =
     useState<ChannelMessageDeletedEvent | null>(null);
+  const [inboxForYouItem, setInboxForYouItem] = useState<InboxForYouItem | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -172,6 +176,12 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
 
     socket.on("channel-notification", (data: ChannelNotificationEvent) => {
       if (data) setChannelNotification(data);
+    });
+
+    socket.on("inbox-for-you-item", (data: InboxForYouItem) => {
+      if (!data?._id || !data?.type) return;
+      if (data.type !== "event" && data.type !== "server_notification") return;
+      setInboxForYouItem(data);
     });
 
     socket.on("server-deleted", (data: ServerDeletedEvent) => {
@@ -289,6 +299,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
 
   const clearNewMessageChannel = useCallback(() => setNewMessageChannel(null), []);
   const clearChannelNotification = useCallback(() => setChannelNotification(null), []);
+  const clearInboxForYouItem = useCallback(() => setInboxForYouItem(null), []);
   const clearServerDeleted = useCallback(() => setServerDeleted(null), []);
 
   return {
@@ -296,6 +307,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     newMessageChannel,
     reactionUpdateChannel,
     channelNotification,
+    inboxForYouItem,
     serverDeleted,
     serverMemberProfileUpdated,
     userProfileStyleUpdated,
@@ -306,6 +318,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     leaveChannel,
     clearNewMessageChannel,
     clearChannelNotification,
+    clearInboxForYouItem,
     clearServerDeleted,
     channelMessageDeleted,
   };

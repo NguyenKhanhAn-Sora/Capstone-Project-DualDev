@@ -1887,7 +1887,15 @@
       "masterHint": "开启：正常通知。关闭：关闭所有通知（社交 + 私信/服务器）。",
       "enabledToast": "已开启通知。",
       "disabledToast": "已关闭通知。",
-      "soundLabel": "通知声音（消息与新通知）"
+      "soundLabel": "通知声音（消息与新通知）",
+      "desktopLabel": "桌面通知（Messages）",
+      "desktopHint": "在有新服务器活动或角色通知时显示系统通知。",
+      "desktopEnabledToast": "已开启桌面通知。",
+      "desktopDeniedToast": "浏览器已阻止桌面通知，请在浏览器设置中允许。",
+      "desktopDisabledToast": "已关闭桌面通知。",
+      "desktopEventTitle": "新活动：{topic}",
+      "desktopEventBody": "{server}",
+      "desktopRoleBody": "来自 {server} 的通知"
     },
     "profile": {
       "title": "个人资料",

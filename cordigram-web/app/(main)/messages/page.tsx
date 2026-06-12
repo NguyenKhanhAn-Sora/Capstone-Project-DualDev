@@ -143,6 +143,12 @@ import ServerStickerSection from "@/components/ServerStickerSection/ServerSticke
 import MessageSearchPanel from "@/components/MessageSearchPanel/MessageSearchPanel";
 import MentionDropdown from "@/components/MentionDropdown/MentionDropdown";
 import { fetchInboxForYou } from "@/lib/inbox-api";
+import {
+  isMessagesDesktopNotificationsEnabled,
+  requestDesktopNotificationPermission,
+  showInboxForYouDesktopNotification,
+  type MessagesDesktopNotificationCopy,
+} from "@/lib/messages-desktop-notifications";
 import { normalizeServerBanner } from "@/lib/server-banner";
 import type { VoiceChannelCallProps } from "@/components/VoiceChannelCall";
 import ChannelUserProfileRoot, {
@@ -2282,11 +2288,13 @@ export default function MessagesPage() {
     newMessageChannel,
     reactionUpdateChannel,
     channelNotification,
+    inboxForYouItem,
     serverDeleted,
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,
     clearChannelNotification,
+    clearInboxForYouItem,
     clearServerDeleted,
     channelMessageDeleted,
   } = useChannelMessages({ token });
@@ -2314,6 +2322,52 @@ export default function MessagesPage() {
     scheduleInboxDotRefresh();
     clearChannelNotification();
   }, [channelNotification, clearChannelNotification, scheduleInboxDotRefresh]);
+
+  const inboxDesktopCopy = useMemo<MessagesDesktopNotificationCopy>(
+    () => ({
+      eventTitle: (topic) =>
+        t("settings.notifications.desktopEventTitle").replace("{topic}", topic),
+      eventBody: (serverName) =>
+        t("settings.notifications.desktopEventBody").replace("{server}", serverName),
+      roleTitle: (title) => title,
+      roleBody: (serverName, excerpt) => {
+        const base = t("settings.notifications.desktopRoleBody").replace(
+          "{server}",
+          serverName,
+        );
+        return excerpt ? `${base} — ${excerpt}` : base;
+      },
+    }),
+    [t],
+  );
+
+  // Realtime: server event / role notification → inbox dot + OS desktop notification (messages only).
+  useEffect(() => {
+    if (!inboxForYouItem) return;
+    setHasInboxNotification(true);
+    scheduleInboxDotRefresh();
+    showInboxForYouDesktopNotification({
+      item: inboxForYouItem,
+      copy: inboxDesktopCopy,
+      enabled: isMessagesDesktopNotificationsEnabled(chatUserSettings),
+      iconUrl: inboxForYouItem.serverAvatarUrl,
+      onNavigate: (item) => {
+        if (item.type === "event") {
+          router.push(`/messages?server=${item.serverId}&event=${item._id}`);
+        } else if (item.type === "server_notification") {
+          router.push(`/messages?server=${item.serverId}`);
+        }
+      },
+    });
+    clearInboxForYouItem();
+  }, [
+    inboxForYouItem,
+    inboxDesktopCopy,
+    chatUserSettings,
+    scheduleInboxDotRefresh,
+    clearInboxForYouItem,
+    router,
+  ]);
 
   // Realtime: server removed — drop from sidebar, clear open server/channel/voice, inbox + toast.
   useEffect(() => {

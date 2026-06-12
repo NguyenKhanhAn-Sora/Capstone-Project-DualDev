@@ -1885,7 +1885,15 @@
       "masterHint": "Bật: thông báo bình thường. Tắt: tắt mọi thông báo (social + DM/server qua cài đặt tài khoản).",
       "enabledToast": "Đã bật thông báo.",
       "disabledToast": "Đã tắt thông báo.",
-      "soundLabel": "Âm thanh thông báo (tin & thông báo mới)"
+      "soundLabel": "Âm thanh thông báo (tin & thông báo mới)",
+      "desktopLabel": "Thông báo desktop (Messages)",
+      "desktopHint": "Hiện thông báo hệ điều hành khi có sự kiện mới hoặc thông báo vai trò trong máy chủ.",
+      "desktopEnabledToast": "Đã bật thông báo desktop.",
+      "desktopDeniedToast": "Trình duyệt đã chặn thông báo desktop. Hãy bật lại trong cài đặt trình duyệt.",
+      "desktopDisabledToast": "Đã tắt thông báo desktop.",
+      "desktopEventTitle": "Sự kiện mới: {topic}",
+      "desktopEventBody": "{server}",
+      "desktopRoleBody": "Thông báo từ {server}"
     },
     "profile": {
       "title": "Hồ sơ",

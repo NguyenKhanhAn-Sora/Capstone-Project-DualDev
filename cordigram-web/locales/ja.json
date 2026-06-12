@@ -1887,7 +1887,15 @@
       "masterHint": "オン: 通常の通知。オフ: すべての通知を無効化（ソーシャル + DM/サーバー）。",
       "enabledToast": "通知をオンにしました。",
       "disabledToast": "通知をオフにしました。",
-      "soundLabel": "通知サウンド（メッセージ・新着通知）"
+      "soundLabel": "通知サウンド（メッセージ・新着通知）",
+      "desktopLabel": "デスクトップ通知（Messages）",
+      "desktopHint": "サーバーの新規イベントやロール通知をOS通知で表示します。",
+      "desktopEnabledToast": "デスクトップ通知を有効にしました。",
+      "desktopDeniedToast": "ブラウザがデスクトップ通知をブロックしました。ブラウザ設定で許可してください。",
+      "desktopDisabledToast": "デスクトップ通知を無効にしました。",
+      "desktopEventTitle": "新しいイベント: {topic}",
+      "desktopEventBody": "{server}",
+      "desktopRoleBody": "{server} からのお知らせ"
     },
     "profile": {
       "title": "プロフィール",
