@@ -40,6 +40,7 @@ class MessagesController extends ChangeNotifier {
   StreamSubscription<Map<String, dynamic>>? _messagesReadSub;
   StreamSubscription<DmProfileStyleUpdatedEvent>? _profileStyleSub;
   StreamSubscription<Map<String, dynamic>>? _channelInboxSub;
+  StreamSubscription<Map<String, dynamic>>? _inboxForYouSub;
   Timer? _inboxPollTimer;
 
   final Set<String> _followingUserIds = {};
@@ -108,7 +109,16 @@ class MessagesController extends ChangeNotifier {
     await DirectMessagesRealtimeService.connect();
     await ChannelMessagesRealtimeService.connect();
     _channelInboxSub = ChannelMessagesRealtimeService.channelNotifications.listen(
-      (_) => refreshInboxCount(),
+      (payload) {
+        MessageNotificationSound.play();
+        refreshInboxCount();
+      },
+    );
+    _inboxForYouSub = ChannelMessagesRealtimeService.inboxForYouItems.listen(
+      (_) {
+        MessageNotificationSound.play();
+        refreshInboxCount();
+      },
     );
     _newMessageSub = DirectMessagesRealtimeService.newMessages.listen(
       _onNewMessage,
@@ -231,6 +241,7 @@ class MessagesController extends ChangeNotifier {
     await _messagesReadSub?.cancel();
     await _profileStyleSub?.cancel();
     await _channelInboxSub?.cancel();
+    await _inboxForYouSub?.cancel();
     _inboxPollTimer?.cancel();
     // Do not disconnect the shared DM socket here. [DmCallManager] needs it
     // app-wide for incoming calls while the user is on Home / social tabs.

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useCallback, useEffect, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./ServerJoinApplicationsPanel.module.css";
@@ -157,7 +158,7 @@ export default function ServerJoinApplicationsPanel({
       setSelectedUserId(null);
       await refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("chat.joinApplications.approveError"));
+      appAlert(e instanceof Error ? e.message : t("chat.joinApplications.approveError"));
     } finally {
       setActionLoading(false);
     }
@@ -171,7 +172,7 @@ export default function ServerJoinApplicationsPanel({
       setSelectedUserId(null);
       await refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("chat.joinApplications.rejectError"));
+      appAlert(e instanceof Error ? e.message : t("chat.joinApplications.rejectError"));
     } finally {
       setActionLoading(false);
     }
@@ -187,7 +188,7 @@ export default function ServerJoinApplicationsPanel({
       }
       await refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("chat.joinApplications.approveError"));
+      appAlert(e instanceof Error ? e.message : t("chat.joinApplications.approveError"));
     } finally {
       setQuickOperatingUserId(null);
     }
@@ -203,7 +204,7 @@ export default function ServerJoinApplicationsPanel({
       }
       await refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("chat.joinApplications.rejectError"));
+      appAlert(e instanceof Error ? e.message : t("chat.joinApplications.rejectError"));
     } finally {
       setQuickOperatingUserId(null);
     }
@@ -379,16 +380,16 @@ export default function ServerJoinApplicationsPanel({
                     onClick={async () => {
                       const uid = menu.userId;
                       setMenu(null);
-                      const minsRaw = window.prompt(t("chat.joinApplications.menuTimeoutPrompt"), "10");
+                      const minsRaw = await appPrompt(t("chat.joinApplications.menuTimeoutPrompt"), "10");
                       if (!minsRaw) return;
                       const mins = Math.max(1, Math.min(60 * 24 * 7, Number(minsRaw)));
                       if (!Number.isFinite(mins)) return;
-                      const reason = window.prompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
+                      const reason = await appPrompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
                       try {
                         await serversApi.timeoutMember(serverId, uid, mins * 60, reason);
                         await refresh();
                       } catch (e) {
-                        alert(e instanceof Error ? e.message : t("chat.joinApplications.menuTimeoutError"));
+                        appAlert(e instanceof Error ? e.message : t("chat.joinApplications.menuTimeoutError"));
                       }
                     }}
                   >
@@ -403,14 +404,14 @@ export default function ServerJoinApplicationsPanel({
                     onClick={async () => {
                       const uid = menu.userId;
                       setMenu(null);
-                      const ok = window.confirm(t("chat.joinApplications.menuKickConfirm"));
+                      const ok = await appConfirm(t("chat.joinApplications.menuKickConfirm"));
                       if (!ok) return;
-                      const reason = window.prompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
+                      const reason = await appPrompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
                       try {
                         await serversApi.kickMember(serverId, uid, reason);
                         await refresh();
                       } catch (e) {
-                        alert(e instanceof Error ? e.message : t("chat.joinApplications.menuKickError"));
+                        appAlert(e instanceof Error ? e.message : t("chat.joinApplications.menuKickError"));
                       }
                     }}
                   >
@@ -425,14 +426,14 @@ export default function ServerJoinApplicationsPanel({
                     onClick={async () => {
                       const uid = menu.userId;
                       setMenu(null);
-                      const ok = window.confirm(t("chat.joinApplications.menuBanConfirm"));
+                      const ok = await appConfirm(t("chat.joinApplications.menuBanConfirm"));
                       if (!ok) return;
-                      const reason = window.prompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
+                      const reason = await appPrompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
                       try {
                         await serversApi.banMember(serverId, uid, reason);
                         await refresh();
                       } catch (e) {
-                        alert(e instanceof Error ? e.message : t("chat.joinApplications.menuBanError"));
+                        appAlert(e instanceof Error ? e.message : t("chat.joinApplications.menuBanError"));
                       }
                     }}
                   >

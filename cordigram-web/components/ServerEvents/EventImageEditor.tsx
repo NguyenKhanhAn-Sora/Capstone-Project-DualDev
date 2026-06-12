@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useRef, useCallback } from "react";
 import styles from "./EventImageEditor.module.css";
 import { uploadMedia } from "@/lib/api";
@@ -44,7 +45,7 @@ export default function EventImageEditor({
   const handleThamGia = async () => {
     const token = localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
     if (!token) {
-      alert("Bạn cần đăng nhập.");
+      appAlert("Bạn cần đăng nhập.");
       return;
     }
     if (file) {
@@ -59,7 +60,7 @@ export default function EventImageEditor({
         onClose();
       } catch (err) {
         console.error(err);
-        alert("Tải ảnh lên thất bại.");
+        appAlert("Tải ảnh lên thất bại.");
       } finally {
         setUploading(false);
       }

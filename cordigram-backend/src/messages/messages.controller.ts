@@ -115,9 +115,8 @@ export class MessagesController {
 
       if (ctx.defaultNotificationLevel === 'all') {
         for (const uid of ctx.memberUserIds) {
-          if (mutedRecipients.has(uid) && mentionSet.has(uid)) {
-            continue;
-          }
+          if (uid === senderId) continue;
+          if (mutedRecipients.has(uid)) continue;
           this.channelMessagesGateway.emitToUser(
             uid,
             'channel-notification',
@@ -125,6 +124,19 @@ export class MessagesController {
           );
           if (mentionSet.has(uid)) {
             void this.fcmPushService.pushChannelMention({
+              userId: uid,
+              serverId: ctx.serverId,
+              serverName: ctx.serverName,
+              serverAvatarUrl: ctx.serverAvatarUrl,
+              channelId,
+              channelName: ctx.channelName,
+              messageId: message._id?.toString?.() ?? '',
+              senderName,
+              senderAvatarUrl,
+              excerpt: (message.content ?? '').slice(0, 200),
+            });
+          } else {
+            void this.fcmPushService.pushChannelMessage({
               userId: uid,
               serverId: ctx.serverId,
               serverName: ctx.serverName,

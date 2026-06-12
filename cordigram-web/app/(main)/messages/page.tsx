@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useLayoutEffect, useRef, memo, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -13174,8 +13175,8 @@ export default function MessagesPage() {
             }}
             onCopyChannelLink={() => {
               const url = `${origin}/invite/server/${selectedServer}/${chId}`;
-              void navigator.clipboard?.writeText(url).catch(() => {
-                window.prompt("Sao chép liên kết:", url);
+              void navigator.clipboard?.writeText(url).catch(async () => {
+                await appPrompt("Sao chép liên kết:", url);
               });
             }}
             onMarkAsRead={() => serversApi.markChannelAsRead(chId)}
@@ -13287,10 +13288,10 @@ export default function MessagesPage() {
               setRenamingCategoryId(categoryContextMenu.category._id);
               setRenamingCategoryName(categoryContextMenu.category.name);
             }}
-            onDeleteCategory={() => {
+            onDeleteCategory={async () => {
               if (catId === UNCATEGORIZED_CATEGORY_ID) {
                 if (
-                  confirm(
+                  await appConfirm(
                     'Bạn có chắc muốn xóa danh mục "Kênh khác"? Tất cả kênh bên trong (trừ kênh mặc định) sẽ bị xóa.',
                   )
                 ) {
@@ -13298,7 +13299,7 @@ export default function MessagesPage() {
                 }
                 return;
               }
-              if (confirm(`Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`)) {
+              if (await appConfirm(`Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`)) {
                 handleDeleteCategory(catId);
               }
             }}

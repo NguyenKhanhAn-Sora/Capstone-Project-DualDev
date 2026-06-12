@@ -8,7 +8,9 @@ import '../../features/notifications/notification_screen.dart';
 import '../../features/post/post_detail_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/reels/reels_screen.dart';
+import 'cordigram_notification_sounds.dart';
 import 'messages_push_handler.dart';
+import 'notification_sound_config.dart';
 
 /// Push routing for Social feed notifications only (follow, likes, comments, etc.).
 /// Messages module pushes are handled by [MessagesPushHandler].
@@ -16,16 +18,10 @@ class SocialPushHandler {
   SocialPushHandler._();
 
   static const String androidSmallIcon = 'ic_stat_cordigram';
-  static const String androidLargeIcon = 'cordigram_logo';
   static const String scope = 'social';
 
   static const AndroidNotificationChannel socialChannel =
-      AndroidNotificationChannel(
-        'cordigram_push_high',
-        'Cordigram Push',
-        description: 'Social notifications and account activity.',
-        importance: Importance.max,
-      );
+      NotificationSoundConfig.socialChannel;
 
   static const Set<String> _socialTypes = {
     'follow',
@@ -77,24 +73,17 @@ class SocialPushHandler {
       title,
       body,
       NotificationDetails(
-        android: AndroidNotificationDetails(
-          socialChannel.id,
-          socialChannel.name,
+        android: NotificationSoundConfig.androidMessageDetails(
+          channelId: socialChannel.id,
+          channelName: socialChannel.name,
           channelDescription: socialChannel.description,
-          icon: androidSmallIcon,
-          largeIcon: const DrawableResourceAndroidBitmap(androidLargeIcon),
-          importance: Importance.max,
-          priority: Priority.high,
-          visibility: NotificationVisibility.public,
+          category: AndroidNotificationCategory.social,
         ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
+        iOS: NotificationSoundConfig.iosMessageDetails,
       ),
       payload: jsonEncode(data),
     );
+    CordigramNotificationSounds.playMessage();
     return true;
   }
 
@@ -104,7 +93,6 @@ class SocialPushHandler {
   }) async {
     final data = Map<String, dynamic>.from(message.data);
     if (!isSocialPush(data)) return;
-    if (message.notification != null) return;
 
     final title = message.notification?.title ?? 'Cordigram';
     final body =
@@ -115,18 +103,13 @@ class SocialPushHandler {
       title,
       body,
       NotificationDetails(
-        android: AndroidNotificationDetails(
-          socialChannel.id,
-          socialChannel.name,
-          icon: androidSmallIcon,
-          importance: Importance.max,
-          priority: Priority.high,
+        android: NotificationSoundConfig.androidMessageDetails(
+          channelId: socialChannel.id,
+          channelName: socialChannel.name,
+          channelDescription: socialChannel.description,
+          category: AndroidNotificationCategory.social,
         ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
+        iOS: NotificationSoundConfig.iosMessageDetails,
       ),
       payload: jsonEncode(data),
     );

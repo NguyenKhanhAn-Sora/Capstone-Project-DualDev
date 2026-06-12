@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -562,10 +563,10 @@ export default function AdsCreatePage() {
     router.push("/ads");
   };
 
-  const handleFormatChange = (newFormat: AdFormat) => {
+  const handleFormatChange = async (newFormat: AdFormat) => {
     if (newFormat === adFormat) return;
     if (uploadedMedia.length > 0) {
-      if (!window.confirm(t("validation.formatChangeClearMedia"))) return;
+      if (!(await appConfirm(t("validation.formatChangeClearMedia")))) return;
     }
     setAdFormat(newFormat);
   };

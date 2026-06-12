@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useMemo, useEffect } from "react";
 import styles from "./CreateEventWizard.module.css";
 import * as serversApi from "@/lib/servers-api";
@@ -128,7 +129,7 @@ export default function CreateEventWizard({
     } catch (e) {
       console.error(e);
       const msg = e instanceof Error ? e.message : "Không thể tạo sự kiện.";
-      alert(msg);
+      appAlert(msg);
     } finally {
       setSubmitting(false);
     }

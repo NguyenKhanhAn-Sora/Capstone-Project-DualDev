@@ -4,6 +4,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'cordigram_notification_sounds.dart';
+import 'notification_sound_config.dart';
 import 'pending_messages_push_navigation.dart';
 import '../../features/messages/call/dm_call_manager.dart';
 import '../../features/messages/call/pending_dm_call_storage.dart';
@@ -20,24 +22,12 @@ class MessagesPushHandler {
   MessagesPushHandler._();
 
   static const String androidSmallIcon = 'ic_stat_cordigram';
-  static const String androidLargeIcon = 'cordigram_logo';
   static const String scope = 'messages';
 
   static const AndroidNotificationChannel callsChannel =
-      AndroidNotificationChannel(
-        'cordigram_push_calls',
-        'Cordigram Calls',
-        description: 'Incoming voice and video calls.',
-        importance: Importance.max,
-      );
-
+      NotificationSoundConfig.callsChannel;
   static const AndroidNotificationChannel messagesChannel =
-      AndroidNotificationChannel(
-        'cordigram_push_messages',
-        'Cordigram Messages',
-        description: 'Direct messages, mentions, events, and announcements.',
-        importance: Importance.high,
-      );
+      NotificationSoundConfig.messagesChannel;
 
   static bool isMessagesPush(Map<String, dynamic> data) {
     final pushScope = (data['scope'] ?? '').toString().toLowerCase();
@@ -48,6 +38,7 @@ class MessagesPushHandler {
         type == 'dm_message' ||
         type == 'direct_message' ||
         type == 'new_dm_message' ||
+        type == 'channel_message' ||
         type == 'channel_mention' ||
         type == 'event' ||
         type == 'server_notification';
@@ -63,6 +54,10 @@ class MessagesPushHandler {
     return type == 'dm_message' ||
         type == 'direct_message' ||
         type == 'new_dm_message';
+  }
+
+  static bool isChannelPush(String type) {
+    return type == 'channel_message' || type == 'channel_mention';
   }
 
   static String dedupeKey(Map<String, dynamic> data) {
@@ -83,7 +78,7 @@ class MessagesPushHandler {
 
   static String titleForData(Map<String, dynamic> data) {
     final type = (data['type'] ?? '').toString().toLowerCase();
-    if (type == 'channel_mention') {
+    if (isChannelPush(type)) {
       final sender = (data['senderName'] ?? 'Someone').toString();
       final channel = (data['channelName'] ?? 'general').toString();
       final server = (data['serverName'] ?? 'Server').toString();
@@ -126,6 +121,29 @@ class MessagesPushHandler {
         .toString();
   }
 
+  static NotificationDetails detailsForType(String type) {
+    if (isCallIncoming(type)) {
+      final channel = callsChannel;
+      return NotificationDetails(
+        android: NotificationSoundConfig.androidIncomingCallDetails(
+          channelId: channel.id,
+          channelName: channel.name,
+          channelDescription: channel.description,
+        ),
+        iOS: NotificationSoundConfig.iosIncomingCallDetails,
+      );
+    }
+    final channel = messagesChannel;
+    return NotificationDetails(
+      android: NotificationSoundConfig.androidMessageDetails(
+        channelId: channel.id,
+        channelName: channel.name,
+        channelDescription: channel.description,
+      ),
+      iOS: NotificationSoundConfig.iosMessageDetails,
+    );
+  }
+
   static Future<bool> handleForegroundMessage({
     required RemoteMessage message,
     required FlutterLocalNotificationsPlugin local,
@@ -162,34 +180,15 @@ class MessagesPushHandler {
 
     final title = message.notification?.title ?? titleForData(data);
     final body = message.notification?.body ?? bodyForData(data);
-    final channel = channelForType(type);
 
     await local.show(
       message.hashCode,
       title,
       body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel.id,
-          channel.name,
-          channelDescription: channel.description,
-          icon: androidSmallIcon,
-          largeIcon: const DrawableResourceAndroidBitmap(androidLargeIcon),
-          importance: Importance.max,
-          priority: Priority.high,
-          visibility: NotificationVisibility.public,
-          category: isCallIncoming(type)
-              ? AndroidNotificationCategory.call
-              : AndroidNotificationCategory.message,
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
+      detailsForType(type),
       payload: jsonEncode(data),
     );
+    CordigramNotificationSounds.playMessage();
     return true;
   }
 
@@ -207,35 +206,14 @@ class MessagesPushHandler {
       return;
     }
 
-    if (message.notification != null && !isCallIncoming(type)) {
-      return;
-    }
-
     final title = message.notification?.title ?? titleForData(data);
     final body = message.notification?.body ?? bodyForData(data);
-    final channel = channelForType(type);
 
     await local.show(
       message.hashCode,
       title,
       body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel.id,
-          channel.name,
-          icon: androidSmallIcon,
-          importance: Importance.max,
-          priority: Priority.high,
-          category: isCallIncoming(type)
-              ? AndroidNotificationCategory.call
-              : AndroidNotificationCategory.message,
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
+      detailsForType(type),
       payload: jsonEncode(data),
     );
   }
@@ -278,7 +256,7 @@ class MessagesPushHandler {
       return;
     }
 
-    if (type == 'channel_mention') {
+    if (isChannelPush(type)) {
       final serverId = (data['serverId'] ?? '').toString();
       final channelId = (data['channelId'] ?? '').toString();
       if (serverId.isEmpty) {
@@ -302,6 +280,7 @@ class MessagesPushHandler {
       PendingMessagesPushNavigation.set({
         'serverId': serverId,
         if (type == 'event') 'eventId': (data['_id'] ?? '').toString(),
+        if (type == 'server_notification') 'inboxTab': 'for_you',
       });
       navigator.push(messagesEntryRoute(const MessagesShell()));
     }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/services/cordigram_notification_sounds.dart';
 import '../../../core/services/auth_storage.dart';
 import '../services/channel_messages_realtime_service.dart';
 import '../services/direct_messages_realtime_service.dart';
@@ -179,10 +180,26 @@ class DmCallManager extends ChangeNotifier {
     );
   }
 
+  void _syncCallSounds() {
+    if (_incoming != null) {
+      unawaited(CordigramNotificationSounds.startIncomingCall());
+      return;
+    }
+    final ringingOutgoing = _outgoings.values.any(
+      (o) => o.status == OutgoingCallStatus.calling,
+    );
+    if (ringingOutgoing) {
+      unawaited(CordigramNotificationSounds.startOutgoingCall());
+    } else {
+      unawaited(CordigramNotificationSounds.stopCallLoop());
+    }
+  }
+
   void _onIncomingDismiss(DmCallIncomingDismissEvent event) {
     if (_incoming?.callerUserId == event.peerId) {
       _incomingTimer?.cancel();
       _incoming = null;
+      _syncCallSounds();
       notifyListeners();
     }
     // peerId is the remote party; only drop outbound if we were dialling them.
@@ -279,6 +296,7 @@ class DmCallManager extends ChangeNotifier {
         !ringingCalleePeers.contains(_incoming!.callerUserId)) {
       _incomingTimer?.cancel();
       _incoming = null;
+      _syncCallSounds();
     }
 
     var outgoingChanged = false;
@@ -378,6 +396,7 @@ class DmCallManager extends ChangeNotifier {
     _setMicEnabledDelegate = null;
     _setSoundEnabledDelegate = null;
     _myName = null;
+    unawaited(CordigramNotificationSounds.stopCallLoop());
     notifyListeners();
     final token = AuthStorage.accessToken;
     if (token != null && token.isNotEmpty) {
@@ -474,6 +493,7 @@ class DmCallManager extends ChangeNotifier {
         _scheduleOutgoingDismiss(peerUserId);
       }
     });
+    _syncCallSounds();
     notifyListeners();
   }
 
@@ -536,6 +556,7 @@ class DmCallManager extends ChangeNotifier {
 
     _incomingTimer?.cancel();
     _incoming = null;
+    _syncCallSounds();
     _startActiveCall(
       session: session,
       peerUserId: inc.callerUserId,
@@ -553,6 +574,7 @@ class DmCallManager extends ChangeNotifier {
     DirectMessagesRealtimeService.rejectCall(inc.callerUserId);
     _incomingTimer?.cancel();
     _incoming = null;
+    _syncCallSounds();
     notifyListeners();
   }
 
@@ -755,9 +777,11 @@ class DmCallManager extends ChangeNotifier {
       if (_incoming != null) {
         DirectMessagesRealtimeService.rejectCall(_incoming!.callerUserId);
         _incoming = null;
+        _syncCallSounds();
         notifyListeners();
       }
     });
+    _syncCallSounds();
     notifyListeners();
   }
 
@@ -813,6 +837,7 @@ class DmCallManager extends ChangeNotifier {
 
     _outgoings.remove(event.fromUserId);
     final callId = event.payload?['callId']?.toString();
+    _syncCallSounds();
     _startActiveCall(
       session: session,
       peerUserId: out.peerUserId,
@@ -861,7 +886,10 @@ class DmCallManager extends ChangeNotifier {
       }
       changed = true;
     }
-    if (changed) notifyListeners();
+    if (changed) {
+      _syncCallSounds();
+      notifyListeners();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -961,7 +989,10 @@ class DmCallManager extends ChangeNotifier {
     _rejectedTimers[peerUserId]?.cancel();
     _rejectedTimers.remove(peerUserId);
     _outgoings.remove(peerUserId);
-    if (notify) notifyListeners();
+    if (notify) {
+      _syncCallSounds();
+      notifyListeners();
+    }
   }
 
   void _cancelTimers() {

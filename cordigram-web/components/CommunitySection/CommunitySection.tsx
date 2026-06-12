@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./CommunitySection.module.css";
@@ -101,7 +102,7 @@ export default function CommunitySection({
       setShowWizard(false);
       onCommunityActivated?.();
     } catch {
-      alert(t("chat.community.activateError"));
+      appAlert(t("chat.community.activateError"));
     } finally {
       setActivating(false);
     }

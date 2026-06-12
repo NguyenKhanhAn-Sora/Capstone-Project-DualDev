@@ -77,7 +77,7 @@
             android:value="2" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="cordigram_push_high" />
+            android:value="cordigram_push_high_v2" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_stat_cordigram" />

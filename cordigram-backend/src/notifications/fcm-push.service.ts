@@ -253,6 +253,47 @@ export class FcmPushService {
     }, 'dm_message');
   }
 
+  async pushChannelMessage(params: {
+    userId: string;
+    serverId: string;
+    serverName: string;
+    serverAvatarUrl?: string | null;
+    channelId: string;
+    channelName: string;
+    messageId: string;
+    senderName: string;
+    senderAvatarUrl?: string | null;
+    excerpt: string;
+  }): Promise<void> {
+    const serverName = params.serverName?.trim() || 'Server';
+    const channelName = params.channelName?.trim() || 'general';
+    const senderName = params.senderName?.trim() || 'Someone';
+    const title = `${senderName} (#${channelName}, ${serverName})`;
+    const body = (params.excerpt ?? '').trim().slice(0, 200) || 'New message';
+
+    const data: Record<string, string> = {
+      scope: 'messages',
+      type: 'channel_message',
+      serverId: params.serverId,
+      serverName,
+      serverAvatarUrl: (params.serverAvatarUrl ?? '').trim(),
+      channelId: params.channelId,
+      channelName,
+      messageId: params.messageId,
+      senderName,
+      senderAvatarUrl: (params.senderAvatarUrl ?? '').trim(),
+      excerpt: body,
+      isMention: 'false',
+    };
+
+    await this.sendToUser(params.userId, {
+      notification: { title, body },
+      data,
+      android: this.androidHigh(FcmPushService.channelMessages),
+      apns: this.apnsDefault(),
+    }, 'channel_message');
+  }
+
   async pushChannelMention(params: {
     userId: string;
     serverId: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useEffect, useMemo, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import { useLanguage } from "@/component/language-provider";
@@ -103,7 +104,7 @@ export default function ServerInteractionsSection({
       });
       setNotifTitle("");
       setNotifContent("");
-      window.alert(t("chat.serverInteractions.sentAlert").replace("{n}", String(res.recipients)));
+      appAlert(t("chat.serverInteractions.sentAlert").replace("{n}", String(res.recipients)));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("chat.serverInteractions.sendError"));
     } finally {
