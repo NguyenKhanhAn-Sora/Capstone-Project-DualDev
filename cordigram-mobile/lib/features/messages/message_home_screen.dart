@@ -26,6 +26,7 @@ import 'messages_settings_screen.dart';
 import '../../core/services/accent_color_controller.dart';
 import '../../core/services/appearance_preset_controller.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/services/pending_messages_push_navigation.dart';
 import 'utils/messages_navigator.dart';
 import 'widgets/messages_boost_store_screen.dart';
 import 'widgets/messages_chrome_builder.dart';
@@ -65,6 +66,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       if (mounted && widget.initialThread != null) {
         _openThread(widget.initialThread!);
       }
+      await _consumePendingPushNavigation();
     });
     _serverRealtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
       _onServerRealtimeEvent,
@@ -103,6 +105,31 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       if (!mounted) return;
       _serverListController.loadServers();
     });
+  }
+
+  Future<void> _consumePendingPushNavigation() async {
+    final pending = PendingMessagesPushNavigation.take();
+    if (pending == null) return;
+    final serverId = (pending['serverId'] ?? '').toString().trim();
+    if (serverId.isEmpty) return;
+
+    await _serverListController.loadServers();
+    if (!mounted) return;
+
+    ServerSummary? target;
+    for (final s in _serverListController.servers) {
+      if (s.id == serverId) {
+        target = s;
+        break;
+      }
+    }
+    if (target == null) return;
+
+    final channelId = (pending['channelId'] ?? '').toString().trim();
+    await _openServer(
+      target,
+      initialTextChannelId: channelId.isEmpty ? null : channelId,
+    );
   }
 
   List<ServerSummary> get _filteredServers {

@@ -27,6 +27,7 @@ import { RolePermissions } from '../roles/role.schema';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AddServerEmojiDto } from './dto/add-server-emoji.dto';
 import { BoostService } from '../boost/boost.service';
+import { FcmPushService } from '../notifications/fcm-push.service';
 
 /** Tổng số emoji tùy chỉnh (tĩnh + GIF) tối đa mỗi máy chủ. */
 const MAX_CUSTOM_EMOJIS_PER_SERVER = 30;
@@ -62,6 +63,7 @@ export class ServersService {
     private readonly auditLogService: AuditLogService,
     @Inject(forwardRef(() => BoostService))
     private readonly boostService: BoostService,
+    private readonly fcmPushService: FcmPushService,
   ) {}
 
   private stickerMaxFromBoost(boost: {
@@ -2621,6 +2623,19 @@ export class ServersService {
             (notification as any).createdAt?.toISOString?.() ??
             new Date().toISOString(),
           seen: false,
+        },
+        actorId,
+      );
+      void this.fcmPushService.pushInboxForYouItemToUsers(
+        uniqueRecipientIds.map((id) => id.toString()),
+        {
+          type: 'server_notification',
+          _id: notification._id.toString(),
+          serverId,
+          serverName: server.name?.trim?.() ?? '',
+          serverAvatarUrl: (server as any).avatarUrl ?? null,
+          title,
+          content,
         },
         actorId,
       );

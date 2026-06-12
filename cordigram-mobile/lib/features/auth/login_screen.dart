@@ -245,7 +245,10 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim().toLowerCase(),
         accessToken: accessToken,
       ));
-      unawaited(PushNotificationService.syncCurrentToken());
+      unawaited((() async {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        await PushNotificationService.syncCurrentToken();
+      })());
       unawaited(DmCallManager.instance.onAuthChanged());
     } on ApiException catch (e) {
       setState(() {
@@ -306,7 +309,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (email.isNotEmpty) {
           unawaited(_upsertRecentAfterLogin(email: email, accessToken: accessToken));
         }
-        unawaited(PushNotificationService.syncCurrentToken());
+        unawaited((() async {
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+          await PushNotificationService.syncCurrentToken();
+        })());
         unawaited(DmCallManager.instance.onAuthChanged());
       } else if (signupToken != null && needsProfile) {
         final email = _decodeEmailFromToken(signupToken);
@@ -397,7 +403,10 @@ class _LoginScreenState extends State<LoginScreen> {
         email: account.email,
         accessToken: accessToken,
       ));
-      unawaited(PushNotificationService.syncCurrentToken());
+      unawaited((() async {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        await PushNotificationService.syncCurrentToken();
+      })());
       unawaited(DmCallManager.instance.onAuthChanged());
     } on ApiException catch (e) {
       setState(() {

@@ -31,6 +31,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { ServerBoostContextInterceptor } from './server-boost-context.interceptor';
 import { BoostModule } from '../boost/boost.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { BoostModule } from '../boost/boost.module';
     forwardRef(() => MessagesModule),
     CloudinaryModule,
     forwardRef(() => BoostModule),
+    NotificationsModule,
   ],
   providers: [ServersService, ServerBoostContextInterceptor],
   controllers: [ServersController],

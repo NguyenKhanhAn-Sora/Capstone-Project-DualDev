@@ -369,6 +369,9 @@ export class UsersController {
     return this.usersService.updateCurrentDevicePushToken({
       userId,
       deviceId: req.headers['x-device-id'] as string | undefined,
+      userAgent: req.headers['user-agent'] as string | undefined,
+      deviceInfo: req.headers['x-device-info'] as string | undefined,
+      ip: (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim(),
       token: dto.token ?? null,
     });
   }

@@ -14,6 +14,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { randomBytes } from 'crypto';
 import { RolesService } from '../roles/roles.service';
 import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
+import { FcmPushService } from '../notifications/fcm-push.service';
 
 const INVITE_EXPIRES_DAYS = 7;
 const ONE_TIME_EVENT_DURATION_MS = 24 * 60 * 60 * 1000;
@@ -27,6 +28,8 @@ export class EventsService {
     private readonly rolesService: RolesService,
     @Inject(forwardRef(() => ChannelMessagesGateway))
     private readonly channelMessagesGateway: ChannelMessagesGateway,
+    @Inject(forwardRef(() => FcmPushService))
+    private readonly fcmPushService: FcmPushService,
   ) {}
 
   private async assertCanManageEvents(
@@ -136,6 +139,20 @@ export class EventsService {
             (saved as any).createdAt?.toISOString?.() ??
             new Date().toISOString(),
           seen: false,
+        },
+        userId,
+      );
+      void this.fcmPushService.pushInboxForYouItemToUsers(
+        memberIds,
+        {
+          type: 'event',
+          _id: saved._id.toString(),
+          serverId,
+          serverName: server.name?.trim?.() ?? '',
+          serverAvatarUrl: (server as any).avatarUrl ?? null,
+          topic: saved.topic,
+          startAt: saved.startAt.toISOString(),
+          endAt: saved.endAt.toISOString(),
         },
         userId,
       );

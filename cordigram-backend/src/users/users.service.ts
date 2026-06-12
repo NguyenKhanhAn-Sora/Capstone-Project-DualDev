@@ -327,6 +327,9 @@ export class UsersService {
   async updateCurrentDevicePushToken(params: {
     userId: string;
     deviceId?: string;
+    userAgent?: string;
+    deviceInfo?: string;
+    ip?: string;
     token?: string | null;
   }): Promise<{ ok: true }> {
     const user = await this.userModel
@@ -346,10 +349,26 @@ export class UsersService {
     const token = params.token?.trim() ?? '';
     const nextToken = token.length ? token : null;
 
-    const current = user.loginDevices ?? [];
-    const idx = current.findIndex((d) => d.deviceIdHash === deviceIdHash);
+    let current = user.loginDevices ?? [];
+    let idx = current.findIndex((d) => d.deviceIdHash === deviceIdHash);
     if (idx < 0) {
-      throw new NotFoundException('Device session not found');
+      await this.recordLoginDevice({
+        userId: params.userId,
+        deviceId,
+        userAgent: params.userAgent,
+        deviceInfo: params.deviceInfo,
+        ip: params.ip,
+        loginMethod: 'mobile',
+      });
+      const refreshed = await this.userModel
+        .findById(params.userId)
+        .select('loginDevices')
+        .exec();
+      current = refreshed?.loginDevices ?? [];
+      idx = current.findIndex((d) => d.deviceIdHash === deviceIdHash);
+      if (idx < 0) {
+        throw new NotFoundException('Device session not found');
+      }
     }
 
     const next = [...current];

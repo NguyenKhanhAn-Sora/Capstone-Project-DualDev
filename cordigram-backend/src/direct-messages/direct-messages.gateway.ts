@@ -92,6 +92,11 @@ export class DirectMessagesGateway
       callId: session.callId,
       reason: 'timeout',
     });
+    this.maybeDismissCallPush({
+      receiverUserId: session.calleeId,
+      callId: session.callId,
+      callerUserId: session.initiatorId,
+    });
     await this.finalizeFromSession(session, session.initiatorId, 'missed');
   }
 
@@ -218,6 +223,43 @@ export class DirectMessagesGateway
     } catch (_err) {
       // ignore
     }
+  }
+
+  private isUserConnected(userId: string): boolean {
+    const sockets = this.connectedUsers.get(userId);
+    return Boolean(sockets && sockets.size > 0);
+  }
+
+  private maybePushDmMessage(params: {
+    receiverId: string;
+    senderId: string;
+    message: any;
+  }): void {
+    const sender = params.message?.senderId ?? {};
+    const senderName =
+      (sender.displayName as string | undefined)?.trim() ||
+      (sender.username as string | undefined)?.trim() ||
+      'New message';
+    const content = String(params.message?.content ?? '').trim();
+    const messageId = params.message?._id?.toString?.() ?? '';
+
+    void this.fcmPushService.pushDmMessage({
+      receiverUserId: params.receiverId,
+      senderUserId: params.senderId,
+      messageId,
+      senderName,
+      senderUsername: (sender.username as string | undefined)?.trim(),
+      senderAvatarUrl: (sender.avatarUrl as string | null | undefined) ?? null,
+      excerpt: content || 'Sent you a message',
+    });
+  }
+
+  private maybeDismissCallPush(params: {
+    receiverUserId: string;
+    callId?: string;
+    callerUserId?: string;
+  }): void {
+    void this.fcmPushService.pushDmCallDismiss(params);
   }
 
   private getSocketIdsByUserId(userId: string): string[] {
@@ -473,6 +515,11 @@ export class DirectMessagesGateway
         });
       }
     }
+    this.maybePushDmMessage({
+      receiverId: payload.receiverId,
+      senderId: payload.senderId,
+      message: payload.message,
+    });
     // Also push unread count update (if receiver is online)
     this.emitDmUnreadCount(payload.receiverId, payload.senderId);
   }
@@ -700,8 +747,13 @@ export class DirectMessagesGateway
         }
         // Push unread count update to receiver (badge)
         await this.emitDmUnreadCount(data.receiverId, senderId);
-      } else {
       }
+
+      this.maybePushDmMessage({
+        receiverId: data.receiverId,
+        senderId,
+        message: populatedMessage,
+      });
 
       // Confirm to sender
       socket.emit('message-sent', {
@@ -1016,6 +1068,12 @@ export class DirectMessagesGateway
       socket.id,
     );
 
+    this.maybeDismissCallPush({
+      receiverUserId: userId,
+      callId: session?.callId,
+      callerUserId: data.callerId,
+    });
+
     if (session) {
       this.emitToAllUserSockets(data.callerId, 'call-sessions-sync', {
         sessions: await this.dmCallSessions.getSessionsForUser(data.callerId),
@@ -1051,6 +1109,12 @@ export class DirectMessagesGateway
       },
       socket.id,
     );
+
+    this.maybeDismissCallPush({
+      receiverUserId: userId,
+      callId: session.callId,
+      callerUserId: data.callerId,
+    });
 
     const ended = await this.dmCallSessions.markEnded({
       userId,
