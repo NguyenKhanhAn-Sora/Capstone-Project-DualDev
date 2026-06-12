@@ -93,6 +93,35 @@ class DmCallIncomingDismissEvent {
   final String reason;
 }
 
+class DmCallSessionSyncItem {
+  const DmCallSessionSyncItem({
+    required this.callId,
+    required this.peerId,
+    required this.role,
+    required this.state,
+    required this.type,
+    this.roomId,
+  });
+
+  final String callId;
+  final String peerId;
+  final String role; // caller | callee
+  final String state;
+  final String type; // audio | video
+  final String? roomId;
+
+  factory DmCallSessionSyncItem.fromJson(Map<String, dynamic> json) {
+    return DmCallSessionSyncItem(
+      callId: (json['callId'] ?? '').toString(),
+      peerId: (json['peerId'] ?? '').toString(),
+      role: (json['role'] ?? '').toString(),
+      state: (json['state'] ?? '').toString(),
+      type: (json['type'] ?? 'audio').toString(),
+      roomId: json['roomId']?.toString(),
+    );
+  }
+}
+
 class DirectMessagesRealtimeService {
   DirectMessagesRealtimeService._();
 
@@ -116,6 +145,9 @@ class DirectMessagesRealtimeService {
   static final StreamController<DmCallIncomingDismissEvent>
       _callIncomingDismissController =
       StreamController<DmCallIncomingDismissEvent>.broadcast();
+  static final StreamController<List<DmCallSessionSyncItem>>
+      _callSessionsSyncController =
+      StreamController<List<DmCallSessionSyncItem>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messagesReadController =
@@ -140,6 +172,8 @@ class DirectMessagesRealtimeService {
   static Stream<DmCallBusyEvent> get callBusy => _callBusyController.stream;
   static Stream<DmCallIncomingDismissEvent> get callIncomingDismiss =>
       _callIncomingDismissController.stream;
+  static Stream<List<DmCallSessionSyncItem>> get callSessionsSync =>
+      _callSessionsSyncController.stream;
   static Stream<Map<String, dynamic>> get messageDeleted =>
       _messageDeletedController.stream;
   static Stream<Map<String, dynamic>> get messagesRead =>
@@ -300,6 +334,19 @@ class DirectMessagesRealtimeService {
         ),
       );
     });
+    socket.on('call-sessions-sync', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      final raw = data['sessions'];
+      if (raw is! List) return;
+      final sessions = raw
+          .whereType<Map>()
+          .map((item) => DmCallSessionSyncItem.fromJson(
+                Map<String, dynamic>.from(item),
+              ))
+          .toList(growable: false);
+      _callSessionsSyncController.add(sessions);
+    });
     socket.on('message-deleted', (payload) {
       if (payload is! Map) return;
       _messageDeletedController.add(Map<String, dynamic>.from(payload));
@@ -454,8 +501,19 @@ class DirectMessagesRealtimeService {
     _socket?.emit('call-reject', {'callerId': callerId});
   }
 
-  static void endCall(String peerId) {
-    _socket?.emit('call-end', {'peerId': peerId});
+  static void endCall(
+    String peerId, {
+    String? status,
+    int? durationSec,
+  }) {
+    final payload = <String, dynamic>{'peerId': peerId};
+    if (status != null && status.isNotEmpty) {
+      payload['status'] = status;
+    }
+    if (durationSec != null) {
+      payload['durationSec'] = durationSec;
+    }
+    _socket?.emit('call-end', payload);
   }
 
   static void sendCallSignal(String event, Map<String, dynamic> payload) {
@@ -480,6 +538,7 @@ class DirectMessagesRealtimeService {
       socket.off('ice-candidate');
       socket.off('call-ended');
       socket.off('call-incoming-dismiss');
+      socket.off('call-sessions-sync');
       socket.off('message-deleted');
       socket.off('messages-read');
       socket.off('user-typing');

@@ -310,7 +310,9 @@ export class DmCallSessionService implements OnModuleDestroy {
   }): Promise<DmCallSessionRecord | null> {
     const session = await this.getByPair(params.userId, params.callerId);
     if (!session || session.logged) return null;
+    if (session.calleeId !== params.userId) return null;
     if (session.answeredAt && session.state === 'connected') return session;
+    if (session.state !== 'ringing') return null;
     session.state = 'connected';
     session.answeredAt = Date.now();
     session.answeredBySocketId = params.answeringSocketId;

@@ -69,6 +69,7 @@ export interface CallEvent {
   from: string;
   callSignal?: CallEventSignal;
   type?: "audio" | "video";
+  callId?: string;
   sdpOffer?: any;
   candidate?: any;
   callerInfo?: {
@@ -80,7 +81,7 @@ export interface CallEvent {
 }
 
 export interface CallBusyEvent {
-  code: "already_in_call" | "peer_busy" | "user_busy";
+  code: "already_in_call" | "peer_busy" | "user_busy" | "blocked";
   receiverId?: string;
   peerId?: string;
 }
@@ -166,7 +167,11 @@ export const useDirectMessages = ({
   >({});
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callBusy, setCallBusy] = useState<CallBusyEvent | null>(null);
-  const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
+  const [callEnded, setCallEnded] = useState<{
+    from: string;
+    reason?: string;
+    callId?: string;
+  } | null>(null);
   const [callIncomingDismiss, setCallIncomingDismiss] =
     useState<CallIncomingDismissEvent | null>(null);
   const [callSessionsSync, setCallSessionsSync] = useState<{
@@ -491,10 +496,13 @@ export const useDirectMessages = ({
       scheduleClearCallEvent(evt, 500);
     });
 
-    socket.on("call-ended", (data: { from: string }) => {
-      setCallEnded(data);
-      setTimeout(() => setCallEnded(null), 1000);
-    });
+    socket.on(
+      "call-ended",
+      (data: { from: string; reason?: string; callId?: string }) => {
+        setCallEnded(data);
+        setTimeout(() => setCallEnded(null), 1000);
+      },
+    );
 
     socket.on(
       "call-incoming-dismiss",
@@ -656,51 +664,75 @@ export const useDirectMessages = ({
   }, []);
 
   const initiateCall = useCallback(
-    (receiverId: string, type: "audio" | "video") => {
-      if (socketRef.current && socketRef.current.connected) {
-        socketRef.current.emit("call-initiate", {
-          receiverId,
-          type,
-          clientPlatform: detectDmClientPlatform(),
-        });
+    (receiverId: string, type: "audio" | "video"): boolean => {
+      if (!socketRef.current?.connected) {
+        return false;
       }
+      socketRef.current.emit("call-initiate", {
+        receiverId,
+        type,
+        clientPlatform: detectDmClientPlatform(),
+      });
+      return true;
     },
     [],
   );
 
-  const answerCall = useCallback((callerId: string, sdpOffer: any) => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit("call-answer", {
-        callerId,
-        sdpOffer,
-      });
+  const answerCall = useCallback((callerId: string, sdpOffer: any): boolean => {
+    if (!socketRef.current?.connected) {
+      return false;
     }
+    socketRef.current.emit("call-answer", {
+      callerId,
+      sdpOffer,
+    });
+    return true;
   }, []);
 
-  const rejectCall = useCallback((callerId: string) => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit("call-reject", {
-        callerId,
-      });
+  const rejectCall = useCallback((callerId: string): boolean => {
+    if (!socketRef.current?.connected) {
+      return false;
     }
+    socketRef.current.emit("call-reject", {
+      callerId,
+    });
+    return true;
   }, []);
 
-  const sendIceCandidate = useCallback((peerId: string, candidate: any) => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit("ice-candidate", {
-        peerId,
-        candidate,
-      });
+  const sendIceCandidate = useCallback((peerId: string, candidate: any): boolean => {
+    if (!socketRef.current?.connected) {
+      return false;
     }
+    socketRef.current.emit("ice-candidate", {
+      peerId,
+      candidate,
+    });
+    return true;
   }, []);
 
-  const endCall = useCallback((peerId: string) => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit("call-end", {
-        peerId,
-      });
-    }
-  }, []);
+  const endCall = useCallback(
+    (
+      peerId: string,
+      options?: {
+        status?: "missed" | "completed" | "declined" | "cancelled";
+        durationSec?: number;
+      },
+    ): boolean => {
+      if (!socketRef.current?.connected) {
+        return false;
+      }
+      const payload: {
+        peerId: string;
+        status?: "missed" | "completed" | "declined" | "cancelled";
+        durationSec?: number;
+      } = { peerId };
+      if (options?.status) payload.status = options.status;
+      if (options?.durationSec != null) payload.durationSec = options.durationSec;
+      socketRef.current.emit("call-end", payload);
+      return true;
+    },
+    [],
+  );
 
   const emitDeleteMessage = useCallback(
     (messageId: string, deleteType?: string, receiverId?: string) => {

@@ -96,12 +96,46 @@ function EndCallWhenRemoteDisconnects({
   return null;
 }
 
+/** Notifies parent when the remote peer joins — used for accurate call duration. */
+function CallSessionTelemetry({
+  onRemoteJoined,
+}: {
+  onRemoteJoined?: () => void;
+}) {
+  const room = useRoomContext();
+  const notifiedRef = useRef(false);
+
+  useEffect(() => {
+    if (!room || !onRemoteJoined) return;
+
+    const maybeNotify = () => {
+      if (notifiedRef.current || room.remoteParticipants.size === 0) return;
+      notifiedRef.current = true;
+      onRemoteJoined();
+    };
+
+    const onParticipantConnected = () => {
+      maybeNotify();
+    };
+
+    room.on(RoomEvent.ParticipantConnected, onParticipantConnected);
+    maybeNotify();
+
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, onParticipantConnected);
+    };
+  }, [room, onRemoteJoined]);
+
+  return null;
+}
+
 interface CallRoomProps {
   token: string;
   serverUrl: string;
   onDisconnect: () => void;
   participantName: string;
   isAudioOnly?: boolean;
+  onRemoteJoined?: () => void;
 }
 
 export default function CallRoom({
@@ -110,6 +144,7 @@ export default function CallRoom({
   onDisconnect,
   participantName,
   isAudioOnly = false,
+  onRemoteJoined,
 }: CallRoomProps) {
   return (
     <div className={styles.callRoomContainer}>
@@ -126,6 +161,7 @@ export default function CallRoom({
         className={styles.liveKitRoom}
       >
         <EndCallWhenRemoteDisconnects onRemoteLeft={onDisconnect} />
+        <CallSessionTelemetry onRemoteJoined={onRemoteJoined} />
         <UnifiedCallView
           participantName={participantName}
           onDisconnect={onDisconnect}

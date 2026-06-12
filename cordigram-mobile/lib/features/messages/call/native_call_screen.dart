@@ -245,7 +245,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
 
     VideoTrack? localPip;
     if (remote != null && local != null) {
-      localPip = _ParticipantTile.pickLocalCameraVideo(local!, camOn: _camEnabled);
+      localPip = _ParticipantTile.pickLocalCameraVideo(local, camOn: _camEnabled);
     }
 
     mgr.setMinimizedPipVideoTracks(
@@ -566,6 +566,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     _roomDisconnectPending = null;
     if (!_hangupCalled) {
       _hangupCalled = true;
+      unawaited(widget.onHangup());
       unawaited(_roomListener?.dispose());
       unawaited(_room?.disconnect());
     }
@@ -776,7 +777,7 @@ class _RemoteCallPlaceholder extends StatelessWidget {
             radius: 56,
             backgroundColor: const Color(0xFF1B2A4A),
             backgroundImage:
-                (url != null && url.isNotEmpty) ? NetworkImage(url!) : null,
+                (url != null && url.isNotEmpty) ? NetworkImage(url) : null,
             onBackgroundImageError: (_, __) {},
             child: (url == null || url.isEmpty)
                 ? Text(
@@ -890,7 +891,7 @@ class _VideoCallBody extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: _CompactSelfPip(
-                local: local as LocalParticipant,
+                local: local,
                 nameHint: localDisplayName,
                 micOn: localMicOn,
                 camOn: localCamOn,
@@ -940,11 +941,11 @@ class _CompactSelfPip extends StatelessWidget {
       );
     }
 
-    final fromRoom = local.name?.trim();
-    final identity = local.identity?.trim();
-    final name = (fromRoom != null && fromRoom.isNotEmpty)
+    final fromRoom = local.name.trim();
+    final identity = local.identity.trim();
+    final name = fromRoom.isNotEmpty
         ? fromRoom
-        : (identity != null && identity.isNotEmpty)
+        : identity.isNotEmpty
             ? identity
             : (nameHint?.trim().isNotEmpty == true ? nameHint!.trim() : 'Bạn');
     final initial =

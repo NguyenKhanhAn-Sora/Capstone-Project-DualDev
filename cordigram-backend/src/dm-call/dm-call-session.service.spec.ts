@@ -158,4 +158,30 @@ describe('DmCallSessionService (in-memory)', () => {
     expect(duplicate.ok).toBe(false);
     if (!duplicate.ok) expect(duplicate.code).toBe('already_in_call');
   });
+
+  it('rejects markAnswered from caller (only callee may answer)', async () => {
+    const noop = () => undefined;
+    await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'audio',
+      initiatorSocketId: 'sock-1',
+      onRingTimeout: noop,
+    });
+
+    const spoof = await service.markAnswered({
+      userId: 'user-a',
+      callerId: 'user-b',
+      answeringSocketId: 'sock-caller',
+    });
+    expect(spoof).toBeNull();
+
+    const legit = await service.markAnswered({
+      userId: 'user-b',
+      callerId: 'user-a',
+      answeringSocketId: 'sock-callee',
+    });
+    expect(legit).not.toBeNull();
+    expect(legit?.state).toBe('connected');
+  });
 });

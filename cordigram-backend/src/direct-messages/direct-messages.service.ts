@@ -209,7 +209,14 @@ export class DirectMessagesService {
       resolvedServerStickerId = resolved.serverStickerId;
     }
 
-    // Pre-fetch link previews for plain-text messages only (skip media/call/voice)
+    const rawType = createDirectMessageDto.type as string | undefined;
+    if (rawType === 'call') {
+      throw new ForbiddenException(
+        'Call logs can only be created by the server',
+      );
+    }
+
+    // Pre-fetch link previews for plain-text messages only (skip media/voice)
     const msgType = createDirectMessageDto.type || 'text';
     const linkPreviews =
       msgType === 'text' && createDirectMessageDto.content

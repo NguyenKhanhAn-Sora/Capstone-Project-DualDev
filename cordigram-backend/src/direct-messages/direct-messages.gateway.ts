@@ -16,6 +16,7 @@ import { Model } from 'mongoose';
 import { Profile } from '../profiles/profile.schema';
 import { User } from '../users/user.schema';
 import { FcmPushService } from '../notifications/fcm-push.service';
+import { BlocksService } from '../users/blocks.service';
 import { DmCallSessionService } from '../dm-call/dm-call-session.service';
 import {
   DmCallClientPlatform,
@@ -52,7 +53,7 @@ export class DirectMessagesGateway
   private emitCallBusy(
     socket: Socket,
     payload: {
-      code: 'already_in_call' | 'peer_busy' | 'user_busy';
+      code: 'already_in_call' | 'peer_busy' | 'user_busy' | 'blocked';
       receiverId?: string;
       peerId?: string;
     },
@@ -483,6 +484,7 @@ export class DirectMessagesGateway
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(User.name) private userModel: Model<User>,
     private readonly fcmPushService: FcmPushService,
+    private readonly blocksService: BlocksService,
     private readonly dmCallSessions: DmCallSessionService,
   ) {}
 
@@ -898,6 +900,16 @@ export class DirectMessagesGateway
         return;
       }
 
+      if (
+        await this.blocksService.isBlockedEither(senderId, data.receiverId)
+      ) {
+        this.emitCallBusy(socket, {
+          code: 'blocked',
+          receiverId: data.receiverId,
+        });
+        return;
+      }
+
       const outcome = await this.dmCallSessions.tryInitiate({
         initiatorId: senderId,
         calleeId: data.receiverId,
@@ -980,11 +992,15 @@ export class DirectMessagesGateway
       roomId,
     });
 
+    if (!session) {
+      return;
+    }
+
     const answerPayload = {
       from: userId,
       sdpOffer: data.sdpOffer,
-      callId: session?.callId,
-      type: session?.type,
+      callId: session.callId,
+      type: session.type,
     };
 
     this.emitToAllUserSockets(data.callerId, 'call-answer', answerPayload);

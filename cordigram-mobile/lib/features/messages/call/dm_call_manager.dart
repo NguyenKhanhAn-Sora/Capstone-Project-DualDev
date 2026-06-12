@@ -41,6 +41,7 @@ class DmCallManager extends ChangeNotifier {
   StreamSubscription<String>? _endedSub;
   StreamSubscription<DmCallBusyEvent>? _busySub;
   StreamSubscription<DmCallIncomingDismissEvent>? _dismissSub;
+  StreamSubscription<List<DmCallSessionSyncItem>>? _sessionsSyncSub;
   Timer? _callHeartbeatTimer;
   final Map<String, String> _callIdsByPeer = {};
   String? _focusedPeerUserId;
@@ -245,16 +246,107 @@ class DmCallManager extends ChangeNotifier {
       _dismissSub = DirectMessagesRealtimeService.callIncomingDismiss
           .listen(_onIncomingDismiss);
     }
+    if (_sessionsSyncSub == null) {
+      _sessionsSyncSub = DirectMessagesRealtimeService.callSessionsSync
+          .listen(_onCallSessionsSync);
+    }
+  }
+
+  void _dismissActiveCallRoutes() {
+    final navigator = _navigatorKey?.currentState;
+    if (navigator != null) {
+      navigator.popUntil((route) {
+        final name = route.settings.name ?? '';
+        return !name.startsWith(activeCallRouteName);
+      });
+    }
+    _openCallRoutes.clear();
+  }
+
+  void _onCallSessionsSync(List<DmCallSessionSyncItem> sessions) {
+    const activeStates = {
+      'ringing',
+      'connecting',
+      'connected',
+      'reconnecting',
+    };
+
+    final ringingCalleePeers = sessions
+        .where((s) => s.role == 'callee' && s.state == 'ringing')
+        .map((s) => s.peerId)
+        .toSet();
+    if (_incoming != null &&
+        !ringingCalleePeers.contains(_incoming!.callerUserId)) {
+      _incomingTimer?.cancel();
+      _incoming = null;
+    }
+
+    var outgoingChanged = false;
+    for (final peer in _outgoings.keys.toList()) {
+      final hasSession = sessions.any(
+        (s) =>
+            s.peerId == peer &&
+            (s.state == 'ringing' ||
+                s.state == 'connected' ||
+                s.state == 'connecting'),
+      );
+      if (!hasSession) {
+        _cancelOutgoingFor(peer, notify: false);
+        outgoingChanged = true;
+      }
+    }
+
+    var activeChanged = false;
+    for (final peer in _actives.keys.toList()) {
+      DmCallSessionSyncItem? match;
+      for (final session in sessions) {
+        if (session.peerId == peer && activeStates.contains(session.state)) {
+          match = session;
+          break;
+        }
+      }
+      if (match == null) {
+        _stopCallHeartbeatForPeer(peer);
+        _actives.remove(peer);
+        _openCallRoutes.remove(peer);
+        activeChanged = true;
+        continue;
+      }
+      if (match.callId.isNotEmpty) {
+        _startCallHeartbeat(match.callId, peer);
+      }
+    }
+
+    if (_actives.isEmpty) {
+      _focusedPeerUserId = null;
+      _activeCallStartedAt = null;
+      clearMinimizedPipVideoTracks();
+      _isCallMinimized = false;
+      _miniCallTuckedToCorner = false;
+    } else if (_focusedPeerUserId == null ||
+        !_actives.containsKey(_focusedPeerUserId)) {
+      _focusedPeerUserId = _actives.keys.first;
+      _activeCallStartedAt = _actives[_focusedPeerUserId!]?.startedAt;
+    }
+
+    if (outgoingChanged || activeChanged) {
+      notifyListeners();
+    } else if (_incoming == null && ringingCalleePeers.isEmpty) {
+      // no-op
+    }
   }
 
   Future<void> onAuthChanged() async {
     if (!_initialized) return;
     _stopAllCallHeartbeats();
+    _dismissActiveCallRoutes();
     if (VoiceChannelSessionController.instance.active) {
       await VoiceChannelSessionController.instance.leave();
     }
     await _dismissSub?.cancel();
     _dismissSub = null;
+    await _sessionsSyncSub?.cancel();
+    _sessionsSyncSub = null;
     await _callSub?.cancel();
     _callSub = null;
     await _endedSub?.cancel();
@@ -387,7 +479,10 @@ class DmCallManager extends ChangeNotifier {
 
   void cancelOutgoingFor(String peerUserId) {
     if (!_outgoings.containsKey(peerUserId)) return;
-    DirectMessagesRealtimeService.endCall(peerUserId);
+    DirectMessagesRealtimeService.endCall(
+      peerUserId,
+      status: 'cancelled',
+    );
     _cancelOutgoingFor(peerUserId);
   }
 
@@ -468,7 +563,18 @@ class DmCallManager extends ChangeNotifier {
         (_actives.isEmpty ? null : _actives.keys.first);
     if (peer == null || !_actives.containsKey(peer)) return;
     _stopCallHeartbeatForPeer(peer);
-    DirectMessagesRealtimeService.endCall(peer);
+    final act = _actives[peer];
+    final startedAt = act?.startedAt ?? _activeCallStartedAt;
+    int? durationSec;
+    if (startedAt != null) {
+      durationSec = DateTime.now().difference(startedAt).inSeconds;
+      if (durationSec < 1) durationSec = 1;
+    }
+    DirectMessagesRealtimeService.endCall(
+      peer,
+      status: 'completed',
+      durationSec: durationSec,
+    );
     _actives.remove(peer);
     _openCallRoutes.remove(peer);
     if (_focusedPeerUserId == peer) {
@@ -481,8 +587,9 @@ class DmCallManager extends ChangeNotifier {
       _activeSoundEnabled = true;
       _setMicEnabledDelegate = null;
       _setSoundEnabledDelegate = null;
-      _activeCallStartedAt =
-          _actives.isEmpty ? null : DateTime.now();
+      _activeCallStartedAt = _focusedPeerUserId == null
+          ? null
+          : _actives[_focusedPeerUserId!]?.startedAt;
     }
     notifyListeners();
   }
@@ -669,6 +776,10 @@ class DmCallManager extends ChangeNotifier {
       _showSnack('Người dùng này đang bận cuộc gọi khác.');
       return;
     }
+    if (event.code == 'blocked') {
+      _showSnack('Không thể gọi người dùng này.');
+      return;
+    }
     _showSnack('Không thể bắt đầu cuộc gọi. Vui lòng thử lại.');
   }
 
@@ -744,8 +855,9 @@ class DmCallManager extends ChangeNotifier {
         _activeSoundEnabled = true;
         _setMicEnabledDelegate = null;
         _setSoundEnabledDelegate = null;
-        _activeCallStartedAt =
-            _actives.isEmpty ? null : DateTime.now();
+        _activeCallStartedAt = _focusedPeerUserId == null
+            ? null
+            : _actives[_focusedPeerUserId!]?.startedAt;
       }
       changed = true;
     }
@@ -765,14 +877,16 @@ class DmCallManager extends ChangeNotifier {
     String? callId,
   }) {
     _focusedPeerUserId = peerUserId;
+    final startedAt = DateTime.now();
     _actives[peerUserId] = ActiveCallState(
       session: session,
       peerUserId: peerUserId,
       peerName: peerName,
       peerAvatarUrl: peerAvatarUrl,
       video: video,
+      startedAt: startedAt,
     );
-    _activeCallStartedAt = DateTime.now();
+    _activeCallStartedAt = startedAt;
     if (_actives.length == 1) {
       clearMinimizedPipVideoTracks();
       _isCallMinimized = false;
@@ -964,6 +1078,7 @@ class ActiveCallState {
     required this.peerName,
     required this.peerAvatarUrl,
     required this.video,
+    required this.startedAt,
   });
 
   final CallSession session;
@@ -971,4 +1086,5 @@ class ActiveCallState {
   final String peerName;
   final String? peerAvatarUrl;
   final bool video;
+  final DateTime startedAt;
 }
