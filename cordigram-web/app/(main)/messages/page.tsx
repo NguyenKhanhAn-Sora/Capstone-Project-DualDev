@@ -22,7 +22,6 @@ import {
   type DirectMessage,
 } from "@/hooks/use-direct-messages";
 import {
-  isCallAnswerEvent,
   isCallRejectedEvent,
   isIceCandidateEvent,
   isIncomingRingEvent,
@@ -37,6 +36,7 @@ import {
 } from "@/lib/call-tab-coordination";
 import {
   addActiveDmCallPeer,
+  getActiveDmCallPeerIds,
   isInActiveDmCall,
   removeActiveDmCallPeer,
 } from "@/lib/dm-call-active-peers";
@@ -2056,6 +2056,7 @@ export default function MessagesPage() {
   const outgoingCallsByPeerRef = useRef(outgoingCallsByPeer);
   const callIdsByPeerRef = useRef<Record<string, string>>({});
   const openedCallTabPeersRef = useRef<Set<string>>(new Set());
+  const openingCallTabForPeerRef = useRef<Set<string>>(new Set());
   const callTabIdRef = useRef<string>("");
   if (!callTabIdRef.current && typeof window !== "undefined") {
     callTabIdRef.current = getCallTabId();
@@ -2070,6 +2071,21 @@ export default function MessagesPage() {
       return next;
     });
   }, []);
+  const isCallTabActiveForPeer = useCallback((peerId: string) => {
+    return (
+      openedCallTabPeersRef.current.has(peerId) ||
+      getActiveDmCallPeerIds().includes(peerId)
+    );
+  }, []);
+  const maybeShowPopupBlockedToast = useCallback(
+    (peerId: string) => {
+      if (isCallTabActiveForPeer(peerId)) return;
+      showTransientError(
+        "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi nhấn Tham gia.",
+      );
+    },
+    [isCallTabActiveForPeer, showTransientError],
+  );
   const markCallTabOpen = useCallback((peerId: string, callId?: string) => {
     openedCallTabPeersRef.current.add(peerId);
     addActiveDmCallPeer(peerId);
@@ -2732,9 +2748,10 @@ export default function MessagesPage() {
 
       try {
         const callUrl = buildCallUrl(peerId, roomName, callType, callId);
-        const win = window.open(callUrl, "_blank", "noopener,noreferrer");
+        const callWindowName = `cordigram-dm-call-${peerId}`;
+        const win = window.open(callUrl, callWindowName, "noopener,noreferrer");
         if (!win) {
-          return false;
+          return isCallTabActiveForPeer(peerId);
         }
         markCallTabOpen(peerId, callId);
         dismissOutgoingCallPopup(peerId);
@@ -2750,6 +2767,7 @@ export default function MessagesPage() {
       buildCallUrl,
       markCallTabOpen,
       dismissOutgoingCallPopup,
+      isCallTabActiveForPeer,
     ],
   );
 
@@ -2781,6 +2799,11 @@ export default function MessagesPage() {
       const roomName = roomNameOverride || outgoing?.roomName;
       if (!roomName) return;
 
+      if (isCallTabActiveForPeer(peerId)) {
+        dismissOutgoingCallPopup(peerId);
+        return;
+      }
+
       if (callId) {
         callIdsByPeerRef.current[peerId] = callId;
       }
@@ -2791,15 +2814,27 @@ export default function MessagesPage() {
       }
 
       markOutgoingAnswered(peerId, roomName, callId);
-      showTransientError(
-        "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi nhấn Tham gia.",
-      );
+      maybeShowPopupBlockedToast(peerId);
     },
-    [markOutgoingAnswered, openCallTabForPeer, showTransientError],
+    [
+      markOutgoingAnswered,
+      openCallTabForPeer,
+      dismissOutgoingCallPopup,
+      isCallTabActiveForPeer,
+      maybeShowPopupBlockedToast,
+    ],
   );
 
   const handlePeerAnsweredCall = useCallback(
     (peerId: string, roomFromAnswer?: string, callId?: string) => {
+      if (isCallTabActiveForPeer(peerId)) {
+        dismissOutgoingCallPopup(peerId);
+        return;
+      }
+      if (openingCallTabForPeerRef.current.has(peerId)) {
+        return;
+      }
+
       const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
       if (!hasOutgoing && !roomFromAnswer) return;
 
@@ -2822,19 +2857,28 @@ export default function MessagesPage() {
         }
       }
 
-      const opened = openCallTabForPeer(peerId, roomFromAnswer);
-      if (opened) {
-        return;
-      }
+      openingCallTabForPeerRef.current.add(peerId);
+      try {
+        const opened = openCallTabForPeer(peerId, roomFromAnswer);
+        if (opened) {
+          return;
+        }
 
-      if (hasOutgoing) {
-        markOutgoingAnswered(peerId, roomFromAnswer, callId);
-        showTransientError(
-          "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi nhấn Tham gia.",
-        );
+        if (hasOutgoing) {
+          markOutgoingAnswered(peerId, roomFromAnswer, callId);
+          maybeShowPopupBlockedToast(peerId);
+        }
+      } finally {
+        openingCallTabForPeerRef.current.delete(peerId);
       }
     },
-    [markOutgoingAnswered, openCallTabForPeer, showTransientError],
+    [
+      markOutgoingAnswered,
+      openCallTabForPeer,
+      dismissOutgoingCallPopup,
+      isCallTabActiveForPeer,
+      maybeShowPopupBlockedToast,
+    ],
   );
 
   // ✅ Accept incoming call — notify caller and open dedicated /call tab
@@ -3040,28 +3084,10 @@ export default function MessagesPage() {
       return;
     }
 
-    // Call answered - open tab for caller.
-    //
-    // The `from === outgoingCall.to` guard is load-bearing: without it, a
-    // stale `answer` callEvent from a previous session (e.g. user logged
-    // out and back in, or called a different person earlier) would
-    // re-fire here the moment the user sets up a NEW outgoingCall and
-    // auto-open a call tab, skipping the accept/reject step entirely.
-    if (isCallAnswerEvent(callEvent)) {
-      const peerId = String(callEvent.from);
-      const roomFromAnswer =
-        typeof callEvent.sdpOffer === "object" &&
-        callEvent.sdpOffer != null &&
-        typeof (callEvent.sdpOffer as { roomName?: string }).roomName === "string"
-          ? String((callEvent.sdpOffer as { roomName: string }).roomName)
-          : undefined;
-      const callId =
-        typeof callEvent.callId === "string" ? callEvent.callId : undefined;
-      handlePeerAnsweredCall(peerId, roomFromAnswer, callId);
-      return;
-    }
+    // Call answered is handled via DM_CALL_ANSWER_EVENT (see effect below) to
+    // avoid duplicate window.open attempts that trigger false popup-block toasts.
     // Do NOT list incomingCall in deps — setIncomingCall updates it and would retrigger this effect forever.
-  }, [callEvent, handlePeerAnsweredCall, rejectCall]);
+  }, [callEvent, rejectCall]);
 
   // Open caller tab immediately on call-answer (bypasses React state batching / short TTL).
   useEffect(() => {
@@ -3236,12 +3262,12 @@ export default function MessagesPage() {
       }
       const peerId = session.peerId;
       dismissOutgoingCallPopup(peerId);
+      if (isCallTabActiveForPeer(peerId)) {
+        continue;
+      }
       const out = outgoingCallsByPeerRef.current[peerId];
       if (!out) continue;
-      if (
-        out.status === "calling" ||
-        (out.status === "answered" && !openedCallTabPeersRef.current.has(peerId))
-      ) {
+      if (out.status === "calling" || out.status === "answered") {
         handlePeerAnsweredCall(peerId, session.roomId, session.callId);
       }
     }
@@ -3263,7 +3289,7 @@ export default function MessagesPage() {
       }
       return prev;
     });
-  }, [callSessionsSync, handlePeerAnsweredCall, dismissOutgoingCallPopup]);
+  }, [callSessionsSync, handlePeerAnsweredCall, dismissOutgoingCallPopup, isCallTabActiveForPeer]);
 
   // ✅ Listen for the call tab telling us the user ended the call.
   //
