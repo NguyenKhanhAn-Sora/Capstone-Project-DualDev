@@ -33,9 +33,13 @@ export interface ChannelReactionUpdateEvent {
 export interface ChannelNotificationEvent {
   type?: string;
   serverId?: string;
+  serverName?: string;
   channelId?: string;
+  channelName?: string;
   messageId?: string;
   senderName?: string;
+  senderAvatarUrl?: string | null;
+  serverAvatarUrl?: string | null;
   excerpt?: string;
   isMention?: boolean;
   createdAt?: string;

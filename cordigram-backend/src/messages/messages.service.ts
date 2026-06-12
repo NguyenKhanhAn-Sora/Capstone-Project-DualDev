@@ -1070,6 +1070,7 @@ export class MessagesService {
   ): Promise<{
     serverId: string;
     serverName: string;
+    serverAvatarUrl: string | null;
     channelName: string;
     defaultNotificationLevel: 'all' | 'mentions';
     memberUserIds: string[];
@@ -1080,7 +1081,7 @@ export class MessagesService {
 
     const server = await this.serverModel
       .findById(channel.serverId)
-      .select('name members interactionSettings')
+      .select('name avatarUrl members interactionSettings')
       .lean()
       .exec();
     if (!server) return null;
@@ -1098,6 +1099,7 @@ export class MessagesService {
     return {
       serverId: (server as any)._id.toString(),
       serverName: (server as any).name,
+      serverAvatarUrl: (server as any).avatarUrl ?? null,
       channelName: channel.name,
       defaultNotificationLevel: level,
       memberUserIds,

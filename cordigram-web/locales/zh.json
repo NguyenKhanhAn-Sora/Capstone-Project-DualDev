@@ -1894,8 +1894,10 @@
       "desktopDeniedToast": "浏览器已阻止桌面通知，请在浏览器设置中允许。",
       "desktopDisabledToast": "已关闭桌面通知。",
       "desktopEventTitle": "新活动：{topic}",
-      "desktopEventBody": "{server}",
-      "desktopRoleBody": "来自 {server} 的通知"
+      "desktopEventTitleLine": "新活动 · {server}",
+      "desktopEventBody": "开始时间 {when}",
+      "desktopRoleBody": "来自 {server} 的通知",
+      "desktopRoleTitleLine": "通知 · {server}"
     },
     "profile": {
       "title": "个人资料",

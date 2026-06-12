@@ -83,6 +83,7 @@ export class MessagesController {
 
       const senderName =
         message.senderId?.displayName ?? message.senderId?.username ?? 'Ai đó';
+      const senderAvatarUrl = message.senderId?.avatarUrl ?? null;
 
       const mentionSet = new Set(ctx.mentionedUserIds);
 
@@ -99,10 +100,12 @@ export class MessagesController {
         type: 'channel_message' as const,
         serverId: ctx.serverId,
         serverName: ctx.serverName,
+        serverAvatarUrl: ctx.serverAvatarUrl,
         channelId,
         channelName: ctx.channelName,
         messageId: message._id?.toString?.() ?? '',
         senderName,
+        senderAvatarUrl,
         excerpt: (message.content ?? '').slice(0, 200),
         isMention: mentionSet.has(userId),
         createdAt: message.createdAt ?? new Date().toISOString(),

@@ -147,8 +147,10 @@ import {
   isMessagesDesktopNotificationsEnabled,
   requestDesktopNotificationPermission,
   showInboxForYouDesktopNotification,
+  showMentionDesktopNotification,
   type MessagesDesktopNotificationCopy,
 } from "@/lib/messages-desktop-notifications";
+import MessagesDesktopNotificationHost from "@/components/MessagesDesktopNotification/MessagesDesktopNotificationHost";
 import { normalizeServerBanner } from "@/lib/server-banner";
 import type { VoiceChannelCallProps } from "@/components/VoiceChannelCall";
 import ChannelUserProfileRoot, {
@@ -2320,25 +2322,82 @@ export default function MessagesPage() {
     if (!channelNotification) return;
     setHasInboxNotification(true);
     scheduleInboxDotRefresh();
+
+    const desktopEnabled = isMessagesDesktopNotificationsEnabled(chatUserSettings);
+    if (
+      desktopEnabled &&
+      channelNotification.isMention === true &&
+      channelNotification.messageId &&
+      channelNotification.serverId &&
+      channelNotification.channelId
+    ) {
+      const viewingSameChannel =
+        typeof document !== "undefined" &&
+        document.hasFocus() &&
+        selectedServerRef.current === channelNotification.serverId &&
+        selectedChannelRef.current === channelNotification.channelId;
+
+      if (!viewingSameChannel) {
+        showMentionDesktopNotification({
+          messageId: channelNotification.messageId,
+          senderName: channelNotification.senderName || "Ai đó",
+          channelName: channelNotification.channelName || "general",
+          serverName: channelNotification.serverName || "Máy chủ",
+          excerpt: channelNotification.excerpt || "",
+          senderAvatarUrl: channelNotification.senderAvatarUrl,
+          enabled: desktopEnabled,
+          onNavigate: () => {
+            router.push(
+              `/messages?server=${channelNotification.serverId}&channel=${channelNotification.channelId}`,
+            );
+          },
+        });
+      }
+    }
+
     clearChannelNotification();
-  }, [channelNotification, clearChannelNotification, scheduleInboxDotRefresh]);
+  }, [
+    channelNotification,
+    clearChannelNotification,
+    scheduleInboxDotRefresh,
+    chatUserSettings,
+    router,
+  ]);
 
   const inboxDesktopCopy = useMemo<MessagesDesktopNotificationCopy>(
     () => ({
-      eventTitle: (topic) =>
-        t("settings.notifications.desktopEventTitle").replace("{topic}", topic),
-      eventBody: (serverName) =>
-        t("settings.notifications.desktopEventBody").replace("{server}", serverName),
-      roleTitle: (title) => title,
-      roleBody: (serverName, excerpt) => {
-        const base = t("settings.notifications.desktopRoleBody").replace(
+      eventTitleLine: (topic, serverName) =>
+        t("settings.notifications.desktopEventTitleLine")
+          .replace("{topic}", topic)
+          .replace("{server}", serverName),
+      eventBody: (topic, startAt) => {
+        if (!startAt) return topic;
+        try {
+          const when = new Date(startAt).toLocaleString(
+            localeTagForLanguage(language),
+            { dateStyle: "medium", timeStyle: "short" },
+          );
+          return t("settings.notifications.desktopEventBody").replace(
+            "{when}",
+            when,
+          );
+        } catch {
+          return topic;
+        }
+      },
+      roleTitleLine: (serverName) =>
+        t("settings.notifications.desktopRoleTitleLine").replace(
           "{server}",
           serverName,
-        );
-        return excerpt ? `${base} — ${excerpt}` : base;
+        ),
+      roleBody: (title, content) => {
+        const excerpt = content.trim().slice(0, 240);
+        return excerpt ? `${title}\n${excerpt}` : title;
       },
+      mentionTitleLine: (senderName, channelName, serverName) =>
+        `${senderName} (#${channelName}, ${serverName})`,
     }),
-    [t],
+    [t, language],
   );
 
   // Realtime: server event / role notification → inbox dot + OS desktop notification (messages only).
@@ -2350,7 +2409,6 @@ export default function MessagesPage() {
       item: inboxForYouItem,
       copy: inboxDesktopCopy,
       enabled: isMessagesDesktopNotificationsEnabled(chatUserSettings),
-      iconUrl: inboxForYouItem.serverAvatarUrl,
       onNavigate: (item) => {
         if (item.type === "event") {
           router.push(`/messages?server=${item.serverId}&event=${item._id}`);
@@ -14133,6 +14191,8 @@ export default function MessagesPage() {
           </div>
         </div>
       )}
+
+      <MessagesDesktopNotificationHost />
 
       {/* Toast Notification */}
       {toastMessage && (

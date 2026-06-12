@@ -1894,8 +1894,10 @@
       "desktopDeniedToast": "Your browser blocked desktop notifications. Enable them in browser settings.",
       "desktopDisabledToast": "Desktop notifications disabled.",
       "desktopEventTitle": "New event: {topic}",
-      "desktopEventBody": "{server}",
-      "desktopRoleBody": "Announcement from {server}"
+      "desktopEventTitleLine": "New event · {server}",
+      "desktopEventBody": "Starts {when}",
+      "desktopRoleBody": "Announcement from {server}",
+      "desktopRoleTitleLine": "Announcement · {server}"
     },
     "profile": {
       "title": "Profile",

@@ -1894,8 +1894,10 @@
       "desktopDeniedToast": "ブラウザがデスクトップ通知をブロックしました。ブラウザ設定で許可してください。",
       "desktopDisabledToast": "デスクトップ通知を無効にしました。",
       "desktopEventTitle": "新しいイベント: {topic}",
-      "desktopEventBody": "{server}",
-      "desktopRoleBody": "{server} からのお知らせ"
+      "desktopEventTitleLine": "新しいイベント · {server}",
+      "desktopEventBody": "開始 {when}",
+      "desktopRoleBody": "{server} からのお知らせ",
+      "desktopRoleTitleLine": "お知らせ · {server}"
     },
     "profile": {
       "title": "プロフィール",

@@ -1892,8 +1892,10 @@
       "desktopDeniedToast": "Trình duyệt đã chặn thông báo desktop. Hãy bật lại trong cài đặt trình duyệt.",
       "desktopDisabledToast": "Đã tắt thông báo desktop.",
       "desktopEventTitle": "Sự kiện mới: {topic}",
-      "desktopEventBody": "{server}",
-      "desktopRoleBody": "Thông báo từ {server}"
+      "desktopEventTitleLine": "Sự kiện mới · {server}",
+      "desktopEventBody": "Bắt đầu {when}",
+      "desktopRoleBody": "Thông báo từ {server}",
+      "desktopRoleTitleLine": "Thông báo · {server}"
     },
     "profile": {
       "title": "Hồ sơ",
