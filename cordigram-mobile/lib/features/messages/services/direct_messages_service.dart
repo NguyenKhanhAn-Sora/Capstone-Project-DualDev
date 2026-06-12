@@ -1,14 +1,38 @@
+import 'dart:async';
 import 'dart:convert';
 
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
 import '../models/dm_conversation.dart';
 import '../models/dm_message.dart';
+import 'dm_mute_prefs_store.dart';
 
 class DirectMessagesService {
   DirectMessagesService._();
   static final Map<String, DateTime?> _dmMutedUntil = {};
   static final Set<String> _dmMutedForever = {};
+
+  static void applyMutedState({
+    required Map<String, DateTime?> mutedUntil,
+    required Set<String> mutedForever,
+  }) {
+    _dmMutedUntil
+      ..clear()
+      ..addAll(mutedUntil);
+    _dmMutedForever
+      ..clear()
+      ..addAll(mutedForever);
+  }
+
+  static Future<void> hydrateConversationMutes() async {
+    final uid = currentUserId;
+    if (uid == null || uid.isEmpty) return;
+    final loaded = await DmMutePrefsStore.loadForUser(uid);
+    applyMutedState(
+      mutedUntil: loaded.mutedUntil,
+      mutedForever: loaded.mutedForever,
+    );
+  }
 
   static Future<Map<String, dynamic>> getMyMessagingProfile() async {
     try {
@@ -70,18 +94,30 @@ class DirectMessagesService {
     bool forever = false,
   }) {
     if (peerUserId.trim().isEmpty) return;
+    String? mutedUntilIso;
     if (forever) {
       _dmMutedForever.add(peerUserId);
       _dmMutedUntil.remove(peerUserId);
-      return;
-    }
-    if (duration == null) {
+    } else if (duration == null) {
       _dmMutedForever.remove(peerUserId);
       _dmMutedUntil.remove(peerUserId);
-      return;
+    } else {
+      _dmMutedForever.remove(peerUserId);
+      final until = DateTime.now().add(duration);
+      _dmMutedUntil[peerUserId] = until;
+      mutedUntilIso = until.toIso8601String();
     }
-    _dmMutedForever.remove(peerUserId);
-    _dmMutedUntil[peerUserId] = DateTime.now().add(duration);
+
+    final uid = currentUserId;
+    if (uid == null || uid.isEmpty) return;
+    unawaited(
+      DmMutePrefsStore.persistPeer(
+        userId: uid,
+        peerUserId: peerUserId,
+        mutedUntilIso: mutedUntilIso,
+        mutedForever: forever,
+      ),
+    );
   }
 
   static bool isConversationMuted(String peerUserId) {

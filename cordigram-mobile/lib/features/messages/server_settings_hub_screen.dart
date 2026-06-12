@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/services/language_controller.dart';
+import '../../core/theme/app_theme_context.dart';
+import 'widgets/messages_chrome_builder.dart';
 import 'models/server_models.dart';
 import 'models/server_permissions.dart';
 import 'server_members_screen.dart';
@@ -16,6 +18,7 @@ import 'server_settings/server_emoji_screen.dart';
 import 'server_settings/server_interaction_screen.dart';
 import 'server_settings/server_safety_screen.dart';
 import 'server_settings/server_sticker_screen.dart';
+import 'server_settings/server_settings_ui.dart';
 import 'server_settings_screen.dart';
 import 'utils/messages_navigator.dart';
 import 'services/servers_service.dart';
@@ -73,52 +76,50 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
 
   Future<void> _confirmDelete() async {
     if (!widget.isOwner) return;
+    final ui = ServerSettingsUi.of(context);
     final nameCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: const Color(0xFF152A52),
-        title: Text(
-          'Xóa “${_server.name}”?',
-          style: const TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Hành động này không thể hoàn tác. Nhập đúng tên máy chủ để xác nhận.',
-              style: TextStyle(color: Color(0xFFB8C8E8)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: nameCtrl,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Tên máy chủ',
-                hintStyle: const TextStyle(color: Color(0xFF6B7A99)),
-                filled: true,
-                fillColor: Color(0xFF0E1F45),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      builder: (c) {
+        final dui = ServerSettingsUi.of(c);
+        return AlertDialog(
+          backgroundColor: dui.card,
+          title: Text(
+            'Xóa “${_server.name}”?',
+            style: TextStyle(color: dui.text),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Hành động này không thể hoàn tác. Nhập đúng tên máy chủ để xác nhận.',
+                style: TextStyle(color: dui.textMuted),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                style: TextStyle(color: dui.text),
+                decoration: dui.fieldDecoration(hintText: 'Tên máy chủ'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Huỷ'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (nameCtrl.text.trim() == _server.name.trim()) {
+                  Navigator.pop(c, true);
+                }
+              },
+              child: Text('Xóa máy chủ', style: TextStyle(color: ui.destructive)),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Huỷ'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameCtrl.text.trim() == _server.name.trim()) {
-                Navigator.pop(c, true);
-              }
-            },
-            child: const Text('Xóa máy chủ', style: TextStyle(color: Color(0xFFFF6B7A))),
-          ),
-        ],
-      ),
+        );
+      },
     );
     nameCtrl.dispose();
     if (ok != true || !mounted) return;
@@ -217,14 +218,18 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
     final canManageRoles = canManageSettings;
     final canBan = widget.permissions.canBan || widget.isOwner;
 
-    return PopScope(
+    return MessagesChromeBuilder(
+      builder: (context, chrome) => PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         Navigator.of(context).pop(_server);
       },
       child: Scaffold(
+      backgroundColor: chrome.bg,
       appBar: AppBar(
+        backgroundColor: chrome.bg,
+        foregroundColor: chrome.text,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
@@ -235,7 +240,11 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
           children: [
             Text(
               _t('chat.serverSettings.ariaLabel'),
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: chrome.text,
+              ),
             ),
             Text(
               _server.name.toUpperCase(),
@@ -243,7 +252,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: chrome.textMuted,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -394,6 +403,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
           ],
         ],
       ),
+    ),
     ),
     );
   }

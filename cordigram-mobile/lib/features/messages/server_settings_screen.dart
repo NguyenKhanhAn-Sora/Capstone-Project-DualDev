@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'models/server_models.dart';
+import 'server_settings/server_settings_ui.dart';
 import 'services/messages_media_service.dart';
 import 'services/servers_service.dart';
 
@@ -30,9 +31,6 @@ const String kDefaultBannerColor =
 const Color kBannerPreviewFallback = Color(0xFF1A1D24);
 
 class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
-  static const Color _pageColor = Color(0xFF08183A);
-  static const Color _fieldFill = Color(0xFF152A52);
-
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final List<TextEditingController> _traitEmojiCtrls = [];
@@ -288,13 +286,8 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     }
   }
 
-  InputDecoration _dec(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-        filled: true,
-        fillColor: _fieldFill,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      );
+  InputDecoration _dec(ServerSettingsUi ui, String hint) =>
+      ui.fieldDecoration(hintText: hint);
 
   String _formatStatDate(dynamic v) {
     if (v == null) return '—';
@@ -308,6 +301,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
   }
 
   Widget _primaryButton({
+    required ServerSettingsUi ui,
     required String label,
     required VoidCallback? onPressed,
     bool loading = false,
@@ -315,30 +309,34 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     return FilledButton(
       onPressed: loading ? null : onPressed,
       style: FilledButton.styleFrom(
-        backgroundColor: const Color(0xFF5865F2),
-        foregroundColor: Colors.white,
+        backgroundColor: ui.accent,
+        foregroundColor: ui.onAccent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       child: loading
-          ? const SizedBox(
+          ? SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: ui.onAccent,
+              ),
             )
           : Text(label, textAlign: TextAlign.center),
     );
   }
 
   Widget _dangerButton({
+    required ServerSettingsUi ui,
     required String label,
     required VoidCallback? onPressed,
   }) {
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFFFF6B7A),
-        side: const BorderSide(color: Color(0xFFFF6B7A)),
+        foregroundColor: ui.destructive,
+        side: BorderSide(color: ui.destructive),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
@@ -346,12 +344,12 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     );
   }
 
-  Widget _sectionLabel(String t) => Padding(
+  Widget _sectionLabel(ServerSettingsUi ui, String t) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
           t,
-          style: const TextStyle(
-            color: Color(0xFF8EA3CC),
+          style: TextStyle(
+            color: ui.textMuted,
             fontWeight: FontWeight.w800,
             fontSize: 12,
             letterSpacing: 0.6,
@@ -361,33 +359,32 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final w = MediaQuery.sizeOf(context).width;
     final hPad = w > 520 ? 24.0 : 16.0;
 
     return Scaffold(
-      backgroundColor: _pageColor,
-      appBar: AppBar(
-        backgroundColor: _pageColor,
-        elevation: 0,
-        title: const Text(
-          'Hồ sơ máy chủ',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(
+        title: 'Hồ sơ máy chủ',
         actions: [
           if (!_loading && _canEdit)
             TextButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: ui.accent,
+                      ),
                     )
-                  : const Text(
+                  : Text(
                       'Lưu',
                       style: TextStyle(
-                        color: Color(0xFF7FB6FF),
+                        color: ui.accent,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -395,7 +392,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: ui.accent))
           : _loadError != null
               ? Center(
                   child: Padding(
@@ -403,7 +400,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                     child: Text(
                       _loadError!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFAFC0E2)),
+                      style: TextStyle(color: ui.textMuted),
                     ),
                   ),
                 )
@@ -412,36 +409,36 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                     return ListView(
                       padding: EdgeInsets.fromLTRB(hPad, 12, hPad, pad.bottom + 32),
                       children: [
-                        _previewCard(w),
+                        _previewCard(ui, w),
                         const SizedBox(height: 16),
                         if (_stats != null)
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: _fieldFill,
+                              color: ui.fieldFill,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               'Thành viên: ${_stats!['memberCount'] ?? 0} | '
                               'Ngày thành lập: ${_formatStatDate(_stats!['createdAt'])}',
-                              style: const TextStyle(
-                                color: Color(0xFF8EA3CC),
+                              style: TextStyle(
+                                color: ui.textMuted,
                                 fontSize: 13,
                               ),
                             ),
                           ),
                         if (_stats != null) const SizedBox(height: 16),
-                        _sectionLabel('TÊN'),
+                        _sectionLabel(ui, 'TÊN'),
                         TextField(
                           controller: _nameCtrl,
                           readOnly: !_canEdit,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _dec('Tên máy chủ'),
+                          style: TextStyle(color: ui.text),
+                          decoration: _dec(ui, 'Tên máy chủ'),
                           onChanged: (_) => setState(() {}),
                         ),
                         const SizedBox(height: 20),
-                        _sectionLabel('BIỂU TƯỢNG'),
+                        _sectionLabel(ui, 'BIỂU TƯỢNG'),
                         LayoutBuilder(
                           builder: (context, c) {
                             final narrow = c.maxWidth < 360;
@@ -450,12 +447,14 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   _primaryButton(
+                                    ui: ui,
                                     label: 'Thay đổi biểu tượng máy chủ',
                                     onPressed: _canEdit ? _pickAvatar : null,
                                     loading: _uploadingAvatar,
                                   ),
                                   const SizedBox(height: 10),
                                   _dangerButton(
+                                    ui: ui,
                                     label: 'Xóa biểu tượng',
                                     onPressed: _canEdit && _avatarUrl.isNotEmpty
                                         ? _removeAvatar
@@ -468,6 +467,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                               children: [
                                 Expanded(
                                   child: _primaryButton(
+                                    ui: ui,
                                     label: 'Thay đổi biểu tượng máy chủ',
                                     onPressed: _canEdit ? _pickAvatar : null,
                                     loading: _uploadingAvatar,
@@ -476,6 +476,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: _dangerButton(
+                                    ui: ui,
                                     label: 'Xóa biểu tượng',
                                     onPressed: _canEdit && _avatarUrl.isNotEmpty
                                         ? _removeAvatar
@@ -487,11 +488,15 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                           },
                         ),
                         const SizedBox(height: 20),
-                        _sectionLabel('BIỂU NGỮ'),
-                        const Text(
+                        _sectionLabel(ui, 'BIỂU NGỮ'),
+                        Text(
                           'Chọn màu nền cho card (khám phá, lời mời, đơn đăng ký). '
                           'Có thể thêm ảnh — ảnh được tối ưu khi tải lên trên web.',
-                          style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 13, height: 1.4),
+                          style: TextStyle(
+                            color: ui.textMuted,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         LayoutBuilder(
@@ -502,12 +507,14 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   _primaryButton(
+                                    ui: ui,
                                     label: 'Tải ảnh biểu ngữ',
                                     onPressed: _canEdit ? _pickBanner : null,
                                     loading: _uploadingBanner,
                                   ),
                                   const SizedBox(height: 10),
                                   _dangerButton(
+                                    ui: ui,
                                     label: 'Xóa ảnh biểu ngữ',
                                     onPressed: _canEdit &&
                                             _bannerImageUrl.isNotEmpty
@@ -521,6 +528,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                               children: [
                                 Expanded(
                                   child: _primaryButton(
+                                    ui: ui,
                                     label: 'Tải ảnh biểu ngữ',
                                     onPressed: _canEdit ? _pickBanner : null,
                                     loading: _uploadingBanner,
@@ -529,6 +537,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: _dangerButton(
+                                    ui: ui,
                                     label: 'Xóa ảnh biểu ngữ',
                                     onPressed: _canEdit &&
                                             _bannerImageUrl.isNotEmpty
@@ -545,16 +554,16 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                           _bannerImageUrl.isEmpty
                               ? 'Nền mặc định từ máy chủ được giữ khi không có ảnh.'
                               : 'Ảnh biểu ngữ sẽ được lưu khi bạn nhấn Lưu.',
-                          style: const TextStyle(
-                            color: Color(0xFF6B7A99),
+                          style: TextStyle(
+                            color: ui.textMuted.withValues(alpha: 0.85),
                             fontSize: 12,
                           ),
                         ),
                         const SizedBox(height: 20),
-                        const Text(
+                        Text(
                           'ĐẶC ĐIỂM',
                           style: TextStyle(
-                            color: Color(0xFF8EA3CC),
+                            color: ui.textMuted,
                             fontWeight: FontWeight.w800,
                             fontSize: 12,
                             letterSpacing: 0.6,
@@ -563,7 +572,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                         const SizedBox(height: 4),
                         Text(
                           '$_traitsFilled/5 đặc điểm đã điền',
-                          style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+                          style: TextStyle(color: ui.textMuted, fontSize: 12),
                         ),
                         const SizedBox(height: 10),
                         for (var i = 0; i < 5; i++) ...[
@@ -576,8 +585,8 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                   controller: _traitEmojiCtrls[i],
                                   readOnly: !_canEdit,
                                   maxLength: 8,
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: _dec('🙂').copyWith(counterText: ''),
+                                  style: TextStyle(color: ui.text),
+                                  decoration: _dec(ui, '🙂').copyWith(counterText: ''),
                                   onChanged: (_) => setState(() {}),
                                 ),
                               ),
@@ -586,8 +595,8 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 child: TextField(
                                   controller: _traitTextCtrls[i],
                                   readOnly: !_canEdit,
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: _dec('Đặc điểm…'),
+                                  style: TextStyle(color: ui.text),
+                                  decoration: _dec(ui, 'Đặc điểm…'),
                                   onChanged: (_) => setState(() {}),
                                 ),
                               ),
@@ -596,10 +605,10 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                           const SizedBox(height: 8),
                         ],
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'MÔ TẢ',
                           style: TextStyle(
-                            color: Color(0xFF8EA3CC),
+                            color: ui.textMuted,
                             fontWeight: FontWeight.w800,
                             fontSize: 12,
                             letterSpacing: 0.6,
@@ -611,16 +620,20 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                           readOnly: !_canEdit,
                           minLines: 3,
                           maxLines: 8,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: ui.text),
                           decoration: _dec(
+                            ui,
                             'Hãy giới thiệu một chút về máy chủ này với thế giới.',
                           ),
                         ),
                         if (!_canEdit) ...[
                           const SizedBox(height: 20),
-                          const Text(
+                          Text(
                             'Bạn không có quyền chỉnh sửa hồ sơ máy chủ.',
-                            style: TextStyle(color: Color(0xFFFFB4B4), fontSize: 13),
+                            style: TextStyle(
+                              color: ui.destructive.withValues(alpha: 0.85),
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ],
@@ -630,7 +643,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     );
   }
 
-  Widget _previewCard(double screenW) {
+  Widget _previewCard(ServerSettingsUi ui, double screenW) {
     final bannerUrl = _bannerImageUrl.trim();
     final avatarUrl = _avatarUrl.trim();
     final name = _nameCtrl.text.trim().isEmpty
@@ -643,7 +656,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: _fieldFill,
+        color: ui.fieldFill,
         borderRadius: BorderRadius.circular(14),
       ),
       clipBehavior: Clip.antiAlias,
@@ -661,18 +674,20 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                           bannerUrl,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
-                            color: const Color(0xFF1A2238),
+                            color: kBannerPreviewFallback,
                             alignment: Alignment.center,
-                            child: const Icon(Icons.image_not_supported_outlined,
-                                color: Color(0xFF8EA3CC)),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              color: ui.textMuted,
+                            ),
                           ),
                         )
                       : Container(
                           color: kBannerPreviewFallback,
                           alignment: Alignment.center,
-                          child: const Icon(
+                          child: Icon(
                             Icons.image_outlined,
-                            color: Color(0xFF4A5568),
+                            color: ui.textMuted.withValues(alpha: 0.6),
                             size: 40,
                           ),
                         ),
@@ -682,14 +697,14 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                   bottom: -26,
                   child: CircleAvatar(
                     radius: 34,
-                    backgroundColor: const Color(0xFF152A52),
+                    backgroundColor: ui.fieldFill,
                     backgroundImage:
                         avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
                     child: avatarUrl.isEmpty
                         ? Text(
                             name.isNotEmpty ? name[0].toUpperCase() : '?',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: ui.text,
                               fontWeight: FontWeight.w800,
                               fontSize: 22,
                             ),
@@ -708,8 +723,8 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: ui.text,
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
                   ),
@@ -721,8 +736,8 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: desc.isEmpty
-                        ? const Color(0xFF6B7A99)
-                        : const Color(0xFFB8C8E8),
+                        ? ui.textMuted.withValues(alpha: 0.85)
+                        : ui.textMuted,
                     fontSize: 13,
                   ),
                 ),

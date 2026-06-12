@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/services/accent_color_controller.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_context.dart';
 import '../../core/theme/messages_chrome_palette.dart';
 import '../../core/services/language_controller.dart';
 import '../profile/services/profile_service.dart';
@@ -10,6 +13,7 @@ import 'services/direct_messages_service.dart';
 import 'services/messages_media_service.dart';
 import 'utils/dm_sidebar_prefs.dart';
 import 'utils/messages_navigator.dart';
+import 'widgets/messages_boost_store_screen.dart';
 import 'widgets/messages_chrome_builder.dart';
 import '../../core/services/messages_shell_theme_controller.dart';
 
@@ -37,12 +41,6 @@ class MessagesSettingsScreen extends StatefulWidget {
 }
 
 class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _cardBg = Color(0xFF0E1F45);
-  static const Color _border = Color(0xFF21345D);
-  static const Color _textMuted = Color(0xFF8EA3CC);
-  static const Color _accent = Color(0xFFEB459E);
-
   /// `null` = danh sách mục; khác = màn chi tiết mục đó.
   String? _detailSection;
   bool _dirty = false;
@@ -89,7 +87,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     _ => Icons.person_rounded,
   };
 
-  String _t(String key) => LanguageController.instance.t(key);
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
 
   String _sectionLabel(String id) =>
       _t('settings.sections.$id');
@@ -150,6 +149,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
       await AccentColorController.instance.enforceBoostPolicy(
         boostUnlocked: _boostUnlocked,
       );
+      await _syncFollowSocialShellIfNeeded();
       _syncAppearanceFromController();
       _displayNameCtrl.text =
           (profile['displayName'] ?? profile['name'] ?? '').toString();
@@ -163,7 +163,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Không tải được cài đặt: $e';
+        _error = '${_t('settings.failedToLoad')} $e';
       });
     }
   }
@@ -194,7 +194,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Lưu thất bại: $e')));
+      ).showSnackBar(SnackBar(content: Text('${_t('settings.errorSave')}: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -240,7 +240,14 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     setState(() => _detailSection = id);
     if (id == 'appearance') {
       unawaited(_refreshBoostStatus());
+      unawaited(_syncFollowSocialShellIfNeeded());
     }
+  }
+
+  /// Legacy default chrome → follow Social shell (light / dark / galaxy).
+  Future<void> _syncFollowSocialShellIfNeeded() async {
+    if (!AccentColorController.instance.isFollowingSocialAppearance) return;
+    await MessagesShellThemeController.instance.clearOverride();
   }
 
   void _syncAppearanceFromController() {
@@ -260,10 +267,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
 
   void _backToHub() => setState(() => _detailSection = null);
 
-  double _horizontalPad(BuildContext context) {
-    final w = MediaQuery.sizeOf(context).width;
-    return w > 520 ? 24 : 14;
-  }
+  double _horizontalPad(BuildContext context) =>
+      AppSpacing.screenPadding(context).horizontal / 2;
 
   @override
   Widget build(BuildContext context) {
@@ -341,14 +346,15 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                 ),
               )
             : inHub
-            ? _buildHub(hPad)
-            : _buildDetail(hPad),
+            ? _buildHub(context, hPad)
+            : _buildDetail(context, hPad),
       ),
     ),
     );
   }
 
-  Widget _buildHub(double hPad) {
+  Widget _buildHub(BuildContext context, double hPad) {
+    final c = context.chrome;
     return ListView(
       padding: EdgeInsets.fromLTRB(
         hPad,
@@ -357,16 +363,26 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
         MediaQuery.paddingOf(context).bottom + 24,
       ),
       children: [
-        const Text(
-          'Tùy chỉnh tin nhắn, quyền riêng tư và giao diện. '
-          'Cài đặt đồng bộ với web khi đăng nhập cùng tài khoản.',
-          style: TextStyle(color: _textMuted, fontSize: 13, height: 1.45),
+        Text(
+          _t('settings.hubHint'),
+          style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.45),
         ),
         const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _hubTile(
+            context,
+            icon: Icons.rocket_launch_rounded,
+            title: _t('chat.messagesPage.boostUpgrade'),
+            subtitle: _t('chat.boostStore.app.heroSubtitle'),
+            onTap: () => MessagesBoostStoreScreen.open(context),
+          ),
+        ),
         ..._sectionIds.map(
           (id) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _hubTile(
+              context,
               icon: _sectionIcon(id),
               title: _sectionLabel(id),
               subtitle: _sectionSubtitle(id),
@@ -378,14 +394,16 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     );
   }
 
-  Widget _hubTile({
+  Widget _hubTile(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final c = context.chrome;
     return Material(
-      color: _cardBg,
+      color: c.surface,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -398,10 +416,10 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF152A52),
+                  color: c.chatInput,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: const Color(0xFFB8C8E8), size: 22),
+                child: Icon(icon, color: c.textMuted, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -410,8 +428,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: c.text,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -419,17 +437,17 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: _textMuted,
+                      style: TextStyle(
+                        color: c.textMuted,
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: Color(0xFF7E8CA8),
+                color: c.textMuted.withValues(alpha: 0.85),
                 size: 22,
               ),
             ],
@@ -439,46 +457,51 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     );
   }
 
-  Widget _buildDetail(double hPad) {
+  Widget _buildDetail(BuildContext context, double hPad) {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
       padding: EdgeInsets.fromLTRB(
         hPad,
-        4,
+        AppSpacing.sm,
         hPad,
-        MediaQuery.paddingOf(context).bottom + 24,
+        MediaQuery.paddingOf(context).bottom + AppSpacing.huge,
       ),
-      child: _buildSectionContent(_detailSection!),
+      child: _buildSectionContent(context, _detailSection!),
     );
   }
 
-  Widget _buildSectionContent(String section) {
+  Widget _buildSectionContent(BuildContext context, String section) {
     switch (section) {
       case 'general':
-        return _buildGeneral();
+        return _buildGeneral(context);
       case 'privacy':
-        return _buildPrivacy();
+        return _buildPrivacy(context);
       case 'messages':
-        return _buildMessages();
+        return _buildMessages(context);
       case 'appearance':
-        return _buildAppearance();
+        return _buildAppearance(context);
       case 'notifications':
-        return _buildNotifications();
+        return _buildNotifications(context);
       case 'profile':
-        return _buildProfile();
+        return _buildProfile(context);
       default:
         return const SizedBox.shrink();
     }
   }
 
-  Widget _buildGeneral() {
+  Widget _buildGeneral(BuildContext context) {
     final lc = LanguageController.instance;
+    final c = context.chrome;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _sectionTitle(_t('settings.general.dmDirectoryTitle')),
-        _hint(_t('settings.general.dmDirectoryHint')),
-        _cardWidget([
+        _sectionTitle(context, _t('settings.general.dmDirectoryTitle')),
+        _hint(context, _t('settings.general.dmDirectoryHint')),
+        _cardWidget(context, [
           _radioRow(
+            context,
             label: _t('settings.general.dmDirectoryAllFriends'),
             selected: _peersMode == DmSidebarPeersMode.all,
             onTap: () => setState(() {
@@ -486,8 +509,9 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
               _dirty = true;
             }),
           ),
-          const Divider(height: 1, color: _border),
+          Divider(height: 1, color: c.border),
           _radioRow(
+            context,
             label: _t('settings.general.dmDirectoryOnlineFriends'),
             selected: _peersMode == DmSidebarPeersMode.online,
             onTap: () => setState(() {
@@ -497,9 +521,9 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
           ),
         ]),
         const SizedBox(height: 20),
-        _sectionTitle(_t('settings.general.languageTitle')),
-        _hint(_t('settings.general.languageHint')),
-        _cardWidget([
+        _sectionTitle(context, _t('settings.general.languageTitle')),
+        _hint(context, _t('settings.general.languageHint')),
+        _cardWidget(context, [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             child: Column(
@@ -507,13 +531,14 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
               children: [
                 Text(
                   _t('settings.general.languageLabel'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: c.text,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 8),
                 _dropdown(
+                  context,
                   value: lc.language,
                   items: {
                     'vi': _t('settings.general.languageNames.vi'),
@@ -536,57 +561,71 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     );
   }
 
-  Widget _buildPrivacy() {
+  Widget _buildPrivacy(BuildContext context) {
+    final c = context.chrome;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _hint(
-          'Ẩn ngày tham gia Cordigram trên hồ sơ công khai. '
-          'Tắt chia sẻ trạng thái online/idle/offline với người khác.',
-        ),
-        _cardWidget([
+        _hint(context, _t('settings.privacy.hint')),
+        _cardWidget(context, [
           _switchRow(
-            label: 'Hiển thị ngày tham gia Cordigram',
+            context,
+            label: _t('settings.privacy.showMemberSince'),
             value: _showMemberSince,
             onChanged: (v) => setState(() {
               _showMemberSince = v;
               _dirty = true;
             }),
           ),
-          const Divider(height: 1, color: _border),
+          Divider(height: 1, color: c.border),
           _switchRow(
-            label: 'Chia sẻ trạng thái (online / chờ / offline)',
+            context,
+            label: _t('settings.privacy.sharePresence'),
             value: _sharePresence,
-            onChanged: (v) => setState(() {
-              _sharePresence = v;
-              _dirty = true;
-            }),
+            onChanged: (v) async {
+              setState(() {
+                _sharePresence = v;
+                _dirty = true;
+              });
+              try {
+                await DirectMessagesService.updateUserSettings(
+                  sharePresence: v,
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${_t('settings.errorSave')}: $e')),
+                );
+              }
+            },
           ),
         ]),
       ],
     );
   }
 
-  Widget _buildMessages() {
+  Widget _buildMessages(BuildContext context) {
+    final c = context.chrome;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _cardWidget([
+        _cardWidget(context, [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Cho phép nhận tin',
-                  style: TextStyle(color: _textMuted, fontSize: 12),
+                Text(
+                  _t('settings.messages.allowMessageLabel'),
+                  style: TextStyle(color: c.textMuted, fontSize: 12),
                 ),
                 const SizedBox(height: 6),
                 _dropdown(
+                  context,
                   value: _dmListFrom,
-                  items: const {
-                    'everyone': 'Tất cả mọi người',
-                    'followers_only': 'Chỉ người bạn theo dõi',
+                  items: {
+                    'everyone': _t('settings.messages.everyone'),
+                    'followers_only': _t('settings.messages.followersOnly'),
                   },
                   onChanged: (v) => setState(() {
                     _dmListFrom = v!;
@@ -594,16 +633,17 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                   }),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Cho phép gọi điện',
-                  style: TextStyle(color: _textMuted, fontSize: 12),
+                Text(
+                  _t('settings.messages.allowCallLabel'),
+                  style: TextStyle(color: c.textMuted, fontSize: 12),
                 ),
                 const SizedBox(height: 6),
                 _dropdown(
+                  context,
                   value: _dmCallFrom,
-                  items: const {
-                    'everyone': 'Tất cả mọi người',
-                    'followers_only': 'Chỉ người bạn theo dõi',
+                  items: {
+                    'everyone': _t('settings.messages.everyone'),
+                    'followers_only': _t('settings.messages.followersOnly'),
                   },
                   onChanged: (v) => setState(() {
                     _dmCallFrom = v!;
@@ -615,8 +655,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
           ),
         ]),
         const SizedBox(height: 20),
-        _sectionTitle('Chặn tin nhắn'),
-        _cardWidget([
+        _sectionTitle(context, _t('settings.messages.blockTitle')),
+        _cardWidget(context, [
           InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: _blockedOpen
@@ -626,11 +666,11 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Danh sách chặn',
+                      _t('settings.messages.blockedList'),
                       style: TextStyle(
-                        color: Color(0xFF6CB7EE),
+                        color: c.accent,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -640,25 +680,27 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                     _blockedOpen
                         ? Icons.expand_less_rounded
                         : Icons.chevron_right_rounded,
-                    color: const Color(0xFF7E8CA8),
+                    color: c.textMuted.withValues(alpha: 0.85),
                   ),
                 ],
               ),
             ),
           ),
           if (_blockedOpen) ...[
-            const Divider(height: 1, color: _border),
+            Divider(height: 1, color: c.border),
             if (_blockedLoading)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: CircularProgressIndicator(color: c.accent),
+                ),
               )
             else if (_blocked.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(14),
+              Padding(
+                padding: const EdgeInsets.all(14),
                 child: Text(
-                  'Chưa chặn ai.',
-                  style: TextStyle(color: _textMuted),
+                  _t('settings.messages.empty'),
+                  style: TextStyle(color: c.textMuted),
                 ),
               )
             else
@@ -671,7 +713,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                     (b['displayName'] ?? b['username'] ?? id).toString();
                 return Column(
                   children: [
-                    if (i > 0) const Divider(height: 1, color: _border),
+                    if (i > 0) Divider(height: 1, color: c.border),
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -682,21 +724,21 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                           Expanded(
                             child: Text(
                               name,
-                              style: const TextStyle(color: Colors.white),
+                              style: TextStyle(color: c.text),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           TextButton(
                             onPressed: () => _unblock(id),
                             style: TextButton.styleFrom(
-                              foregroundColor: _accent,
+                              foregroundColor: c.accent,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
                               ),
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            child: const Text('Bỏ chặn'),
+                            child: Text(_t('settings.messages.unblock')),
                           ),
                         ],
                       ),
@@ -710,179 +752,333 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     );
   }
 
-  Widget _buildAppearance() {
+  Widget _buildAppearance(BuildContext context) {
     final presetEntries = AccentColorController.presetHex.entries
         .where((e) => e.key != 'default')
         .toList();
     final accents = AccentColorController.accentOptions;
     final chromeHex = AccentColorController.instance.chromeHex;
+    final c = context.chrome;
+    final modeLabel = AccentColorController.instance.isFollowingSocialAppearance
+        ? _t('settings.appearance.modeFollowSocial')
+        : _appearanceSource == 'accent' && _boostUnlocked
+            ? _t('settings.appearance.modeAccent')
+            : _t('settings.appearance.modeBackground');
+
+    final screenW = MediaQuery.sizeOf(context).width;
+    final accentColumns = screenW < 380 ? 5 : 6;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _hint(_t('settings.appearance.mutualHint')),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Text(
-            _appearanceSource == 'accent' && _boostUnlocked
-                ? _t('settings.appearance.modeAccent')
-                : _t('settings.appearance.modeBackground'),
-            style: TextStyle(
-              color: AccentColorController.instance.effectivePalette.accent,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.4,
-            ),
+        _hint(context, _t('settings.appearance.mutualHintShort')),
+        const SizedBox(height: AppSpacing.md),
+        _appearanceStatusChip(context, modeLabel),
+        const SizedBox(height: AppSpacing.lg),
+        _appearanceSection(
+          context,
+          title: _t('settings.appearance.followSocialTitle'),
+          hint: _t('settings.appearance.followSocialHint'),
+          child: _socialFollowTile(
+            context,
+            active: AccentColorController.instance.isFollowingSocialAppearance,
+            onTap: () async {
+              await AccentColorController.instance.resetToSocialAppearance();
+              setState(() {
+                _syncAppearanceFromController();
+                _dirty = true;
+              });
+            },
           ),
         ),
-        _sectionTitle(_t('settings.appearanceBg.title')),
-        _hint(_t('settings.appearanceBg.hintShort')),
-        _cardWidget([
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: presetEntries.map((entry) {
-                final color =
-                    MessagesChromePalette.hexToColor(entry.value) ??
-                    const Color(0xFF111827);
-                final shellDark =
-                    MessagesShellThemeController.instance.theme ==
-                    MessagesShellTheme.dark;
-                final active = _appearanceSource == 'background' &&
-                    shellDark &&
-                    MessagesChromePalette.normalizeHex(
-                          AccentColorController.instance.chromeHex,
-                        ) ==
-                        MessagesChromePalette.normalizeHex(entry.value);
-                return _colorSwatch(
-                  color: color,
-                  active: active,
-                  size: 52,
-                  onTap: () async {
-                    await AccentColorController.instance.setPreset(entry.key);
-                    setState(() {
-                      _syncAppearanceFromController();
-                      _dirty = true;
-                    });
-                  },
-                );
-              }).toList(),
-            ),
+        const SizedBox(height: AppSpacing.xl),
+        _appearanceSection(
+          context,
+          title: _t('settings.appearanceBg.title'),
+          hint: _t('settings.appearanceBg.hintShort'),
+          child: _backgroundPresetRow(
+            context,
+            presetEntries.map((entry) {
+              final color =
+                  MessagesChromePalette.hexToColor(entry.value) ??
+                  const Color(0xFF111827);
+              final shellCustom =
+                  MessagesShellThemeController.instance.hasOverride;
+              final active = _appearanceSource == 'background' &&
+                  shellCustom &&
+                  MessagesShellThemeController.instance.theme ==
+                      MessagesShellTheme.dark &&
+                  MessagesChromePalette.normalizeHex(
+                        AccentColorController.instance.chromeHex,
+                      ) ==
+                      MessagesChromePalette.normalizeHex(entry.value);
+              return _SwatchSpec(
+                color: color,
+                active: active,
+                onTap: () async {
+                  await AccentColorController.instance.setPreset(entry.key);
+                  setState(() {
+                    _syncAppearanceFromController();
+                    _dirty = true;
+                  });
+                },
+              );
+            }).toList(),
           ),
-        ]),
-        const SizedBox(height: 20),
-        _sectionTitle(_t('settings.themeColors.title')),
-        if (!_boostUnlocked)
-          _hint(_t('settings.themeColors.lockedHint')),
-        _cardWidget([
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Opacity(
-              opacity: _boostUnlocked ? 1 : 0.45,
-              child: IgnorePointer(
-                ignoring: !_boostUnlocked,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: accents.map((opt) {
-                    final primary = opt['color'] as Color;
-                    final secondary = opt['secondary'] as Color?;
-                    final hex = AccentColorController.hexFromColor(primary);
-                    final active = _appearanceSource == 'accent' &&
-                        MessagesChromePalette.normalizeHex(
-                              _accentHex ?? '',
-                            ) ==
-                            MessagesChromePalette.normalizeHex(hex);
-                    return _colorSwatch(
-                      color: primary,
-                      secondary: secondary,
-                      active: active,
-                      size: 42,
-                      onTap: () async {
-                        await AccentColorController.instance.setAccentHex(hex);
-                        setState(() {
-                          _syncAppearanceFromController();
-                          _dirty = true;
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        _appearanceSection(
+          context,
+          title: _t('settings.themeColors.title'),
+          hint: _boostUnlocked
+              ? _t('settings.themeColors.hint')
+              : _t('settings.themeColors.lockedHint'),
+          child: Opacity(
+            opacity: _boostUnlocked ? 1 : 0.45,
+            child: IgnorePointer(
+              ignoring: !_boostUnlocked,
+              child: _responsiveSwatchGrid(
+                context,
+                minCellSize: 36,
+                maxCellSize: 40,
+                maxColumns: accentColumns,
+                items: accents.map((opt) {
+                  final primary = opt['color'] as Color;
+                  final secondary = opt['secondary'] as Color?;
+                  final hex = AccentColorController.hexFromColor(primary);
+                  final active = _appearanceSource == 'accent' &&
+                      MessagesChromePalette.normalizeHex(_accentHex ?? '') ==
+                          MessagesChromePalette.normalizeHex(hex);
+                  return _SwatchSpec(
+                    color: primary,
+                    secondary: secondary,
+                    active: active,
+                    onTap: () async {
+                      await AccentColorController.instance.setAccentHex(hex);
+                      setState(() {
+                        _syncAppearanceFromController();
+                        _dirty = true;
+                      });
+                    },
+                  );
+                }).toList(),
               ),
             ),
           ),
-        ]),
+        ),
         if (_boostUnlocked && _appearanceSource == 'accent')
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
             child: Text(
-              'Màu hiện tại: $chromeHex',
-              style: const TextStyle(color: _textMuted, fontSize: 12),
+              _t('settings.appearance.currentColor', {'hex': chromeHex}),
+              style: TextStyle(color: c.textMuted, fontSize: 12),
+            ),
+          ),
+        const SizedBox(height: AppSpacing.lg),
+      ],
+    );
+  }
+
+  Widget _appearanceStatusChip(BuildContext context, String label) {
+    final c = context.chrome;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: c.accentSoft,
+        borderRadius: AppRadii.mdAll,
+        border: Border.all(color: c.accent.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: c.accent,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _appearanceSection(
+    BuildContext context, {
+    required String title,
+    required String hint,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(context, title),
+        _hint(context, hint),
+        _cardWidget(context, [
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: child,
+          ),
+        ]),
+      ],
+    );
+  }
+
+  /// Ba preset nền — chia đều hàng ngang, không tràn.
+  Widget _backgroundPresetRow(
+    BuildContext context,
+    List<_SwatchSpec> items,
+  ) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final gap = AppSpacing.sm;
+    return Row(
+      children: [
+        for (var i = 0; i < items.length; i++)
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: i == 0 ? 0 : gap / 2,
+                right: i == items.length - 1 ? 0 : gap / 2,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 72),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: _ColorSwatchCell.fromSpec(items[i]),
+                ),
+              ),
             ),
           ),
       ],
     );
   }
 
-  Widget _colorSwatch({
-    required Color color,
-    Color? secondary,
+  /// Lưới màu responsive — không tràn ngang trên màn hình nhỏ.
+  Widget _responsiveSwatchGrid(
+    BuildContext context, {
+    required List<_SwatchSpec> items,
+    required double minCellSize,
+    required double maxCellSize,
+    required int maxColumns,
+    double gap = AppSpacing.sm,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxW = constraints.maxWidth;
+        var cols = maxColumns;
+
+        while (cols > 4) {
+          final minRowW = cols * minCellSize + (cols - 1) * gap;
+          if (minRowW <= maxW) break;
+          cols--;
+        }
+
+        var cell = (maxW - (cols - 1) * gap) / cols;
+        if (cell < minCellSize && cols > 4) {
+          cols--;
+          cell = (maxW - (cols - 1) * gap) / cols;
+        }
+        cell = cell.clamp(minCellSize, maxCellSize);
+
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: items
+              .map(
+                (spec) => SizedBox(
+                  width: cell,
+                  height: cell,
+                  child: _ColorSwatchCell.fromSpec(spec),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Widget _socialFollowTile(
+    BuildContext context, {
     required bool active,
-    required double size,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(size > 44 ? 10 : 8),
-          border: Border.all(
-            color: active ? Colors.white : Colors.transparent,
-            width: 2.5,
+    final c = context.chrome;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppRadii.lgAll,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadii.lgAll,
+        child: Ink(
+          height: AppSpacing.minTouchTarget,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.lgAll,
+            gradient: const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                Color(0xFFF6F8FB),
+                Color(0xFF0C1220),
+                Color(0xFF2A1A5E),
+                Color(0xFF5865F2),
+              ],
+              stops: [0, 0.35, 0.72, 1],
+            ),
+            border: Border.all(
+              color: active ? c.accent : c.border,
+              width: active ? 2 : 1,
+            ),
           ),
-          gradient: secondary != null
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [color, secondary],
-                )
-              : null,
-          color: secondary == null ? color : null,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.sync_rounded,
+                color: Colors.white.withValues(alpha: active ? 1 : 0.85),
+                size: 20,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: Text(
+                  _t('settings.appearance.followSocialPick'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: active
-            ? Icon(
-                Icons.check_rounded,
-                color: Colors.white,
-                size: size > 44 ? 22 : 18,
-              )
-            : null,
       ),
     );
   }
 
-  Widget _buildNotifications() {
+  Widget _buildNotifications(BuildContext context) {
+    final c = context.chrome;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _cardWidget([
+        _cardWidget(context, [
           _switchRow(
-            label: 'Thông báo',
-            subtitle:
-                'Bật: thông báo bình thường. Tắt: tắt mọi thông báo (social + DM).',
+            context,
+            label: _t('settings.notifications.masterLabel'),
+            subtitle: _t('settings.notifications.masterHint'),
             value: _notifEnabled,
             onChanged: (v) => setState(() {
               _notifEnabled = v;
               _dirty = true;
             }),
           ),
-          const Divider(height: 1, color: _border),
+          Divider(height: 1, color: c.border),
           _switchRow(
-            label: 'Âm thanh thông báo',
-            subtitle: 'Tin nhắn và thông báo mới',
+            context,
+            label: _t('settings.notifications.soundLabel'),
             value: _soundEnabled,
             onChanged: (v) => setState(() {
               _soundEnabled = v;
@@ -894,35 +1090,61 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     );
   }
 
-  Widget _buildProfile() {
+  Widget _buildProfile(BuildContext context) {
+    final c = context.chrome;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _cardWidget([
+        _cardWidget(context, [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _fieldLabel('TÊN HIỂN THỊ'),
-                _textField(_displayNameCtrl, 'Tên hiển thị'),
-                const SizedBox(height: 12),
-                _fieldLabel('USERNAME'),
-                _textField(_usernameCtrl, 'Username'),
-                const SizedBox(height: 12),
-                _fieldLabel('ĐẠI TỪ NHÂN XƯNG'),
-                _textField(_pronounsCtrl, 'ví dụ: they/them'),
-                const SizedBox(height: 12),
-                _fieldLabel('TIỂU SỬ'),
-                _hint(
-                  'Có thể dùng markdown và liên kết.',
+                _fieldLabel(
+                  context,
+                  _t('chat.profileEditor.displayNameLabel').toUpperCase(),
                 ),
+                _textField(
+                  context,
+                  _displayNameCtrl,
+                  _t('chat.profileEditor.displayNameLabel'),
+                ),
+                const SizedBox(height: 12),
+                _fieldLabel(
+                  context,
+                  _t('chat.profileEditor.usernameLabel').toUpperCase(),
+                ),
+                _textField(
+                  context,
+                  _usernameCtrl,
+                  _t('chat.profileEditor.usernameLabel'),
+                ),
+                const SizedBox(height: 12),
+                _fieldLabel(
+                  context,
+                  _t('chat.profileEditor.pronounsLabel').toUpperCase(),
+                ),
+                _textField(
+                  context,
+                  _pronounsCtrl,
+                  _t('chat.profileEditor.pronounsPlaceholder'),
+                ),
+                const SizedBox(height: 12),
+                _fieldLabel(
+                  context,
+                  _t('chat.profileEditor.bioLabel').toUpperCase(),
+                ),
+                _hint(context, _t('chat.profileEditor.bioHint')),
                 TextField(
                   controller: _bioCtrl,
                   maxLines: 4,
                   maxLength: 300,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _inputDec('Tiểu sử'),
+                  style: TextStyle(color: c.text),
+                  decoration: _inputDec(
+                    context,
+                    _t('chat.profileEditor.bioLabel'),
+                  ),
                   onChanged: (_) => setState(() => _dirty = true),
                 ),
               ],
@@ -933,11 +1155,13 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     );
   }
 
-  Widget _radioRow({
+  Widget _radioRow(
+    BuildContext context, {
     required String label,
     required bool selected,
     required VoidCallback onTap,
   }) {
+    final c = context.chrome;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -948,14 +1172,14 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_off_rounded,
-              color: selected ? _accent : _textMuted,
+              color: selected ? c.accent : c.textMuted,
               size: 22,
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
+                style: TextStyle(color: c.text, fontSize: 15),
               ),
             ),
           ],
@@ -965,12 +1189,14 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
   }
 
   /// Hàng công tắc: nhãn trên, switch căn phải — tránh overflow ngang.
-  Widget _switchRow({
+  Widget _switchRow(
+    BuildContext context, {
     required String label,
     String? subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final c = context.chrome;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
@@ -982,8 +1208,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: c.text,
                     fontWeight: FontWeight.w500,
                     fontSize: 15,
                   ),
@@ -992,8 +1218,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: _textMuted,
+                    style: TextStyle(
+                      color: c.textMuted,
                       fontSize: 12,
                       height: 1.4,
                     ),
@@ -1007,7 +1233,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
             value: value,
             onChanged: onChanged,
             activeThumbColor: Colors.white,
-            activeTrackColor: _accent,
+            activeTrackColor: c.accent,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],
@@ -1015,67 +1241,81 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     );
   }
 
-  Widget _sectionTitle(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(
-      text,
-      style: const TextStyle(
-        color: Color(0xFF8EA3CC),
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.5,
+  Widget _sectionTitle(BuildContext context, String text) {
+    final c = context.chrome;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: c.textMuted,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
       ),
-    ),
-  );
+    );
+  }
 
-  Widget _hint(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Text(
-      text,
-      style: const TextStyle(color: _textMuted, fontSize: 13, height: 1.45),
-    ),
-  );
-
-  Widget _fieldLabel(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(
-      text,
-      style: const TextStyle(
-        color: _textMuted,
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.5,
+  Widget _hint(BuildContext context, String text) {
+    final c = context.chrome;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        text,
+        style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.45),
       ),
-    ),
-  );
+    );
+  }
 
-  Widget _cardWidget(List<Widget> children) => Container(
-    margin: const EdgeInsets.only(bottom: 4),
-    decoration: BoxDecoration(
-      color: _cardBg,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _border),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: children,
-    ),
-  );
+  Widget _fieldLabel(BuildContext context, String text) {
+    final c = context.chrome;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: c.textMuted,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
 
-  Widget _dropdown({
+  Widget _cardWidget(BuildContext context, List<Widget> children) {
+    final c = context.chrome;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _dropdown(
+    BuildContext context, {
     required String value,
     required Map<String, String> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final c = context.chrome;
     return DropdownButtonFormField<String>(
       isExpanded: true,
       initialValue: value,
-      dropdownColor: const Color(0xFF152A52),
-      style: const TextStyle(color: Colors.white, fontSize: 15),
+      dropdownColor: c.chatInput,
+      style: TextStyle(color: c.text, fontSize: 15),
       decoration: InputDecoration(
         filled: true,
-        fillColor: const Color(0xFF152A52),
+        fillColor: c.chatInput,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
@@ -1094,24 +1334,103 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     );
   }
 
-  Widget _textField(TextEditingController ctrl, String hint) {
+  Widget _textField(
+    BuildContext context,
+    TextEditingController ctrl,
+    String hint,
+  ) {
     return TextField(
       controller: ctrl,
-      style: const TextStyle(color: Colors.white),
-      decoration: _inputDec(hint),
+      style: TextStyle(color: context.chrome.text),
+      decoration: _inputDec(context, hint),
       onChanged: (_) => setState(() => _dirty = true),
     );
   }
 
-  InputDecoration _inputDec(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(color: _textMuted),
-    filled: true,
-    fillColor: const Color(0xFF152A52),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide.none,
-    ),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+  InputDecoration _inputDec(BuildContext context, String hint) {
+    final c = context.chrome;
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: c.textMuted),
+      filled: true,
+      fillColor: c.chatInput,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    );
+  }
+}
+
+class _SwatchSpec {
+  const _SwatchSpec({
+    required this.color,
+    required this.active,
+    required this.onTap,
+    this.secondary,
+  });
+
+  final Color color;
+  final Color? secondary;
+  final bool active;
+  final VoidCallback onTap;
+}
+
+class _ColorSwatchCell extends StatelessWidget {
+  const _ColorSwatchCell({
+    required this.color,
+    required this.active,
+    required this.onTap,
+    this.secondary,
+  });
+
+  factory _ColorSwatchCell.fromSpec(_SwatchSpec spec) => _ColorSwatchCell(
+    color: spec.color,
+    secondary: spec.secondary,
+    active: spec.active,
+    onTap: spec.onTap,
   );
+
+  final Color color;
+  final Color? secondary;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.chrome;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppRadii.mdAll,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadii.mdAll,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.mdAll,
+            border: Border.all(
+              color: active ? c.accent : Colors.transparent,
+              width: 2.5,
+            ),
+            gradient: secondary != null
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [color, secondary!],
+                  )
+                : null,
+            color: secondary == null ? color : null,
+          ),
+          child: active
+              ? Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: MediaQuery.sizeOf(context).width < 360 ? 16 : 18,
+                )
+              : null,
+        ),
+      ),
+    );
+  }
 }

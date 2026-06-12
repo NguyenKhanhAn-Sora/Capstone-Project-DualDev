@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/services/language_controller.dart';
+import '../../../core/theme/app_theme_context.dart';
 import '../models/server_models.dart';
+import '../utils/messages_ui.dart';
+import 'messages_chrome_builder.dart';
 import '../services/direct_messages_service.dart';
 import '../services/servers_service.dart';
 
@@ -32,14 +36,10 @@ class InviteToServerSheet extends StatefulWidget {
   final ServerSummary server;
 
   static Future<void> show(BuildContext context, ServerSummary server) {
-    return showModalBottomSheet<void>(
-      context: context,
+    return MessagesUi.showBottomSheet<void>(
+      context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0E2247),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => InviteToServerSheet(server: server),
+      child: InviteToServerSheet(server: server),
     );
   }
 
@@ -128,7 +128,7 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
     await Clipboard.setData(ClipboardData(text: _inviteLink));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã sao chép link mời')),
+      SnackBar(content: Text(_t('chat.inviteToServerSheet.copiedToast'))),
     );
   }
 
@@ -155,6 +155,9 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
     }
   }
 
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
+
   List<_InviteRow> get _filtered {
     final q = _search.text.trim().toLowerCase();
     if (q.isEmpty) return _rows;
@@ -169,172 +172,191 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final h = MediaQuery.sizeOf(context).height * 0.88;
-    return SizedBox(
-      height: h,
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(999),
+    return MessagesChromeBuilder(
+      builder: (context, chrome) {
+        final h = MediaQuery.sizeOf(context).height * 0.88;
+        return SizedBox(
+          height: h,
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: chrome.textMuted.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _t('chat.inviteToServerSheet.title', {
+                              'serverName': widget.server.name,
+                            }),
+                            style: TextStyle(
+                              color: chrome.text,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(
+                            Icons.close_rounded,
+                            color: chrome.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Mời vào ${widget.server.name}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                      _t('chat.inviteToServerSheet.description'),
+                      style: TextStyle(color: chrome.textMuted, fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: OutlinedButton.icon(
+                      onPressed: _copyLink,
+                      icon: Icon(Icons.link_rounded, color: chrome.accent),
+                      label: Text(
+                        _t('chat.inviteToServerSheet.copyInviteLink'),
+                        style: TextStyle(color: chrome.text),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: chrome.text,
+                        side: BorderSide(color: chrome.border),
+                        minimumSize: const Size.fromHeight(44),
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        _error!,
+                        style: TextStyle(color: chrome.accent, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      controller: _search,
+                      style: TextStyle(color: chrome.text),
+                      decoration: InputDecoration(
+                        hintText: _t('chat.inviteToServerSheet.searchPlaceholder'),
+                        hintStyle: TextStyle(color: chrome.textMuted),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: chrome.textMuted,
+                        ),
+                        filled: true,
+                        fillColor: chrome.chatInput,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _loading
+                        ? Center(
+                            child: CircularProgressIndicator(color: chrome.accent),
+                          )
+                        : _filtered.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                _t('chat.inviteToServerSheet.errorLoad'),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: chrome.textMuted),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: _filtered.length,
+                            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                            itemBuilder: (context, i) {
+                              final row = _filtered[i];
+                              final invited = _invitedIds.contains(row.userId);
+                              final sending = _sendingId == row.userId;
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: chrome.surfaceMuted,
+                                  backgroundImage:
+                                      (row.avatarUrl ?? '').startsWith('http')
+                                      ? NetworkImage(row.avatarUrl!)
+                                      : null,
+                                  child: (row.avatarUrl ?? '').startsWith('http')
+                                      ? null
+                                      : Text(
+                                          _initialLetter(
+                                            row.displayName,
+                                            row.username,
+                                          ),
+                                        ),
+                                ),
+                                title: Text(
+                                  row.displayName.isNotEmpty
+                                      ? row.displayName
+                                      : row.username,
+                                  style: TextStyle(
+                                    color: chrome.text,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  row.username,
+                                  style: TextStyle(color: chrome.textMuted),
+                                ),
+                                trailing: TextButton(
+                                  onPressed: invited || sending
+                                      ? null
+                                      : () => _inviteFriend(row),
+                                  child: sending
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: chrome.accent,
+                                          ),
+                                        )
+                                      : Text(
+                                          _t('chat.inviteToServerSheet.invite'),
+                                          style: TextStyle(color: chrome.accent),
+                                        ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Gửi lời mời tới bạn bè (đang follow hoặc follow bạn) chưa tham gia máy chủ.',
-                style: TextStyle(color: Color(0xFFAFC0E2), fontSize: 13),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: OutlinedButton.icon(
-                onPressed: _copyLink,
-                icon: const Icon(Icons.link_rounded, color: Color(0xFF8EB7FF)),
-                label: const Text(
-                  'Sao chép link mời',
-                  style: TextStyle(color: Colors.white),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFF2D4578)),
-                  minimumSize: const Size.fromHeight(44),
-                ),
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 13),
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _search,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Tìm theo tên hoặc username…',
-                  hintStyle: const TextStyle(color: Color(0xFF8A98B8)),
-                  prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF8A98B8)),
-                  filled: true,
-                  fillColor: const Color(0xFF13254A),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _filtered.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          _rows.isEmpty
-                              ? 'Không có bạn nào để mời (hoặc mọi người đã trong máy chủ).'
-                              : 'Không tìm thấy người phù hợp.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Color(0xFFAFC0E2)),
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _filtered.length,
-                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-                      itemBuilder: (context, i) {
-                        final row = _filtered[i];
-                        final invited = _invitedIds.contains(row.userId);
-                        final sending = _sendingId == row.userId;
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: const Color(0xFF1F2D4D),
-                            backgroundImage: (row.avatarUrl ?? '').startsWith('http')
-                                ? NetworkImage(row.avatarUrl!)
-                                : null,
-                            child: (row.avatarUrl ?? '').startsWith('http')
-                                ? null
-                                : Text(
-                                    _initialLetter(
-                                      row.displayName,
-                                      row.username,
-                                    ),
-                                  ),
-                          ),
-                          title: Text(
-                            row.displayName.isNotEmpty
-                                ? row.displayName
-                                : row.username,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Text(
-                            row.username,
-                            style: const TextStyle(color: Color(0xFFAFC0E2)),
-                          ),
-                          trailing: TextButton(
-                            onPressed: invited || sending
-                                ? null
-                                : () => _inviteFriend(row),
-                            child: sending
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : Text(invited ? 'Đã mời' : 'Mời'),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

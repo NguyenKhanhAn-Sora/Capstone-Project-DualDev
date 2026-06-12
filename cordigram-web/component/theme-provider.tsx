@@ -155,7 +155,7 @@ function clampAccentForUi(hex: string): string {
  * still keeps body copy readable on the light shell stylesheet.
  */
 export type ApplyAccentColorOptions = {
-  messagesShellTheme?: "light" | "dark";
+  messagesShellTheme?: "light" | "dark" | "galaxy";
 };
 
 export function applyAccentColor(
@@ -384,6 +384,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       //xét typeof window để xem có đang chạy trong môi trường browser hay không
       localStorage.setItem(STORAGE_KEY, theme);
+      window.dispatchEvent(new Event("cordigram-messages-shell-theme"));
     }
   }, [theme]);
 
@@ -393,6 +394,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(APPEARANCE_PRESET_KEY, appearancePreset);
       if (appearanceSync) localStorage.setItem(APPEARANCE_SYNC_KEY, "1");
       else localStorage.removeItem(APPEARANCE_SYNC_KEY);
+      window.dispatchEvent(new Event("cordigram-messages-shell-theme"));
     }
   }, [appearancePreset, appearanceSync]);
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/accent_color_controller.dart';
+import '../../../core/services/appearance_preset_controller.dart';
 import '../../../core/services/language_controller.dart';
 import '../../../core/services/messages_shell_theme_controller.dart';
 import '../../../core/theme/app_theme_context.dart';
@@ -22,6 +23,7 @@ class MessagesChromeBuilder extends StatelessWidget {
       listenable: Listenable.merge([
         AccentColorController.instance,
         MessagesShellThemeController.instance,
+        AppearancePresetController.instance,
         LanguageController.instance,
       ]),
       builder: (context, _) => builder(context, context.chrome),

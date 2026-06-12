@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
@@ -24,7 +24,12 @@ import 'widgets/channel_chat_gate_sheet.dart';
 import 'widgets/chat_link_preview.dart';
 import 'widgets/gif_toolbar_icon.dart';
 import 'widgets/sticker_toolbar_icon.dart';
+import 'widgets/channel_chat_expressions_host.dart';
+import 'widgets/chat_expressions_menu.dart';
+import 'widgets/chat_message_media_bubble.dart';
+import 'widgets/chat_media_viewer.dart';
 import 'widgets/messages_chrome_builder.dart';
+import 'utils/chat_media_resolver.dart';
 import '../../core/services/accent_color_controller.dart';
 import '../../core/theme/messages_chrome_palette.dart';
 
@@ -1129,6 +1134,36 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     );
   }
 
+  void _openExpressionsHub(MessagesChromePalette chrome) {
+    unawaited(
+      ChatExpressionsMenu.show(
+        context: context,
+        chrome: chrome,
+        host: ChannelChatExpressionsHost(
+          inputController: _inputController,
+          chrome: chrome,
+          serverId: widget.server.id,
+          serverEmojiMap: _serverEmojiMap,
+          chatBlocked: _chatBlocked,
+          onSendGiphy: (g, stickers) => _sendChannelMessage(
+            content: g.title.trim().isEmpty
+                ? (stickers ? 'Sent a sticker' : 'Sent a GIF')
+                : g.title.trim(),
+            type: stickers ? 'sticker' : 'gif',
+            giphyId: g.id,
+          ),
+          onSendServerSticker: (sticker, group) => _sendChannelMessage(
+            content: '🎨 [Sticker]: ${sticker.imageUrl}',
+            type: 'sticker',
+            customStickerUrl: sticker.imageUrl,
+            serverStickerId: sticker.id,
+            serverStickerServerId: group.serverId,
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _showMessageActions(ChannelMessage message) async {
     final isMine = _isMine(message);
     await showModalBottomSheet<void>(
@@ -1446,60 +1481,34 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         durationSec: message.voiceDurationSec,
       );
     }
-    if (message.attachments.isNotEmpty) {
-      final mediaUrl = MessagesMediaService.optimizeHeavyVideoUrl(
-        message.attachments.first,
-      );
-      final lower = mediaUrl.toLowerCase();
-      final looksLikeImage =
-          lower.contains('.png') ||
-          lower.contains('.jpg') ||
-          lower.contains('.jpeg') ||
-          lower.contains('.webp') ||
-          lower.contains('.gif') ||
-          lower.contains('/image/upload') ||
-          lower.contains('/res.cloudinary.com/');
-      if (looksLikeImage) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            mediaUrl,
-            width: 220,
-            height: 160,
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.low,
-            cacheWidth: 660,
-            cacheHeight: 480,
-            errorBuilder: (_, __, ___) =>
-                Text(text, style: const TextStyle(color: Colors.white)),
-          ),
+    final mediaBubble = ChatMessageMediaBubble.fromContent(
+      content: text,
+      attachments: message.attachments,
+      onTapImage: (url) {
+        final items = collectChannelMedia(_messages);
+        openChatMediaViewer(
+          context,
+          items: items,
+          initialIndex: indexOfChatMedia(items, url),
         );
-      }
-    }
-    if (text.startsWith('http://') || text.startsWith('https://')) {
-      final lower = text.toLowerCase();
-      final looksLikeImage =
-          lower.contains('.png') ||
-          lower.contains('.jpg') ||
-          lower.contains('.jpeg') ||
-          lower.contains('.webp') ||
-          lower.contains('.gif') ||
-          lower.contains('/image/upload') ||
-          lower.contains('/res.cloudinary.com/');
-      if (looksLikeImage) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            text,
-            width: 220,
-            height: 160,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-                Text(text, style: const TextStyle(color: Colors.white)),
-          ),
+      },
+      onTapVideo: () {
+        final items = collectChannelMedia(_messages);
+        final resolved = ChatMediaResolver.resolveContentText(
+          content: text,
+          attachments: message.attachments,
         );
-      }
-    }
+        final video = ChatMediaResolver.extractVideoUrl(resolved);
+        if (video == null || items.isEmpty) return;
+        openChatMediaViewer(
+          context,
+          items: items,
+          initialIndex: indexOfChatMedia(items, video),
+        );
+      },
+    );
+    if (mediaBubble != null) return mediaBubble;
+
     final pollMatch = _pollRegExp.firstMatch(text);
     if (pollMatch != null) {
       final pollId = pollMatch.group(1) ?? '';
@@ -1514,23 +1523,6 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           width: 180,
           height: 180,
           fit: BoxFit.cover,
-        ),
-      );
-    }
-    if (text.startsWith('📷 [Image]:') || text.startsWith('🎬 [Video]:')) {
-      final mediaUrl = MessagesMediaService.optimizeHeavyVideoUrl(
-        text.substring(text.indexOf(':') + 1).trim(),
-      );
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          mediaUrl,
-          width: 220,
-          height: 160,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.low,
-          cacheWidth: 660,
-          cacheHeight: 480,
         ),
       );
     }
@@ -1949,18 +1941,21 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 fontSize: 14,
                               ),
                               border: InputBorder.none,
-                              suffixIcon: IconButton(
-                                padding: const EdgeInsets.only(right: 4),
-                                constraints: const BoxConstraints(),
-                                icon: const Icon(
-                                  Icons.tag_faces_rounded,
-                                  color: Color(0xFFB6C2DC),
-                                  size: 22,
-                                ),
-                                onPressed: _showEmojiPicker,
-                              ),
                             ),
                           ),
+                        ),
+                      ),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 44,
+                        ),
+                        onPressed: () => _openExpressionsHub(chrome),
+                        icon: Icon(
+                          Icons.mood_rounded,
+                          color: chrome.textMuted,
+                          size: 24,
                         ),
                       ),
                       IconButton(
@@ -1975,26 +1970,6 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           color: Color(0xFFB6C2DC),
                           size: 24,
                         ),
-                      ),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 44,
-                        ),
-                        tooltip: 'GIF',
-                        onPressed: () => _openGiphyPicker(stickers: false),
-                        icon: const GifToolbarIcon(size: 18),
-                      ),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 44,
-                        ),
-                        tooltip: 'Sticker',
-                        onPressed: _showStickerPickerMenu,
-                        icon: const StickerToolbarIcon(size: 20),
                       ),
                       Padding(
                         padding: const EdgeInsets.only(left: 2, bottom: 2),

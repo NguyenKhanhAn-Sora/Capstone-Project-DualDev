@@ -10,6 +10,7 @@ import 'core/services/deep_link_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/session_bootstrap.dart';
 import 'core/services/accent_color_controller.dart';
+import 'core/services/appearance_preset_controller.dart';
 import 'core/services/language_controller.dart';
 import 'core/services/messages_shell_theme_controller.dart';
 import 'core/services/theme_controller.dart';
@@ -58,6 +59,7 @@ void main() async {
   await DeepLinkService.initialize(appNavigatorKey);
   // Social theme + language; Messages chrome tải riêng (không đổi MaterialApp social).
   await ThemeController.instance.load();
+  await AppearancePresetController.instance.load();
   await LanguageController.instance.load();
   await MessagesShellThemeController.instance.load();
   await AccentColorController.instance.load();

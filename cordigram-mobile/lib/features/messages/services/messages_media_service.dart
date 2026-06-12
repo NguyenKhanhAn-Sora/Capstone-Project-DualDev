@@ -1,5 +1,6 @@
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
+import 'messages_boost_service.dart';
 
 /// Mirrors web `uploadMedia` — `POST /posts/upload` with
 /// `x-cordigram-upload-context: messages` (see `cordigram-web/lib/cordigram-upload-context.ts`).
@@ -75,22 +76,52 @@ class MessagesMediaService {
   static Future<void> refreshBoostStatus({bool force = false}) async {
     if (_boostStatusLoaded && !force) return;
     _boostStatusLoaded = true;
-    try {
-      final json = await ApiService.get(
-        '/users/boost-status?scope=messages',
-        extraHeaders: _authHeaders,
-      );
-      final active = json['active'] == true;
-      final accountBoost = json['accountBoost'] == true;
-      final unlocked = json['unlocked'] == true;
-      final tier = (json['tier'] ?? '').toString().trim().toLowerCase();
-      _boostActive =
-          active || accountBoost || unlocked || tier == 'basic' || tier == 'boost';
-    } catch (_) {
-      _boostActive = false;
-    }
+    final status = await MessagesBoostService.fetchStatus();
+    _boostActive = status.isUnlocked;
   }
 
+  /// Chat thumbnail — WebP/JPEG auto format, capped width (never use video transforms).
+  static String optimizeChatImageUrl(String rawUrl) {
+    var url = rawUrl.trim();
+    if (url.isEmpty) return url;
+    if (url.startsWith('http://')) {
+      url = 'https://${url.substring(7)}';
+    }
+    if (!url.contains('/res.cloudinary.com/')) return url;
+    const thumb = '/image/upload/q_auto,f_auto,w_480/';
+    if (url.contains(thumb)) return url;
+    if (url.contains('/image/upload/')) {
+      return url.replaceFirst('/image/upload/', thumb);
+    }
+    // Legacy path without resource type — only optimize if not a video URL.
+    if (url.contains('/video/upload')) return url;
+    if (url.contains('/upload/') && !url.contains('vc_auto')) {
+      return url.replaceFirst('/upload/', '/upload/q_auto,f_auto,w_480/');
+    }
+    return url;
+  }
+
+  /// Full-screen gallery image (slightly larger than bubble thumb).
+  static String optimizeChatImageFullUrl(String rawUrl) {
+    var url = rawUrl.trim();
+    if (url.isEmpty) return url;
+    if (url.startsWith('http://')) {
+      url = 'https://${url.substring(7)}';
+    }
+    if (!url.contains('/res.cloudinary.com/')) return url;
+    const full = '/image/upload/q_auto,f_auto,w_1280/';
+    if (url.contains(full)) return url;
+    if (url.contains('/image/upload/')) {
+      return url.replaceFirst('/image/upload/', full);
+    }
+    if (url.contains('/video/upload')) return url;
+    if (url.contains('/upload/') && !url.contains('vc_auto')) {
+      return url.replaceFirst('/upload/', '/upload/q_auto,f_auto,w_1280/');
+    }
+    return url;
+  }
+
+  /// Video playback URL — boost may add codec/size transforms (images must not use this).
   static String optimizeHeavyVideoUrl(String rawUrl) {
     final url = rawUrl.trim();
     if (!_boostActive || url.isEmpty) return url;

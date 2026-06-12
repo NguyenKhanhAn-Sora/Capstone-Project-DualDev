@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/server_models.dart';
 import '../models/server_role_models.dart';
 import '../services/servers_service.dart';
+import 'server_settings_ui.dart';
 
 /// Chặn spam đề cập — lưu vào `automod.mentionSpamFilter` trong `/safety-settings`.
 class ServerAutomodScreen extends StatefulWidget {
@@ -22,9 +23,6 @@ class ServerAutomodScreen extends StatefulWidget {
 }
 
 class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-
   Map<String, dynamic> _full = {};
   Map<String, dynamic> _msf = {};
   bool _loading = true;
@@ -141,26 +139,26 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final hPad = MediaQuery.sizeOf(context).width > 520 ? 24.0 : 14.0;
 
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: const Text('AutoMod', style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(title: 'AutoMod'),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: ui.accent))
           : _error != null
-              ? Center(child: Text(_error!))
+              ? Center(
+                  child: Text(_error!, style: TextStyle(color: ui.textMuted)),
+                )
               : ListView(
                   padding: EdgeInsets.fromLTRB(hPad, 12, hPad, pad.bottom + 24),
                   children: [
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: _card,
+                        color: ui.card,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -169,26 +167,26 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                           Container(
                             width: 44,
                             height: 44,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF5865F2),
+                            decoration: BoxDecoration(
+                              color: ui.accent,
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
-                            child: const Text(
+                            child: Text(
                               '@',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: ui.onAccent,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 20,
                               ),
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Chặn spam đề cập — giới hạn số lần @ vai trò và người dùng trong một tin.',
                               style: TextStyle(
-                                color: Color(0xFF8EA3CC),
+                                color: ui.textMuted,
                                 height: 1.4,
                               ),
                             ),
@@ -198,45 +196,43 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                     ),
                     const SizedBox(height: 16),
                     SwitchListTile(
-                      tileColor: _card,
+                      tileColor: ui.card,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      title: const Text('Bật lọc',
-                          style: TextStyle(color: Colors.white)),
+                      title: Text(
+                        'Bật lọc',
+                        style: TextStyle(color: ui.text),
+                      ),
                       value: _msf['enabled'] == true,
                       onChanged: widget.canManage
                           ? (v) => setState(() => _msf['enabled'] = v)
                           : null,
-                      activeThumbColor: const Color(0xFF00C48C),
+                      activeThumbColor: ui.accent,
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _limitCtrl,
                       enabled: widget.canManage,
                       keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
+                      style: TextStyle(color: ui.text),
+                      decoration: ui.fieldDecoration(
                         labelText: 'Giới hạn đề cập / tin',
-                        labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-                        filled: true,
-                        fillColor: _card,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Phản hồi',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: ui.text,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     CheckboxListTile(
-                      title: const Text('Chặn tin nhắn',
-                          style: TextStyle(color: Colors.white)),
+                      title: Text(
+                        'Chặn tin nhắn',
+                        style: TextStyle(color: ui.text),
+                      ),
                       value: (_msf['responses'] as Map)['blockMessage'] == true,
                       onChanged: widget.canManage
                           ? (v) => setState(() {
@@ -247,11 +243,13 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                                 _msf['responses'] = r;
                               })
                           : null,
-                      activeColor: const Color(0xFF5865F2),
+                      activeColor: ui.accent,
                     ),
                     CheckboxListTile(
-                      title: const Text('Cảnh báo',
-                          style: TextStyle(color: Colors.white)),
+                      title: Text(
+                        'Cảnh báo',
+                        style: TextStyle(color: ui.text),
+                      ),
                       value: (_msf['responses'] as Map)['sendWarning'] == true,
                       onChanged: widget.canManage
                           ? (v) => setState(() {
@@ -262,11 +260,13 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                                 _msf['responses'] = r;
                               })
                           : null,
-                      activeColor: const Color(0xFF5865F2),
+                      activeColor: ui.accent,
                     ),
                     CheckboxListTile(
-                      title: const Text('Hạn chế thành viên',
-                          style: TextStyle(color: Colors.white)),
+                      title: Text(
+                        'Hạn chế thành viên',
+                        style: TextStyle(color: ui.text),
+                      ),
                       value:
                           (_msf['responses'] as Map)['restrictMember'] == true,
                       onChanged: widget.canManage
@@ -278,22 +278,16 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                                 _msf['responses'] = r;
                               })
                           : null,
-                      activeColor: const Color(0xFF5865F2),
+                      activeColor: ui.accent,
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _durationCtrl,
                       enabled: widget.canManage,
                       keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
+                      style: TextStyle(color: ui.text),
+                      decoration: ui.fieldDecoration(
                         labelText: 'Thời gian hạn chế (giờ)',
-                        labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-                        filled: true,
-                        fillColor: _card,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -301,22 +295,16 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                       controller: _notifCtrl,
                       enabled: widget.canManage,
                       maxLines: 2,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
+                      style: TextStyle(color: ui.text),
+                      decoration: ui.fieldDecoration(
                         labelText: 'Thông báo tùy chỉnh (tuỳ chọn)',
-                        labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
-                        filled: true,
-                        fillColor: _card,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Miễn trừ',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: ui.text,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -350,27 +338,28 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                             onPressed: () async {
                               final picked = await showModalBottomSheet<String>(
                                 context: context,
-                                backgroundColor: _card,
-                                builder: (ctx) => SafeArea(
-                                  child: ListView(
-                                    shrinkWrap: true,
-                                    children: _roles
-                                        .where((r) => !r.isDefault)
-                                        .where((r) => !_exemptRoleIds.contains(r.id))
-                                        .map(
-                                          (r) => ListTile(
-                                            title: Text(
-                                              r.name,
-                                              style: const TextStyle(
-                                                color: Colors.white,
+                                backgroundColor: ui.card,
+                                builder: (ctx) {
+                                  final bui = ServerSettingsUi.of(ctx);
+                                  return SafeArea(
+                                    child: ListView(
+                                      shrinkWrap: true,
+                                      children: _roles
+                                          .where((r) => !r.isDefault)
+                                          .where((r) => !_exemptRoleIds.contains(r.id))
+                                          .map(
+                                            (r) => ListTile(
+                                              title: Text(
+                                                r.name,
+                                                style: TextStyle(color: bui.text),
                                               ),
+                                              onTap: () => Navigator.pop(ctx, r.id),
                                             ),
-                                            onTap: () => Navigator.pop(ctx, r.id),
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  );
+                                },
                               );
                               if (picked == null) return;
                               setState(() {
@@ -414,26 +403,27 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                             onPressed: () async {
                               final picked = await showModalBottomSheet<String>(
                                 context: context,
-                                backgroundColor: _card,
-                                builder: (ctx) => SafeArea(
-                                  child: ListView(
-                                    shrinkWrap: true,
-                                    children: _channels
-                                        .where((c) => !_exemptChannelIds.contains(c.id))
-                                        .map(
-                                          (c) => ListTile(
-                                            title: Text(
-                                              '#${c.name}',
-                                              style: const TextStyle(
-                                                color: Colors.white,
+                                backgroundColor: ui.card,
+                                builder: (ctx) {
+                                  final bui = ServerSettingsUi.of(ctx);
+                                  return SafeArea(
+                                    child: ListView(
+                                      shrinkWrap: true,
+                                      children: _channels
+                                          .where((c) => !_exemptChannelIds.contains(c.id))
+                                          .map(
+                                            (c) => ListTile(
+                                              title: Text(
+                                                '#${c.name}',
+                                                style: TextStyle(color: bui.text),
                                               ),
+                                              onTap: () => Navigator.pop(ctx, c.id),
                                             ),
-                                            onTap: () => Navigator.pop(ctx, c.id),
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  );
+                                },
                               );
                               if (picked == null) return;
                               setState(() {
@@ -450,7 +440,8 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                     FilledButton(
                       onPressed: widget.canManage ? _save : null,
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF5865F2),
+                        backgroundColor: ui.accent,
+                        foregroundColor: ui.onAccent,
                         minimumSize: const Size(double.infinity, 48),
                       ),
                       child: const Text('Lưu cài đặt'),

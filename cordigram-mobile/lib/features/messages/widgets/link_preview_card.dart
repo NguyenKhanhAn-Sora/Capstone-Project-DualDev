@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/auth_storage.dart';
+import '../../../../core/theme/app_theme_context.dart';
+import '../utils/messages_i18n.dart';
 
 class _PreviewData {
   const _PreviewData({
@@ -107,10 +109,14 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_resolved || _data == null) return const SizedBox.shrink();
+    if (!_resolved) return const SizedBox.shrink();
+    final c = context.chrome;
+    if (_data == null) {
+      return _FallbackLinkChip(url: widget.url);
+    }
     final d = _data!;
     if (d.title == null && d.description == null && d.image == null) {
-      return const SizedBox.shrink();
+      return _FallbackLinkChip(url: widget.url);
     }
 
     return GestureDetector(
@@ -119,14 +125,9 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
         margin: const EdgeInsets.only(top: 6),
         constraints: const BoxConstraints(maxWidth: 320),
         decoration: BoxDecoration(
-          color: const Color(0xFF0E1E3F),
-          borderRadius: BorderRadius.circular(8),
-          border: Border(
-            left: const BorderSide(color: Color(0xFF3D63DD), width: 3),
-            top: BorderSide(color: Colors.white.withValues(alpha: 0.07), width: 1),
-            right: BorderSide(color: Colors.white.withValues(alpha: 0.07), width: 1),
-            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.07), width: 1),
-          ),
+          color: c.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: c.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -167,9 +168,9 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
                         ),
                       Expanded(
                         child: Text(
-                          (d.siteName ?? _hostnameOf(widget.url)).toUpperCase(),
-                          style: const TextStyle(
-                            color: Color(0xFF8A9DC0),
+                          (d.siteName ?? _linkPreviewHostname(widget.url)).toUpperCase(),
+                          style: TextStyle(
+                            color: c.textMuted,
                             fontSize: 10,
                             letterSpacing: 0.5,
                           ),
@@ -183,8 +184,8 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
                     const SizedBox(height: 3),
                     Text(
                       d.title!,
-                      style: const TextStyle(
-                        color: Color(0xFFDDE1E9),
+                      style: TextStyle(
+                        color: c.text,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -196,8 +197,8 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
                     const SizedBox(height: 2),
                     Text(
                       d.description!,
-                      style: const TextStyle(
-                        color: Color(0xFF8A9DC0),
+                      style: TextStyle(
+                        color: c.textMuted,
                         fontSize: 11,
                       ),
                       maxLines: 2,
@@ -213,11 +214,71 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
     );
   }
 
-  static String _hostnameOf(String url) {
-    try {
-      return Uri.parse(url).host.replaceFirst(RegExp(r'^www\.'), '');
-    } catch (_) {
-      return url;
-    }
+}
+
+String _linkPreviewHostname(String url) {
+  try {
+    return Uri.parse(url).host.replaceFirst(RegExp(r'^www\.'), '');
+  } catch (_) {
+    return url;
+  }
+}
+
+/// Khi API preview thất bại — vẫn hiện domain + mở liên kết (parity web fallback).
+class _FallbackLinkChip extends StatelessWidget {
+  const _FallbackLinkChip({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.chrome;
+    final host = _linkPreviewHostname(url);
+    return GestureDetector(
+      onTap: () async {
+        final uri = Uri.tryParse(url);
+        if (uri != null && await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(top: 6),
+        constraints: const BoxConstraints(maxWidth: 320),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: c.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.link_rounded, size: 16, color: c.accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    host,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: c.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    MessagesI18n.t('chat.linkPreview.visitLink'),
+                    style: TextStyle(color: c.textMuted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

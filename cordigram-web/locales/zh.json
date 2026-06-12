@@ -1852,7 +1852,11 @@
       "dark": "深色",
       "mutualHint": "消息界面只保存一套配色：背景预设与 Boost 主题色写入同一值，不会叠加。每个色块会重绘整个消息界面（背景、侧栏、强调色等）。未订阅 Boost 仅可用背景；订阅后可切换到主题色。",
       "modeBackground": "当前：背景预设",
-      "modeAccent": "当前：主题色（Boost）"
+      "modeAccent": "当前：主题色（Boost）",
+      "modeFollowSocial": "当前：与 Social 一致",
+      "followSocialTitle": "与 Social 一致",
+      "followSocialHint": "跟随 Social 的浅色、深色或银河模式。仅影响消息，不更改 Social。",
+      "followSocialPick": "使用 Social 外观"
     },
     "appearanceBg": {
       "title": "背景",

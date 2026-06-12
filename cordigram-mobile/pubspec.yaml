@@ -67,6 +67,8 @@ dependencies:
   package_info_plus: ^8.0.0
   open_file: ^3.3.2
   app_links: ^6.4.0
+  cached_network_image: ^3.4.1
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

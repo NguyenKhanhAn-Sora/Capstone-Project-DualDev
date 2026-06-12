@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/servers_service.dart';
+import 'server_settings_ui.dart';
 
 class ServerBansScreen extends StatefulWidget {
   const ServerBansScreen({
@@ -17,9 +18,6 @@ class ServerBansScreen extends StatefulWidget {
 }
 
 class _ServerBansScreenState extends State<ServerBansScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-
   List<Map<String, dynamic>> _rows = [];
   List<Map<String, dynamic>> _restricted = [];
   bool _loading = true;
@@ -75,23 +73,27 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
   }
 
   Future<void> _unban(String userId) async {
+    final ui = ServerSettingsUi.of(context);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: const Color(0xFF152A52),
-        title: const Text('Gỡ cấm?', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'Người này có thể tham gia lại bằng lời mời.',
-          style: TextStyle(color: Color(0xFFB8C8E8)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
-          TextButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('Gỡ cấm', style: TextStyle(color: Color(0xFF7FB6FF))),
+      builder: (c) {
+        final dui = ServerSettingsUi.of(c);
+        return AlertDialog(
+          backgroundColor: dui.card,
+          title: Text('Gỡ cấm?', style: TextStyle(color: dui.text)),
+          content: Text(
+            'Người này có thể tham gia lại bằng lời mời.',
+            style: TextStyle(color: dui.textMuted),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+            TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: Text('Gỡ cấm', style: TextStyle(color: ui.accent)),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
     try {
@@ -125,7 +127,8 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
     }
   }
 
-  Widget _userTile({
+  Widget _userTile(
+    ServerSettingsUi ui, {
     required Map<String, dynamic> r,
     required String uid,
     required String name,
@@ -136,19 +139,19 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: _card,
+        color: ui.card,
         borderRadius: BorderRadius.circular(12),
         child: ListTile(
           leading: CircleAvatar(
-            backgroundColor: const Color(0xFF21345D),
+            backgroundColor: ui.fieldFill,
             backgroundImage: (r['avatarUrl']?.toString().isNotEmpty == true)
                 ? NetworkImage(r['avatarUrl'].toString())
                 : null,
             child: r['avatarUrl'] == null
                 ? Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: ui.text,
                       fontWeight: FontWeight.w700,
                     ),
                   )
@@ -156,8 +159,8 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
           ),
           title: Text(
             name,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: ui.text,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -165,7 +168,7 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
             subtitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 12),
+            style: TextStyle(color: ui.textMuted, fontSize: 12),
           ),
           trailing: onAction == null
               ? null
@@ -173,7 +176,7 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
                   onPressed: onAction,
                   child: Text(
                     actionLabel,
-                    style: const TextStyle(color: Color(0xFF7FB6FF)),
+                    style: TextStyle(color: ui.accent),
                   ),
                 ),
         ),
@@ -183,46 +186,41 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final hPad = MediaQuery.sizeOf(context).width > 520 ? 24.0 : 14.0;
 
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: const Text('Danh sách ban', style: TextStyle(fontWeight: FontWeight.w800)),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(
+        title: 'Danh sách ban',
         actions: [
           IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: ui.accent))
           : _error != null
-          ? Center(child: Text(_error!))
+          ? Center(
+              child: Text(_error!, style: TextStyle(color: ui.textMuted)),
+            )
           : ListView(
               padding: EdgeInsets.fromLTRB(hPad, 10, hPad, pad.bottom + 16),
               children: [
                 TextField(
                   controller: _search,
                   onChanged: (_) => setState(() {}),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
+                  style: TextStyle(color: ui.text),
+                  decoration: ui.fieldDecoration(
                     hintText: 'Tìm theo tên hoặc user ID',
-                    hintStyle: const TextStyle(color: Color(0xFF6B7A99)),
-                    filled: true,
-                    fillColor: _card,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    prefixIcon: const Icon(Icons.search, color: Color(0xFF8EA3CC)),
+                    prefixIcon: Icon(Icons.search, color: ui.textMuted),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Đã cấm',
                   style: TextStyle(
-                    color: Color(0xFF8EA3CC),
+                    color: ui.textMuted,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                     letterSpacing: 0.5,
@@ -230,9 +228,9 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
                 ),
                 const SizedBox(height: 8),
                 if (_filtered.isEmpty)
-                  const Text(
+                  Text(
                     'Không có lệnh cấm',
-                    style: TextStyle(color: Color(0xFF8EA3CC)),
+                    style: TextStyle(color: ui.textMuted),
                   )
                 else
                   ..._filtered.map((r) {
@@ -240,6 +238,7 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
                     final name = (r['displayName'] ?? r['username'] ?? uid).toString();
                     final reason = (r['reason'] ?? '').toString();
                     return _userTile(
+                      ui,
                       r: r,
                       uid: uid,
                       name: name,
@@ -250,25 +249,26 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
                   }),
                 if (widget.canUnban && _restricted.isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'Hạn chế đề cập',
                     style: TextStyle(
-                      color: Color(0xFF8EA3CC),
+                      color: ui.textMuted,
                       fontWeight: FontWeight.w800,
                       fontSize: 12,
                       letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Thành viên bị AutoMod hạn chế @ — có thể gỡ tại đây.',
-                    style: TextStyle(color: Color(0xFF8EA3CC), fontSize: 13),
+                    style: TextStyle(color: ui.textMuted, fontSize: 13),
                   ),
                   const SizedBox(height: 8),
                   ..._restricted.map((r) {
                     final uid = (r['userId'] ?? '').toString();
                     final name = (r['displayName'] ?? r['username'] ?? uid).toString();
                     return _userTile(
+                      ui,
                       r: r,
                       uid: uid,
                       name: name,

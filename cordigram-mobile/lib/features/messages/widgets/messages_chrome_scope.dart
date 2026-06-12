@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/config/app_theme.dart';
 import '../../../core/services/accent_color_controller.dart';
+import '../../../core/services/appearance_preset_controller.dart';
 import '../../../core/services/language_controller.dart';
 import '../../../core/services/messages_shell_theme_controller.dart';
 import '../../../core/theme/messages_chrome_palette.dart';
+import 'messages_galaxy_background.dart';
 
 /// Theme Messages — chỉ subtree này; không đổi Social (feed, profile, …).
 class MessagesChromeScope extends StatelessWidget {
@@ -18,6 +20,7 @@ class MessagesChromeScope extends StatelessWidget {
       listenable: Listenable.merge([
         AccentColorController.instance,
         MessagesShellThemeController.instance,
+        AppearancePresetController.instance,
         LanguageController.instance,
       ]),
       builder: (context, _) {
@@ -27,15 +30,25 @@ class MessagesChromeScope extends StatelessWidget {
             ? Brightness.light
             : Brightness.dark;
         final theme = AppTheme.fromPalette(palette, brightness: brightness);
-        return Theme(
-          data: theme,
-          child: DefaultTextStyle(
-            style: TextStyle(color: palette.text, fontSize: 14),
-            child: IconTheme(
-              data: IconThemeData(color: palette.textMuted),
-              child: child,
+        final showGalaxy =
+            MessagesShellThemeController.instance.theme ==
+                MessagesShellTheme.galaxy &&
+            AccentColorController.instance.isFollowingSocialAppearance;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (showGalaxy) const MessagesGalaxyBackground(),
+            Theme(
+              data: theme,
+              child: DefaultTextStyle(
+                style: TextStyle(color: palette.text, fontSize: 14),
+                child: IconTheme(
+                  data: IconThemeData(color: palette.textMuted),
+                  child: child,
+                ),
+              ),
             ),
-          ),
+          ],
         );
       },
     );

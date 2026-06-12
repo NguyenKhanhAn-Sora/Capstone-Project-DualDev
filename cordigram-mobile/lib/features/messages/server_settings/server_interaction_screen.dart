@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/server_models.dart';
 import '../models/server_role_models.dart';
 import '../services/servers_service.dart';
+import 'server_settings_ui.dart';
 
 /// Tin nhắn hệ thống + thông báo vai trò — GET/PATCH `/interaction-settings`.
 class ServerInteractionScreen extends StatefulWidget {
@@ -20,9 +21,6 @@ class ServerInteractionScreen extends StatefulWidget {
 }
 
 class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
-  static const Color _bg = Color(0xFF08183A);
-  static const Color _card = Color(0xFF0E1F45);
-
   Map<String, dynamic>? _settings;
   List<ServerChannel> _textChannels = [];
   List<Map<String, dynamic>> _roles = [];
@@ -148,18 +146,16 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ui = ServerSettingsUi.of(context);
     final pad = MediaQuery.paddingOf(context);
     final w = MediaQuery.sizeOf(context).width;
     final hPad = w > 520 ? 24.0 : 14.0;
 
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: const Text('Tương tác', style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
+      backgroundColor: ui.bg,
+      appBar: ui.buildAppBar(title: 'Tương tác'),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: ui.accent))
           : _error != null
               ? Center(
                   child: Padding(
@@ -167,7 +163,11 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_error!, textAlign: TextAlign.center),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: ui.textMuted),
+                        ),
                         TextButton(onPressed: _load, child: const Text('Thử lại')),
                       ],
                     ),
@@ -175,7 +175,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: _load,
-                  color: const Color(0xFF7FB6FF),
+                  color: ui.accent,
                   child: ListView(
                     padding: EdgeInsets.fromLTRB(hPad, 12, hPad, pad.bottom + 24),
                     children: [
@@ -183,44 +183,51 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                         widget.canManage
                             ? 'Chỉ chủ hoặc người có quyền Quản lý máy chủ mới đổi được các mục dưới (nếu API cho phép).'
                             : 'Bạn chỉ xem được cài đặt.',
-                        style: const TextStyle(color: Color(0xFF8EA3CC), fontSize: 13),
+                        style: TextStyle(color: ui.textMuted, fontSize: 13),
                       ),
                       const SizedBox(height: 16),
                       _cardBlock(
+                        ui,
                         title: 'Tin nhắn hệ thống',
                         child: Column(
                           children: [
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('Bật tin nhắn hệ thống',
-                                  style: TextStyle(color: Colors.white)),
+                              title: Text(
+                                'Bật tin nhắn hệ thống',
+                                style: TextStyle(color: ui.text),
+                              ),
                               value: _settings?['systemMessagesEnabled'] == true,
                               onChanged: _canEdit
                                   ? (v) => _patch({'systemMessagesEnabled': v})
                                   : null,
-                              activeThumbColor: const Color(0xFF00C48C),
+                              activeThumbColor: ui.accent,
                             ),
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('Chào mừng thành viên mới',
-                                  style: TextStyle(color: Colors.white)),
+                              title: Text(
+                                'Chào mừng thành viên mới',
+                                style: TextStyle(color: ui.text),
+                              ),
                               value: _settings?['welcomeMessageEnabled'] == true,
                               onChanged: _canEdit
                                   ? (v) => _patch({'welcomeMessageEnabled': v})
                                   : null,
-                              activeThumbColor: const Color(0xFF00C48C),
+                              activeThumbColor: ui.accent,
                             ),
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('Trả lời chào mừng bằng sticker',
-                                  style: TextStyle(color: Colors.white)),
+                              title: Text(
+                                'Trả lời chào mừng bằng sticker',
+                                style: TextStyle(color: ui.text),
+                              ),
                               value:
                                   _settings?['stickerReplyWelcomeEnabled'] == true,
                               onChanged: _canEdit
                                   ? (v) =>
                                       _patch({'stickerReplyWelcomeEnabled': v})
                                   : null,
-                              activeThumbColor: const Color(0xFF00C48C),
+                              activeThumbColor: ui.accent,
                             ),
                             const SizedBox(height: 8),
                             Align(
@@ -228,7 +235,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                               child: Text(
                                 'Kênh tin hệ thống',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.85),
+                                  color: ui.text.withValues(alpha: 0.85),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -236,18 +243,25 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String?>(
                               value: _effectiveChannelId(),
-                              decoration: _dropdownDec(),
-                              dropdownColor: _card,
-                              style: const TextStyle(color: Colors.white),
+                              decoration: _dropdownDec(ui),
+                              dropdownColor: ui.card,
+                              style: TextStyle(color: ui.text),
                               items: [
-                                const DropdownMenuItem<String?>(
+                                DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text('— Chưa chọn —'),
+                                  child: Text(
+                                    '— Chưa chọn —',
+                                    style: TextStyle(color: ui.text),
+                                  ),
                                 ),
                                 ..._textChannels.map(
                                   (c) => DropdownMenuItem<String?>(
                                     value: c.id,
-                                    child: Text('#${c.name}', overflow: TextOverflow.ellipsis),
+                                    child: Text(
+                                      '#${c.name}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(color: ui.text),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -261,7 +275,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                               child: Text(
                                 'Thông báo mặc định',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.85),
+                                  color: ui.text.withValues(alpha: 0.85),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -273,17 +287,23 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                                       'mentions'
                                   ? 'mentions'
                                   : 'all',
-                              decoration: _dropdownDec(),
-                              dropdownColor: _card,
-                              style: const TextStyle(color: Colors.white),
-                              items: const [
+                              decoration: _dropdownDec(ui),
+                              dropdownColor: ui.card,
+                              style: TextStyle(color: ui.text),
+                              items: [
                                 DropdownMenuItem(
                                   value: 'all',
-                                  child: Text('Tất cả tin nhắn'),
+                                  child: Text(
+                                    'Tất cả tin nhắn',
+                                    style: TextStyle(color: ui.text),
+                                  ),
                                 ),
                                 DropdownMenuItem(
                                   value: 'mentions',
-                                  child: Text('Chỉ khi được nhắc'),
+                                  child: Text(
+                                    'Chỉ khi được nhắc',
+                                    style: TextStyle(color: ui.text),
+                                  ),
                                 ),
                               ],
                               onChanged: _canEdit
@@ -299,6 +319,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                       ),
                       const SizedBox(height: 20),
                       _cardBlock(
+                        ui,
                         title: 'Thông báo vai trò (tab Dành cho bạn)',
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -306,8 +327,8 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                             TextField(
                               controller: _notifTitle,
                               enabled: _canEdit,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _fieldDec('Tiêu đề'),
+                              style: TextStyle(color: ui.text),
+                              decoration: ui.fieldDecoration(hintText: 'Tiêu đề'),
                             ),
                             const SizedBox(height: 10),
                             TextField(
@@ -315,8 +336,8 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                               enabled: _canEdit,
                               minLines: 2,
                               maxLines: 5,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _fieldDec('Nội dung'),
+                              style: TextStyle(color: ui.text),
+                              decoration: ui.fieldDecoration(hintText: 'Nội dung'),
                             ),
                             const SizedBox(height: 12),
                             SegmentedButton<String>(
@@ -340,11 +361,13 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                               const SizedBox(height: 10),
                               DropdownButtonFormField<String>(
                                 value: _notifRoleId,
-                                decoration: _dropdownDec(),
-                                dropdownColor: _card,
-                                hint: const Text('Chọn vai trò',
-                                    style: TextStyle(color: Color(0xFF8EA3CC))),
-                                style: const TextStyle(color: Colors.white),
+                                decoration: _dropdownDec(ui),
+                                dropdownColor: ui.card,
+                                hint: Text(
+                                  'Chọn vai trò',
+                                  style: TextStyle(color: ui.textMuted),
+                                ),
+                                style: TextStyle(color: ui.text),
                                 items: _roles
                                     .where((r) => r['isDefault'] != true)
                                     .map(
@@ -353,6 +376,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                                         child: Text(
                                           r['name']?.toString() ?? '',
                                           overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(color: ui.text),
                                         ),
                                       ),
                                     )
@@ -366,7 +390,8 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                             FilledButton(
                               onPressed: _canEdit ? _sendRoleNotif : null,
                               style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF5865F2),
+                                backgroundColor: ui.accent,
+                                foregroundColor: ui.onAccent,
                               ),
                               child: const Text('Gửi thông báo'),
                             ),
@@ -386,26 +411,22 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
     return exists ? id : null;
   }
 
-  InputDecoration _fieldDec(String h) => InputDecoration(
-        hintText: h,
-        hintStyle: const TextStyle(color: Color(0xFF6B7A99)),
+  InputDecoration _dropdownDec(ServerSettingsUi ui) => InputDecoration(
         filled: true,
-        fillColor: _card,
+        fillColor: ui.card,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       );
 
-  InputDecoration _dropdownDec() => InputDecoration(
-        filled: true,
-        fillColor: _card,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      );
-
-  Widget _cardBlock({required String title, required Widget child}) {
+  Widget _cardBlock(
+    ServerSettingsUi ui, {
+    required String title,
+    required Widget child,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _card,
+        color: ui.card,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -413,8 +434,8 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: ui.text,
               fontWeight: FontWeight.w800,
               fontSize: 15,
             ),
