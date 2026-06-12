@@ -2061,6 +2061,15 @@ export default function MessagesPage() {
     callTabIdRef.current = getCallTabId();
   }
   const currentUserIdRef = useRef(currentUserId);
+  const dismissOutgoingCallPopup = useCallback((peerId: string) => {
+    setOutgoingCallsByPeer((prev) => {
+      if (!prev[peerId]) return prev;
+      const next = { ...prev };
+      delete next[peerId];
+      outgoingCallsByPeerRef.current = next;
+      return next;
+    });
+  }, []);
   const markCallTabOpen = useCallback((peerId: string, callId?: string) => {
     openedCallTabPeersRef.current.add(peerId);
     addActiveDmCallPeer(peerId);
@@ -2071,7 +2080,8 @@ export default function MessagesPage() {
     if (resolvedCallId) {
       setActiveDmCallIdForHeartbeat(resolvedCallId);
     }
-  }, []);
+    dismissOutgoingCallPopup(peerId);
+  }, [dismissOutgoingCallPopup]);
   const markCallTabClosed = useCallback((peerId: string) => {
     openedCallTabPeersRef.current.delete(peerId);
     removeActiveDmCallPeer(peerId);
@@ -2697,16 +2707,6 @@ export default function MessagesPage() {
     [currentUserProfile, token],
   );
 
-  const dismissOutgoingCallPopup = useCallback((peerId: string) => {
-    setOutgoingCallsByPeer((prev) => {
-      if (!prev[peerId]) return prev;
-      const next = { ...prev };
-      delete next[peerId];
-      outgoingCallsByPeerRef.current = next;
-      return next;
-    });
-  }, []);
-
   const openCallTabForPeer = useCallback(
     (peerId: string, roomNameOverride?: string): boolean => {
       if (!currentUserProfile || !token) return false;
@@ -2781,14 +2781,19 @@ export default function MessagesPage() {
       const roomName = roomNameOverride || outgoing?.roomName;
       if (!roomName) return;
 
-      markOutgoingAnswered(peerId, roomName, callId);
+      if (callId) {
+        callIdsByPeerRef.current[peerId] = callId;
+      }
 
       const opened = openCallTabForPeer(peerId, roomName);
-      if (!opened) {
-        showTransientError(
-          "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi nhấn Tham gia.",
-        );
+      if (opened) {
+        return;
       }
+
+      markOutgoingAnswered(peerId, roomName, callId);
+      showTransientError(
+        "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi nhấn Tham gia.",
+      );
     },
     [markOutgoingAnswered, openCallTabForPeer, showTransientError],
   );
@@ -2798,10 +2803,32 @@ export default function MessagesPage() {
       const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
       if (!hasOutgoing && !roomFromAnswer) return;
 
-      markOutgoingAnswered(peerId, roomFromAnswer, callId);
+      if (callId) {
+        callIdsByPeerRef.current[peerId] = callId;
+      }
+      if (hasOutgoing && roomFromAnswer) {
+        const existing = outgoingCallsByPeerRef.current[peerId];
+        if (existing) {
+          const patched = {
+            ...existing,
+            roomName: roomFromAnswer,
+            callId:
+              callId ||
+              existing.callId ||
+              callIdsByPeerRef.current[peerId],
+          };
+          const next = { ...outgoingCallsByPeerRef.current, [peerId]: patched };
+          outgoingCallsByPeerRef.current = next;
+        }
+      }
 
       const opened = openCallTabForPeer(peerId, roomFromAnswer);
-      if (!opened && hasOutgoing) {
+      if (opened) {
+        return;
+      }
+
+      if (hasOutgoing) {
+        markOutgoingAnswered(peerId, roomFromAnswer, callId);
         showTransientError(
           "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup rồi nhấn Tham gia.",
         );
@@ -3208,9 +3235,15 @@ export default function MessagesPage() {
         continue;
       }
       const peerId = session.peerId;
+      dismissOutgoingCallPopup(peerId);
       const out = outgoingCallsByPeerRef.current[peerId];
-      if (!out || out.status !== "calling") continue;
-      handlePeerAnsweredCall(peerId, session.roomId, session.callId);
+      if (!out) continue;
+      if (
+        out.status === "calling" ||
+        (out.status === "answered" && !openedCallTabPeersRef.current.has(peerId))
+      ) {
+        handlePeerAnsweredCall(peerId, session.roomId, session.callId);
+      }
     }
 
     setOutgoingCallsByPeer((prev) => {
@@ -3230,7 +3263,7 @@ export default function MessagesPage() {
       }
       return prev;
     });
-  }, [callSessionsSync, handlePeerAnsweredCall]);
+  }, [callSessionsSync, handlePeerAnsweredCall, dismissOutgoingCallPopup]);
 
   // ✅ Listen for the call tab telling us the user ended the call.
   //
@@ -3258,6 +3291,7 @@ export default function MessagesPage() {
       if (!data || typeof data !== "object") return;
       if (data.type === "call-active" && data.peerId) {
         markCallTabOpen(data.peerId, data.callId);
+        dismissOutgoingCallPopup(data.peerId);
         return;
       }
       if (data.type === "self-ended" && data.peerId) {
@@ -3285,7 +3319,7 @@ export default function MessagesPage() {
       channel.removeEventListener("message", onMessage);
       channel.close();
     };
-  }, [endCall, markCallTabClosed, markCallTabOpen]);
+  }, [endCall, markCallTabClosed, markCallTabOpen, dismissOutgoingCallPopup]);
 
   // ✅ Listen for call-rejected event
   useEffect(() => {
@@ -13894,7 +13928,9 @@ export default function MessagesPage() {
         />
       )}
 
-      {Object.entries(outgoingCallsByPeer).map(([peerId, outgoingCall]) => (
+      {Object.entries(outgoingCallsByPeer)
+        .filter(([peerId]) => !activeCallTabPeers.includes(peerId))
+        .map(([peerId, outgoingCall]) => (
         <OutgoingCallPopup
           key={peerId}
           receiverName={
