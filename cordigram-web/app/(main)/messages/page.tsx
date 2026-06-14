@@ -8319,16 +8319,6 @@ export default function MessagesPage() {
         return (
           <div>
             {textBefore && <div style={{ marginBottom: 4 }}>{textBefore}</div>}
-            <a
-              href={fullUrl}
-              style={{
-                color: "var(--color-chat-accent)",
-                fontSize: 14,
-                wordBreak: "break-all",
-              }}
-            >
-              {fullUrl}
-            </a>
             <ServerInviteCard serverId={sid} inviteUrl={fullUrl} />
             {textAfter && <div style={{ marginTop: 4 }}>{textAfter}</div>}
           </div>
@@ -9602,10 +9592,6 @@ export default function MessagesPage() {
                     title={t("chat.messagesPage.searchButtonAria")}
                     aria-label={t("chat.messagesPage.searchButtonAria")}
                   >
-                    <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
                     {t("chat.messagesPage.searchButtonLabel")}
                   </button>
                 </div>

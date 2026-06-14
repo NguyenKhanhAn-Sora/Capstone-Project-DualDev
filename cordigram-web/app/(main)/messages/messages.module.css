@@ -597,7 +597,7 @@
 
 .searchButton {
   width: 100%;
-  padding: 9px 14px 9px 36px;
+  padding: 9px 14px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-chat-input);
@@ -607,7 +607,7 @@
   transition: all 0.22s ease;
   font-family: var(--font-roboto);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   position: relative;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -618,21 +618,6 @@
   border-color: var(--color-primary);
   color: var(--color-text);
   box-shadow: 0 0 0 3px var(--accent-soft), 0 2px 12px rgba(0, 0, 0, 0.15);
-}
-
-.searchIcon {
-  position: absolute;
-  left: 26px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-text-muted);
-  pointer-events: none;
-  flex-shrink: 0;
-  transition: color 0.18s ease;
-}
-
-.searchButton:hover .searchIcon {
-  color: var(--color-text);
 }
 
 /* Server header (tên máy chủ + hồ sơ + mời) */
@@ -5053,9 +5038,10 @@
 /* ── Search button: glass card style ── */
 :global([data-messages-theme="galaxy"]) .searchButton {
   border-radius: 10px;
-  padding: 10px 14px 10px 38px;
+  padding: 10px 14px;
   font-size: 13px;
   letter-spacing: 0.01em;
+  text-align: center;
 }
 
 :global([data-messages-theme="galaxy"]) .searchButton:hover {
