@@ -53,6 +53,20 @@ class DmUnreadCountEvent {
   final int? conversationUnread;
 }
 
+class DmBlockUpdatedEvent {
+  const DmBlockUpdatedEvent({
+    required this.blocked,
+    this.blockerId,
+    this.peerId,
+    this.direction,
+  });
+
+  final bool blocked;
+  final String? blockerId;
+  final String? peerId;
+  final String? direction;
+}
+
 class DmCallEvent {
   const DmCallEvent({
     required this.fromUserId,
@@ -132,6 +146,8 @@ class DirectMessagesRealtimeService {
       StreamController<DmMessage>.broadcast();
   static final StreamController<DmUnreadCountEvent> _unreadController =
       StreamController<DmUnreadCountEvent>.broadcast();
+  static final StreamController<DmBlockUpdatedEvent> _blockUpdatedController =
+      StreamController<DmBlockUpdatedEvent>.broadcast();
   static final StreamController<PresenceState> _presenceController =
       StreamController<PresenceState>.broadcast();
   static final StreamController<Map<String, dynamic>> _reactionController =
@@ -164,6 +180,8 @@ class DirectMessagesRealtimeService {
   static Stream<DmMessage> get newMessages => _newMessageController.stream;
   static Stream<DmUnreadCountEvent> get unreadCounts =>
       _unreadController.stream;
+  static Stream<DmBlockUpdatedEvent> get blockUpdated =>
+      _blockUpdatedController.stream;
   static Stream<PresenceState> get presences => _presenceController.stream;
   static Stream<Map<String, dynamic>> get reactions =>
       _reactionController.stream;
@@ -232,6 +250,18 @@ class DirectMessagesRealtimeService {
           totalUnread: total is num ? total.toInt() : 0,
           fromUserId: payload['fromUserId']?.toString(),
           conversationUnread: unread is num ? unread.toInt() : null,
+        ),
+      );
+    });
+
+    socket.on('dm-block-updated', (payload) {
+      if (payload is! Map) return;
+      _blockUpdatedController.add(
+        DmBlockUpdatedEvent(
+          blocked: payload['blocked'] == true,
+          blockerId: payload['blockerId']?.toString(),
+          peerId: payload['peerId']?.toString(),
+          direction: payload['direction']?.toString(),
         ),
       );
     });
@@ -527,6 +557,7 @@ class DirectMessagesRealtimeService {
       socket.off('new-message');
       socket.off('message-sent');
       socket.off('dm-unread-count');
+      socket.off('dm-block-updated');
       socket.off('presence-updated');
       socket.off('presence-snapshot');
       socket.off('reaction-added');

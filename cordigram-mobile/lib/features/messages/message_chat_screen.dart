@@ -1948,7 +1948,11 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
         ? widget.thread.name.trim().substring(0, 1).toUpperCase()
         : 'U';
     final myId = widget.controller.myUserId;
-    final isBlocked = widget.controller.isUserBlocked(widget.thread.id);
+    final isBlockedByMe = widget.controller.isUserBlocked(widget.thread.id);
+    final isBlockedByPeer = widget.controller.isUserBlockedByPeer(
+      widget.thread.id,
+    );
+    final isBlocked = isBlockedByMe || isBlockedByPeer;
 
     final canCall = widget.controller.canCallPeer(widget.thread.id);
 
@@ -2100,7 +2104,13 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Bạn đã chặn ${widget.thread.name}',
+                                isBlockedByPeer
+                                    ? MessagesI18n.dmBlockedByPeer(
+                                        widget.thread.name,
+                                      )
+                                    : MessagesI18n.dmBlockedByYou(
+                                        widget.thread.name,
+                                      ),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 15,
@@ -2108,24 +2118,28 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 12),
-                              FilledButton(
-                                onPressed: () async {
-                                  try {
-                                    await widget.controller.unblockUser(
-                                      widget.thread.id,
-                                    );
-                                  } catch (_) {
-                                    if (!mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Không thể gỡ chặn'),
-                                      ),
-                                    );
-                                  }
-                                },
-                                child: const Text('Gỡ chặn'),
-                              ),
+                              if (isBlockedByMe) ...[
+                                const SizedBox(height: 12),
+                                FilledButton(
+                                  onPressed: () async {
+                                    try {
+                                      await widget.controller.unblockUser(
+                                        widget.thread.id,
+                                      );
+                                    } catch (_) {
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            MessagesI18n.dmBlockUpdateError(),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: Text(MessagesI18n.dmUnblock()),
+                                ),
+                              ],
                             ],
                           ),
                         ),

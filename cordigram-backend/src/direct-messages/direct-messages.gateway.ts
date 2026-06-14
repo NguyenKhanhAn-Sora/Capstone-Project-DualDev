@@ -1235,4 +1235,20 @@ export class DirectMessagesGateway
       this.server.to(socketId).emit(event, payload);
     }
   }
+
+  emitDmBlockUpdated(payload: {
+    blockerId: string;
+    blockedId: string;
+    blocked: boolean;
+  }): void {
+    this.emitToAllUserSockets(payload.blockedId, 'dm-block-updated', {
+      blockerId: payload.blockerId,
+      blocked: payload.blocked,
+    });
+    this.emitToAllUserSockets(payload.blockerId, 'dm-block-updated', {
+      peerId: payload.blockedId,
+      blocked: payload.blocked,
+      direction: 'outgoing',
+    });
+  }
 }

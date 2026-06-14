@@ -19,6 +19,7 @@ class DmConversation {
     this.category,
     this.isFollowing = false,
     this.isBlockedByMe = false,
+    this.isBlockedByPeer = false,
   });
 
   final String userId;
@@ -40,6 +41,7 @@ class DmConversation {
   final String? category;
   final bool isFollowing;
   final bool isBlockedByMe;
+  final bool isBlockedByPeer;
 
   bool get isMuted {
     if (mutedForever) return true;
@@ -102,6 +104,7 @@ class DmConversation {
       }(),
       isFollowing: json['isFollowing'] == true,
       isBlockedByMe: json['isBlockedByMe'] == true,
+      isBlockedByPeer: json['isBlockedByPeer'] == true,
     );
   }
 }

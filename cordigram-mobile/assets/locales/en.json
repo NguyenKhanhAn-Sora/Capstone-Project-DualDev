@@ -3745,6 +3745,8 @@
       "unmuteNotifications": "Turn notifications back on",
       "block": "Block",
       "unblock": "Unblock",
+      "blockedByYou": "You blocked {name}",
+      "blockedByPeer": "You were blocked by {name}",
       "muteDialogTitle": "Mute message notifications",
       "muteDialogActiveTitle": "Notifications are off",
       "turnOnNotifications": "Turn notifications back on",

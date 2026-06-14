@@ -31,9 +31,11 @@ class MessagesController extends ChangeNotifier {
   final Map<String, DateTime?> _conversationMutedUntil = {};
   final Set<String> _conversationMutedForever = {};
   final Set<String> _blockedUsers = {};
+  final Set<String> _blockedByPeerUsers = {};
 
   StreamSubscription<DmMessage>? _newMessageSub;
   StreamSubscription<DmUnreadCountEvent>? _unreadSub;
+  StreamSubscription<DmBlockUpdatedEvent>? _blockUpdatedSub;
   StreamSubscription<PresenceState>? _presenceSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
@@ -125,6 +127,9 @@ class MessagesController extends ChangeNotifier {
     );
     _unreadSub = DirectMessagesRealtimeService.unreadCounts.listen(
       _onUnreadCount,
+    );
+    _blockUpdatedSub = DirectMessagesRealtimeService.blockUpdated.listen(
+      _onBlockUpdatedEvent,
     );
     _presenceSub = DirectMessagesRealtimeService.presences.listen(_onPresence);
     _reactionSub = DirectMessagesRealtimeService.reactions.listen(_onReactionEvent);
@@ -235,6 +240,7 @@ class MessagesController extends ChangeNotifier {
     LanguageController.instance.removeListener(_onLanguageChanged);
     await _newMessageSub?.cancel();
     await _unreadSub?.cancel();
+    await _blockUpdatedSub?.cancel();
     await _presenceSub?.cancel();
     await _reactionSub?.cancel();
     await _deletedSub?.cancel();
@@ -284,6 +290,14 @@ class MessagesController extends ChangeNotifier {
         ..addAll(following.map((c) => c.userId));
       for (final c in conversations) {
         final peerId = c.userId;
+        if (c.isBlockedByMe) {
+          _blockedUsers.add(peerId);
+        }
+        if (c.isBlockedByPeer) {
+          _blockedByPeerUsers.add(peerId);
+        } else {
+          _blockedByPeerUsers.remove(peerId);
+        }
         if (c.lastMessageAt != null) {
           final ms = c.lastMessageAt!.millisecondsSinceEpoch;
           final prev = _peerLastActivityMs[peerId] ?? 0;
@@ -862,6 +876,29 @@ class MessagesController extends ChangeNotifier {
   }
 
   bool isUserBlocked(String userId) => _blockedUsers.contains(userId);
+
+  bool isUserBlockedByPeer(String userId) => _blockedByPeerUsers.contains(userId);
+
+  void _onBlockUpdatedEvent(DmBlockUpdatedEvent event) {
+    if (event.direction == 'outgoing') {
+      final peerId = event.peerId;
+      if (peerId == null || peerId.isEmpty) return;
+      if (event.blocked) {
+        _blockedUsers.add(peerId);
+      } else {
+        _blockedUsers.remove(peerId);
+      }
+    } else {
+      final blockerId = event.blockerId;
+      if (blockerId == null || blockerId.isEmpty) return;
+      if (event.blocked) {
+        _blockedByPeerUsers.add(blockerId);
+      } else {
+        _blockedByPeerUsers.remove(blockerId);
+      }
+    }
+    notifyListeners();
+  }
 
   Future<void> refreshBlockedUsers() async {
     try {

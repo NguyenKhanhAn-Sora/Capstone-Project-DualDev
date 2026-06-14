@@ -107,6 +107,14 @@ export interface DmUnreadCountEvent {
   _seq?: number;
 }
 
+export interface DmBlockUpdatedEvent {
+  blockerId?: string;
+  peerId?: string;
+  blocked: boolean;
+  direction?: "outgoing";
+  _seq?: number;
+}
+
 export interface BoostEntitlementUpdatedEvent {
   userId: string;
   scope?: "messages" | "social";
@@ -147,6 +155,8 @@ export const useDirectMessages = ({
   const [newMessage, setNewMessage] = useState<DirectMessageEvent | null>(null);
   const [dmUnreadCountEvent, setDmUnreadCountEvent] =
     useState<DmUnreadCountEvent | null>(null);
+  const [dmBlockUpdatedEvent, setDmBlockUpdatedEvent] =
+    useState<DmBlockUpdatedEvent | null>(null);
   const [messageSent, setMessageSent] = useState<DirectMessage | false>(false);
   const [userTyping, setUserTyping] = useState<{
     fromUserId: string;
@@ -282,6 +292,25 @@ export const useDirectMessages = ({
             typeof data.conversationUnread === "number"
               ? data.conversationUnread
               : null,
+          _seq: Date.now(),
+        });
+      },
+    );
+
+    socket.on(
+      "dm-block-updated",
+      (data: {
+        blockerId?: string;
+        peerId?: string;
+        blocked?: boolean;
+        direction?: "outgoing";
+      }) => {
+        if (!data || typeof data !== "object") return;
+        setDmBlockUpdatedEvent({
+          blockerId: data.blockerId ? String(data.blockerId) : undefined,
+          peerId: data.peerId ? String(data.peerId) : undefined,
+          blocked: data.blocked === true,
+          direction: data.direction,
           _seq: Date.now(),
         });
       },
@@ -747,6 +776,7 @@ export const useDirectMessages = ({
     isConnected,
     newMessage,
     dmUnreadCountEvent,
+    dmBlockUpdatedEvent,
     messageSent,
     userTyping,
     messagesRead,

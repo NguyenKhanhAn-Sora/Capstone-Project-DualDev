@@ -414,6 +414,14 @@ class MessagesI18n {
 
   static String dmUnblock() => t('chat.dmConversation.unblock');
 
+  static String dmBlockedByYou(String name) => t(
+        'chat.dmConversation.blockedByYou',
+      ).replaceAll('{name}', name);
+
+  static String dmBlockedByPeer(String name) => t(
+        'chat.dmConversation.blockedByPeer',
+      ).replaceAll('{name}', name);
+
   static String dmMuteDialogTitle() => t('chat.dmConversation.muteDialogTitle');
 
   static String dmMuteDialogActiveTitle() =>

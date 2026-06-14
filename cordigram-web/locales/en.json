@@ -1649,6 +1649,8 @@
       "unfollow": "Unfollow",
       "block": "Block",
       "unblock": "Unblock",
+      "blockedByYou": "You blocked {name}",
+      "blockedByPeer": "You were blocked by {name}",
       "moreActions": "Options",
       "categories": {
         "customer": "Customer",

@@ -577,6 +577,7 @@ class DirectMessagesService {
         category: conv.category ?? existing.category,
         isFollowing: conv.isFollowing || existing.isFollowing,
         isBlockedByMe: conv.isBlockedByMe || existing.isBlockedByMe,
+        isBlockedByPeer: conv.isBlockedByPeer || existing.isBlockedByPeer,
       );
       applyConversationPreferencesFromApi(
         conv.userId,

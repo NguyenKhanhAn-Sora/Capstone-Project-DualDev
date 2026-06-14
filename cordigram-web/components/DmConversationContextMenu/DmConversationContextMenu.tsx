@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useLanguage } from "@/component/language-provider";
 import {
   DM_CATEGORY_COLORS,
@@ -45,8 +45,38 @@ export default function DmConversationContextMenu({
 }: DmConversationContextMenuProps) {
   const { t } = useLanguage();
   const menuRef = useRef<HTMLDivElement>(null);
+  const submenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [openSubmenu, setOpenSubmenu] = useState<"mute" | "category" | null>(
     null,
+  );
+
+  const showSubmenu = useCallback((key: "mute" | "category") => {
+    if (submenuCloseTimerRef.current) {
+      clearTimeout(submenuCloseTimerRef.current);
+      submenuCloseTimerRef.current = null;
+    }
+    setOpenSubmenu(key);
+  }, []);
+
+  const scheduleHideSubmenu = useCallback(() => {
+    if (submenuCloseTimerRef.current) {
+      clearTimeout(submenuCloseTimerRef.current);
+    }
+    submenuCloseTimerRef.current = setTimeout(() => {
+      setOpenSubmenu(null);
+      submenuCloseTimerRef.current = null;
+    }, 160);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (submenuCloseTimerRef.current) {
+        clearTimeout(submenuCloseTimerRef.current);
+      }
+    },
+    [],
   );
 
   useEffect(() => {
@@ -75,10 +105,8 @@ export default function DmConversationContextMenu({
       >
         <div
           className={styles.submenuWrap}
-          onMouseEnter={() => setOpenSubmenu("category")}
-          onMouseLeave={() =>
-            setOpenSubmenu((prev) => (prev === "category" ? null : prev))
-          }
+          onMouseEnter={() => showSubmenu("category")}
+          onMouseLeave={scheduleHideSubmenu}
         >
           <button
             type="button"
@@ -90,7 +118,13 @@ export default function DmConversationContextMenu({
             <span className={styles.chevron}>›</span>
           </button>
           {openSubmenu === "category" && (
-            <div className={styles.submenu} role="menu">
+            <div
+              className={styles.submenu}
+              role="menu"
+              onMouseEnter={() => showSubmenu("category")}
+              onMouseLeave={scheduleHideSubmenu}
+            >
+              <div className={styles.submenuPanel}>
               {preferences.category && (
                 <>
                   <button
@@ -124,16 +158,15 @@ export default function DmConversationContextMenu({
                   {preferences.category === key ? " ✓" : ""}
                 </button>
               ))}
+              </div>
             </div>
           )}
         </div>
 
         <div
           className={styles.submenuWrap}
-          onMouseEnter={() => setOpenSubmenu("mute")}
-          onMouseLeave={() =>
-            setOpenSubmenu((prev) => (prev === "mute" ? null : prev))
-          }
+          onMouseEnter={() => showSubmenu("mute")}
+          onMouseLeave={scheduleHideSubmenu}
         >
           <button
             type="button"
@@ -149,7 +182,13 @@ export default function DmConversationContextMenu({
             <span className={styles.chevron}>›</span>
           </button>
           {openSubmenu === "mute" && (
-            <div className={styles.submenu} role="menu">
+            <div
+              className={styles.submenu}
+              role="menu"
+              onMouseEnter={() => showSubmenu("mute")}
+              onMouseLeave={scheduleHideSubmenu}
+            >
+              <div className={styles.submenuPanel}>
               {muted && (
                 <>
                   <button
@@ -209,6 +248,7 @@ export default function DmConversationContextMenu({
                   </button>
                 </>
               )}
+              </div>
             </div>
           )}
         </div>

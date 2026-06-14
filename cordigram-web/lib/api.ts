@@ -3666,6 +3666,7 @@ export type ConversationListItem = {
   };
   isFollowing?: boolean;
   isBlockedByMe?: boolean;
+  isBlockedByPeer?: boolean;
 };
 
 export async function patchDmConversationPreferences(opts: {
@@ -3723,6 +3724,7 @@ export async function getConversationList(opts?: {
     preferences: c.preferences ?? undefined,
     isFollowing: c.isFollowing === true,
     isBlockedByMe: c.isBlockedByMe === true,
+    isBlockedByPeer: c.isBlockedByPeer === true,
   }));
 }
 

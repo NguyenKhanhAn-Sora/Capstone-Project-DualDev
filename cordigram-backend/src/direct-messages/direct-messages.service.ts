@@ -822,10 +822,12 @@ export class DirectMessagesService {
       .map((r) => String(r.userId ?? ''))
       .filter((id) => id && Types.ObjectId.isValid(id));
 
-    const [prefMap, followingSet, blockedByMeSet] = await Promise.all([
+    const [prefMap, followingSet, blockedByMeSet, blockedByPeerSet] =
+      await Promise.all([
       this.dmPrefService.getMapForUser(userId, peerIds),
       this.getFollowingPeerIds(userId, peerIds),
       this.getBlockedByMePeerIds(userId, peerIds),
+      this.getBlockedByPeerIds(userId, peerIds),
     ]);
 
     return Promise.all(
@@ -848,6 +850,7 @@ export class DirectMessagesService {
           preferences,
           isFollowing: followingSet.has(peerId),
           isBlockedByMe: blockedByMeSet.has(peerId),
+          isBlockedByPeer: blockedByPeerSet.has(peerId),
         };
       }),
     );
@@ -889,6 +892,21 @@ export class DirectMessagesService {
       .map((id) => new Types.ObjectId(id));
     if (!ids.length) return set;
     const rows = await this.blocksService.listBlockedUserIds(userId, ids);
+    for (const id of rows) set.add(id);
+    return set;
+  }
+
+  private async getBlockedByPeerIds(
+    userId: string,
+    peerIds: string[],
+  ): Promise<Set<string>> {
+    const set = new Set<string>();
+    if (!peerIds.length || !Types.ObjectId.isValid(userId)) return set;
+    const ids = peerIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (!ids.length) return set;
+    const rows = await this.blocksService.listBlockedByUserIds(userId, ids);
     for (const id of rows) set.add(id);
     return set;
   }

@@ -158,6 +158,26 @@ export class BlocksService {
       .filter(Boolean);
   }
 
+  /** Users in `candidateIds` who have blocked `blockedId`. */
+  async listBlockedByUserIds(
+    blockedId: string | Types.ObjectId,
+    candidateIds?: Types.ObjectId[],
+  ): Promise<string[]> {
+    const blocked = this.asObjectId(blockedId, 'blockedId');
+    const filter: Record<string, unknown> = { blockedId: blocked };
+    if (candidateIds?.length) {
+      filter.blockerId = { $in: candidateIds };
+    }
+    const rows = await this.blockModel
+      .find(filter)
+      .select('blockerId')
+      .lean()
+      .exec();
+    return rows
+      .map((doc) => doc.blockerId?.toString?.() ?? '')
+      .filter(Boolean);
+  }
+
   async assertNotBlocked(viewerId: Types.ObjectId, ownerId: Types.ObjectId) {
     const blocked = await this.isBlockedEither(viewerId, ownerId);
     if (blocked) {

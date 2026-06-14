@@ -1650,6 +1650,8 @@
       "unfollow": "Bỏ theo dõi",
       "block": "Chặn",
       "unblock": "Bỏ chặn",
+      "blockedByYou": "Bạn đã chặn {name}",
+      "blockedByPeer": "Bạn đã bị {name} chặn",
       "moreActions": "Tùy chọn",
       "categories": {
         "customer": "Khách hàng",

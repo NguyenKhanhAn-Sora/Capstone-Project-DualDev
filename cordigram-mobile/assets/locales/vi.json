@@ -3753,6 +3753,8 @@
       "unfollow": "Bỏ theo dõi",
       "block": "Chặn",
       "unblock": "Gỡ chặn",
+      "blockedByYou": "Bạn đã chặn {name}",
+      "blockedByPeer": "Bạn đã bị {name} chặn",
       "muteDialogTitle": "Tắt thông báo tin nhắn",
       "muteDialogActiveTitle": "Thông báo đang tắt",
       "turnOnNotifications": "Bật thông báo trở lại",
