@@ -10,6 +10,7 @@ import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/services/user_notifier.dart';
 import '../post/post_detail_screen.dart';
 import '../report/report_user_sheet.dart';
 import '../settings/settings_screen.dart';
@@ -2162,6 +2163,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       final newUrl = (res['avatarUrl'] as String?) ?? '';
       final newOriginalUrl = res['avatarOriginalUrl'] as String?;
+      final oldUrl = _profile?.avatarUrl ?? '';
       setState(() {
         _avatarLoading = false;
         _profile = _profile?.copyWith(
@@ -2169,6 +2171,9 @@ class _ProfileScreenState extends State<ProfileScreen>
           avatarOriginalUrl: newOriginalUrl,
         );
       });
+      if (oldUrl.isNotEmpty) imageCache.evict(NetworkImage(oldUrl));
+      if (newUrl.isNotEmpty) imageCache.evict(NetworkImage(newUrl));
+      UserNotifier.avatarUrl.value = newUrl.isNotEmpty ? newUrl : null;
       final username = _profile?.username ?? '';
       if (username.isNotEmpty && newUrl.isNotEmpty) {
         AuthStorage.syncAvatarByUsername(username, newUrl);
@@ -2193,24 +2198,24 @@ class _ProfileScreenState extends State<ProfileScreen>
         backgroundColor: scheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text(
-          'Remove profile photo',
+          LanguageController.instance.t('profile.removePhotoTitle'),
           style: TextStyle(color: scheme.onSurface, fontSize: 16),
         ),
         content: Text(
-          'Are you sure you want to remove your current profile photo? It will be replaced with the default avatar.',
+          LanguageController.instance.t('profile.removePhotoMessage'),
           style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
-              'Cancel',
+              LanguageController.instance.t('common.cancel'),
               style: TextStyle(color: scheme.onSurfaceVariant),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Remove', style: TextStyle(color: scheme.error)),
+            child: Text(LanguageController.instance.t('common.remove'), style: TextStyle(color: scheme.error)),
           ),
         ],
       ),
@@ -2220,6 +2225,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     setState(() => _avatarLoading = true);
     try {
+      final oldUrl = _profile?.avatarUrl ?? '';
       final res = await ProfileService.removeAvatar();
       if (!mounted) return;
       final newUrl = (res['avatarUrl'] as String?) ?? _defaultAvatar;
@@ -2231,6 +2237,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           avatarOriginalUrl: newOriginalUrl,
         );
       });
+      if (oldUrl.isNotEmpty) imageCache.evict(NetworkImage(oldUrl));
+      UserNotifier.avatarUrl.value = newUrl.isNotEmpty ? newUrl : null;
       final username = _profile?.username ?? '';
       if (username.isNotEmpty) {
         AuthStorage.syncAvatarByUsername(username, newUrl);
@@ -2294,9 +2302,27 @@ class _ProfileScreenState extends State<ProfileScreen>
       isOwner,
       p.isFollowing,
     );
-    final totalPosts = p.stats.totalPosts > 0
-        ? p.stats.totalPosts
-        : p.stats.posts + p.stats.reels;
+    // Mirror web logic: tabDerivedCount ?? statsOriginalFallback
+    // Web filters: non-repost, non-sponsored, must have media or poll; then adds reels.
+    // Never use stats.totalPosts — it double-counts posts + reels on the server.
+    int? tabDerivedCount;
+    final postsLoaded = _tabLoaded['posts'] == true;
+    final reelsLoaded = _tabLoaded['reels'] == true;
+    if (postsLoaded || reelsLoaded) {
+      final postsCount = postsLoaded
+          ? _tabItems['posts']!.where((item) {
+              // _tabItems['posts'] already excludes reposts & ads.
+              // Web also requires media[0] or poll to be present.
+              final media = item['media'];
+              final hasMedia = media is List && media.isNotEmpty;
+              final hasPoll = item['poll'] != null;
+              return hasMedia || hasPoll;
+            }).length
+          : 0;
+      final reelsCount = reelsLoaded ? _tabItems['reels']!.length : 0;
+      tabDerivedCount = postsCount + reelsCount;
+    }
+    final totalPosts = tabDerivedCount ?? (p.stats.posts + p.stats.reels);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -3589,7 +3615,7 @@ class _GridTileState extends State<_GridTile> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
-                        child: const Text('View image'),
+                        child: Text(LanguageController.instance.t('common.viewImage')),
                       ),
                     ],
                   ),

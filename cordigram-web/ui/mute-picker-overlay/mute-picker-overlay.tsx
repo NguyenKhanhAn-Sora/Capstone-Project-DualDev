@@ -28,6 +28,8 @@ type Props = {
   error?: string;
   labelSave?: string;
   labelSaving?: string;
+  labelDate?: string;
+  labelTime?: string;
 };
 
 export const DEFAULT_MUTE_OPTIONS: MuteOption[] = [
@@ -59,6 +61,8 @@ export default function MutePickerOverlay({
   error,
   labelSave = "Save",
   labelSaving = "Saving...",
+  labelDate = "Date",
+  labelTime = "Time",
 }: Props) {
   if (!open) return null;
 
@@ -99,7 +103,7 @@ export default function MutePickerOverlay({
         {selected === "custom" ? (
           <div className={styles.customRow}>
             <div className={styles.pickerGroup}>
-              <span className={styles.pickerLabel}>Date</span>
+              <span className={styles.pickerLabel}>{labelDate}</span>
               <DateSelect
                 value={customDate}
                 onChange={onCustomDateChange}
@@ -109,7 +113,7 @@ export default function MutePickerOverlay({
               />
             </div>
             <div className={styles.pickerGroup}>
-              <span className={styles.pickerLabel}>Time</span>
+              <span className={styles.pickerLabel}>{labelTime}</span>
               <TimeSelect
                 value={customTime}
                 onChange={onCustomTimeChange}

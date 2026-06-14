@@ -148,6 +148,7 @@ enum PostMenuAction {
   hidePost,
   reportPost,
   blockAccount,
+  seeLikes,
 }
 
 /// A single post card for the home feed.
@@ -326,6 +327,7 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
         danger: false,
       ));
       entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
+      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
     } else if (isOwner) {
       entries.add((id: 'editPost', label: lc.t('post.menu.editPost'), danger: false));
       entries.add((
@@ -353,9 +355,11 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
         danger: false,
       ));
       entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
+      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
       entries.add((id: 'deletePost', label: lc.t('post.menu.deletePost'), danger: true));
     } else {
       entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
+      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
       entries.add((
         id: 'followToggle',
         label: widget.state.following ? lc.t('post.menu.unfollow') : lc.t('post.menu.follow'),
@@ -451,6 +455,8 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
         return _onMenuAction(PostMenuAction.reportPost);
       case 'blockAccount':
         return _onMenuAction(PostMenuAction.blockAccount);
+      case 'seeLikes':
+        return _onMenuAction(PostMenuAction.seeLikes);
     }
   }
 
@@ -626,7 +632,7 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-class _PostHeader extends StatelessWidget {
+class _PostHeader extends StatefulWidget {
   const _PostHeader({
     required this.post,
     required this.onHide,
@@ -655,19 +661,49 @@ class _PostHeader extends StatelessWidget {
   final void Function(bool nextFollow)? onFollow;
 
   @override
+  State<_PostHeader> createState() => _PostHeaderState();
+}
+
+class _PostHeaderState extends State<_PostHeader> {
+  @override
+  void initState() {
+    super.initState();
+    LanguageController.instance.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageController.instance.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final post = widget.post;
+    final onHide = widget.onHide;
+    final onOpenMenu = widget.onOpenMenu;
+    final showMenuButton = widget.showMenuButton;
+    final hideCloseButton = widget.hideCloseButton;
+    final useUsername = widget.useUsername;
+    final isSponsored = widget.isSponsored;
+    final isFollowing = widget.isFollowing;
+    final showInlineFollow = widget.showInlineFollow;
+    final onFollow = widget.onFollow;
+    final onAuthorTap = widget.onAuthorTap;
     final scheme = Theme.of(context).colorScheme;
-    final canOpenProfile =
-        post.authorId != null &&
-        post.authorId!.isNotEmpty &&
-        onAuthorTap != null;
+    final authorId = post.authorId ?? '';
+    final canOpenProfile = authorId.isNotEmpty && onAuthorTap != null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         GestureDetector(
           onTap: canOpenProfile
-              ? () => onAuthorTap!.call(post.authorId!)
+              ? () => onAuthorTap(authorId)
               : null,
           child: _Avatar(
             avatarUrl: post.avatarUrl,
@@ -678,7 +714,7 @@ class _PostHeader extends StatelessWidget {
         Expanded(
           child: GestureDetector(
             onTap: canOpenProfile
-                ? () => onAuthorTap!.call(post.authorId!)
+                ? () => onAuthorTap(authorId)
                 : null,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

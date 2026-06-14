@@ -853,6 +853,15 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
           _showSnack(LanguageController.instance.t('reels.snack.blockError'), error: true);
         }
         return;
+      case PostMenuAction.seeLikes:
+        if (!mounted) return;
+        showPostLikesSheet(
+          context,
+          postId: reel.id,
+          viewerId: _viewerId,
+          title: LanguageController.instance.t('post.menu.seeLikes'),
+        );
+        return;
       case PostMenuAction.goToAdsPost:
       case PostMenuAction.detailAds:
         _showSnack(LanguageController.instance.t('reels.snack.adsNotAvailable'), error: true);
@@ -1155,6 +1164,7 @@ class _ReelPageState extends State<_ReelPage> {
         ));
       }
       entries.add((id: 'copyLink', label: lc.t('reels.menu.copyLink'), danger: false));
+      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
       entries.add((id: 'deleteReel', label: lc.t('reels.menu.deleteReel'), danger: true));
     } else {
       if (canDownload) {
@@ -1176,6 +1186,7 @@ class _ReelPageState extends State<_ReelPage> {
         danger: false,
       ));
       entries.add((id: 'hideReel', label: lc.t('reels.menu.hideReel'), danger: false));
+      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
       entries.add((id: 'reportReel', label: lc.t('reels.menu.report'), danger: false));
       entries.add((
         id: 'blockAccount',
@@ -1246,6 +1257,8 @@ class _ReelPageState extends State<_ReelPage> {
         return widget.onMenuAction(PostMenuAction.reportPost);
       case 'blockAccount':
         return widget.onMenuAction(PostMenuAction.blockAccount);
+      case 'seeLikes':
+        return widget.onMenuAction(PostMenuAction.seeLikes);
     }
   }
 
@@ -2782,6 +2795,20 @@ class _RCommentTileState extends State<_RCommentTile> {
               : LanguageController.instance.t('reels.comments.pin'),
           onTap: _onPinComment,
         ),
+      CommentSheetAction(
+        icon: Icons.favorite_border_rounded,
+        label: LanguageController.instance.t('reels.commentMenu.seeLikes'),
+        onTap: () {
+          Navigator.of(context).pop();
+          showCommentLikesSheet(
+            context,
+            postId: widget.postId,
+            commentId: widget.comment.id,
+            viewerId: widget.viewerId,
+            title: LanguageController.instance.t('reels.commentMenu.seeLikes'),
+          );
+        },
+      ),
       if (_isOwnComment) ...[
         CommentSheetAction(
           icon: Icons.edit_outlined,

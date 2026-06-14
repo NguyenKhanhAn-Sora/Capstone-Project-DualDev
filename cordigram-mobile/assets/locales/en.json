@@ -89,7 +89,13 @@
     "profile": {
       "title": "Profile",
       "main": "Main profile",
-      "server": "Server profile"
+      "server": "Server profile",
+      "profilePage": "Profile page",
+      "aboutThisUser": "About this user",
+      "followersList": "Followers list",
+      "followingList": "Following list",
+      "accountAge": "Account age",
+      "publishedPosts": "Published posts"
     },
     "activity": {
       "activityLog": "Activity log",
@@ -102,6 +108,8 @@
     "changePassword": "Change password",
     "viewDevices": "View devices",
     "unhide": "Unhide",
+    "unhideTitle": "Unhide this post?",
+    "unhideMessage": "This post will appear in your feed again.",
     "unblock": "Unblock",
     "accountEmail": "Account email",
     "manageSignInEmail": "Manage your sign-in email and verification steps.",
@@ -349,9 +357,14 @@
       "loadingHistory": "Loading violation history...",
       "noViolations": "No violations found.",
       "refreshing": "Refreshing...",
-      "tapToView": "Tap to view violated content",
+      "tapToView": "View details ›",
       "reason": "Reason: {reason}",
       "noReasonProvided": "No reason provided.",
+      "statusClean": "Clean",
+      "statusLow": "Low risk",
+      "statusHigh": "High risk",
+      "strikeBadge": "Strike {delta} (Total {total})",
+      "strikeHint": "Strike total decreases over time with good behavior.",
       "severity": {
         "high": "High",
         "medium": "Medium",
@@ -390,7 +403,41 @@
       "masterHint": "On: normal notifications. Off: disable all notifications (social + DM/server).",
       "enabledToast": "Notifications enabled.",
       "disabledToast": "Notifications disabled.",
-      "soundLabel": "Notification sounds (messages & new notifications)"
+      "soundLabel": "Notification sounds (messages & new notifications)",
+      "pushNotifications": "Push Notifications",
+      "muteNotifications": "Mute Notifications",
+      "chooseHowLongCategory": "Choose how long to mute {label}",
+      "status": {
+        "enabled": "Enabled",
+        "muted": "Muted",
+        "mutedIndefinitely": "Muted indefinitely",
+        "mutedLessThanMinute": "Muted (less than a minute)",
+        "mutedMinutes": "Muted for {n} minute(s)",
+        "mutedHours": "Muted for {n} hour(s)",
+        "mutedDays": "Muted for {n} day(s)"
+      },
+      "categories": {
+        "follow": "Follows",
+        "followDesc": "When someone follows you.",
+        "comment": "Comments",
+        "commentDesc": "When someone comments on your post.",
+        "like": "Likes",
+        "likeDesc": "When someone likes your post.",
+        "mentions": "Mentions",
+        "mentionsDesc": "When someone mentions you.",
+        "system": "System",
+        "systemDesc": "Important updates from Cordigram."
+      },
+      "muteOptions": {
+        "5m": "5 minutes",
+        "10m": "10 minutes",
+        "15m": "15 minutes",
+        "30m": "30 minutes",
+        "1h": "1 hour",
+        "1d": "1 day",
+        "until": "Until I turn it on",
+        "custom": "Choose date & time"
+      }
     },
     "hubHint": "Customize messages, privacy, and appearance. Settings sync with the web when you use the same account.",
     "sections": {
@@ -584,6 +631,7 @@
       "postDeleted": "Post deleted",
       "deleteError": "Failed to delete post",
       "postHidden": "Post hidden",
+      "hideError": "Failed to hide post",
       "signInFirst": "Please sign in first",
       "reportSubmitted": "Report submitted",
       "accountBlocked": "Account blocked",
@@ -658,7 +706,8 @@
       "saveAds": "Save this ads",
       "unsaveAds": "Unsave this ads",
       "hidePost": "Hide this post",
-      "hideAds": "Hide this ads"
+      "hideAds": "Hide this ads",
+      "seeLikes": "See who liked this"
     },
     "actions": {
       "like": "Like",
@@ -742,6 +791,9 @@
       "allowComments": "Allow comments",
       "allowDownload": "Allow download",
       "hideLikeCount": "Hide like count",
+      "pollQuestionHint": "Ask a question…",
+      "pollOptionHint": "Option {n}",
+      "voteFailed": "Vote failed",
       "cancel": "Cancel",
       "done": "Done"
     },
@@ -784,9 +836,18 @@
       "caption": "Caption",
       "location": "Location (optional)",
       "hashtags": "Hashtags (e.g. #music #flutter)",
+      "settings": "Settings",
+      "searchPlace": "Search a place…",
+      "pollOptions": "Poll options",
+      "pollOption": "Option {n}",
       "allowComments": "Allow comments",
+      "allowCommentsSub": "Let others comment on this post",
+      "allowMultipleAnswers": "Allow multiple answers",
+      "allowMultipleAnswersSub": "Voters can select more than one option",
       "allowDownload": "Allow download",
+      "allowDownloadSub": "Let others save media from this post",
       "hideLikeCount": "Hide like count",
+      "hideLikeCountSub": "Viewers won't see the number of likes",
       "saveChanges": "Save changes",
       "saveVisibility": "Save visibility"
     },
@@ -815,7 +876,8 @@
         "edit": "Edit comment",
         "delete": "Delete comment",
         "report": "Report comment",
-        "block": "Block this user"
+        "block": "Block this user",
+        "seeLikes": "See who liked this"
       },
       "comments": {
         "title": "Comments",
@@ -835,8 +897,15 @@
         "replyingTo": "Replying to @{username}",
         "searchingUsers": "Searching users…",
         "noUsers": "No users found",
-        "placeholder": "Write a comment…"
+        "placeholder": "Write a comment…",
+        "editHint": "Edit your comment...",
+        "editSuccess": "Comment updated",
+        "editError": "Failed to update comment"
       }
+    },
+    "likesSheet": {
+      "search": "Search username",
+      "noLikes": "No likes yet"
     }
   },
   "reels": {
@@ -953,14 +1022,35 @@
       "edit": "Edit comment",
       "delete": "Delete comment",
       "report": "Report comment",
-      "block": "Block this user"
+      "block": "Block this user",
+      "seeLikes": "See who liked this"
     }
+  },
+  "postMute": {
+    "5m": "5 minutes",
+    "10m": "10 minutes",
+    "15m": "15 minutes",
+    "30m": "30 minutes",
+    "1h": "1 hour",
+    "1d": "1 day",
+    "until": "Until I turn it back on",
+    "custom": "Choose date & time",
+    "title": "Mute this {kindLabel}",
+    "subtitle": "Choose how long to pause notifications.",
+    "selectDate": "Select date",
+    "selectTime": "Select time",
+    "invalidDateTime": "Please select a valid date and time.",
+    "futureTimeError": "Please choose a future time.",
+    "saveError": "Failed to update notifications",
+    "saving": "Saving..."
   },
   "profile": {
     "cannotRender": {
       "title": "Cannot render profile",
       "message": "Profile data is unavailable. Please try again."
     },
+    "removePhotoTitle": "Remove profile photo",
+    "removePhotoMessage": "Are you sure you want to remove your current profile photo? It will be replaced with the default avatar.",
     "cropPhoto": "Crop photo",
     "tabs": {
       "posts": "Posts",
@@ -1325,6 +1415,7 @@
     "viewImage": "View image",
     "retry": "Retry",
     "refresh": "Refresh",
+    "noPostsFor": "No posts found for #{tag}",
     "deletePost": {
       "title": "Delete post",
       "message": "This action cannot be undone."
@@ -1381,9 +1472,23 @@
       "endLive": "End live",
       "endLiveDialog": {
         "title": "End livestream?",
+        "content": "This will stop the livestream for all viewers immediately.",
         "cancel": "Cancel",
         "confirm": "End live"
       },
+      "deleteComment": {
+        "title": "Delete comment?",
+        "content": "This will remove the comment for all viewers and cannot be undone."
+      },
+      "blockUser": {
+        "title": "Block {author}?",
+        "message": "They will no longer be able to see your content or interact with you."
+      },
+      "latencyMode": "Latency mode",
+      "saveChanges": "Save changes",
+      "saving": "Saving...",
+      "unableToUpdate": "Unable to update livestream settings.",
+      "backToHome": "Back to home",
       "retryConnect": "Retry connect",
       "back": "Back",
       "liveNow": "Live now",
@@ -3775,6 +3880,9 @@
     "optFollowers": "Followers",
     "optPublic": "Public",
     "optPrivate": "Only me",
+    "descFollowers": "Only people who follow you",
+    "descPublic": "Anyone can view this story",
+    "descPrivate": "Only you can see this",
     "btnPost": "Share Story",
     "btnPosting": "Posting...",
     "btnChangePhoto": "Change photo",
@@ -3801,6 +3909,19 @@
     "you": "You",
     "follow": "Follow",
     "following": "Following",
-    "user": "User"
+    "user": "User",
+    "labelMusic": "Music",
+    "btnAddMusic": "Add Music",
+    "btnRemoveMusic": "Remove",
+    "btnChangeMusic": "Change",
+    "musicTrending": "Trending",
+    "musicSearch": "Search",
+    "musicSearchHint": "Search songs...",
+    "musicNoResults": "No results found",
+    "musicSelect": "Use",
+    "timeNow": "now",
+    "timeMinutes": "{n}m",
+    "timeHours": "{n}h",
+    "timeDays": "{n}d"
   }
 }

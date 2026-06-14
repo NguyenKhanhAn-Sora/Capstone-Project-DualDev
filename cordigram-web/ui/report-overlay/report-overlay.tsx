@@ -25,6 +25,8 @@ type Props = {
   onSelectReason: (key: string) => void;
   onNoteChange: (value: string) => void;
   onSubmit: () => void;
+  labelBack?: string;
+  labelClose?: string;
   labelCancel?: string;
   labelSubmit?: string;
   labelSubmitting?: string;
@@ -50,6 +52,8 @@ export default function ReportOverlay({
   onSelectReason,
   onNoteChange,
   onSubmit,
+  labelBack = "Back",
+  labelClose = "Close",
   labelCancel = "Cancel",
   labelSubmit = "Submit report",
   labelSubmitting = "Submitting...",
@@ -79,21 +83,21 @@ export default function ReportOverlay({
           {category ? (
             <button
               className={styles.backBtn}
-              aria-label="Back"
+              aria-label={labelBack}
               onClick={() => { onSelectCategory(""); onSelectReason(""); }}
             >
               <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-              Back
+              {labelBack}
             </button>
           ) : null}
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 className={styles.title}>{title}</h3>
             {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
           </div>
-          <button className={styles.closeBtn} aria-label="Close" onClick={onClose}>
+          <button className={styles.closeBtn} aria-label={labelClose} onClick={onClose}>
             ×
           </button>
         </div>

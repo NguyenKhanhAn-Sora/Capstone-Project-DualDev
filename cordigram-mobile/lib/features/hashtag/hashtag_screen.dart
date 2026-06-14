@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
@@ -238,7 +239,7 @@ class _HashtagScreenState extends State<HashtagScreen> {
 
   Future<void> _handleQuickRepost(FeedPostState targetState) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
       return;
     }
 
@@ -255,7 +256,7 @@ class _HashtagScreenState extends State<HashtagScreen> {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted');
+      _showSnack(LanguageController.instance.t('home.snack.reposted'));
     } on ApiException catch (e) {
       try {
         await PostInteractionService.repost(originalId);
@@ -266,15 +267,15 @@ class _HashtagScreenState extends State<HashtagScreen> {
             await PostInteractionService.repost(targetId);
           } catch (_) {}
         }
-        _showSnack('Reposted');
+        _showSnack(LanguageController.instance.t('home.snack.reposted'));
       } catch (_) {
         _showSnack(
-          e.message.isNotEmpty ? e.message : 'Failed to repost',
+          e.message.isNotEmpty ? e.message : LanguageController.instance.t('home.snack.repostError'),
           error: true,
         );
       }
     } catch (_) {
-      _showSnack('Failed to repost', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.repostError'), error: true);
     }
   }
 
@@ -283,7 +284,7 @@ class _HashtagScreenState extends State<HashtagScreen> {
     RepostQuoteInput input,
   ) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
       return;
     }
 
@@ -314,20 +315,20 @@ class _HashtagScreenState extends State<HashtagScreen> {
           await PostInteractionService.repost(targetId);
         } catch (_) {}
       }
-      _showSnack('Reposted with quote');
+      _showSnack(LanguageController.instance.t('home.snack.repostedWithQuote'));
     } on ApiException catch (e) {
       _showSnack(
-        e.message.isNotEmpty ? e.message : 'Failed to repost with quote',
+        e.message.isNotEmpty ? e.message : LanguageController.instance.t('home.snack.repostWithQuoteError'),
         error: true,
       );
     } catch (_) {
-      _showSnack('Failed to repost with quote', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.repostWithQuoteError'), error: true);
     }
   }
 
   Future<void> _onRepost(FeedPostState state) async {
     if (AuthStorage.accessToken == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.signInToRepost'), error: true);
       return;
     }
 
@@ -348,7 +349,7 @@ class _HashtagScreenState extends State<HashtagScreen> {
       if (quoteInput == null) return;
       await _handleQuoteRepost(state, quoteInput);
     } catch (_) {
-      _showSnack('Unable to open repost menu', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.repostMenuError'), error: true);
     }
   }
 
@@ -356,11 +357,11 @@ class _HashtagScreenState extends State<HashtagScreen> {
     setState(() => _items.remove(state));
     try {
       await PostInteractionService.hide(state.post.id);
-      _showSnack('Post hidden');
+      _showSnack(LanguageController.instance.t('home.snack.postHidden'));
     } catch (_) {
       if (!mounted) return;
       setState(() => _items.add(state));
-      _showSnack('Failed to hide post', error: true);
+      _showSnack(LanguageController.instance.t('home.snack.hideError'), error: true);
     }
   }
 
@@ -422,7 +423,7 @@ class _HashtagScreenState extends State<HashtagScreen> {
             stats: updated.stats,
           ),
         );
-        _showSnack('Post updated');
+        _showSnack(LanguageController.instance.t('home.snack.postUpdated'));
         return;
       case PostMenuAction.editVisibility:
         final nextVisibility = await showEditVisibilitySheet(
@@ -435,7 +436,7 @@ class _HashtagScreenState extends State<HashtagScreen> {
           post.id,
           state.copyWith(post: post.copyWith(visibility: nextVisibility)),
         );
-        _showSnack('Visibility updated');
+        _showSnack(LanguageController.instance.t('home.snack.visibilityUpdated'));
         return;
       case PostMenuAction.toggleComments:
         final currentAllowed = post.allowComments != false;
@@ -447,14 +448,14 @@ class _HashtagScreenState extends State<HashtagScreen> {
         try {
           await PostInteractionService.setAllowComments(post.id, nextAllowed);
           _showSnack(
-            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+            nextAllowed ? LanguageController.instance.t('home.snack.commentsOn') : LanguageController.instance.t('home.snack.commentsOff'),
           );
         } catch (_) {
           _replaceState(
             post.id,
             state.copyWith(post: post.copyWith(allowComments: currentAllowed)),
           );
-          _showSnack('Failed to update comments', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.commentsError'), error: true);
         }
         return;
       case PostMenuAction.toggleHideLike:
@@ -466,13 +467,13 @@ class _HashtagScreenState extends State<HashtagScreen> {
         );
         try {
           await PostInteractionService.setHideLikeCount(post.id, nextHidden);
-          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+          _showSnack(LanguageController.instance.t(nextHidden ? 'home.snack.likeHidden' : 'home.snack.likeVisible'));
         } catch (_) {
           _replaceState(
             post.id,
             state.copyWith(post: post.copyWith(hideLikeCount: currentHidden)),
           );
-          _showSnack('Failed to update like visibility', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.likeError'), error: true);
         }
         return;
       case PostMenuAction.followToggle:
@@ -491,7 +492,7 @@ class _HashtagScreenState extends State<HashtagScreen> {
             ? PostInteractionService.reelPermalink(post.id)
             : PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
-        _showSnack('Link copied');
+        _showSnack(LanguageController.instance.t('home.snack.linkCopied'));
         return;
       case PostMenuAction.muteNotifications:
         final label = post.kind.toLowerCase() == 'reel' ? 'reel' : 'post';
@@ -502,16 +503,16 @@ class _HashtagScreenState extends State<HashtagScreen> {
         );
         if (muted) {
           _showSnack(
-            label == 'reel'
-                ? 'Reel notifications muted'
-                : 'Post notifications muted',
+            LanguageController.instance.t(
+              label == 'reel' ? 'home.snack.reelMuted' : 'home.snack.postMuted',
+            ),
           );
         }
         return;
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack('Please sign in first', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.signInFirst'), error: true);
           return;
         }
         final reported = await showReportPostSheet(
@@ -519,14 +520,14 @@ class _HashtagScreenState extends State<HashtagScreen> {
           postId: post.id,
           authHeader: {'Authorization': 'Bearer $token'},
         );
-        if (reported) _showSnack('Report submitted');
+        if (reported) _showSnack(LanguageController.instance.t('home.snack.reportSubmitted'));
         return;
       case PostMenuAction.deletePost:
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Delete post',
-          message: 'This action cannot be undone.',
-          confirmLabel: 'Delete',
+          title: LanguageController.instance.t('home.deletePost.title'),
+          message: LanguageController.instance.t('common.cannotUndo'),
+          confirmLabel: LanguageController.instance.t('common.delete'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -535,13 +536,13 @@ class _HashtagScreenState extends State<HashtagScreen> {
         setState(() => _items.removeWhere((s) => s.post.id == post.id));
         try {
           await PostInteractionService.deletePost(post.id);
-          _showSnack('Post deleted');
+          _showSnack(LanguageController.instance.t('home.snack.postDeleted'));
         } catch (_) {
           if (!mounted) return;
           if (snapshot != null) {
             setState(() => _items.insert(0, snapshot));
           }
-          _showSnack('Failed to delete post', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.deleteError'), error: true);
         }
         return;
       case PostMenuAction.blockAccount:
@@ -551,9 +552,9 @@ class _HashtagScreenState extends State<HashtagScreen> {
             post.authorUsername ?? post.author?.username ?? post.displayName;
         final confirmed = await showPostConfirmDialog(
           context,
-          title: 'Block @$username?',
-          message: 'You will no longer see posts from this account.',
-          confirmLabel: 'Block',
+          title: LanguageController.instance.t('home.blockUser.title').replaceAll('{username}', username),
+          message: LanguageController.instance.t('home.blockUser.message'),
+          confirmLabel: LanguageController.instance.t('common.block'),
           danger: true,
         );
         if (confirmed != true) return;
@@ -564,16 +565,25 @@ class _HashtagScreenState extends State<HashtagScreen> {
           setState(() {
             _items.removeWhere((s) => s.post.authorId == userId);
           });
-          _showSnack('Account blocked');
+          _showSnack(LanguageController.instance.t('home.snack.accountBlocked'));
         } catch (_) {
-          _showSnack('Failed to block account', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.blockError'), error: true);
         }
         return;
       case PostMenuAction.goToAdsPost:
         _openPostDetail(state);
         return;
       case PostMenuAction.detailAds:
-        _showSnack('Ads detail is available from Home feed', error: true);
+        _showSnack(LanguageController.instance.t('home.snack.adsDetailError'), error: true);
+        return;
+      case PostMenuAction.seeLikes:
+        if (!mounted) return;
+        showPostLikesSheet(
+          context,
+          postId: post.id,
+          viewerId: _viewerId,
+          title: LanguageController.instance.t('post.menu.seeLikes'),
+        );
         return;
     }
   }
@@ -905,7 +915,7 @@ class _HashtagReelCard extends StatelessWidget {
                                       alpha: 0.18,
                                     ),
                                   ),
-                                  child: const Text('View image'),
+                                  child: Text(LanguageController.instance.t('common.viewImage')),
                                 ),
                               ],
                             ),
@@ -1014,7 +1024,7 @@ class _HashtagErrorState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            ElevatedButton(onPressed: onRetry, child: Text(LanguageController.instance.t('common.retry'))),
           ],
         ),
       ),
@@ -1039,7 +1049,7 @@ class _HashtagEmptyState extends StatelessWidget {
             const Icon(Icons.tag, color: Colors.white54, size: 42),
             const SizedBox(height: 10),
             Text(
-              'No posts found for #$tag',
+              LanguageController.instance.t('hashtag.noPostsFor', {'tag': tag}),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
@@ -1048,7 +1058,7 @@ class _HashtagEmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            ElevatedButton(onPressed: onRefresh, child: const Text('Refresh')),
+            ElevatedButton(onPressed: onRefresh, child: Text(LanguageController.instance.t('common.refresh'))),
           ],
         ),
       ),

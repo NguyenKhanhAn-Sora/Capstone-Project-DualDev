@@ -8,6 +8,7 @@ import 'package:livekit_client/livekit_client.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/language_controller.dart';
 import '../home/home_screen.dart';
 import '../profile/profile_screen.dart';
 import '../profile/services/profile_service.dart';
@@ -1036,13 +1037,13 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     showDialog<void>(
       context: ctx,
       builder: (_) => AlertDialog(
-        title: const Text('Delete comment?'),
-        content: const Text('This will remove the comment for all viewers and cannot be undone.'),
+        title: Text(LanguageController.instance.t('livestream.hub.deleteComment.title')),
+        content: Text(LanguageController.instance.t('livestream.hub.deleteComment.content')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(LanguageController.instance.t('common.cancel'))),
           TextButton(
             onPressed: () { Navigator.of(ctx).pop(); unawaited(_deleteComment(comment)); },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(LanguageController.instance.t('common.delete'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -1070,13 +1071,13 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     showDialog<void>(
       context: ctx,
       builder: (_) => AlertDialog(
-        title: Text('Block ${comment.author}?'),
-        content: const Text('They will no longer be able to see your content or interact with you.'),
+        title: Text(LanguageController.instance.t('livestream.hub.blockUser.title').replaceAll('{author}', comment.author)),
+        content: Text(LanguageController.instance.t('livestream.hub.blockUser.message')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(LanguageController.instance.t('common.cancel'))),
           TextButton(
             onPressed: () { Navigator.of(ctx).pop(); unawaited(_blockUserFromLive(comment)); },
-            child: const Text('Block', style: TextStyle(color: Colors.red)),
+            child: Text(LanguageController.instance.t('common.block'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -1140,30 +1141,30 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                       ),
                       _menuField(
                         controller: titleCtrl,
-                        label: 'Title',
+                        label: LanguageController.instance.t('livestream.hub.fields.title'),
                         maxLines: 2,
                       ),
                       const SizedBox(height: 10),
                       _menuField(
                         controller: descCtrl,
-                        label: 'Description',
+                        label: LanguageController.instance.t('livestream.hub.fields.description'),
                         maxLines: 3,
                       ),
                       const SizedBox(height: 10),
                       _menuField(
                         controller: pinCtrl,
-                        label: 'Pinned comment',
+                        label: LanguageController.instance.t('livestream.hub.fields.pinnedComment'),
                         maxLines: 2,
                       ),
                       const SizedBox(height: 10),
                       _menuField(
                         controller: locCtrl,
-                        label: 'Location',
+                        label: LanguageController.instance.t('livestream.hub.fields.location'),
                         maxLines: 1,
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Latency mode',
+                        LanguageController.instance.t('livestream.hub.latencyMode'),
                         style: TextStyle(
                           color: tokens.text,
                           fontWeight: FontWeight.w600,
@@ -1172,18 +1173,18 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                       const SizedBox(height: 8),
                       DropdownButtonFormField<LivestreamLatencyMode>(
                         initialValue: selectedLatency,
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: LivestreamLatencyMode.adaptive,
-                            child: Text('Adaptive'),
+                            child: Text(LanguageController.instance.t('livestream.hub.adaptive')),
                           ),
                           DropdownMenuItem(
                             value: LivestreamLatencyMode.balanced,
-                            child: Text('Balanced'),
+                            child: Text(LanguageController.instance.t('livestream.hub.balanced')),
                           ),
                           DropdownMenuItem(
                             value: LivestreamLatencyMode.low,
-                            child: Text('Low latency'),
+                            child: Text(LanguageController.instance.t('livestream.hub.lowLatency')),
                           ),
                         ],
                         onChanged: (next) {
@@ -1219,8 +1220,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                                       } catch (_) {
                                         if (!mounted) return;
                                         setState(
-                                          () => _error =
-                                              'Unable to update livestream settings.',
+                                          () => _error = LanguageController.instance.t('livestream.hub.unableToUpdate'),
                                         );
                                       } finally {
                                         if (context.mounted && !closedBySave) {
@@ -1230,7 +1230,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                                     },
                               icon: const Icon(Icons.save_outlined),
                               label: Text(
-                                saving ? 'Saving...' : 'Save changes',
+                                saving ? LanguageController.instance.t('livestream.hub.saving') : LanguageController.instance.t('livestream.hub.saveChanges'),
                               ),
                             ),
                           ),
@@ -1250,7 +1250,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                                 backgroundColor: Colors.red.shade600,
                               ),
                               icon: const Icon(Icons.stop_circle_outlined),
-                              label: const Text('End live'),
+                              label: Text(LanguageController.instance.t('livestream.hub.endLive')),
                             ),
                           ),
                         ],
@@ -1321,21 +1321,19 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('End livestream?'),
-          content: const Text(
-            'This will stop the livestream for all viewers immediately.',
-          ),
+          title: Text(LanguageController.instance.t('livestream.hub.endLiveDialog.title')),
+          content: Text(LanguageController.instance.t('livestream.hub.endLiveDialog.content')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(LanguageController.instance.t('livestream.hub.endLiveDialog.cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.red.shade600,
               ),
-              child: const Text('End live'),
+              child: Text(LanguageController.instance.t('livestream.hub.endLiveDialog.confirm')),
             ),
           ],
         );
@@ -1468,13 +1466,13 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                             _openStream(streamId, asHost: true);
                           },
                     icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Retry connect'),
+                    label: Text(LanguageController.instance.t('livestream.hub.retryConnect')),
                   ),
                 ],
                 const SizedBox(height: 10),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Back'),
+                  child: Text(LanguageController.instance.t('livestream.hub.back')),
                 ),
               ],
             ),
@@ -1490,7 +1488,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Live now'),
+        title: Text(LanguageController.instance.t('livestream.hub.liveNow')),
         actions: [
           IconButton(
             onPressed: _loadingList ? null : _loadLiveList,
@@ -1522,10 +1520,10 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                   ? const Center(child: CircularProgressIndicator())
                   : _liveItems.isEmpty
                   ? ListView(
-                      children: const [
-                        SizedBox(height: 180),
+                      children: [
+                        const SizedBox(height: 180),
                         Center(
-                          child: Text('No livestream is active right now.'),
+                          child: Text(LanguageController.instance.t('livestream.hub.noLivestream')),
                         ),
                       ],
                     )
@@ -1950,7 +1948,7 @@ class _LivestreamHubScreenState extends State<LivestreamHubScreen>
                           );
                         },
                         icon: const Icon(Icons.home_rounded),
-                        label: const Text('Back to home'),
+                        label: Text(LanguageController.instance.t('livestream.hub.backToHome')),
                       ),
                     ],
                   ),

@@ -44,14 +44,37 @@ class _StoryBarState extends State<StoryBar> {
   }
 
   void _openCreator() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const StoryCreatorScreen()),
+    await Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder<void>(
+        pageBuilder: (_, __, ___) => const StoryCreatorScreen(),
+        // Use an opaque scaffold-colour backdrop on frame 0, then fade the
+        // story creator in on top.  This prevents the home screen from showing
+        // through during the entrance animation (Flutter only skips painting
+        // covered routes AFTER the opaque transition completes, so a plain
+        // FadeTransition from opacity-0 lets the home feed bleed through).
+        transitionsBuilder: (ctx, animation, __, child) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(color: Theme.of(ctx).scaffoldBackgroundColor),
+              FadeTransition(
+                opacity: CurvedAnimation(
+                    parent: animation, curve: Curves.easeIn),
+                child: child,
+              ),
+            ],
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 220),
+        opaque: true,
+        barrierDismissible: false,
+      ),
     );
-    _load(); // Refresh after creating
+    _load();
   }
 
   void _openViewer(int groupIndex) async {
-    await Navigator.of(context).push(
+    await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         builder: (_) => StoryViewerScreen(
           groups: _groups,

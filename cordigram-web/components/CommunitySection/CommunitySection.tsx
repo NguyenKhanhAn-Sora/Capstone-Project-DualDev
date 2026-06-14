@@ -7,6 +7,50 @@ import styles from "./CommunitySection.module.css";
 import { useLanguage } from "@/component/language-provider";
 import { translateChannelName } from "@/lib/system-names";
 
+const IcoTrend = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+  </svg>
+);
+const IcoChart = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    <line x1="2" y1="20" x2="22" y2="20"/>
+  </svg>
+);
+const IcoInfo = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+  </svg>
+);
+const IcoCelebrate = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+  </svg>
+);
+const IcoHome = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+);
+const IcoWrench = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+  </svg>
+);
+const IcoClipboard = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+    <line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
+  </svg>
+);
+const IcoClose = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+
 interface Props {
   serverId: string;
   canManageSettings: boolean;
@@ -128,13 +172,9 @@ export default function CommunitySection({
     return (
       <div className={styles.container}>
         <div className={styles.activatedBanner}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-          <h2 className={styles.activatedTitle}>
-            {t("chat.community.activatedTitle")}
-          </h2>
-          <p className={styles.activatedDesc}>
-            {t("chat.community.activatedDesc")}
-          </p>
+          <div className={styles.activatedIcon}><IcoCelebrate /></div>
+          <h2 className={styles.activatedTitle}>{t("chat.community.activatedTitle")}</h2>
+          <p className={styles.activatedDesc}>{t("chat.community.activatedDesc")}</p>
         </div>
       </div>
     );
@@ -179,7 +219,7 @@ export default function CommunitySection({
 
         <div className={styles.featureCards}>
           <div className={styles.featureCard}>
-            <div className={`${styles.featureCardIcon} ${styles.green}`}>📈</div>
+            <div className={`${styles.featureCardIcon} ${styles.green}`}><IcoTrend /></div>
             <h3 className={styles.featureCardTitle}>{t("chat.community.feature1Title")}</h3>
             <p className={styles.featureCardDesc}>
               {t("chat.community.feature1Desc").split(t("chat.community.feature1Highlight")).map((part, i, arr) =>
@@ -190,7 +230,7 @@ export default function CommunitySection({
             </p>
           </div>
           <div className={styles.featureCard}>
-            <div className={`${styles.featureCardIcon} ${styles.blue}`}>📊</div>
+            <div className={`${styles.featureCardIcon} ${styles.blue}`}><IcoChart /></div>
             <h3 className={styles.featureCardTitle}>{t("chat.community.feature2Title")}</h3>
             <p className={styles.featureCardDesc}>
               {t("chat.community.feature2Desc").split(t("chat.community.feature2Highlight")).map((part, i, arr) =>
@@ -201,7 +241,7 @@ export default function CommunitySection({
             </p>
           </div>
           <div className={styles.featureCard}>
-            <div className={`${styles.featureCardIcon} ${styles.red}`}>ℹ️</div>
+            <div className={`${styles.featureCardIcon} ${styles.indigo}`}><IcoInfo /></div>
             <h3 className={styles.featureCardTitle}>{t("chat.community.feature3Title")}</h3>
             <p className={styles.featureCardDesc}>{t("chat.community.feature3Desc")}</p>
           </div>
@@ -215,8 +255,9 @@ export default function CommunitySection({
             <button
               className={styles.modalClose}
               onClick={() => setShowWizard(false)}
+              aria-label="Close"
             >
-              ×
+              <IcoClose />
             </button>
 
             {/* Sidebar */}
@@ -240,7 +281,7 @@ export default function CommunitySection({
                   </div>
                 </div>
               </div>
-              <div className={styles.wizardIllustration}>🏠</div>
+              <div className={styles.wizardIllustration}><IcoHome /></div>
             </div>
 
             {/* Content */}
@@ -263,17 +304,11 @@ export default function CommunitySection({
                     <p className={styles.checkSectionDesc}>
                       {t("chat.community.check1Desc")}
                     </p>
-                    <div
-                      className={styles.checkItem}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => setCheckEmail((v) => !v)}
-                    >
-                      <div className={`${styles.checkIcon} ${checkEmail ? styles.checked : styles.unchecked}`}>
-                        {checkEmail ? "✓" : ""}
-                      </div>
-                      <span className={styles.checkLabel}>
-                        {t("chat.community.check1Label")}
-                      </span>
+                    <div className={styles.checkItem} style={{ cursor: "pointer" }} onClick={() => setCheckEmail((v) => !v)}>
+                      <span className={styles.checkLabel}>{t("chat.community.check1Label")}</span>
+                      <button type="button" className={styles.togglePill} data-on={String(checkEmail)} onClick={(e) => { e.stopPropagation(); setCheckEmail((v) => !v); }}>
+                        <span className={styles.toggleThumb} />
+                      </button>
                     </div>
                   </div>
 
@@ -284,17 +319,11 @@ export default function CommunitySection({
                     <p className={styles.checkSectionDesc}>
                       {t("chat.community.check2Desc")}
                     </p>
-                    <div
-                      className={styles.checkItem}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => setCheckContentFilter((v) => !v)}
-                    >
-                      <div className={`${styles.checkIcon} ${checkContentFilter ? styles.checked : styles.unchecked}`}>
-                        {checkContentFilter ? "✓" : ""}
-                      </div>
-                      <span className={styles.checkLabel}>
-                        {t("chat.community.check2Label")}
-                      </span>
+                    <div className={styles.checkItem} style={{ cursor: "pointer" }} onClick={() => setCheckContentFilter((v) => !v)}>
+                      <span className={styles.checkLabel}>{t("chat.community.check2Label")}</span>
+                      <button type="button" className={styles.togglePill} data-on={String(checkContentFilter)} onClick={(e) => { e.stopPropagation(); setCheckContentFilter((v) => !v); }}>
+                        <span className={styles.toggleThumb} />
+                      </button>
                     </div>
                   </div>
 
@@ -314,7 +343,7 @@ export default function CommunitySection({
               {/* ── STEP 2 ── */}
               {step === 2 && (
                 <>
-                  <div className={styles.wizardContentIcon}>🔧</div>
+                  <div className={styles.wizardContentIconWrap}><IcoWrench /></div>
                   <h3 className={styles.wizardContentTitle}>
                     {t("chat.community.step2Title")}
                   </h3>
@@ -422,7 +451,7 @@ export default function CommunitySection({
               {/* ── STEP 3 ── */}
               {step === 3 && (
                 <>
-                  <div className={styles.wizardContentIcon}>📋</div>
+                  <div className={styles.wizardContentIconWrap}><IcoClipboard /></div>
                   <h3 className={styles.wizardContentTitle}>{t("chat.community.step3Title")}</h3>
                   <p className={styles.wizardContentDesc}>
                     {t("chat.community.step3Desc")}

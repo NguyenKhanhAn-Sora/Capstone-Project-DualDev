@@ -67,6 +67,8 @@ type Props = {
   onToast?: (message: string) => void;
   /** Tạm thời: parent có thể truyền; nếu không sẽ mặc định locked. */
   boostUnlocked?: boolean;
+  /** Current messages shell theme — forwarded to portaled sub-modals. */
+  theme?: string;
 };
 
 async function urlToImageFile(url: string): Promise<File> {
@@ -86,6 +88,7 @@ export default function MessagesProfileEditor({
   servers,
   onToast,
   boostUnlocked = false,
+  theme,
 }: Props) {
   const { t } = useLanguage();
   /** Tránh vòng lặp: parent hay truyền `onToast` inline → không đưa vào deps của loadProfile. */
@@ -691,32 +694,32 @@ export default function MessagesProfileEditor({
           <div className={styles.left}>
             <div className={styles.boostPromo}>
               <div className={styles.boostPromoRow}>
-                <div>
-                  <div className={styles.boostPromoTitle}>
+                <div className={styles.boostPromoTop}>
+                  <span className={styles.boostPromoTitle}>
                     {boostUnlocked
                       ? t("chat.profileEditor.boostPromoTitleActive")
                       : t("chat.profileEditor.boostPromoTitleDemo")}
-                    {!boostUnlocked ? (
-                      <span className={styles.lockedTag}>
-                        <span className={styles.lockedTagDot} aria-hidden />
-                        {t("chat.profileEditor.boostPromoTagLocked")}
-                      </span>
-                    ) : (
-                      <span className={styles.lockedTag}>
-                        <span className={styles.lockedTagDot} aria-hidden />
-                        {t("chat.profileEditor.boostPromoTagUnlock")}
-                      </span>
-                    )}
-                  </div>
-                  <div className={styles.boostPromoDesc}>
-                    {boostUnlocked
-                      ? t("chat.profileEditor.boostPromoDescActive")
-                      : t("chat.profileEditor.boostPromoDescDemo")}
-                  </div>
+                  </span>
+                  {!boostUnlocked ? (
+                    <span className={styles.lockedTag}>
+                      <span className={styles.lockedTagDot} aria-hidden />
+                      {t("chat.profileEditor.boostPromoTagLocked")}
+                    </span>
+                  ) : (
+                    <span className={styles.lockedTag}>
+                      <span className={styles.lockedTagDot} aria-hidden />
+                      {t("chat.profileEditor.boostPromoTagUnlock")}
+                    </span>
+                  )}
+                </div>
+                <div className={styles.boostPromoDesc}>
+                  {boostUnlocked
+                    ? t("chat.profileEditor.boostPromoDescActive")
+                    : t("chat.profileEditor.boostPromoDescDemo")}
                 </div>
                 <button
                   type="button"
-                  className={styles.btnGhost}
+                  className={styles.btnBoost}
                   onClick={openDisplayNameStyleModal}
                 >
                   {boostUnlocked
@@ -988,6 +991,7 @@ export default function MessagesProfileEditor({
         open={pickerOpen}
         mode={pickerMode}
         recentAvatarUrls={recentList}
+        theme={theme}
         onClose={() => setPickerOpen(false)}
         onPickFile={(file) => {
           if (pickerMode === "banner") void onBannerFile(file);
@@ -1000,6 +1004,7 @@ export default function MessagesProfileEditor({
         open={cropOpen}
         imageSrc={cropSrc}
         sourceFile={cropFile}
+        theme={theme}
         onClose={() => {
           setCropOpen(false);
           setCropSrc(null);
@@ -1012,6 +1017,7 @@ export default function MessagesProfileEditor({
         open={bannerCropOpen}
         imageSrc={bannerCropSrc}
         sourceFile={bannerCropFile}
+        theme={theme}
         onClose={() => {
           setBannerCropOpen(false);
           setBannerCropSrc(null);
@@ -1024,6 +1030,7 @@ export default function MessagesProfileEditor({
         open={colorOpen}
         anchorRect={swatchRect}
         valueHex={effectiveBannerSolidHex}
+        theme={theme}
         onChange={(hex) => {
           if (tab === "server" && serverId) {
             setServerBannerSolidHex(hex);
@@ -1042,6 +1049,7 @@ export default function MessagesProfileEditor({
         value={boostUnlocked ? appliedDisplayNameStyle : demoDisplayNameStyle}
         revertValue={styleModalBaseline}
         onToast={onToast}
+        theme={theme}
         onClose={() => setStyleModalOpen(false)}
         onDraftPreview={(next) => emitDisplayNameStyleUpdated(next)}
         onChange={(next) => {

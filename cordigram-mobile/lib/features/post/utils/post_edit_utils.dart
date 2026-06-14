@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/app_theme.dart';
+import '../../../core/services/language_controller.dart';
 
 import '../../home/models/feed_post.dart';
 import '../../home/services/post_interaction_service.dart';
@@ -290,6 +291,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
             : AppSemanticColors.light);
     final bottomPad = MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).viewPadding.bottom;
+    final lc = LanguageController.instance;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 12, 16, 14 + bottomPad),
@@ -323,7 +325,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
             // ── Caption section ──────────────────────────────────────────────
             _SectionCard(
               tokens: tokens,
-              label: 'Caption',
+              label: lc.t('post.edit.caption'),
               child: _Field(
                 controller: _captionCtrl,
                 label: '',
@@ -336,12 +338,12 @@ class _EditPostSheetState extends State<_EditPostSheet> {
             // ── Location section ─────────────────────────────────────────────
             _SectionCard(
               tokens: tokens,
-              label: 'Location',
+              label: lc.t('post.edit.location'),
               child: Column(
                 children: [
                   _Field(
                     controller: _locationCtrl,
-                    label: 'Search a place…',
+                    label: lc.t('post.edit.searchPlace'),
                     onChanged: _onLocationChanged,
                     prefixIcon: Icon(
                       Icons.place_outlined,
@@ -419,7 +421,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
             // ── Hashtags section ─────────────────────────────────────────────
             _SectionCard(
               tokens: tokens,
-              label: 'Hashtags',
+              label: lc.t('post.edit.hashtags'),
               child: _Field(
                 controller: _hashtagsCtrl,
                 label: 'e.g. #music #flutter',
@@ -431,7 +433,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
             if (_isPoll && _optionCtrls.isNotEmpty) ...[
               _SectionCard(
                 tokens: tokens,
-                label: 'Poll options',
+                label: lc.t('post.edit.pollOptions'),
                 child: Column(
                   children: List.generate(_optionCtrls.length, (i) {
                     final imgUrl = (widget.post.poll?.hasImages == true &&
@@ -468,7 +470,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                           Expanded(
                             child: _Field(
                               controller: _optionCtrls[i],
-                              label: 'Option ${i + 1}',
+                              label: lc.t('post.edit.pollOption').replaceAll('{n}', '${i + 1}'),
                             ),
                           ),
                         ],
@@ -483,12 +485,12 @@ class _EditPostSheetState extends State<_EditPostSheet> {
             // ── Settings section ─────────────────────────────────────────────
             _SectionCard(
               tokens: tokens,
-              label: 'Settings',
+              label: lc.t('post.edit.settings'),
               child: Column(
                 children: [
                   _ToggleTile(
-                    title: 'Allow comments',
-                    subtitle: 'Let others comment on this post',
+                    title: lc.t('post.edit.allowComments'),
+                    subtitle: lc.t('post.edit.allowCommentsSub'),
                     value: _allowComments,
                     onChanged: (v) => setState(() => _allowComments = v),
                     tokens: tokens,
@@ -496,8 +498,8 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                   if (_isPoll) ...[
                     Divider(height: 1, color: tokens.panelBorder),
                     _ToggleTile(
-                      title: 'Allow multiple answers',
-                      subtitle: 'Voters can select more than one option',
+                      title: lc.t('post.edit.allowMultipleAnswers'),
+                      subtitle: lc.t('post.edit.allowMultipleAnswersSub'),
                       value: _allowMultipleAnswers,
                       onChanged: (v) =>
                           setState(() => _allowMultipleAnswers = v),
@@ -506,8 +508,8 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                   ] else ...[
                     Divider(height: 1, color: tokens.panelBorder),
                     _ToggleTile(
-                      title: 'Allow download',
-                      subtitle: 'Let others save media from this post',
+                      title: lc.t('post.edit.allowDownload'),
+                      subtitle: lc.t('post.edit.allowDownloadSub'),
                       value: _allowDownload,
                       onChanged: (v) => setState(() => _allowDownload = v),
                       tokens: tokens,
@@ -515,8 +517,8 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                   ],
                   Divider(height: 1, color: tokens.panelBorder),
                   _ToggleTile(
-                    title: 'Hide like count',
-                    subtitle: 'Viewers won\'t see the number of likes',
+                    title: lc.t('post.edit.hideLikeCount'),
+                    subtitle: lc.t('post.edit.hideLikeCountSub'),
                     value: _hideLikeCount,
                     onChanged: (v) => setState(() => _hideLikeCount = v),
                     tokens: tokens,
@@ -739,6 +741,7 @@ class _EditVisibilitySheetState extends State<_EditVisibilitySheet> {
     final bottomPad =
         MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).viewPadding.bottom;
+    final lc = LanguageController.instance;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 12, 16, 14 + bottomPad),
@@ -810,7 +813,7 @@ class _EditVisibilitySheetState extends State<_EditVisibilitySheet> {
                         color: theme.colorScheme.onPrimary,
                       ),
                     )
-                  : const Text('Save visibility'),
+                  : Text(lc.t('post.edit.saveVisibility')),
             ),
           ),
         ],

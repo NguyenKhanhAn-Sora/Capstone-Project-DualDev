@@ -1,85 +1,132 @@
+/* ── Container ───────────────────────────────────────────────────────────── */
+
 .container {
-  padding: 24px;
-  color: var(--color-panel-text);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px 0;
 }
 
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
 .title {
-  font-size: 24px;
-  font-weight: 700;
-  text-align: center;
-  margin: 0 0 8px 0;
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--color-panel-text);
-  line-height: 1.3;
+  padding-right: 44px;
+  line-height: 1.22;
 }
 
 .subtitle {
-  font-size: 16px;
+  margin: 0 0 20px;
+  font-size: 13px;
   color: var(--color-panel-text-muted);
-  text-align: center;
-  line-height: 1.5;
-  margin: 0 0 24px 0;
+  line-height: 1.55;
 }
+
+/* ── Purpose list ────────────────────────────────────────────────────────── */
 
 .purposeList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
+  gap: 6px;
 }
+
+/* ── Purpose button ──────────────────────────────────────────────────────── */
 
 .purposeButton {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 16px;
+  width: 100%;
+  padding: 16px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--color-panel-border);
   background: var(--color-panel-sidebar);
-  border: 2px solid var(--color-panel-sidebar-border);
-  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
-  color: var(--color-panel-text);
-  font-size: 16px;
-  font-weight: 500;
   text-align: left;
+  color: var(--color-panel-text);
+  transition:
+    background 0.18s,
+    border-color 0.2s,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s;
 }
 
 .purposeButton:hover {
   background: var(--color-panel-hover);
   border-color: var(--color-panel-accent);
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
 }
 
+.purposeButton:hover .arrow {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
+.purposeButton:active {
+  transform: translateY(0) scale(0.99);
+  box-shadow: none;
+}
+
+/* ── Icon ────────────────────────────────────────────────────────────────── */
+
 .purposeIcon {
-  font-size: 28px;
-  width: 48px;
-  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-panel-active);
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   flex-shrink: 0;
+  /* color + background set via inline style */
 }
+
+/* ── Name ────────────────────────────────────────────────────────────────── */
 
 .purposeName {
   flex: 1;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-panel-text);
+  letter-spacing: -0.01em;
 }
+
+/* ── Chevron ─────────────────────────────────────────────────────────────── */
 
 .arrow {
-  font-size: 24px;
+  display: flex;
+  align-items: center;
   color: var(--color-panel-text-muted);
+  opacity: 0.4;
   flex-shrink: 0;
+  transition:
+    opacity 0.16s,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
 .footer {
-  text-align: center;
-  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 0 22px;
+  margin-top: 16px;
+  border-top: 1px solid var(--color-panel-border);
+  position: sticky;
+  bottom: 0;
+  background: var(--color-panel-bg);
 }
 
 .footerText {
-  font-size: 14px;
+  margin: 0;
+  font-size: 13px;
   color: var(--color-panel-text-muted);
-  margin: 0 0 16px 0;
+  text-align: center;
   line-height: 1.5;
 }
 
@@ -89,26 +136,34 @@
   color: var(--color-panel-accent);
   cursor: pointer;
   padding: 0;
-  font-size: 14px;
-  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: opacity 0.16s;
 }
 
 .skipLink:hover {
   text-decoration: underline;
+  opacity: 0.8;
 }
 
 .backButton {
+  padding: 9px 24px;
+  border-radius: 10px;
+  border: 1.5px solid var(--color-panel-border);
   background: transparent;
-  border: none;
   color: var(--color-panel-text);
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 8px 16px;
-  border-radius: 4px;
-  transition: all 0.2s;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s;
 }
 
 .backButton:hover {
   background: var(--color-panel-hover);
+  border-color: var(--color-panel-border);
+  transform: translateY(-1px);
+}
+
+.backButton:active {
+  transform: translateY(0);
 }

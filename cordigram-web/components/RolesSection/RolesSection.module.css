@@ -1,46 +1,85 @@
-.container {
-  padding: 0;
-  max-width: 740px;
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
+@keyframes sectionFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.loading,
-.error {
+/* ── Container ───────────────────────────────────────────────────────────── */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 740px;
+  animation: sectionFadeUp 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+
+.loading {
   padding: 40px;
   text-align: center;
   color: var(--color-panel-text-muted);
+  font-size: 14px;
 }
 
 .error {
-  color: var(--color-panel-danger);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(237, 66, 69, 0.08);
+  border: 1px solid rgba(237, 66, 69, 0.22);
+  color: var(--color-panel-danger, #ed4245);
+  font-size: 13px;
 }
 
 .retryBtn {
-  margin-top: 12px;
-  padding: 8px 16px;
+  margin-top: 10px;
+  padding: 8px 18px;
   background: var(--color-panel-accent);
-  color: white;
+  color: #fff;
   border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  border-radius: 10px;
   font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.15s;
 }
 
 .retryBtn:hover {
   background: var(--color-panel-accent-hover);
+  transform: translateY(-1px);
 }
 
-/* Banner */
+/* ── Banner ──────────────────────────────────────────────────────────────── */
+
 .banner {
-  background: linear-gradient(135deg, #5865f2 0%, #7289da 100%);
-  border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 24px;
+  position: relative;
+  border-radius: 16px;
+  padding: 26px 24px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #3d4fd7 0%, #5865f2 40%, #7c3aed 100%);
+  box-shadow:
+    0 4px 24px rgba(88, 101, 242, 0.30),
+    0 16px 48px rgba(124, 58, 237, 0.20);
+}
+
+.banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 70% at 100% 0%, rgba(255, 255, 255, 0.10), transparent),
+    radial-gradient(ellipse 50% 60% at 0% 100%, rgba(124, 58, 237, 0.25), transparent);
+  pointer-events: none;
 }
 
 .bannerContent {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 24px;
+  flex-wrap: wrap;
 }
 
 .bannerIllustration {
@@ -50,8 +89,10 @@
 .illustrationPlaceholder {
   width: 200px;
   height: 120px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -59,59 +100,70 @@
 
 .bannerText {
   flex: 1;
+  min-width: 200px;
 }
 
 .bannerTitle {
-  font-size: 24px;
-  font-weight: 700;
-  color: white;
-  margin: 0 0 8px 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin: 0 0 6px;
 }
 
 .bannerDesc {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0 0 16px 0;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.78);
+  margin: 0 0 18px;
   line-height: 1.5;
 }
 
 .createBtn {
-  padding: 10px 20px;
-  background: var(--color-panel-bg);
-  color: var(--color-panel-accent);
-  border: none;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 22px;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.18s, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s;
 }
 
 .createBtn:hover {
-  background: var(--color-panel-hover);
+  background: rgba(255, 255, 255, 0.24);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.20);
 }
 
-/* Roles List */
+/* ── Roles list ──────────────────────────────────────────────────────────── */
+
 .rolesList {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  background: var(--color-panel-sidebar);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 14px;
+  overflow: hidden;
 }
 
 .roleItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: var(--color-panel-sidebar);
-  border-radius: 4px;
+  padding: 13px 18px;
   cursor: pointer;
-  transition: background 0.15s;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-panel-border) 55%, transparent);
+  transition: background 0.12s;
 }
 
-.roleItem:hover {
-  background: var(--color-panel-hover);
-}
+.roleItem:last-child { border-bottom: none; }
+
+.roleItem:hover { background: var(--color-panel-hover); }
 
 .roleInfo {
   display: flex;
@@ -120,15 +172,16 @@
 }
 
 .roleColorDot {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.12);
 }
 
 .roleIcon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--color-panel-border);
   display: flex;
@@ -139,19 +192,13 @@
 }
 
 .roleName {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 14.5px;
+  font-weight: 600;
   color: var(--color-panel-text);
 }
 
-.defaultRole {
-  margin-top: 16px;
-  background: var(--color-panel-deep);
-}
-
-.defaultRole:hover {
-  background: var(--color-panel-sidebar);
-}
+.defaultRole { background: var(--color-panel-deep); }
+.defaultRole:hover { background: var(--color-panel-hover); }
 
 .defaultRoleText {
   display: flex;
@@ -165,13 +212,52 @@
 }
 
 .roleArrow {
-  color: var(--color-panel-text-muted);
+  color: var(--color-panel-text-faint);
   display: flex;
   align-items: center;
+  transition: color 0.12s, transform 0.15s;
+}
+
+.roleItem:hover .roleArrow {
+  color: var(--color-panel-text-muted);
+  transform: translateX(2px);
 }
 
 .roleArrow svg {
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GALAXY THEME OVERRIDES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:global([data-messages-theme="galaxy"]) .banner {
+  background: linear-gradient(135deg, rgba(40, 50, 160, 0.85) 0%, rgba(88, 101, 242, 0.80) 45%, rgba(124, 58, 237, 0.78) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(165, 180, 252, 0.12);
+  box-shadow:
+    0 4px 24px rgba(88, 101, 242, 0.22),
+    0 20px 60px rgba(124, 58, 237, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+:global([data-messages-theme="galaxy"]) .rolesList {
+  background: rgba(6, 8, 20, 0.55);
+  border-color: rgba(88, 101, 242, 0.12);
+}
+
+:global([data-messages-theme="galaxy"]) .roleItem:hover {
+  background: rgba(88, 101, 242, 0.07);
+}
+
+:global([data-messages-theme="galaxy"]) .roleName {
+  color: rgba(225, 232, 252, 0.90);
+}
+
+:global([data-messages-theme="galaxy"]) .retryBtn {
+  background: linear-gradient(135deg, #5865f2, #7c3aed);
 }

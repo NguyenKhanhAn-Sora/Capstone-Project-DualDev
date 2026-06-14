@@ -1,88 +1,136 @@
+/* ═══════════════════════════════════════════════
+   CallMessageCard — Theme-adaptive
+   Uses --color-chat-* / --accent-color from messages-shell-theme.css
+   Galaxy gradient effects gated at bottom.
+   ═══════════════════════════════════════════════ */
+
 .card {
   min-width: 220px;
-  max-width: 280px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: color-mix(
-    in srgb,
-    var(--color-primary) 14%,
-    var(--color-surface-muted)
-  );
-  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--color-text) 6%, transparent);
+  max-width: 288px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--color-chat-received, rgba(12, 15, 35, 0.88));
+  border: 1px solid var(--color-chat-modal-border, rgba(124, 58, 237, 0.22));
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   user-select: none;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  box-shadow:
+    0 6px 28px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
 }
 
 .topRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .iconCircle {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--color-on-accent, #fff);
+  color: #fff;
 }
 
 .iconMissed {
-  background: var(--color-panel-danger);
+  background: var(--color-panel-danger, #ef4444);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
 }
 
 .iconOk {
-  background: color-mix(
-    in srgb,
-    var(--color-primary) 82%,
-    var(--color-primary-strong)
-  );
+  background: var(--accent-color, #5865f2);
+  box-shadow: 0 0 14px rgba(88, 101, 242, 0.35);
 }
 
 .textCol {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
 .title {
   font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
+  font-weight: 700;
+  color: var(--color-chat-text-strong, #dde2f0);
   line-height: 1.25;
 }
 
 .subtitle {
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: var(--color-chat-text-secondary, rgba(120, 140, 190, 0.9));
   line-height: 1.2;
 }
 
 .callBackBtn {
   width: 100%;
-  padding: 9px 12px;
+  padding: 10px 12px;
   border: none;
-  border-radius: 10px;
-  background: var(--color-primary);
-  color: var(--color-on-accent, #fff);
+  border-radius: 12px;
+  background: var(--accent-color, #5865f2);
+  color: #fff;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 12px var(--accent-soft, rgba(88, 101, 242, 0.3));
+  letter-spacing: 0.01em;
 }
 
 .callBackBtn:hover {
-  background: var(--color-primary-strong);
+  background: var(--accent-hover, #4752c4);
+  box-shadow: 0 4px 18px var(--accent-soft, rgba(88, 101, 242, 0.45));
+  transform: translateY(-1px);
 }
 
 .callBackBtn:active {
-  transform: scale(0.98);
+  transform: scale(0.98) translateY(0);
+}
+
+/* ── Galaxy-only decorative effects ── */
+:global([data-messages-theme="galaxy"]) .card {
+  background: var(--color-chat-received, rgba(24, 34, 54, 0.82));
+  border-color: var(--color-chat-modal-border, rgba(36, 51, 71, 0.85));
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.35),
+    0 0 24px rgba(124, 58, 237, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:global([data-messages-theme="galaxy"]) .card:hover {
+  box-shadow:
+    0 6px 28px rgba(0, 0, 0, 0.45),
+    0 0 32px rgba(124, 58, 237, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+:global([data-messages-theme="galaxy"]) .iconOk {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: 0 0 14px rgba(88, 101, 242, 0.45);
+}
+
+:global([data-messages-theme="galaxy"]) .callBackBtn {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: 0 2px 12px rgba(88, 101, 242, 0.38);
+}
+
+:global([data-messages-theme="galaxy"]) .callBackBtn:hover {
+  background: linear-gradient(135deg, #4752c4 0%, #6d28d9 100%);
+  box-shadow: 0 4px 18px rgba(88, 101, 242, 0.55), 0 0 8px rgba(124, 58, 237, 0.3);
 }

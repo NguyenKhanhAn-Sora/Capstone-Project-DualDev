@@ -1,11 +1,100 @@
 "use client";
-
 import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import { useLanguage } from "@/component/language-provider";
 import { translateChannelName } from "@/lib/system-names";
+import styles from "./ServerInteractionsSection.module.css";
 
+/* ── Chevron SVG ─────────────────────────────────────────────────────────── */
+const ChevronDown = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+const SendIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </svg>
+);
+
+/* ── CustomSelect ────────────────────────────────────────────────────────── */
+interface SelectOption { value: string; label: string }
+interface CustomSelectProps {
+  value: string;
+  options: SelectOption[];
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}
+
+function CustomSelect({ value, options, onChange, disabled }: CustomSelectProps) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const current = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className={styles.selectWrap} ref={wrapRef}>
+      <button
+        type="button"
+        className={`${styles.selectBtn} ${open ? styles.selectBtnOpen : ""}`}
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((v) => !v)}
+      >
+        <span>{current?.label ?? value}</span>
+        <span className={styles.selectChevron}><ChevronDown /></span>
+      </button>
+      {open && (
+        <div className={styles.selectDropdown}>
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`${styles.selectOption} ${opt.value === value ? styles.selectOptionActive : ""}`}
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── CheckRow ────────────────────────────────────────────────────────────── */
+interface CheckRowProps {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (v: boolean) => void;
+}
+
+function CheckRow({ label, checked, disabled, onChange }: CheckRowProps) {
+  return (
+    <label
+      className={`${styles.checkRow} ${disabled ? styles.checkRowDisabled : ""}`}
+      onClick={() => !disabled && onChange(!checked)}
+    >
+      <span className={styles.checkLabel}>{label}</span>
+      <div className={`${styles.toggle} ${checked ? styles.toggleOn : ""}`}>
+        <span className={styles.toggleThumb} />
+      </div>
+    </label>
+  );
+}
+
+/* ── Main component ──────────────────────────────────────────────────────── */
 interface ServerInteractionsSectionProps {
   serverId: string;
   canManageSettings: boolean;
@@ -51,9 +140,7 @@ export default function ServerInteractionsSection({
         if (cancelled) return;
         setError(e instanceof Error ? e.message : t("chat.serverInteractions.loadFail"));
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
   }, [serverId, t]);
@@ -65,11 +152,8 @@ export default function ServerInteractionsSection({
 
   const updateSetting = async (
     patch: Partial<Pick<serversApi.ServerInteractionSettings,
-      | "systemMessagesEnabled"
-      | "welcomeMessageEnabled"
-      | "stickerReplyWelcomeEnabled"
-      | "defaultNotificationLevel"
-      | "systemChannelId"
+      | "systemMessagesEnabled" | "welcomeMessageEnabled"
+      | "stickerReplyWelcomeEnabled" | "defaultNotificationLevel" | "systemChannelId"
     >>,
   ) => {
     if (!canEdit) return;
@@ -115,94 +199,93 @@ export default function ServerInteractionsSection({
     }
   };
 
-  if (loading) {
-    return <div style={{ color: "var(--color-panel-text-muted)" }}>{t("chat.serverInteractions.loading")}</div>;
+  if (loading) return <div className={styles.loading}>{t("chat.serverInteractions.loading")}</div>;
+  if (!settings) {
+    return <div className={styles.errorBar}>{error || t("chat.serverInteractions.loadError")}</div>;
   }
 
-  if (!settings) {
-    return <div style={{ color: "var(--color-panel-danger)" }}>{error || t("chat.serverInteractions.loadError")}</div>;
-  }
+  /* Channel options */
+  const channelOptions: SelectOption[] = [
+    { value: "", label: t("chat.serverInteractions.noChannel") },
+    ...textChannels.map((ch) => ({
+      value: ch._id,
+      label: `#${translateChannelName(ch.name, language)}`,
+    })),
+  ];
+
+  /* Notification level options */
+  const notifLevelOptions: SelectOption[] = [
+    { value: "all",      label: t("chat.serverInteractions.notifAll") },
+    { value: "mentions", label: t("chat.serverInteractions.notifMentions") },
+  ];
+
+  /* Notification target options */
+  const targetOptions: SelectOption[] = [
+    { value: "everyone", label: t("chat.serverInteractions.targetEveryone") },
+    { value: "role",     label: t("chat.serverInteractions.targetRole") },
+  ];
+
+  /* Role options */
+  const roleOptions: SelectOption[] = roles
+    .filter((r) => !r.isDefault)
+    .map((r) => ({ value: r._id, label: r.name }));
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
-      {error && (
-        <div style={{ color: "var(--color-panel-danger)", fontSize: 13 }}>{error}</div>
-      )}
+    <div className={styles.wrap}>
+      {error && <div className={styles.errorBar}>{error}</div>}
 
-      <section>
-        <h3 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>{t("chat.serverInteractions.title")}</h3>
-        <p style={{ marginTop: 4, color: "var(--color-panel-text-muted)", fontSize: 13 }}>
-          {t("chat.serverInteractions.desc")}
-        </p>
-      </section>
+      {/* ── System messages card ── */}
+      <div className={styles.sectionCard}>
+        <div className={styles.sectionTitle}>{t("chat.serverInteractions.systemMessages")}</div>
 
-      <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
-        <h4 style={{ margin: 0, fontSize: 20 }}>{t("chat.serverInteractions.systemMessages")}</h4>
-        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>{t("chat.serverInteractions.enableSystem")}</span>
-            <input
-              type="checkbox"
-              checked={settings.systemMessagesEnabled}
-              disabled={!canEdit || saving}
-              onChange={(e) => updateSetting({ systemMessagesEnabled: e.target.checked })}
-            />
-          </label>
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>{t("chat.serverInteractions.sendWelcome")}</span>
-            <input
-              type="checkbox"
-              checked={settings.welcomeMessageEnabled}
-              disabled={!canEdit || saving}
-              onChange={(e) => updateSetting({ welcomeMessageEnabled: e.target.checked })}
-            />
-          </label>
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>{t("chat.serverInteractions.stickerReply")}</span>
-            <input
-              type="checkbox"
-              checked={settings.stickerReplyWelcomeEnabled}
-              disabled={!canEdit || saving || !settings.welcomeMessageEnabled}
-              onChange={(e) => updateSetting({ stickerReplyWelcomeEnabled: e.target.checked })}
-            />
-          </label>
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>{t("chat.serverInteractions.systemChannel")}</span>
-            <select
-              value={settings.systemChannelId ?? ""}
-              disabled={!canEdit || saving}
-              onChange={(e) => updateSetting({ systemChannelId: e.target.value || null })}
-            >
-              <option value="">{t("chat.serverInteractions.noChannel")}</option>
-              {textChannels.map((ch) => (
-                <option key={ch._id} value={ch._id}>
-                  #{translateChannelName(ch.name, language)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: "grid", gap: 6 }}>
-            <span>{t("chat.serverInteractions.defaultNotif")}</span>
-            <select
-              value={settings.defaultNotificationLevel}
-              disabled={!canEdit || saving}
-              onChange={(e) =>
-                updateSetting({ defaultNotificationLevel: e.target.value === "mentions" ? "mentions" : "all" })
-              }
-            >
-              <option value="all">{t("chat.serverInteractions.notifAll")}</option>
-              <option value="mentions">{t("chat.serverInteractions.notifMentions")}</option>
-            </select>
-          </label>
+        <CheckRow
+          label={t("chat.serverInteractions.enableSystem")}
+          checked={settings.systemMessagesEnabled}
+          disabled={!canEdit || saving}
+          onChange={(v) => updateSetting({ systemMessagesEnabled: v })}
+        />
+        <CheckRow
+          label={t("chat.serverInteractions.sendWelcome")}
+          checked={settings.welcomeMessageEnabled}
+          disabled={!canEdit || saving}
+          onChange={(v) => updateSetting({ welcomeMessageEnabled: v })}
+        />
+        <CheckRow
+          label={t("chat.serverInteractions.stickerReply")}
+          checked={settings.stickerReplyWelcomeEnabled}
+          disabled={!canEdit || saving || !settings.welcomeMessageEnabled}
+          onChange={(v) => updateSetting({ stickerReplyWelcomeEnabled: v })}
+        />
+
+        <div className={styles.fieldGroup}>
+          <div className={styles.fieldLabel}>{t("chat.serverInteractions.systemChannel")}</div>
+          <CustomSelect
+            value={settings.systemChannelId ?? ""}
+            options={channelOptions}
+            disabled={!canEdit || saving}
+            onChange={(v) => updateSetting({ systemChannelId: v || null })}
+          />
         </div>
-      </section>
 
-      <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
-        <h4 style={{ margin: 0, fontSize: 20 }}>{t("chat.serverInteractions.roleNotif")}</h4>
-        <p style={{ marginTop: 4, color: "var(--color-panel-text-muted)", fontSize: 13 }}>
-          {t("chat.serverInteractions.roleNotifDesc")}
-        </p>
-        <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+        <div className={styles.fieldGroup}>
+          <div className={styles.fieldLabel}>{t("chat.serverInteractions.defaultNotif")}</div>
+          <CustomSelect
+            value={settings.defaultNotificationLevel}
+            options={notifLevelOptions}
+            disabled={!canEdit || saving}
+            onChange={(v) =>
+              updateSetting({ defaultNotificationLevel: v === "mentions" ? "mentions" : "all" })
+            }
+          />
+        </div>
+      </div>
+
+      {/* ── Role notification card ── */}
+      <div className={styles.sectionCard}>
+        <div className={styles.sectionTitle}>{t("chat.serverInteractions.roleNotif")}</div>
+        <p className={styles.sectionDesc}>{t("chat.serverInteractions.roleNotifDesc")}</p>
+
+        <div className={styles.notifForm}>
           <input
             type="text"
             placeholder={t("chat.serverInteractions.notifTitlePlaceholder")}
@@ -217,35 +300,40 @@ export default function ServerInteractionsSection({
             onChange={(e) => setNotifContent(e.target.value)}
             rows={4}
           />
-          <select
-            value={notifTargetType}
-            disabled={!canEdit || sending}
-            onChange={(e) => setNotifTargetType(e.target.value as "everyone" | "role")}
-          >
-            <option value="everyone">{t("chat.serverInteractions.targetEveryone")}</option>
-            <option value="role">{t("chat.serverInteractions.targetRole")}</option>
-          </select>
-          {notifTargetType === "role" && (
-            <select
-              value={notifRoleId}
+
+          <div className={styles.fieldGroup}>
+            <div className={styles.fieldLabel}>{t("chat.serverInteractions.targetEveryone")}</div>
+            <CustomSelect
+              value={notifTargetType}
+              options={targetOptions}
               disabled={!canEdit || sending}
-              onChange={(e) => setNotifRoleId(e.target.value)}
-            >
-              {roles.filter((r) => !r.isDefault).map((r) => (
-                <option key={r._id} value={r._id}>{r.name}</option>
-              ))}
-            </select>
+              onChange={(v) => setNotifTargetType(v as "everyone" | "role")}
+            />
+          </div>
+
+          {notifTargetType === "role" && roleOptions.length > 0 && (
+            <div className={styles.fieldGroup}>
+              <div className={styles.fieldLabel}>{t("chat.serverInteractions.targetRole")}</div>
+              <CustomSelect
+                value={notifRoleId}
+                options={roleOptions}
+                disabled={!canEdit || sending}
+                onChange={setNotifRoleId}
+              />
+            </div>
           )}
+
           <button
             type="button"
+            className={styles.sendBtn}
             disabled={!canEdit || sending}
             onClick={handleSendRoleNotification}
-            style={{ justifySelf: "start" }}
           >
+            <SendIcon />
             {sending ? t("chat.serverInteractions.sendingBtn") : t("chat.serverInteractions.sendBtn")}
           </button>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

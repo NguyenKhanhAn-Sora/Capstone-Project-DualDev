@@ -13,6 +13,7 @@ type Props = {
   sourceFile: File | null;
   onClose: () => void;
   onSubmit: (form: FormData) => Promise<void>;
+  theme?: string;
 };
 
 async function getCroppedDataUrl(
@@ -45,6 +46,7 @@ export default function ProfileAvatarCropModal({
   sourceFile,
   onClose,
   onSubmit,
+  theme,
 }: Props) {
   const { t } = useLanguage();
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -113,6 +115,7 @@ export default function ProfileAvatarCropModal({
     <div
       className={styles.overlay}
       role="presentation"
+      data-messages-theme={theme ?? "dark"}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !submitting) onClose();
       }}
@@ -163,7 +166,7 @@ export default function ProfileAvatarCropModal({
                   style={{
                     width: "100%",
                     height: "100%",
-                    background: "#2b2d31",
+                    background: "var(--ms-bg-input, #2b2d31)",
                   }}
                 />
               )}

@@ -897,6 +897,15 @@ class _SearchScreenState extends State<SearchScreen> {
           _showSnack(LanguageController.instance.t('search.failedBlockAccount'), error: true);
         }
         return;
+      case PostMenuAction.seeLikes:
+        if (!mounted) return;
+        showPostLikesSheet(
+          context,
+          postId: post.id,
+          viewerId: _viewerId,
+          title: LanguageController.instance.t('post.menu.seeLikes'),
+        );
+        return;
     }
   }
 
@@ -1328,7 +1337,7 @@ class _SearchScreenState extends State<SearchScreen> {
           if (_hashtagsHasMore)
             TextButton(
               onPressed: _loadHashtagsMore,
-              child: const Text('Load more'),
+              child: Text(LanguageController.instance.t('common.loadMore')),
             ),
         ],
       );
@@ -1340,7 +1349,7 @@ class _SearchScreenState extends State<SearchScreen> {
           if (_reelsHasMore)
             TextButton(
               onPressed: _loadReelsMore,
-              child: const Text('Load more'),
+              child: Text(LanguageController.instance.t('common.loadMore')),
             ),
         ],
       );
@@ -1352,7 +1361,7 @@ class _SearchScreenState extends State<SearchScreen> {
           if (_postsHasMore)
             TextButton(
               onPressed: _loadPostsMore,
-              child: const Text('Load more'),
+              child: Text(LanguageController.instance.t('common.loadMore')),
             ),
         ],
       );
@@ -1401,7 +1410,7 @@ class _SearchScreenState extends State<SearchScreen> {
               textInputAction: TextInputAction.search,
               style: TextStyle(color: scheme.onSurface),
               decoration: InputDecoration(
-                hintText: 'Search people, #hashtags, posts, reels',
+                hintText: LanguageController.instance.t('search.hint'),
                 hintStyle: TextStyle(color: scheme.onSurfaceVariant),
                 prefixIcon: Icon(
                   Icons.search_rounded,

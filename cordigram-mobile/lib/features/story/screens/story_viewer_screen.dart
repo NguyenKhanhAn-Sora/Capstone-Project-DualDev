@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
 import '../../../core/services/language_controller.dart';
 import '../models/story_models.dart';
 import '../services/story_service.dart';
+import '../widgets/story_music_picker.dart';
 import '../../profile/profile_screen.dart';
 
 class StoryViewerScreen extends StatefulWidget {
@@ -35,6 +37,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   AnimationController? _progressCtrl;
   VideoPlayerController? _videoCtrl;
   bool _videoReady = false;
+  AudioPlayer? _audioPlayer;
 
   List<StoryViewer> _viewers = [];
   bool _loadingViewers = false;
@@ -55,6 +58,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ── Story navigation ──────────────────────────────────────────────────────
 
   void _initStory() {
+    _stopAudio();
     _disposeVideo();
     _disposeProgress();
     _videoReady = false;
@@ -67,7 +71,33 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       _loadVideo(_story.mediaUrl!);
     } else {
       _startProgress();
+      // Play background music for text/image stories
+      if (_story.music != null && _story.music!.audioUrl.isNotEmpty) {
+        _initMusicPlayer(_story.music!);
+      }
     }
+  }
+
+  Future<void> _initMusicPlayer(StoryMusic music) async {
+    _stopAudio();
+    final player = AudioPlayer();
+    _audioPlayer = player;
+    try {
+      await player.play(UrlSource(music.audioUrl));
+      if (music.startTime > 0) {
+        await player.seek(Duration(seconds: music.startTime));
+      }
+      await player.setReleaseMode(ReleaseMode.loop);
+    } catch (_) {
+      _audioPlayer = null;
+      player.dispose();
+    }
+  }
+
+  void _stopAudio() {
+    _audioPlayer?.stop();
+    _audioPlayer?.dispose();
+    _audioPlayer = null;
   }
 
   void _startProgress() {
@@ -148,6 +178,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _paused = true;
     _progressCtrl?.stop();
     _videoCtrl?.pause();
+    _audioPlayer?.pause();
     setState(() {});
   }
 
@@ -155,6 +186,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _paused = false;
     _progressCtrl?.forward(from: _progressCtrl!.value);
     _videoCtrl?.play();
+    _audioPlayer?.resume();
     setState(() {});
   }
 
@@ -245,6 +277,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   void dispose() {
     _disposeProgress();
     _disposeVideo();
+    _stopAudio();
     super.dispose();
   }
 
@@ -267,6 +300,14 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               top: 0, left: 0, right: 0,
               child: _buildTopOverlay(),
             ),
+            // Music sticker (text/image stories with music)
+            if (_story.music != null && !_showViewers)
+              Positioned(
+                bottom: 90,
+                left: 16,
+                right: 70,
+                child: StoryMusicSticker(music: _story.music!),
+              ),
             if (!_showViewers)
               Positioned.fill(child: _buildTapAreas()),
             if (!_showViewers)
@@ -702,11 +743,16 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   String _formatRelative(DateTime dt) {
+    final t = LanguageController.instance.t;
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    return '${diff.inDays}d';
+    if (diff.inMinutes < 1) return t('story.timeNow');
+    if (diff.inMinutes < 60) {
+      return t('story.timeMinutes', {'n': diff.inMinutes});
+    }
+    if (diff.inHours < 24) {
+      return t('story.timeHours', {'n': diff.inHours});
+    }
+    return t('story.timeDays', {'n': diff.inDays});
   }
 }
 

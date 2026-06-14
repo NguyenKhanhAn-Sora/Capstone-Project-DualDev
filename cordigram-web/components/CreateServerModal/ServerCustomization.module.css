@@ -1,46 +1,70 @@
+/* ── Container ───────────────────────────────────────────────────────────── */
+
 .container {
-  padding: 24px;
-  color: var(--color-panel-text);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px 0;
 }
 
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
 .title {
-  font-size: 24px;
-  font-weight: 700;
-  text-align: center;
-  margin: 0 0 8px 0;
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--color-panel-text);
+  text-align: center;
+  padding-right: 0;
+  line-height: 1.22;
 }
 
 .subtitle {
-  font-size: 16px;
+  margin: 0 0 22px;
+  font-size: 13px;
   color: var(--color-panel-text-muted);
   text-align: center;
-  line-height: 1.5;
-  margin: 0 0 24px 0;
+  line-height: 1.55;
 }
+
+/* ── Upload section ──────────────────────────────────────────────────────── */
 
 .uploadSection {
   display: flex;
   flex-direction: column;
   align-items: center;
   margin-bottom: 24px;
+  gap: 10px;
 }
 
 .uploadButton {
-  width: 80px;
-  height: 80px;
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
   border: 2px dashed var(--color-panel-accent);
-  background: var(--color-panel-sidebar);
+  background: color-mix(in oklab, var(--color-panel-accent) 6%, var(--color-panel-sidebar));
   cursor: pointer;
-  transition: all 0.2s;
   padding: 0;
   overflow: hidden;
+  position: relative;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s;
 }
 
-.uploadButton:hover {
-  border-color: #7289da;
-  background: var(--color-panel-hover);
+.uploadButton:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--color-panel-accent);
+  background: color-mix(in oklab, var(--color-panel-accent) 12%, var(--color-panel-sidebar));
+  transform: scale(1.06);
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-panel-accent) 10%, transparent);
+}
+
+.uploadButton:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: none;
 }
 
 .uploadButton:disabled {
@@ -60,18 +84,21 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: 4px;
-}
-
-.uploadIcon {
-  font-size: 32px;
+  gap: 3px;
   position: relative;
 }
 
-.plusIcon {
+.uploadCameraIcon {
+  color: var(--color-panel-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plusBadge {
   position: absolute;
-  bottom: -4px;
-  right: -4px;
+  top: 4px;
+  right: 4px;
   width: 18px;
   height: 18px;
   background: var(--color-panel-accent);
@@ -79,91 +106,128 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
   color: #fff;
 }
 
 .uploadText {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 9px;
+  font-weight: 800;
   color: var(--color-panel-accent);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+/* ── Uploading indicator ─────────────────────────────────────────────────── */
+
+.uploadingWrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+@keyframes customizeSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.uploadingSpinner {
+  color: var(--color-panel-text-muted);
+  animation: customizeSpin 1s linear infinite;
+  flex-shrink: 0;
 }
 
 .uploadingText {
-  margin-top: 8px;
-  font-size: 14px;
+  margin: 0;
+  font-size: 13px;
   color: var(--color-panel-text-muted);
 }
 
+/* ── Input section ───────────────────────────────────────────────────────── */
+
 .inputSection {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .label {
   display: block;
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-panel-text-muted);
   margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .required {
-  color: var(--color-panel-danger);
+  color: var(--color-panel-danger, #ed4245);
 }
 
 .input {
   width: 100%;
-  padding: 10px 12px;
+  box-sizing: border-box;
+  padding: 11px 14px;
   background: var(--color-panel-deep);
-  border: 1px solid var(--color-panel-deep-border);
-  border-radius: 4px;
+  border: 1.5px solid var(--color-panel-deep-border);
+  border-radius: 10px;
   color: var(--color-panel-text);
-  font-size: 16px;
-  transition: all 0.2s;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .input:focus {
   outline: none;
   border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-panel-accent) 18%, transparent);
+}
+
+.input::placeholder {
+  color: var(--color-panel-text-muted);
+  opacity: 0.5;
 }
 
 .hint {
-  margin-top: 8px;
-  font-size: 12px;
+  margin: 8px 0 0;
+  font-size: 11.5px;
   color: var(--color-panel-text-faint);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .link {
   color: var(--color-panel-accent);
   cursor: pointer;
+  transition: opacity 0.15s;
 }
 
 .link:hover {
   text-decoration: underline;
+  opacity: 0.8;
 }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
 
 .footer {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding-top: 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0 22px;
+  margin-top: 4px;
+  border-top: 1px solid var(--color-panel-border);
+  position: sticky;
+  bottom: 0;
+  background: var(--color-panel-bg);
 }
 
 .backButton {
-  flex: 1;
-  padding: 10px 16px;
-  background: transparent;
+  padding: 9px 20px;
+  border-radius: 10px;
   border: none;
+  background: transparent;
   color: var(--color-panel-text);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s;
+  transition: background 0.18s;
 }
 
 .backButton:hover:not(:disabled) {
@@ -176,23 +240,30 @@
 }
 
 .createButton {
-  flex: 1;
-  padding: 10px 16px;
-  background: var(--color-panel-accent);
+  padding: 9px 24px;
+  border-radius: 10px;
   border: none;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s;
+  letter-spacing: 0.01em;
+  transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
 }
 
 .createButton:hover:not(:disabled) {
   background: var(--color-panel-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--color-panel-accent) 40%, transparent);
+}
+
+.createButton:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .createButton:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
 }

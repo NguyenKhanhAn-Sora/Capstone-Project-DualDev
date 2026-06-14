@@ -6,6 +6,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Req,
   UnauthorizedException,
@@ -63,6 +64,26 @@ export class StoriesController {
     const user = req.user as AuthenticatedUser | undefined;
     if (!user) throw new UnauthorizedException();
     return this.storiesService.deleteStory(user.userId, storyId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/visibility')
+  @HttpCode(200)
+  async updateVisibility(
+    @Req() req: Request,
+    @Param('id') storyId: string,
+    @Body('visibility') visibility: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) throw new UnauthorizedException();
+    if (!['public', 'followers', 'private'].includes(visibility)) {
+      throw new BadRequestException('visibility must be public, followers, or private');
+    }
+    return this.storiesService.updateVisibility(
+      user.userId,
+      storyId,
+      visibility as 'public' | 'followers' | 'private',
+    );
   }
 
   @UseGuards(JwtAuthGuard)

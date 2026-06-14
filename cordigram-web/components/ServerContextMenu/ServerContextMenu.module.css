@@ -1,3 +1,5 @@
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -5,31 +7,102 @@
   background: transparent;
 }
 
+/* ── Entrance animations ──────────────────────────────────────────────────── */
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-6px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes submenuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateX(-6px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+    filter: blur(0);
+  }
+}
+
+/* ── Menu ─────────────────────────────────────────────────────────────────── */
+
 .menu {
   position: fixed;
   background: var(--color-panel-context);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  padding: 6px 0;
-  min-width: 220px;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.28),
+    0 16px 40px rgba(0, 0, 0, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  padding: 6px;
+  min-width: 230px;
   border: 1px solid var(--color-panel-border);
   z-index: 9999;
+  animation: menuIn 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: top left;
 }
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.menuHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--color-panel-border);
+}
+
+.menuHeaderDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-panel-accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 6px color-mix(in oklab, var(--color-panel-accent) 60%, transparent);
+}
+
+.menuHeaderName {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-panel-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  opacity: 0.75;
+}
+
+/* ── Menu item ───────────────────────────────────────────────────────────── */
 
 .menuItem {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   background: transparent;
   border: none;
-  border-radius: 0;
-  padding: 10px 14px;
+  border-radius: 8px;
+  padding: 8px 10px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
   color: var(--color-panel-text);
-  font-size: 14px;
+  font-size: 13.5px;
   text-align: left;
   font-weight: 500;
   box-sizing: border-box;
@@ -37,6 +110,11 @@
 
 .menuItem:hover {
   background: var(--color-panel-hover);
+  transform: translateX(1px);
+}
+
+.menuItem:active {
+  transform: scale(0.98);
 }
 
 .menuItemOpen {
@@ -48,17 +126,107 @@
 }
 
 .menuItemDanger:hover {
-  background: rgba(242, 63, 66, 0.15);
+  background: rgba(242, 63, 66, 0.12) !important;
 }
 
 .menuItemWithSub {
   position: relative;
 }
 
-.menuItemWithSub .arrow {
+/* ── Item parts ──────────────────────────────────────────────────────────── */
+
+.itemIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  color: inherit;
+}
+
+.menuItem:hover .itemIcon {
+  opacity: 1;
+}
+
+.menuItemDanger .itemIcon {
+  opacity: 0.85;
+}
+
+.itemLabel {
+  flex: 1;
+  line-height: 1.3;
+}
+
+.itemContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.subLabel {
+  font-size: 11px;
+  color: var(--color-panel-text-muted);
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+/* ── Arrow / Chevron ─────────────────────────────────────────────────────── */
+
+.arrow {
+  display: flex;
+  align-items: center;
   margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.45;
+  color: var(--color-panel-text-muted);
+  transition: opacity 0.14s, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.menuItem:hover .arrow {
   opacity: 0.8;
 }
+
+.arrowOpen {
+  transform: rotate(90deg);
+  opacity: 0.8;
+}
+
+/* ── Custom checkbox ─────────────────────────────────────────────────────── */
+
+.checkbox {
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--color-panel-text-faint);
+  border-radius: 4px;
+  background: transparent;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: background 0.14s, border-color 0.14s, box-shadow 0.14s;
+  position: relative;
+}
+
+.checkbox.checked {
+  background: var(--color-panel-accent);
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--color-panel-accent) 40%, transparent);
+}
+
+.checkbox.checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 5px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+
+/* ── Divider ─────────────────────────────────────────────────────────────── */
 
 .divider {
   height: 1px;
@@ -66,49 +234,22 @@
   margin: 4px 0;
 }
 
-.checkboxWrap {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 8px;
-}
+/* ── Submenu ─────────────────────────────────────────────────────────────── */
 
-.checkbox {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--color-panel-text-faint);
-  border-radius: 3px;
-  background: transparent;
-  flex-shrink: 0;
-}
-
-.checkbox.checked {
-  background: var(--color-panel-accent);
-  border-color: var(--color-panel-accent);
-}
-
-.subLabel {
-  font-size: 12px;
-  color: var(--color-panel-text-muted);
-  font-weight: 400;
-  margin-top: 2px;
-}
-
-.menuItemWithSub .subLabel {
-  display: block;
-}
-
-/* Submenu */
 .submenu {
   position: fixed;
   background: var(--color-panel-context);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  padding: 6px 0;
-  min-width: 200px;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.28),
+    0 16px 40px rgba(0, 0, 0, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  padding: 6px;
+  min-width: 210px;
   border: 1px solid var(--color-panel-border);
   z-index: 10000;
+  animation: submenuIn 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: left center;
 }
 
 .submenuItem {
@@ -117,58 +258,197 @@
   width: 100%;
   background: transparent;
   border: none;
-  padding: 10px 14px;
+  border-radius: 8px;
+  padding: 8px 10px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.14s, transform 0.12s;
   color: var(--color-panel-text);
-  font-size: 14px;
+  font-size: 13.5px;
   text-align: left;
   font-weight: 500;
   box-sizing: border-box;
+  gap: 10px;
 }
 
 .submenuItem:hover {
   background: var(--color-panel-hover);
+  transform: translateX(1px);
+}
+
+.submenuItem:active {
+  transform: scale(0.98);
 }
 
 .submenuItem.selected {
   color: var(--color-panel-accent);
 }
 
+/* ── Radio button ────────────────────────────────────────────────────────── */
+
 .radio {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--color-panel-text-faint);
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--color-panel-text-faint);
   border-radius: 50%;
   background: transparent;
-  margin-right: 10px;
   flex-shrink: 0;
+  transition: border-color 0.14s, background 0.14s, box-shadow 0.14s;
 }
 
 .submenuItem.selected .radio {
   border-color: var(--color-panel-accent);
   background: var(--color-panel-accent);
-  box-shadow: inset 0 0 0 3px var(--color-panel-context);
+  box-shadow: inset 0 0 0 3px var(--color-panel-context), 0 0 6px color-mix(in oklab, var(--color-panel-accent) 40%, transparent);
 }
+
+/* ── Submenu checkbox labels ─────────────────────────────────────────────── */
 
 .submenuCheckbox {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 14px;
+  padding: 7px 10px;
   font-size: 13px;
   color: var(--color-panel-text);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.14s;
+  box-sizing: border-box;
+}
+
+.submenuCheckbox:hover {
+  background: var(--color-panel-hover);
 }
 
 .submenuCheckbox input {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   accent-color: var(--color-panel-accent);
+  flex-shrink: 0;
 }
 
 .submenuDivider {
   height: 1px;
   background: var(--color-panel-border);
   margin: 4px 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GALAXY THEME OVERRIDES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:global([data-messages-theme="galaxy"]) .menu,
+:global([data-messages-theme="galaxy"]) .submenu {
+  background: rgba(8, 10, 24, 0.90);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-color: rgba(88, 101, 242, 0.18);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.50),
+    0 20px 50px rgba(0, 0, 0, 0.40),
+    0 0 60px rgba(88, 101, 242, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:global([data-messages-theme="galaxy"]) .menuHeader {
+  border-bottom-color: rgba(88, 101, 242, 0.14);
+}
+
+:global([data-messages-theme="galaxy"]) .menuHeaderDot {
+  background: radial-gradient(circle at 35% 35%, #a5b4fc, #5865f2);
+  box-shadow: 0 0 8px rgba(88, 101, 242, 0.70), 0 0 16px rgba(88, 101, 242, 0.35);
+}
+
+:global([data-messages-theme="galaxy"]) .menuHeaderName {
+  background-image: linear-gradient(120deg, #e8ecf8 0%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  opacity: 1;
+}
+
+:global([data-messages-theme="galaxy"]) .menuItem {
+  color: rgba(225, 232, 252, 0.88);
+}
+
+:global([data-messages-theme="galaxy"]) .menuItem:hover {
+  background: rgba(88, 101, 242, 0.10);
+}
+
+:global([data-messages-theme="galaxy"]) .menuItemOpen {
+  background: rgba(88, 101, 242, 0.10) !important;
+}
+
+:global([data-messages-theme="galaxy"]) .menuItemDanger {
+  color: rgba(255, 120, 120, 0.90) !important;
+}
+
+:global([data-messages-theme="galaxy"]) .menuItemDanger:hover {
+  background: rgba(237, 66, 69, 0.14) !important;
+}
+
+:global([data-messages-theme="galaxy"]) .itemIcon {
+  color: rgba(165, 180, 252, 0.80);
+}
+
+:global([data-messages-theme="galaxy"]) .menuItemDanger .itemIcon {
+  color: rgba(255, 120, 120, 0.80);
+}
+
+:global([data-messages-theme="galaxy"]) .subLabel {
+  color: rgba(165, 180, 252, 0.50);
+}
+
+:global([data-messages-theme="galaxy"]) .arrow {
+  color: rgba(124, 58, 237, 0.60);
+}
+
+:global([data-messages-theme="galaxy"]) .divider,
+:global([data-messages-theme="galaxy"]) .submenuDivider {
+  background: rgba(88, 101, 242, 0.12);
+}
+
+:global([data-messages-theme="galaxy"]) .checkbox {
+  border-color: rgba(124, 58, 237, 0.45);
+}
+
+:global([data-messages-theme="galaxy"]) .checkbox.checked {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  border-color: transparent;
+  box-shadow: 0 0 8px rgba(88, 101, 242, 0.55);
+}
+
+:global([data-messages-theme="galaxy"]) .submenuItem {
+  color: rgba(225, 232, 252, 0.88);
+}
+
+:global([data-messages-theme="galaxy"]) .submenuItem:hover {
+  background: rgba(88, 101, 242, 0.10);
+}
+
+:global([data-messages-theme="galaxy"]) .submenuItem.selected {
+  color: #a5b4fc;
+}
+
+:global([data-messages-theme="galaxy"]) .radio {
+  border-color: rgba(124, 58, 237, 0.45);
+}
+
+:global([data-messages-theme="galaxy"]) .submenuItem.selected .radio {
+  border-color: #7c3aed;
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: inset 0 0 0 3px rgba(8, 10, 24, 0.90), 0 0 8px rgba(88, 101, 242, 0.55);
+}
+
+:global([data-messages-theme="galaxy"]) .submenuCheckbox {
+  color: rgba(225, 232, 252, 0.88);
+}
+
+:global([data-messages-theme="galaxy"]) .submenuCheckbox:hover {
+  background: rgba(88, 101, 242, 0.10);
+}
+
+:global([data-messages-theme="galaxy"]) .submenuCheckbox input {
+  accent-color: #7c3aed;
 }

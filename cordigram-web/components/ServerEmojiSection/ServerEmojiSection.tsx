@@ -2,6 +2,12 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./ServerEmojiSection.module.css";
+
+const IcoUpload = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+  </svg>
+);
 import * as serversApi from "@/lib/servers-api";
 import { fetchBoostStatus } from "@/lib/api";
 import AddServerEmojiModal from "@/components/AddServerEmojiModal/AddServerEmojiModal";
@@ -156,7 +162,7 @@ export default function ServerEmojiSection({ serverId, token, canManage, onEmoji
       <div className={styles.toolbar}>
         <input ref={inputRef} type="file" className={styles.hiddenInput} accept={ACCEPT} aria-hidden tabIndex={-1} onChange={(e) => handleFiles(e.target.files)} />
         <button type="button" className={styles.uploadBtn} disabled={remaining <= 0} onClick={() => inputRef.current?.click()}>
-          {t("chat.serverEmoji.uploadBtn")}
+          <IcoUpload />{t("chat.serverEmoji.uploadBtn")}
         </button>
         <span className={styles.meta}>{t("chat.serverEmoji.slotsLeft").replace("{n}", String(remaining)).replace("{max}", String(max))}</span>
       </div>
