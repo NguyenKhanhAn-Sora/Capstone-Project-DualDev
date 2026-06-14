@@ -1636,6 +1636,31 @@
       "sent": "送信済み",
       "seen": "既読"
     },
+    "dmConversation": {
+      "menuLabel": "{name} との会話オプション",
+      "categorize": "分類",
+      "clearCategory": "分類を解除",
+      "muteNotifications": "通知をミュート",
+      "unmuteNotifications": "通知をオンにする",
+      "mute1h": "1時間",
+      "mute4h": "4時間",
+      "muteUntil8am": "8:00 AMまで",
+      "muteForever": "手動でオンにするまで",
+      "unfollow": "フォロー解除",
+      "block": "ブロック",
+      "unblock": "ブロック解除",
+      "blockedByYou": "{name} をブロックしました",
+      "blockedByPeer": "{name} からブロックされました",
+      "moreActions": "オプション",
+      "categories": {
+        "customer": "顧客",
+        "family": "家族",
+        "work": "仕事",
+        "friends": "友達",
+        "reply_later": "後で返信",
+        "colleague": "同僚"
+      }
+    },
     "mention": {
       "tooltip": "メンション (@mention)"
     },

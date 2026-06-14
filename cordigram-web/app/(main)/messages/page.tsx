@@ -184,6 +184,7 @@ import DmConversationContextMenu from "@/components/DmConversationContextMenu/Dm
 import {
   parseDmConversationPreferences,
   isDmConversationMuted,
+  DM_CATEGORY_COLORS,
   type DmConversationPreferences,
   type DmConversationCategory,
   emptyDmConversationPreferences,
@@ -1747,6 +1748,73 @@ export default function MessagesPage() {
   >({});
   const [dmBlockedByMe, setDmBlockedByMe] = useState<Set<string>>(new Set());
   const [dmBlockedByPeer, setDmBlockedByPeer] = useState<Set<string>>(new Set());
+  const dmBlockedByMeRef = useRef<Set<string>>(new Set());
+  const dmBlockedByPeerRef = useRef<Set<string>>(new Set());
+  const dmBlockFetchGenRef = useRef(0);
+  dmBlockedByMeRef.current = dmBlockedByMe;
+  dmBlockedByPeerRef.current = dmBlockedByPeer;
+
+  const persistDmBlockState = useCallback(
+    (byMe: Set<string>, byPeer: Set<string>) => {
+      if (!currentUserId) return;
+      try {
+        sessionStorage.setItem(
+          `cordigram:dm-blocks:${currentUserId}`,
+          JSON.stringify({ byMe: [...byMe], byPeer: [...byPeer] }),
+        );
+      } catch {
+        /* ignore */
+      }
+    },
+    [currentUserId],
+  );
+
+  const applyDmBlockSets = useCallback(
+    (byMe: Set<string>, byPeer: Set<string>) => {
+      dmBlockedByMeRef.current = byMe;
+      dmBlockedByPeerRef.current = byPeer;
+      setDmBlockedByMe(byMe);
+      setDmBlockedByPeer(byPeer);
+      persistDmBlockState(byMe, byPeer);
+    },
+    [persistDmBlockState],
+  );
+
+  const applyDmBlockSetsFromApi = useCallback(
+    (byMe: Set<string>, byPeer: Set<string>, gen: number) => {
+      if (gen !== dmBlockFetchGenRef.current) return;
+      applyDmBlockSets(byMe, byPeer);
+    },
+    [applyDmBlockSets],
+  );
+
+  const applyDmBlockSetsLive = useCallback(
+    (byMe: Set<string>, byPeer: Set<string>) => {
+      dmBlockFetchGenRef.current += 1;
+      applyDmBlockSets(byMe, byPeer);
+    },
+    [applyDmBlockSets],
+  );
+
+  const refreshDmBlockState = useCallback(async () => {
+    if (!token) return;
+    const gen = ++dmBlockFetchGenRef.current;
+    try {
+      const list = await getConversationList({ token });
+      if (gen !== dmBlockFetchGenRef.current) return;
+      const byMe = new Set<string>();
+      const byPeer = new Set<string>();
+      list.forEach((c) => {
+        const peerId = String(c.userId ?? "");
+        if (!peerId) return;
+        if (c.isBlockedByMe) byMe.add(peerId);
+        if (c.isBlockedByPeer) byPeer.add(peerId);
+      });
+      applyDmBlockSetsFromApi(byMe, byPeer, gen);
+    } catch {
+      /* ignore */
+    }
+  }, [token, applyDmBlockSetsFromApi]);
   const [dmContextMenu, setDmContextMenu] = useState<{
     x: number;
     y: number;
@@ -3844,12 +3912,15 @@ export default function MessagesPage() {
       if (!token || !peerId) return;
       try {
         await blockUser({ token, userId: peerId });
-        setDmBlockedByMe((prev) => new Set(prev).add(peerId));
+        applyDmBlockSetsLive(
+          new Set(dmBlockedByMeRef.current).add(peerId),
+          dmBlockedByPeerRef.current,
+        );
       } catch (e) {
         console.error("Failed to block DM peer", e);
       }
     },
-    [token],
+    [token, applyDmBlockSetsLive],
   );
 
   const handleDmUnblockPeer = useCallback(
@@ -3857,18 +3928,15 @@ export default function MessagesPage() {
       if (!token || !peerId) return;
       try {
         await unblockUser({ token, userId: peerId });
-        setDmBlockedByMe((prev) => {
-          const next = new Set(prev);
-          next.delete(peerId);
-          return next;
-        });
+        const next = new Set(dmBlockedByMeRef.current);
+        next.delete(peerId);
+        applyDmBlockSetsLive(next, dmBlockedByPeerRef.current);
       } catch (e) {
         console.error("Failed to unblock DM peer", e);
       }
     },
-    [token],
+    [token, applyDmBlockSetsLive],
   );
-
   const activeDmPeerId = selectedDirectMessageFriend?._id ?? "";
   const dmBlockedByMeActive = Boolean(
     activeDmPeerId && dmBlockedByMe.has(activeDmPeerId),
@@ -4699,6 +4767,7 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!token || selectedServer) return;
     let cancelled = false;
+    const gen = ++dmBlockFetchGenRef.current;
     getConversationList({ token })
       .then((list) => {
         if (cancelled) return;
@@ -4728,8 +4797,7 @@ export default function MessagesPage() {
           }
         });
         setDmConversationPrefs((prev) => ({ ...prev, ...prefs }));
-        setDmBlockedByMe((prev) => new Set([...prev, ...blocked]));
-        setDmBlockedByPeer((prev) => new Set([...prev, ...blockedByPeer]));
+        applyDmBlockSetsFromApi(blocked, blockedByPeer, gen);
         const activeDmId = selectedDmFriendRef.current?._id;
         if (activeDmId) counts[String(activeDmId)] = 0;
         setDmUnreadCounts(counts);
@@ -4758,7 +4826,43 @@ export default function MessagesPage() {
         if (!cancelled) setDmUnreadCounts({});
       });
     return () => { cancelled = true; };
-  }, [token, selectedServer]);
+  }, [token, selectedServer, applyDmBlockSetsFromApi]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    try {
+      const raw = sessionStorage.getItem(`cordigram:dm-blocks:${currentUserId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          byMe?: string[];
+          byPeer?: string[];
+        };
+        applyDmBlockSets(
+          new Set(Array.isArray(parsed.byMe) ? parsed.byMe : []),
+          new Set(Array.isArray(parsed.byPeer) ? parsed.byPeer : []),
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+    void refreshDmBlockState();
+  }, [currentUserId, applyDmBlockSets, refreshDmBlockState]);
+
+  useEffect(() => {
+    if (!token || selectedServer) return;
+    const syncBlocks = () => {
+      void refreshDmBlockState();
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") syncBlocks();
+    };
+    window.addEventListener("focus", syncBlocks);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", syncBlocks);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [token, selectedServer, refreshDmBlockState]);
 
   // Đồng bộ badge từng hội thoại theo backend (socket dm-unread-count).
   useEffect(() => {
@@ -4786,23 +4890,19 @@ export default function MessagesPage() {
     if (dmBlockUpdatedEvent.direction === "outgoing") {
       const peerId = dmBlockUpdatedEvent.peerId;
       if (!peerId) return;
-      setDmBlockedByMe((prev) => {
-        const next = new Set(prev);
-        if (dmBlockUpdatedEvent.blocked) next.add(peerId);
-        else next.delete(peerId);
-        return next;
-      });
+      const next = new Set(dmBlockedByMeRef.current);
+      if (dmBlockUpdatedEvent.blocked) next.add(peerId);
+      else next.delete(peerId);
+      applyDmBlockSetsLive(next, dmBlockedByPeerRef.current);
       return;
     }
     const blockerId = dmBlockUpdatedEvent.blockerId;
     if (!blockerId) return;
-    setDmBlockedByPeer((prev) => {
-      const next = new Set(prev);
-      if (dmBlockUpdatedEvent.blocked) next.add(blockerId);
-      else next.delete(blockerId);
-      return next;
-    });
-  }, [dmBlockUpdatedEvent]);
+    const nextPeer = new Set(dmBlockedByPeerRef.current);
+    if (dmBlockUpdatedEvent.blocked) nextPeer.add(blockerId);
+    else nextPeer.delete(blockerId);
+    applyDmBlockSetsLive(dmBlockedByMeRef.current, nextPeer);
+  }, [dmBlockUpdatedEvent, applyDmBlockSetsLive]);
 
   // Mở server từ link /messages?server=xxx (sau khi join từ event link)
   useEffect(() => {
@@ -5595,7 +5695,13 @@ export default function MessagesPage() {
       if (token) await markDmConversationRead({ token, userId: peerId });
     } catch (_err) {}
     prepareScrollToLatest();
-    await loadDirectMessages(friend._id);
+    await refreshDmBlockState();
+    const peerBlocked =
+      dmBlockedByPeerRef.current.has(peerId) ||
+      dmBlockedByMeRef.current.has(peerId);
+    if (!peerBlocked) {
+      await loadDirectMessages(friend._id);
+    }
     scheduleScrollToBottom();
   };
 
@@ -9511,6 +9617,13 @@ export default function MessagesPage() {
                           friend.username?.charAt(0)?.toUpperCase() ||
                           "U";
                         const hue = Math.floor(Math.random() * 360);
+                        const dmPref =
+                          dmConversationPrefs[friend._id] ??
+                          emptyDmConversationPreferences();
+                        const category = dmPref.category;
+                        const categoryColor = category
+                          ? DM_CATEGORY_COLORS[category]
+                          : null;
                         return (
                           <div
                             key={friend._id}
@@ -9545,14 +9658,36 @@ export default function MessagesPage() {
                                 {friend.displayName || friend.username}
                               </p>
                               <p className={styles.friendStatus}>
-                                {formatDmPresenceLabel({
-                                  entry: (presenceByUserId as Record<string, unknown>)?.[
-                                    friend._id
-                                  ] as any,
-                                  t,
-                                  language,
-                                  fallbackLastActiveAt: friend.lastActiveAt,
-                                })}
+                                {categoryColor ? (
+                                  <span
+                                    className={styles.dmCategoryMark}
+                                    style={{ color: categoryColor }}
+                                    title={t(
+                                      `chat.dmConversation.categories.${category}`,
+                                    )}
+                                    aria-label={t(
+                                      `chat.dmConversation.categories.${category}`,
+                                    )}
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                      aria-hidden
+                                    >
+                                      <path d="M21.41 11.59l-8.59 8.59a2 2 0 0 1-2.83 0l-7.17-7.17a2 2 0 0 1 0-2.83L11.17 2.59a2 2 0 0 1 2.83 0l7.41 7.41a2 2 0 0 1 0 2.83zM5.5 7A1.5 1.5 0 1 0 5.5 4 1.5 1.5 0 0 0 5.5 7z" />
+                                    </svg>
+                                  </span>
+                                ) : null}
+                                <span className={styles.friendStatusText}>
+                                  {formatDmPresenceLabel({
+                                    entry: (presenceByUserId as Record<string, unknown>)?.[
+                                      friend._id
+                                    ] as any,
+                                    t,
+                                    language,
+                                    fallbackLastActiveAt: friend.lastActiveAt,
+                                  })}
+                                </span>
                               </p>
                             </div>
                             {(dmUnreadCounts[String(friend._id)] ?? 0) > 0 &&
@@ -11518,76 +11653,6 @@ export default function MessagesPage() {
                     if (near) setShowNewMessagesBelow(false);
                   }}
                 >
-                  {selectedDirectMessageFriend && shouldBlockDmChatInput && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        zIndex: 45,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "rgba(15, 16, 20, 0.94)",
-                        padding: 24,
-                      }}
-                    >
-                      <div
-                        style={{
-                          maxWidth: 440,
-                          textAlign: "center",
-                          background: "var(--color-panel-bg)",
-                          border: "1px solid var(--color-panel-border)",
-                          borderRadius: 12,
-                          padding: "28px 24px",
-                          boxShadow: "0 16px 48px rgba(0,0,0,.45)",
-                        }}
-                      >
-                        <p
-                          style={{
-                            margin: 0,
-                            color: "var(--color-panel-text)",
-                            fontSize: 15,
-                            fontWeight: 700,
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {dmBlockedByPeerActive
-                            ? t("chat.dmConversation.blockedByPeer", {
-                                name:
-                                  selectedDirectMessageFriend.displayName ||
-                                  selectedDirectMessageFriend.username ||
-                                  t("chat.sidebar.userFallback"),
-                              })
-                            : t("chat.dmConversation.blockedByYou", {
-                                name:
-                                  selectedDirectMessageFriend.displayName ||
-                                  selectedDirectMessageFriend.username ||
-                                  t("chat.sidebar.userFallback"),
-                              })}
-                        </p>
-                        {dmBlockedByMeActive && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void handleDmUnblockPeer(selectedDirectMessageFriend._id)
-                            }
-                            style={{
-                              marginTop: 20,
-                              padding: "10px 20px",
-                              borderRadius: 6,
-                              border: "none",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              background: "var(--color-panel-accent)",
-                              color: "#fff",
-                            }}
-                          >
-                            {t("chat.dmConversation.unblock")}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
                   {!selectedDirectMessageFriend &&
                     selectedServer &&
                     myServerAccessStatus?.chatBlockReason === "age_under_18" && (
@@ -11731,7 +11796,40 @@ export default function MessagesPage() {
                       </div>
                     )}
                   {selectedDirectMessageFriend ? (
-                    loadingDirectMessages ? (
+                    shouldBlockDmChatInput ? (
+                      <div className={styles.dmBlockedPanel}>
+                        <div className={styles.dmBlockedCard}>
+                          <p className={styles.dmBlockedText}>
+                            {dmBlockedByPeerActive
+                              ? t("chat.dmConversation.blockedByPeer", {
+                                  name:
+                                    selectedDirectMessageFriend.displayName ||
+                                    selectedDirectMessageFriend.username ||
+                                    t("chat.sidebar.userFallback"),
+                                })
+                              : t("chat.dmConversation.blockedByYou", {
+                                  name:
+                                    selectedDirectMessageFriend.displayName ||
+                                    selectedDirectMessageFriend.username ||
+                                    t("chat.sidebar.userFallback"),
+                                })}
+                          </p>
+                          {dmBlockedByMeActive && (
+                            <button
+                              type="button"
+                              className={styles.dmBlockedUnblockBtn}
+                              onClick={() =>
+                                void handleDmUnblockPeer(
+                                  selectedDirectMessageFriend._id,
+                                )
+                              }
+                            >
+                              {t("chat.dmConversation.unblock")}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : loadingDirectMessages ? (
                       <div
                         style={{
                           display: "flex",

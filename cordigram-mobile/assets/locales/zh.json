@@ -3732,13 +3732,30 @@
     "dmConversation": {
       "muteUntilForever": "关闭通知直到我重新开启",
       "unmuteNotifications": "重新开启通知",
+      "muteNotifications": "关闭通知",
+      "mute1h": "1 小时",
+      "mute4h": "4 小时",
+      "muteUntil8am": "直到 8:00 AM",
+      "categorize": "分类",
+      "clearCategory": "清除分类",
+      "unfollow": "取消关注",
       "block": "屏蔽",
       "unblock": "取消屏蔽",
+      "blockedByYou": "您已屏蔽 {name}",
+      "blockedByPeer": "您已被 {name} 屏蔽",
       "muteDialogTitle": "关闭消息通知",
       "muteDialogActiveTitle": "通知已关闭",
       "turnOnNotifications": "重新开启通知",
       "blockUpdateError": "无法更新屏蔽状态",
-      "now": "刚刚"
+      "now": "刚刚",
+      "categories": {
+        "customer": "客户",
+        "family": "家人",
+        "work": "工作",
+        "friends": "朋友",
+        "reply_later": "稍后回复",
+        "colleague": "同事"
+      }
     }
   },
   "player": {

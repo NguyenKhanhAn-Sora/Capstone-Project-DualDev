@@ -192,6 +192,8 @@ class MessagesController extends ChangeNotifier {
           isOnline: t.isOnline,
           lastSeenAt: t.lastSeenAt,
         ),
+        category: t.category,
+        isFollowing: t.isFollowing,
       );
     }
   }
@@ -390,6 +392,8 @@ class MessagesController extends ChangeNotifier {
           isPinned: t.isPinned,
           lastSeenAt: t.lastSeenAt,
           presenceLabel: t.presenceLabel,
+          category: t.category,
+          isFollowing: t.isFollowing,
         );
       }
       notifyListeners();
@@ -414,6 +418,8 @@ class MessagesController extends ChangeNotifier {
         isPinned: _threads[idx].isPinned,
         lastSeenAt: _threads[idx].lastSeenAt,
         presenceLabel: _threads[idx].presenceLabel,
+        category: _threads[idx].category,
+        isFollowing: _threads[idx].isFollowing,
       );
       _recalcTotalUnread();
       notifyListeners();
@@ -706,6 +712,8 @@ class MessagesController extends ChangeNotifier {
         isPinned: t.isPinned,
         lastSeenAt: t.lastSeenAt,
         presenceLabel: t.presenceLabel,
+        category: t.category,
+        isFollowing: t.isFollowing,
       );
     }
     for (final entry in _messagesByUser.entries) {
@@ -829,6 +837,8 @@ class MessagesController extends ChangeNotifier {
       isPinned: t.isPinned,
       lastSeenAt: t.lastSeenAt,
       presenceLabel: t.presenceLabel,
+      category: t.category,
+      isFollowing: t.isFollowing,
     );
   }
 
@@ -906,6 +916,24 @@ class MessagesController extends ChangeNotifier {
       _blockedUsers
         ..clear()
         ..addAll(blocked);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> refreshDmBlockStateFromApi() async {
+    try {
+      final conversations = await DirectMessagesService.getConversations();
+      final blocked = await DirectMessagesService.getBlockedUserIds();
+      _blockedUsers
+        ..clear()
+        ..addAll(blocked);
+      _blockedByPeerUsers
+        ..clear()
+        ..addAll(
+          conversations
+              .where((c) => c.isBlockedByPeer)
+              .map((c) => c.userId),
+        );
       notifyListeners();
     } catch (_) {}
   }
@@ -1056,6 +1084,8 @@ class MessagesController extends ChangeNotifier {
       isPinned: current.isPinned,
       lastSeenAt: lastSeen,
       presenceLabel: nextLabel,
+      category: current.category,
+      isFollowing: current.isFollowing,
     );
     notifyListeners();
   }
@@ -1098,6 +1128,8 @@ class MessagesController extends ChangeNotifier {
           isPinned: t.isPinned,
           lastSeenAt: t.lastSeenAt,
           presenceLabel: t.presenceLabel,
+          category: t.category,
+          isFollowing: t.isFollowing,
         );
       }
     }
@@ -1145,6 +1177,8 @@ class MessagesController extends ChangeNotifier {
       isPinned: current.isPinned,
       lastSeenAt: current.lastSeenAt,
       presenceLabel: current.presenceLabel,
+      category: current.category,
+      isFollowing: current.isFollowing,
     );
     _sortThreads();
   }

@@ -184,9 +184,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return (key: string, vars?: Record<string, string | number>) => {
       const hit = getByPath(dict, key);
       if (typeof hit === "string") return formatVars(hit, vars);
-      // fallback to vi, then key
-      const fallback = getByPath(DICTS.vi, key);
-      if (typeof fallback === "string") return formatVars(fallback, vars);
+      const enFallback = getByPath(DICTS.en, key);
+      if (typeof enFallback === "string") return formatVars(enFallback, vars);
+      const viFallback = getByPath(DICTS.vi, key);
+      if (typeof viFallback === "string") return formatVars(viFallback, vars);
       return key;
     };
   }, [language]);

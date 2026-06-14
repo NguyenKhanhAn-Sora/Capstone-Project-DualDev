@@ -3,25 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../core/services/language_controller.dart';
 import '../messages_controller.dart';
 import '../models/message_thread.dart';
+import '../utils/dm_conversation_categories.dart';
 import '../utils/messages_i18n.dart';
 
-const _categoryKeys = [
-  'customer',
-  'family',
-  'work',
-  'friends',
-  'reply_later',
-  'colleague',
-];
-
-const _categoryColors = {
-  'customer': Color(0xFFED4245),
-  'family': Color(0xFFEB459E),
-  'work': Color(0xFFFAA61A),
-  'friends': Color(0xFFFEE75C),
-  'reply_later': Color(0xFF57F287),
-  'colleague': Color(0xFF5865F2),
-};
+const _categoryKeys = dmConversationCategoryKeys;
 
 class DmConversationActionsSheet {
   DmConversationActionsSheet._();
@@ -241,7 +226,7 @@ class DmConversationActionsSheet {
                 },
               ),
             ..._categoryKeys.map((key) {
-              final color = _categoryColors[key] ?? Colors.white;
+              final color = dmCategoryColors[key] ?? Colors.white;
               return ListTile(
                 leading: Container(
                   width: 12,

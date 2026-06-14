@@ -1636,6 +1636,31 @@
       "sent": "已发送",
       "seen": "已读"
     },
+    "dmConversation": {
+      "menuLabel": "与 {name} 的对话选项",
+      "categorize": "分类",
+      "clearCategory": "清除分类",
+      "muteNotifications": "关闭通知",
+      "unmuteNotifications": "开启通知",
+      "mute1h": "1 小时",
+      "mute4h": "4 小时",
+      "muteUntil8am": "直到 8:00 AM",
+      "muteForever": "直到我手动开启",
+      "unfollow": "取消关注",
+      "block": "屏蔽",
+      "unblock": "取消屏蔽",
+      "blockedByYou": "您已屏蔽 {name}",
+      "blockedByPeer": "您已被 {name} 屏蔽",
+      "moreActions": "选项",
+      "categories": {
+        "customer": "客户",
+        "family": "家人",
+        "work": "工作",
+        "friends": "朋友",
+        "reply_later": "稍后回复",
+        "colleague": "同事"
+      }
+    },
     "mention": {
       "tooltip": "提及 (@mention)"
     },

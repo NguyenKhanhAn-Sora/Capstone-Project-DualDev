@@ -65,7 +65,8 @@ class MessageChatScreen extends StatefulWidget {
   State<MessageChatScreen> createState() => _MessageChatScreenState();
 }
 
-class _MessageChatScreenState extends State<MessageChatScreen> {
+class _MessageChatScreenState extends State<MessageChatScreen>
+    with WidgetsBindingObserver {
   MessagesChromePalette get _chrome => AccentColorController.instance.palette;
   static RegExp? _inviteRegExpCache;
 
@@ -152,11 +153,13 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.controller.addListener(_onControllerChanged);
     _inputController.addListener(_onInputChanged);
     _loadConversation();
     _loadLanguage();
     unawaited(MessagesMediaService.refreshBoostStatus());
+    unawaited(widget.controller.refreshDmBlockStateFromApi());
     widget.controller.setActiveConversationPeer(widget.thread.id);
     widget.controller.markConversationRead(widget.thread.id);
     _typingSub = DirectMessagesRealtimeService.userTyping.listen((event) {
@@ -173,6 +176,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.controller.setActiveConversationPeer(null);
     _typingTimer?.cancel();
     _typingSub?.cancel();
@@ -182,6 +186,13 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     widget.controller.removeListener(_onControllerChanged);
     _inputController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(widget.controller.refreshDmBlockStateFromApi());
+    }
   }
 
   void _scheduleMarkPeerMessageRead(String messageId) {
