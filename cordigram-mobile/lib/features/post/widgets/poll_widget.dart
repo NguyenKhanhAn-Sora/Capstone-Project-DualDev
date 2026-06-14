@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/poll_data.dart';
+import '../../../core/services/language_controller.dart';
 import '../../messages/services/polls_api_service.dart';
 import 'poll_voters_sheet.dart';
 
@@ -172,7 +173,7 @@ class _PollWidgetState extends State<PollWidget> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Vote failed: $e')),
+          SnackBar(content: Text('${LanguageController.instance.t('post.create.voteFailed')}: $e')),
         );
       }
     } finally {

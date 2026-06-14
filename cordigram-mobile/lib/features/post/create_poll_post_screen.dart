@@ -709,7 +709,7 @@ class _CreatePollPostScreenState extends State<CreatePollPostScreen> {
             maxLength: 500,
             style: TextStyle(color: tokens.text, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Ask a question…',
+              hintText: LanguageController.instance.t('post.create.pollQuestionHint'),
               hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(14),
@@ -1411,7 +1411,7 @@ class _OptionRow extends StatelessWidget {
               controller: controller,
               style: TextStyle(color: tokens.text, fontSize: 14),
               decoration: InputDecoration(
-                hintText: 'Option ${index + 1}',
+                hintText: LanguageController.instance.t('post.create.pollOptionHint').replaceAll('{n}', '${index + 1}'),
                 hintStyle: TextStyle(color: tokens.textMuted),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(

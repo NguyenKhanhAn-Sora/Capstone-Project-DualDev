@@ -126,95 +126,17 @@ type MentionRef = {
   username?: string;
 };
 
-const REPORT_GROUPS: ReportCategory[] = [
-  {
-    key: "abuse",
-    label: "Harassment / Hate speech",
-    accent: "#f59e0b",
-    reasons: [
-      { key: "harassment", label: "Targets an individual to harass" },
-      { key: "hate_speech", label: "Hate speech or discrimination" },
-      { key: "offensive_discrimination", label: "Attacks vulnerable groups" },
-    ],
-  },
-  {
-    key: "violence",
-    label: "Violence / Threats",
-    accent: "#ef4444",
-    reasons: [
-      { key: "violence_threats", label: "Threatens or promotes violence" },
-      { key: "graphic_violence", label: "Graphic violent imagery" },
-      { key: "extremism", label: "Extremism or terrorism" },
-      { key: "self_harm", label: "Self-harm or suicide" },
-    ],
-  },
-  {
-    key: "sensitive",
-    label: "Sensitive content",
-    accent: "#a855f7",
-    reasons: [
-      { key: "nudity", label: "Nudity or adult content" },
-      { key: "minor_nudity", label: "Minor safety risk" },
-      { key: "sexual_solicitation", label: "Sexual solicitation" },
-    ],
-  },
-  {
-    key: "misinfo",
-    label: "Impersonation / Misinformation",
-    accent: "#22c55e",
-    reasons: [
-      { key: "fake_news", label: "False or misleading information" },
-      { key: "impersonation", label: "Impersonation of a person or org" },
-    ],
-  },
-  {
-    key: "spam",
-    label: "Spam / Scam",
-    accent: "#14b8a6",
-    reasons: [
-      { key: "spam", label: "Spam or irrelevant content" },
-      { key: "financial_scam", label: "Financial scam" },
-      { key: "unsolicited_ads", label: "Unwanted advertising" },
-    ],
-  },
-  {
-    key: "ip",
-    label: "Intellectual property",
-    accent: "#3b82f6",
-    reasons: [
-      { key: "copyright", label: "Copyright infringement" },
-      { key: "trademark", label: "Trademark violation" },
-      { key: "brand_impersonation", label: "Brand impersonation" },
-    ],
-  },
-  {
-    key: "illegal",
-    label: "Illegal activity",
-    accent: "#f97316",
-    reasons: [
-      { key: "contraband", label: "Contraband" },
-      { key: "illegal_transaction", label: "Illegal transaction" },
-    ],
-  },
-  {
-    key: "privacy",
-    label: "Privacy violation",
-    accent: "#06b6d4",
-    reasons: [
-      { key: "doxxing", label: "Doxxing private information" },
-      {
-        key: "nonconsensual_intimate",
-        label: "Non-consensual intimate content",
-      },
-    ],
-  },
-  {
-    key: "other",
-    label: "Other",
-    accent: "#94a3b8",
-    reasons: [{ key: "other", label: "Other reason" }],
-  },
-];
+const REPORT_GROUP_ACCENTS: Record<string, string> = {
+  abuse: "#f59e0b",
+  violence: "#ef4444",
+  sensitive: "#a855f7",
+  misinfo: "#22c55e",
+  spam: "#14b8a6",
+  ip: "#3b82f6",
+  illegal: "#f97316",
+  privacy: "#06b6d4",
+  other: "#94a3b8",
+};
 
 const COMMENT_POLL_INTERVAL = 4000;
 const COMMENT_PAGE_SIZE = 10;
@@ -593,37 +515,124 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     value: "public" | "followers" | "private";
     title: string;
     description: string;
-  }> = [
+  }> = useMemo(() => [
     {
       value: "public",
-      title: "Public",
-      description: "Anyone can view this post",
+      title: t("visibilityOverlay.options.public.title"),
+      description: t("visibilityOverlay.options.public.description"),
     },
     {
       value: "followers",
-      title: "Friends / Following",
-      description: "Only followers can view this post",
+      title: t("visibilityOverlay.options.followers.title"),
+      description: t("visibilityOverlay.options.followers.description"),
     },
     {
       value: "private",
-      title: "Private",
-      description: "Only you can view this post",
+      title: t("visibilityOverlay.options.private.title"),
+      description: t("visibilityOverlay.options.private.description"),
     },
-  ];
+  ], [t]);
 
   const muteOptions = useMemo(
     () => [
-      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
-      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
-      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
-      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
-      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
-      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
-      { key: "until", label: "Until I turn it back on", ms: null },
-      { key: "custom", label: "Choose date & time", ms: null },
+      { key: "5m", label: t("muteOverlay.options.5m"), ms: 5 * 60 * 1000 },
+      { key: "10m", label: t("muteOverlay.options.10m"), ms: 10 * 60 * 1000 },
+      { key: "15m", label: t("muteOverlay.options.15m"), ms: 15 * 60 * 1000 },
+      { key: "30m", label: t("muteOverlay.options.30m"), ms: 30 * 60 * 1000 },
+      { key: "1h", label: t("muteOverlay.options.1h"), ms: 60 * 60 * 1000 },
+      { key: "1d", label: t("muteOverlay.options.1d"), ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: t("muteOverlay.options.until"), ms: null },
+      { key: "custom", label: t("muteOverlay.options.custom"), ms: null },
     ],
-    [],
+    [t],
   );
+
+  const reportGroups: ReportCategory[] = useMemo(() => [
+    {
+      key: "abuse",
+      label: t("reportOverlay.groups.abuse.label"),
+      accent: REPORT_GROUP_ACCENTS.abuse,
+      reasons: [
+        { key: "harassment", label: t("reportOverlay.groups.abuse.harassment") },
+        { key: "hate_speech", label: t("reportOverlay.groups.abuse.hate_speech") },
+        { key: "offensive_discrimination", label: t("reportOverlay.groups.abuse.offensive_discrimination") },
+      ],
+    },
+    {
+      key: "violence",
+      label: t("reportOverlay.groups.violence.label"),
+      accent: REPORT_GROUP_ACCENTS.violence,
+      reasons: [
+        { key: "violence_threats", label: t("reportOverlay.groups.violence.violence_threats") },
+        { key: "graphic_violence", label: t("reportOverlay.groups.violence.graphic_violence") },
+        { key: "extremism", label: t("reportOverlay.groups.violence.extremism") },
+        { key: "self_harm", label: t("reportOverlay.groups.violence.self_harm") },
+      ],
+    },
+    {
+      key: "sensitive",
+      label: t("reportOverlay.groups.sensitive.label"),
+      accent: REPORT_GROUP_ACCENTS.sensitive,
+      reasons: [
+        { key: "nudity", label: t("reportOverlay.groups.sensitive.nudity") },
+        { key: "minor_nudity", label: t("reportOverlay.groups.sensitive.minor_nudity") },
+        { key: "sexual_solicitation", label: t("reportOverlay.groups.sensitive.sexual_solicitation") },
+      ],
+    },
+    {
+      key: "misinfo",
+      label: t("reportOverlay.groups.misinfo.label"),
+      accent: REPORT_GROUP_ACCENTS.misinfo,
+      reasons: [
+        { key: "fake_news", label: t("reportOverlay.groups.misinfo.fake_news") },
+        { key: "impersonation", label: t("reportOverlay.groups.misinfo.impersonation") },
+      ],
+    },
+    {
+      key: "spam",
+      label: t("reportOverlay.groups.spam.label"),
+      accent: REPORT_GROUP_ACCENTS.spam,
+      reasons: [
+        { key: "spam", label: t("reportOverlay.groups.spam.spam") },
+        { key: "financial_scam", label: t("reportOverlay.groups.spam.financial_scam") },
+        { key: "unsolicited_ads", label: t("reportOverlay.groups.spam.unsolicited_ads") },
+      ],
+    },
+    {
+      key: "ip",
+      label: t("reportOverlay.groups.ip.label"),
+      accent: REPORT_GROUP_ACCENTS.ip,
+      reasons: [
+        { key: "copyright", label: t("reportOverlay.groups.ip.copyright") },
+        { key: "trademark", label: t("reportOverlay.groups.ip.trademark") },
+        { key: "brand_impersonation", label: t("reportOverlay.groups.ip.brand_impersonation") },
+      ],
+    },
+    {
+      key: "illegal",
+      label: t("reportOverlay.groups.illegal.label"),
+      accent: REPORT_GROUP_ACCENTS.illegal,
+      reasons: [
+        { key: "contraband", label: t("reportOverlay.groups.illegal.contraband") },
+        { key: "illegal_transaction", label: t("reportOverlay.groups.illegal.illegal_transaction") },
+      ],
+    },
+    {
+      key: "privacy",
+      label: t("reportOverlay.groups.privacy.label"),
+      accent: REPORT_GROUP_ACCENTS.privacy,
+      reasons: [
+        { key: "doxxing", label: t("reportOverlay.groups.privacy.doxxing") },
+        { key: "nonconsensual_intimate", label: t("reportOverlay.groups.privacy.nonconsensual_intimate") },
+      ],
+    },
+    {
+      key: "other",
+      label: t("reportOverlay.groups.other.label"),
+      accent: REPORT_GROUP_ACCENTS.other,
+      reasons: [{ key: "other", label: t("reportOverlay.groups.other.other") }],
+    },
+  ], [t]);
 
   useEffect(() => {
     setVisibilitySelected((post?.visibility as any) ?? "public");
@@ -712,7 +721,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       setMentionSuggestions([]);
       setMentionOpen(false);
       setMentionHighlight(-1);
-      setMentionError("Sign in to mention users");
+      setMentionError(t("postEditOverlay.signInToMention"));
       return;
     }
 
@@ -796,7 +805,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         setLocationSuggestions([]);
         setLocationOpen(false);
         setLocationHighlight(-1);
-        setLocationError("No suggestions found, try different keywords.");
+        setLocationError(t("postEditOverlay.noLocationFound"));
       } finally {
         if (!controller.signal.aborted) setLocationLoading(false);
       }
@@ -1156,13 +1165,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           : Promise.resolve(null),
       ]);
       setPost((prev) => (prev ? { ...prev, ...updated } : updated));
-      setEditSuccess("Post updated");
+      setEditSuccess(t("postEditOverlay.postUpdated"));
       setEditOpen(false);
     } catch (err: any) {
       const message =
         (err && typeof err === "object" && "message" in err
           ? (err as { message?: string }).message
-          : null) || "Failed to update post";
+          : null) || t("postEditOverlay.updateFailed");
       setEditError(message);
     } finally {
       setEditSaving(false);
@@ -1502,12 +1511,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     });
   }, []);
   const selectedReportGroup = useMemo(
-    () => REPORT_GROUPS.find((g) => g.key === reportCategory),
+    () => reportGroups.find((g) => g.key === reportCategory),
     [reportCategory],
   );
 
   const selectedReportCommentGroup = useMemo(
-    () => REPORT_GROUPS.find((g) => g.key === reportCommentCategory),
+    () => reportGroups.find((g) => g.key === reportCommentCategory),
     [reportCommentCategory],
   );
 
@@ -4053,14 +4062,14 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     })
                   }
                 >
-                  Reply
+                  {t("reelsPage.comments.reply")}
                 </button>
               ) : null}
               <button
                 className={styles.linkBtn}
                 onClick={() => toggleCommentLike(comment)}
                 aria-pressed={comment.liked}
-                aria-label={comment.liked ? "Unlike comment" : "Like comment"}
+                aria-label={comment.liked ? t("reelsPage.comments.unlikeComment") : t("reelsPage.comments.likeComment")}
               >
                 <IconLike size={14} filled={comment.liked} />
               </button>
@@ -4116,17 +4125,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               disabled={translatingIds.has(comment.id)}
                             >
                               {translatingIds.has(comment.id)
-                                ? "Translating..."
+                                ? t("commentMenu.translating")
                                 : translatedComments.has(comment.id)
-                                ? "Hide translation"
-                                : "Translate comment"}
+                                ? t("commentMenu.hideTranslation")
+                                : t("commentMenu.translateComment")}
                             </button>
                           ) : null}
                           <button
                             className={styles.commentMoreItem}
                             onClick={() => startEditComment(comment)}
                           >
-                            Edit comment
+                            {t("commentMenu.editComment")}
                           </button>
                           {isAuthor && !comment.parentId ? (
                             <button
@@ -4134,15 +4143,15 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               onClick={() => handleTogglePin(comment)}
                             >
                               {comment.pinnedAt
-                                ? "Unpin comment"
-                                : "Pin comment"}
+                                ? t("commentMenu.unpinComment")
+                                : t("commentMenu.pinComment")}
                             </button>
                           ) : null}
                           <button
                             className={`${styles.commentMoreItem} ${styles.commentDanger}`}
                             onClick={() => openDeleteConfirm(comment)}
                           >
-                            Delete comment
+                            {t("commentMenu.deleteComment")}
                           </button>
                         </>
                       ) : isAuthor ? (
@@ -4160,10 +4169,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               disabled={translatingIds.has(comment.id)}
                             >
                               {translatingIds.has(comment.id)
-                                ? "Translating..."
+                                ? t("commentMenu.translating")
                                 : translatedComments.has(comment.id)
-                                ? "Hide translation"
-                                : "Translate comment"}
+                                ? t("commentMenu.hideTranslation")
+                                : t("commentMenu.translateComment")}
                             </button>
                           ) : null}
                           {!comment.parentId ? (
@@ -4172,21 +4181,21 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               onClick={() => handleTogglePin(comment)}
                             >
                               {comment.pinnedAt
-                                ? "Unpin comment"
-                                : "Pin comment"}
+                                ? t("commentMenu.unpinComment")
+                                : t("commentMenu.pinComment")}
                             </button>
                           ) : null}
                           <button
                             className={`${styles.commentMoreItem}`}
                             onClick={() => openDeleteConfirm(comment)}
                           >
-                            Delete comment
+                            {t("commentMenu.deleteComment")}
                           </button>
                           <button
                             className={styles.commentMoreItem}
                             onClick={() => openCommentReportModal(comment.id)}
                           >
-                            Report comment
+                            {t("commentMenu.reportComment")}
                           </button>
                           <button
                             className={`${styles.commentMoreItem} ${styles.commentDanger}`}
@@ -4197,7 +4206,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               )
                             }
                           >
-                            Block this user
+                            {t("commentMenu.blockUser")}
                           </button>
                         </>
                       ) : (
@@ -4215,17 +4224,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               disabled={translatingIds.has(comment.id)}
                             >
                               {translatingIds.has(comment.id)
-                                ? "Translating..."
+                                ? t("commentMenu.translating")
                                 : translatedComments.has(comment.id)
-                                ? "Hide translation"
-                                : "Translate comment"}
+                                ? t("commentMenu.hideTranslation")
+                                : t("commentMenu.translateComment")}
                             </button>
                           ) : null}
                           <button
                             className={styles.commentMoreItem}
                             onClick={() => openCommentReportModal(comment.id)}
                           >
-                            Report comment
+                            {t("commentMenu.reportComment")}
                           </button>
                           <button
                             className={`${styles.commentMoreItem} ${styles.commentDanger}`}
@@ -4236,7 +4245,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               )
                             }
                           >
-                            Block this user
+                            {t("commentMenu.blockUser")}
                           </button>
                         </>
                       )}
@@ -4414,8 +4423,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   );
   const commentsLocked = Boolean(post && post.allowComments === false);
   const commentsToggleLabel =
-    post?.allowComments === false ? "Turn on comments" : "Turn off comments";
-  const hideLikeToggleLabel = hideLikeCount ? "Show like" : "Hide like";
+    post?.allowComments === false ? t("postMenu.turnOnComments") : t("postMenu.turnOffComments");
+  const hideLikeToggleLabel = hideLikeCount ? t("postMenu.showLike") : t("postMenu.hideLike");
   const disableVisibilityUpdate =
     visibilitySaving ||
     visibilitySelected === ((post?.visibility as any) ?? "public");
@@ -4606,7 +4615,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       setCommentMentionSuggestions([]);
       setCommentMentionOpen(false);
       setCommentMentionHighlight(-1);
-      setCommentMentionError("Sign in to mention users");
+      setCommentMentionError(t("postEditOverlay.signInToMention"));
       setCommentMentionLoading(false);
       return;
     }
@@ -4861,11 +4870,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       >
         <div className={feedStyles.modalHeader}>
           <div>
-            <h3 className={feedStyles.modalTitle}>Edit post</h3>
+            <h3 className={feedStyles.modalTitle}>{t("postEditOverlay.title")}</h3>
           </div>
           <button
             className={feedStyles.closeBtn}
-            aria-label="Close"
+            aria-label={t("postEditOverlay.close")}
             onClick={closeEditModal}
             type="button"
           >
@@ -4876,23 +4885,23 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         <form className={feedStyles.editForm} onSubmit={handleEditSubmit}>
           <label className={feedStyles.editLabel}>
             <div className={feedStyles.editLabelRow}>
-              <span className={feedStyles.editLabelText}>Caption</span>
+              <span className={feedStyles.editLabelText}>{t("postEditOverlay.captionLabel")}</span>
               <div className={feedStyles.emojiWrap} ref={editEmojiRef}>
                 <button
                   type="button"
                   className={feedStyles.emojiButton}
                   onClick={() => setEditEmojiOpen((prev) => !prev)}
-                  aria-label="Add emoji"
+                  aria-label={t("postEditOverlay.addEmoji")}
                 >
                   <svg
-                    aria-label="Emoji icon"
+                    aria-label={t("postEditOverlay.emojiIcon")}
                     fill="currentColor"
                     height="20"
                     role="img"
                     viewBox="0 0 24 24"
                     width="20"
                   >
-                    <title>Emoji icon</title>
+                    <title>{t("postEditOverlay.emojiIcon")}</title>
                     <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
                   </svg>
                 </button>
@@ -4928,7 +4937,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 }}
                 rows={4}
                 maxLength={2200}
-                placeholder="Write something..."
+                placeholder={t("postEditOverlay.captionPlaceholder")}
               />
               <span className={feedStyles.charCount}>
                 {editCaption.length}/2200
@@ -4939,11 +4948,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           {mentionOpen ? (
             <div className={feedStyles.mentionDropdown}>
               {mentionLoading ? (
-                <div className={feedStyles.mentionItem}>Searching...</div>
+                <div className={feedStyles.mentionItem}>{t("postEditOverlay.searching")}</div>
               ) : null}
               {!mentionLoading && mentionSuggestions.length === 0 ? (
                 <div className={feedStyles.mentionItem}>
-                  {mentionError || "No matches"}
+                  {mentionError || t("postEditOverlay.noMentionMatches")}
                 </div>
               ) : null}
               {mentionSuggestions.map((opt, idx) => {
@@ -4991,7 +5000,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
           <div className={feedStyles.editField}>
             <div className={feedStyles.editLabelRow}>
-              <span className={feedStyles.editLabelText}>Hashtags</span>
+              <span className={feedStyles.editLabelText}>{t("postEditOverlay.hashtagsLabel")}</span>
             </div>
             <div className={feedStyles.chipShell}>
               <div className={feedStyles.chips}>
@@ -5001,7 +5010,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     <button
                       type="button"
                       onClick={() => removeHashtag(tag)}
-                      aria-label={`Remove ${tag}`}
+                      aria-label={t("postEditOverlay.removeHashtag", { tag })}
                     >
                       ×
                     </button>
@@ -5009,7 +5018,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 ))}
                 <input
                   className={feedStyles.chipInput}
-                  placeholder={editHashtags.length ? "Add hashtag" : "Add hashtag (e.g. travel)"}
+                  placeholder={t("postEditOverlay.hashtagPlaceholder")}
                   value={hashtagDraft}
                   onChange={(e) => setHashtagDraft(e.target.value)}
                   onKeyDown={(e) => {
@@ -5021,16 +5030,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 />
               </div>
             </div>
-            <p className={feedStyles.fieldHint}>Press Enter or Space to add a hashtag</p>
+            <p className={feedStyles.fieldHint}>{t("postEditOverlay.hashtagHint")}</p>
           </div>
 
           <div className={feedStyles.editField}>
             <div className={feedStyles.editLabelRow}>
-              <span className={feedStyles.editLabelText}>Location</span>
+              <span className={feedStyles.editLabelText}>{t("postEditOverlay.locationLabel")}</span>
             </div>
             <input
               className={feedStyles.editInput}
-              placeholder="Add a place"
+              placeholder={t("postEditOverlay.locationPlaceholder")}
               value={locationQuery}
               onChange={(e) => {
                 locationUserTyped.current = true;
@@ -5045,11 +5054,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             {locationOpen ? (
               <div className={feedStyles.locationDropdown}>
                 {locationLoading ? (
-                  <div className={feedStyles.locationItem}>Searching...</div>
+                  <div className={feedStyles.locationItem}>{t("postEditOverlay.searching")}</div>
                 ) : null}
                 {!locationLoading && locationSuggestions.length === 0 ? (
                   <div className={feedStyles.locationItem}>
-                    {locationError || "No suggestions"}
+                    {locationError || t("postEditOverlay.noLocationSuggestions")}
                   </div>
                 ) : null}
                 {locationSuggestions.map((opt, idx) => {
@@ -5074,7 +5083,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           {(post as any)?.poll?.options?.length > 0 && (
             <div className={feedStyles.editField}>
               <div className={feedStyles.editLabelRow}>
-                <span className={feedStyles.editLabelText}>Lựa chọn bình chọn</span>
+                <span className={feedStyles.editLabelText}>{t("postEditOverlay.pollOptionsLabel")}</span>
               </div>
               <div className={feedStyles.pollOptionsEditor}>
                 {((post as any).poll.options as string[]).map((_: string, idx: number) => {
@@ -5099,7 +5108,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           })
                         }
                         maxLength={100}
-                        placeholder={`Lựa chọn ${idx + 1}`}
+                        placeholder={t("postEditOverlay.pollOptionPlaceholder", { n: idx + 1 })}
                       />
                     </div>
                   );
@@ -5116,9 +5125,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 onChange={() => setEditAllowComments((prev) => !prev)}
               />
               <div>
-                <p className={feedStyles.switchTitle}>Allow comments</p>
+                <p className={feedStyles.switchTitle}>{t("postEditOverlay.allowComments")}</p>
                 <p className={feedStyles.switchHint}>
-                  Enable to receive feedback from everyone
+                  {t("postEditOverlay.allowCommentsDesc")}
                 </p>
               </div>
             </label>
@@ -5131,8 +5140,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   onChange={() => setEditAllowMultiple((p) => !p)}
                 />
                 <div>
-                  <p className={feedStyles.switchTitle}>Cho phép chọn nhiều</p>
-                  <p className={feedStyles.switchHint}>Người dùng có thể chọn nhiều lựa chọn cùng lúc</p>
+                  <p className={feedStyles.switchTitle}>{t("postEditOverlay.allowMultiple")}</p>
+                  <p className={feedStyles.switchHint}>{t("postEditOverlay.allowMultipleDesc")}</p>
                 </div>
               </label>
             ) : (
@@ -5152,13 +5161,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   }
                 />
                 <div>
-                  <p className={feedStyles.switchTitle}>Allow downloads</p>
+                  <p className={feedStyles.switchTitle}>{t("postEditOverlay.allowDownloads")}</p>
                   <p className={feedStyles.switchHint}>
                     {post?.repostOf
                       ? lockedEditAllowDownloadLoading
-                        ? "Inherited from original post (loading…)"
-                        : "Inherited from the original post (can’t be changed)"
-                      : "Share the original file with people you trust"}
+                        ? t("postEditOverlay.allowDownloadsInheritedLoading")
+                        : t("postEditOverlay.allowDownloadsInherited")
+                      : t("postEditOverlay.allowDownloadsDesc")}
                   </p>
                 </div>
               </label>
@@ -5171,9 +5180,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 onChange={() => setEditHideLikeCount((prev) => !prev)}
               />
               <div>
-                <p className={feedStyles.switchTitle}>Hide like</p>
+                <p className={feedStyles.switchTitle}>{t("postEditOverlay.hideLike")}</p>
                 <p className={feedStyles.switchHint}>
-                  Viewers won’t see the number of likes on this post
+                  {t("postEditOverlay.hideLikeDesc")}
                 </p>
               </div>
             </label>
@@ -5193,14 +5202,14 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               onClick={closeEditModal}
               disabled={editSaving}
             >
-              Cancel
+              {t("postEditOverlay.cancel")}
             </button>
             <button
               type="submit"
               className={feedStyles.modalPrimary}
               disabled={editSaving}
             >
-              {editSaving ? "Saving..." : "Save changes"}
+              {editSaving ? t("postEditOverlay.saving") : t("postEditOverlay.saveChanges")}
             </button>
           </div>
         </form>
@@ -5212,17 +5221,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     <VisibilityPickerOverlay
       open
       onClose={closeVisibilityModal}
-      title="Edit visibility"
-      subtitle="Choose who can see this post."
+      title={t("visibilityOverlay.title")}
+      subtitle={t("visibilityOverlay.subtitle")}
       options={visibilityOptions}
       selected={visibilitySelected}
       onChange={(v) => setVisibilitySelected(v as "public" | "followers" | "private")}
       onSave={submitVisibilityUpdate}
       submitting={visibilitySaving}
       error={visibilityError}
-      labelSave="Update visibility"
-      labelSaving="Updating..."
-      labelCancel="Cancel"
+      labelSave={t("visibilityOverlay.labelSave")}
+      labelSaving={t("visibilityOverlay.labelSaving")}
+      labelCancel={t("visibilityOverlay.labelCancel")}
     />
   );
 
@@ -5230,6 +5239,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     <MutePickerOverlay
       open
       onClose={closeMuteModal}
+      title={t("muteOverlay.title")}
+      subtitle={t("muteOverlay.subtitle")}
       options={muteOptions}
       selected={muteOption}
       onSelect={setMuteOption}
@@ -5240,6 +5251,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       onSave={handleSavePostMute}
       submitting={muteSaving}
       error={muteError}
+      labelSave={t("muteOverlay.labelSave")}
+      labelSaving={t("muteOverlay.labelSaving")}
+      labelDate={t("muteOverlay.labelDate")}
+      labelTime={t("muteOverlay.labelTime")}
     />
   );
 
@@ -5381,7 +5396,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={goToPostPage}
                     >
-                      Go to ads
+                      {t("postMenu.goToAds")}
                     </button>
                     <button
                       type="button"
@@ -5389,7 +5404,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={openAdsDetailPage}
                     >
-                      Detail ads
+                      {t("postMenu.detailAds")}
                     </button>
                     <button
                       type="button"
@@ -5405,7 +5420,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={copyPermalink}
                     >
-                      Copy link
+                      {t("postMenu.copyLink")}
                     </button>
                   </>
               ) : isAuthor ? (
@@ -5419,7 +5434,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       openEditModal();
                     }}
                   >
-                    Edit post
+                    {t("postMenu.editPost")}
                   </button>
                   {!isReachRestricted ? (
                     <button
@@ -5431,7 +5446,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         setVisibilityModalOpen(true);
                       }}
                     >
-                      Edit visibility
+                      {t("postMenu.editVisibility")}
                     </button>
                   ) : null}
                   <button
@@ -5448,8 +5463,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     }}
                   >
                     {isMutedForPost
-                      ? "Turn on notification"
-                      : "Mute notifications"}
+                      ? t("postMenu.turnOnNotification")
+                      : t("postMenu.muteNotifications")}
                   </button>
                   <button
                     type="button"
@@ -5474,7 +5489,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={goToPostPage}
                     >
-                      Go to ads
+                      {t("postMenu.goToAds")}
                     </button>
                   ) : null}
                   <button
@@ -5483,7 +5498,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     role="menuitem"
                     onClick={copyPermalink}
                   >
-                    Copy link
+                    {t("postMenu.copyLink")}
                   </button>
                   <button
                     type="button"
@@ -5491,7 +5506,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     role="menuitem"
                     onClick={openDeletePostConfirm}
                   >
-                    Delete post
+                    {t("postMenu.deletePost")}
                   </button>
                 </>
               ) : (
@@ -5508,11 +5523,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     >
                       {isSponsoredPostUi
                         ? saved
-                          ? "Unsave this ads"
-                          : "Save this ads"
+                          ? t("postMenu.unsaveThisAds")
+                          : t("postMenu.saveThisAds")
                         : saved
-                          ? "Unsave this post"
-                          : "Save this post"}
+                          ? t("postMenu.unsaveThisPost")
+                          : t("postMenu.saveThisPost")}
                     </button>
                   ) : null}
                   {post?.authorId ? (
@@ -5525,7 +5540,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         toggleFollowAuthor();
                       }}
                     >
-                      {followingAuthor ? "Unfollow" : "Follow"}
+                      {followingAuthor ? t("postMenu.unfollow") : t("postMenu.follow")}
                     </button>
                   ) : null}
                   {allowDownloads && currentMedia ? (
@@ -5535,7 +5550,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={handleDownloadCurrentMedia}
                     >
-                      Download this media
+                      {t("postMenu.downloadThisMedia")}
                     </button>
                   ) : null}
                   <button
@@ -5547,7 +5562,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       openReportModal();
                     }}
                   >
-                    Report
+                    {t("postMenu.report")}
                   </button>
                   <div className={styles.moreMenuDivider} />
                   {post?.repostOf ? (
@@ -5557,7 +5572,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={goToPostPage}
                     >
-                      Go to ads
+                      {t("postMenu.goToAds")}
                     </button>
                   ) : null}
                   <button
@@ -5566,7 +5581,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     role="menuitem"
                     onClick={copyPermalink}
                   >
-                    Copy link
+                    {t("postMenu.copyLink")}
                   </button>
                   <button
                     type="button"
@@ -5574,7 +5589,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     role="menuitem"
                     onClick={goToAuthorProfile}
                   >
-                    Go to this account
+                    {t("postMenu.goToThisAccount")}
                   </button>
                 </>
               )}
@@ -6188,13 +6203,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                             <div className={feedStyles.mentionDropdown}>
                               {commentMentionLoading ? (
                                 <div className={feedStyles.mentionItem}>
-                                  Searching...
+                                  {t("postEditOverlay.searching")}
                                 </div>
                               ) : null}
                               {!commentMentionLoading &&
                               commentMentionSuggestions.length === 0 ? (
                                 <div className={feedStyles.mentionItem}>
-                                  {commentMentionError || "No matches"}
+                                  {commentMentionError || t("postEditOverlay.noMentionMatches")}
                                 </div>
                               ) : null}
                               {commentMentionSuggestions.map((opt, idx) => {
@@ -6718,9 +6733,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         open={reportOpen}
         closing={reportClosing}
         onClose={closeReportModal}
-        title="Report this post"
-        subtitle="Help us understand what is wrong with this content."
-        groups={REPORT_GROUPS}
+        title={t("reportOverlay.titlePost")}
+        subtitle={t("reportOverlay.subtitlePost")}
+        groups={reportGroups}
         category={reportCategory}
         reason={reportReason}
         note={reportNote}
@@ -6730,15 +6745,24 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         onSelectReason={(key) => setReportReason(key || null)}
         onNoteChange={setReportNote}
         onSubmit={submitReport}
+        labelBack={t("reportOverlay.back")}
+        labelClose={t("reportOverlay.close")}
+        labelCancel={t("reportOverlay.labelCancel")}
+        labelSubmit={t("reportOverlay.labelSubmit")}
+        labelSubmitting={t("reportOverlay.labelSubmitting")}
+        labelSelectReason={t("reportOverlay.labelSelectReason")}
+        labelPickCategory={t("reportOverlay.labelPickCategory")}
+        labelNotes={t("reportOverlay.labelNotes")}
+        labelNotesPlaceholder={t("reportOverlay.labelNotesPlaceholder")}
       />
 
       <ReportOverlay
         open={reportCommentOpen}
         closing={reportCommentClosing}
         onClose={closeCommentReportModal}
-        title="Report this comment"
-        subtitle="Help us understand what is wrong with this comment."
-        groups={REPORT_GROUPS}
+        title={t("reportOverlay.titleComment")}
+        subtitle={t("reportOverlay.subtitleComment")}
+        groups={reportGroups}
         category={reportCommentCategory}
         reason={reportCommentReason}
         note={reportCommentNote}
@@ -6748,47 +6772,56 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         onSelectReason={(key) => setReportCommentReason(key || null)}
         onNoteChange={setReportCommentNote}
         onSubmit={submitCommentReport}
+        labelBack={t("reportOverlay.back")}
+        labelClose={t("reportOverlay.close")}
+        labelCancel={t("reportOverlay.labelCancel")}
+        labelSubmit={t("reportOverlay.labelSubmit")}
+        labelSubmitting={t("reportOverlay.labelSubmitting")}
+        labelSelectReason={t("reportOverlay.labelSelectReason")}
+        labelPickCategory={t("reportOverlay.labelPickCategory")}
+        labelNotes={t("reportOverlay.labelNotes")}
+        labelNotesPlaceholder={t("reportOverlay.labelNotesPlaceholder")}
       />
 
       <ConfirmActionOverlay
         open={deletePostOpen}
         onClose={closeDeletePostConfirm}
         variant="danger"
-        title="Delete this post?"
-        body="Removing this post will delete it for everyone. This action cannot be undone."
+        title={t("confirmDeletePost.title")}
+        body={t("confirmDeletePost.body")}
         error={deletePostError}
         submitting={deletePostSubmitting}
         onConfirm={confirmDeletePost}
-        labelConfirm="Delete"
-        labelConfirming="Deleting..."
-        labelCancel="Cancel"
+        labelConfirm={t("confirmDeletePost.labelConfirm")}
+        labelConfirming={t("confirmDeletePost.labelConfirming")}
+        labelCancel={t("confirmDeletePost.labelCancel")}
       />
 
       <ConfirmActionOverlay
         open={Boolean(deleteTarget)}
         onClose={closeDeleteConfirm}
         variant="danger"
-        title="Delete this comment?"
-        body="Removing this comment will also delete its replies. This action cannot be undone."
+        title={t("confirmDeleteComment.title")}
+        body={t("confirmDeleteComment.body")}
         error={deleteError}
         submitting={deleteSubmitting}
         onConfirm={confirmDeleteComment}
-        labelConfirm="Delete"
-        labelConfirming="Deleting..."
-        labelCancel="Cancel"
+        labelConfirm={t("confirmDeleteComment.labelConfirm")}
+        labelConfirming={t("confirmDeleteComment.labelConfirming")}
+        labelCancel={t("confirmDeleteComment.labelCancel")}
       />
 
       <ConfirmActionOverlay
         open={Boolean(blockTarget)}
         onClose={closeBlockUserModal}
         variant="danger"
-        title="Block this account?"
-        body={blockTarget ? `You are about to block @${blockTarget.label}. They will no longer be able to interact with you.` : undefined}
+        title={t("confirmBlockUser.title")}
+        body={blockTarget ? t("confirmBlockUser.body", { label: blockTarget.label }) : undefined}
         submitting={blocking}
         onConfirm={confirmBlockUser}
-        labelConfirm="Block"
-        labelConfirming="Blocking..."
-        labelCancel="Cancel"
+        labelConfirm={t("confirmBlockUser.labelConfirm")}
+        labelConfirming={t("confirmBlockUser.labelConfirming")}
+        labelCancel={t("confirmBlockUser.labelCancel")}
       />
 
       {postId ? (

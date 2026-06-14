@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -249,6 +250,7 @@ class _ContentActivityMeta {
   const _ContentActivityMeta({
     required this.postCaption,
     required this.postMediaUrl,
+    required this.postMediaType,
     required this.postAuthorDisplayName,
     required this.postAuthorUsername,
     required this.commentSnippet,
@@ -259,6 +261,7 @@ class _ContentActivityMeta {
 
   final String? postCaption;
   final String? postMediaUrl;
+  final String? postMediaType;
   final String? postAuthorDisplayName;
   final String? postAuthorUsername;
   final String? commentSnippet;
@@ -270,6 +273,7 @@ class _ContentActivityMeta {
     return _ContentActivityMeta(
       postCaption: j['postCaption'] as String?,
       postMediaUrl: j['postMediaUrl'] as String?,
+      postMediaType: j['postMediaType'] as String?,
       postAuthorDisplayName: j['postAuthorDisplayName'] as String?,
       postAuthorUsername: j['postAuthorUsername'] as String?,
       commentSnippet: j['commentSnippet'] as String?,
@@ -315,12 +319,16 @@ class _ContentActivityItem {
 }
 
 class _HiddenPostMedia {
-  const _HiddenPostMedia({required this.url});
+  const _HiddenPostMedia({required this.url, required this.type});
 
   final String? url;
+  final String? type;
 
   factory _HiddenPostMedia.fromJson(Map<String, dynamic> j) {
-    return _HiddenPostMedia(url: j['url'] as String?);
+    return _HiddenPostMedia(
+      url: j['url'] as String?,
+      type: j['type'] as String?,
+    );
   }
 }
 
@@ -1519,45 +1527,8 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
     }
   }
 
-  bool _isViolationWarnAction(String action) {
-    return action == 'warn' || action == 'warn_user';
-  }
-
-  String? _formatViolationRemainingHourMinute(String? value) {
-    if (value == null || value.isEmpty) return null;
-    final expiresAt = DateTime.tryParse(value);
-    if (expiresAt == null) return null;
-    final totalMinutes = (expiresAt.difference(DateTime.now()).inMinutes).clamp(
-      0,
-      1 << 30,
-    );
-    final hours = (totalMinutes / 60).floor();
-    final minutes = totalMinutes % 60;
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
-  }
-
   bool _canOpenViolationDetail(_ViolationHistoryItem item) {
     return item.targetType != 'user';
-  }
-
-  String _violationSubtitle(_ViolationHistoryItem item) {
-    final lc = LanguageController.instance;
-    if (item.action == 'mute_interaction') {
-      final remaining = _formatViolationRemainingHourMinute(
-        item.actionExpiresAt,
-      );
-      return remaining != null
-          ? lc.t('settings.violations.subtitle.interactionMutedRemaining', {'time': remaining})
-          : lc.t('settings.violations.subtitle.interactionMutedUntilOn');
-    }
-    if (_isViolationWarnAction(item.action)) {
-      return lc.t('settings.violations.subtitle.severityNoStrike', {'severity': _formatViolationSeverityLabel(item.severity)});
-    }
-    return lc.t('settings.violations.subtitle.severityWithStrike', {
-      'severity': _formatViolationSeverityLabel(item.severity),
-      'delta': item.strikeDelta,
-      'total': item.strikeTotalAfter,
-    });
   }
 
   Future<void> _openViolationDetail(_ViolationHistoryItem item) async {
@@ -1627,6 +1598,81 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
 
   String? _activityThumbUrl(_ContentActivityItem item) {
     return item.meta?.postMediaUrl ?? item.meta?.targetAvatarUrl;
+  }
+
+  String? _activityThumbType(_ContentActivityItem item) {
+    if (item.meta?.postMediaUrl != null) return item.meta?.postMediaType;
+    return null;
+  }
+
+  bool _isVideoMedia({String? type, String? url}) {
+    if (type != null && type.isNotEmpty) return type == 'video';
+    if (url == null || url.isEmpty) return false;
+    final path = url.toLowerCase().split('?').first;
+    return path.endsWith('.mp4') ||
+        path.endsWith('.mov') ||
+        path.endsWith('.webm') ||
+        path.endsWith('.m4v') ||
+        path.endsWith('.3gp');
+  }
+
+  Widget _buildThumbnail({
+    required String? url,
+    String? type,
+    double size = 42,
+    double radius = 8,
+  }) {
+    final isVideo = _isVideoMedia(type: type, url: url);
+
+    if (url == null || url.isEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        child: const Center(child: Text('📝', style: TextStyle(fontSize: 14))),
+      );
+    }
+
+    if (isVideo) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: _border),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.play_circle_fill_rounded,
+            color: Colors.white.withValues(alpha: 0.85),
+            size: size * 0.52,
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: _surface,
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          child: const Center(child: Text('📝', style: TextStyle(fontSize: 14))),
+        ),
+      ),
+    );
   }
 
   String? _priorityCommentIdForActivity(_ContentActivityItem item) {
@@ -1709,9 +1755,9 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _surface,
-        title: Text('Unhide this post?', style: TextStyle(color: _textPrimary)),
+        title: Text(lc.t('settings.unhideTitle'), style: TextStyle(color: _textPrimary)),
         content: Text(
-          'This post will appear in your feed again.',
+          lc.t('settings.unhideMessage'),
           style: TextStyle(color: _textSecondary),
         ),
         actions: [
@@ -4131,59 +4177,149 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
     return const Color(0xFF2E3A58);
   }
 
-  Widget _buildCreatorMetricRow({
+  Color _creatorStatusPillText(String status) {
+    final normalized = status.toLowerCase();
+    if (normalized == 'approved') return const Color(0xFF34d399);
+    if (normalized == 'rejected') return const Color(0xFFf87171);
+    return const Color(0xFF93C5FD);
+  }
+
+  Widget _buildCreatorMetricCard({
     required String title,
-    required String value,
-    required String threshold,
+    required String currentValue,
+    required String requirement,
+    required bool isMet,
+    required double progress,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: _textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+    const metColor = Color(0xFF10b981);
+    const unmetColor = Color(0xFFef4444);
+    final statusColor = isMet ? metColor : unmetColor;
+
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(15, 10, 10, 10),
+          decoration: BoxDecoration(
+            color: _surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: _textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isMet ? statusColor : Colors.transparent,
+                      border: isMet ? null : Border.all(color: statusColor, width: 1.5),
+                    ),
+                    child: Center(
+                      child: Text(
+                        isMet ? '✓' : '✕',
+                        style: TextStyle(
+                          color: isMet ? Colors.white : statusColor,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                currentValue,
+                style: TextStyle(
+                  color: _textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(color: _textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                requirement,
+                style: TextStyle(color: _textSecondary, fontSize: 10),
+              ),
+              const SizedBox(height: 7),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  backgroundColor: _border.withValues(alpha: 0.5),
+                  valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                  minHeight: 3,
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: 3,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: statusColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
+              ),
             ),
           ),
-          const SizedBox(width: 10),
-          Text(
-            threshold,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRequestInfoRow(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 13, color: _textSecondary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
             style: TextStyle(color: _textSecondary, fontSize: 12),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildCreatorLatestRequest(_CreatorLatestRequest request) {
     final lc = LanguageController.instance;
+    final pillBg = _creatorStatusPillBg(request.status);
+    final pillText = _creatorStatusPillText(request.status);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _border),
+        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4195,53 +4331,54 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
                 style: TextStyle(
                   color: _textPrimary,
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _creatorStatusPillBg(request.status),
+                  color: pillBg,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  request.status,
+                  request.status.toUpperCase(),
                   style: TextStyle(
-                    color: _textPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                    color: pillText,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
             ],
           ),
           if ((request.createdAt ?? '').isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
+            const SizedBox(height: 8),
+            _buildRequestInfoRow(
+              Icons.send_rounded,
               lc.t('settings.creator.submitted', {'time': _formatRelativeTime(request.createdAt)}),
-              style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.reviewedAt ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
+            _buildRequestInfoRow(
+              Icons.check_circle_outline_rounded,
               lc.t('settings.creator.reviewed', {'time': _formatRelativeTime(request.reviewedAt)}),
-              style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.decisionReason ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
+            _buildRequestInfoRow(
+              Icons.info_outline_rounded,
               lc.t('settings.creator.reason', {'reason': request.decisionReason}),
-              style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.cooldownUntil ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
+            _buildRequestInfoRow(
+              Icons.timer_outlined,
               lc.t('settings.creator.canRequestAgain', {'time': _formatRelativeTime(request.cooldownUntil)}),
-              style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
         ],
@@ -4252,6 +4389,8 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
   Widget _buildCreatorVerificationTab() {
     final lc = LanguageController.instance;
     final status = _creatorStatus;
+    const metColor = Color(0xFF10b981);
+    const unmetColor = Color(0xFFef4444);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4269,223 +4408,369 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
           lc.t('settings.creator.description'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
-        const SizedBox(height: 14),
-        _buildCard(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(14),
+        const SizedBox(height: 16),
+
+        // Loading state
+        if (_creatorLoading)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_creatorLoading)
-                    Text(
-                      lc.t('settings.creator.loadingEligibility'),
-                      style: TextStyle(color: _textSecondary, fontSize: 13),
-                    ),
-                  if (status != null && status.account.isCreatorVerified) ...[
-                    if (status.latestRequest != null)
-                      _buildCreatorLatestRequest(status.latestRequest!),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: _accent.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _accent.withValues(alpha: 0.45),
+                  CircularProgressIndicator(color: _accent, strokeWidth: 2),
+                  const SizedBox(height: 12),
+                  Text(
+                    lc.t('settings.creator.loadingEligibility'),
+                    style: TextStyle(color: _textSecondary, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        // Verified state
+        if (status != null && status.account.isCreatorVerified) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: metColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: metColor.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: metColor.withValues(alpha: 0.15),
+                    border: Border.all(color: metColor.withValues(alpha: 0.4)),
+                  ),
+                  child: const Icon(
+                    Icons.verified_rounded,
+                    color: metColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lc.t('settings.creator.title'),
+                        style: const TextStyle(
+                          color: metColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      child: Text(
+                      const SizedBox(height: 2),
+                      Text(
                         lc.t('settings.creator.accountVerified'),
-                        style: TextStyle(color: _textPrimary),
+                        style: const TextStyle(
+                          color: metColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (status.latestRequest != null) ...[
+            const SizedBox(height: 12),
+            _buildCreatorLatestRequest(status.latestRequest!),
+          ],
+        ],
+
+        // Unverified state
+        if (status != null && !status.account.isCreatorVerified) ...[
+          // Score card with ring
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _border),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 88,
+                  height: 88,
+                  child: CustomPaint(
+                    painter: _ScoreRingPainter(
+                      score: status.eligibility.score.toDouble(),
+                      maxScore: status.eligibility.minimumScore.toDouble() > 0
+                          ? status.eligibility.minimumScore.toDouble()
+                          : 70,
+                      pass: status.eligibility.eligible,
                     ),
-                  ],
-                  if (status != null && !status.account.isCreatorVerified) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: _surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _border),
-                      ),
+                    child: Center(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            lc.t('settings.creator.creatorScore'),
+                            _formatNum(status.eligibility.score),
                             style: TextStyle(
-                              color: _textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${_formatNum(status.eligibility.score)} / ${_formatNum(status.eligibility.minimumScore)}',
-                            style: TextStyle(
-                              color: _textPrimary,
+                              color: status.eligibility.eligible ? metColor : unmetColor,
                               fontSize: 20,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
                             ),
                           ),
-                          const SizedBox(height: 6),
                           Text(
-                            status.eligibility.eligible
-                                ? lc.t('settings.creator.meetsAllConditions')
-                                : lc.t('settings.creator.improveMissing'),
+                            '/ ${_formatNum(status.eligibility.minimumScore)}',
                             style: TextStyle(
                               color: _textSecondary,
-                              fontSize: 12,
+                              fontSize: 10,
+                              height: 1.2,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildCard(
-                      children: [
-                        _buildCreatorMetricRow(
-                          title: lc.t('settings.profile.accountAge'),
-                          value: lc.t('settings.creator.accountAgeDays', {'days': status.eligibility.accountAgeDays}),
-                          threshold: lc.t('settings.creator.minimum', {'value': status.criteria.minAccountAgeDays}),
-                        ),
-                        _buildCreatorMetricRow(
-                          title: lc.t('settings.creator.followersLabel'),
-                          value: '${status.eligibility.followersCount}',
-                          threshold: lc.t('settings.creator.minimum', {'value': status.criteria.minFollowersCount}),
-                        ),
-                        _buildCreatorMetricRow(
-                          title: lc.t('settings.profile.publishedPosts'),
-                          value: '${status.eligibility.postsCount}',
-                          threshold: lc.t('settings.creator.minimum', {'value': status.criteria.minPostsCount}),
-                        ),
-                        _buildCreatorMetricRow(
-                          title: lc.t('settings.creator.activePostingDays'),
-                          value: '${status.eligibility.activePostingDays30d}',
-                          threshold: lc.t('settings.creator.minimum', {'value': status.criteria.minActivePostingDays30d}),
-                        ),
-                        _buildCreatorMetricRow(
-                          title: lc.t('settings.creator.avgEngagement'),
-                          value: _formatNum(
-                            status.eligibility.engagementPerPost30d,
-                          ),
-                          threshold: lc.t('settings.creator.minimum', {'value': _formatNum(status.criteria.minEngagementPerPost30d)}),
-                        ),
-                        _buildCreatorMetricRow(
-                          title: lc.t('settings.creator.recentViolations'),
-                          value: '${status.eligibility.recentViolations90d}',
-                          threshold: lc.t('settings.creator.maximum', {'value': status.criteria.maxRecentViolations90d}),
-                        ),
-                      ],
-                    ),
-                    if (status.eligibility.failedRequirements.isNotEmpty) ...[
-                      const SizedBox(height: 10),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        lc.t('settings.creator.missingRequirements', {'list': status.eligibility.failedRequirements.map(_formatRequirementLabel).join(', ')}),
-                        style: TextStyle(color: _danger, fontSize: 12),
+                        lc.t('settings.creator.creatorScore'),
+                        style: TextStyle(
+                          color: _textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                        ),
                       ),
-                    ],
-                    if (status.latestRequest != null) ...[
-                      const SizedBox(height: 12),
-                      _buildCreatorLatestRequest(status.latestRequest!),
-                    ],
-                    const SizedBox(height: 12),
-                    Text(
-                      lc.t('settings.creator.requestNote'),
-                      style: TextStyle(
-                        color: _textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      key: const ValueKey('creator-request-note-input'),
-                      minLines: 4,
-                      maxLines: 4,
-                      onChanged: (v) => _creatorNote = v,
-                      style: TextStyle(color: _textPrimary),
-                      decoration: _emailInputDecoration(
-                        lc.t('settings.creator.requestNotePlaceholder'),
-                      ),
-                    ),
-                    if (_creatorError != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        _creatorError!,
-                        style: TextStyle(color: _danger, fontSize: 12),
-                      ),
-                    ],
-                    if (_creatorSuccess != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        _creatorSuccess!,
-                        style: TextStyle(color: _textPrimary, fontSize: 12),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: (_creatorLoading || _creatorSubmitting)
-                                ? null
-                                : _loadCreatorVerificationStatus,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: _textPrimary,
-                              disabledForegroundColor: _textSecondary,
-                              side: BorderSide(color: _border),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: Text(lc.t('settings.refreshStatus')),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: (status.eligibility.eligible ? metColor : unmetColor)
+                              .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: (status.eligibility.eligible ? metColor : unmetColor)
+                                .withValues(alpha: 0.35),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed:
-                                (_creatorSubmitting ||
-                                    _creatorLoading ||
-                                    !status.canRequest)
-                                ? null
-                                : _submitCreatorVerification,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _accent,
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: const Color(0xFF2C456A),
-                              disabledForegroundColor: _textPrimary,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: Text(
-                              _creatorSubmitting
-                                  ? lc.t('settings.creator.submittingDots')
-                                  : lc.t('settings.creator.requestCreator'),
-                              textAlign: TextAlign.center,
-                            ),
+                        child: Text(
+                          status.eligibility.eligible
+                              ? lc.t('settings.creator.meetsAllConditions')
+                              : lc.t('settings.creator.improveMissing'),
+                          style: TextStyle(
+                            color: status.eligibility.eligible ? metColor : unmetColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Metric grid — 2 columns
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 1.35,
+            children: [
+              _buildCreatorMetricCard(
+                title: lc.t('settings.profile.accountAge'),
+                currentValue: lc.t('settings.creator.accountAgeDays', {'days': status.eligibility.accountAgeDays}),
+                requirement: lc.t('settings.creator.minimum', {'value': status.criteria.minAccountAgeDays}),
+                isMet: status.eligibility.accountAgeDays >= status.criteria.minAccountAgeDays,
+                progress: status.criteria.minAccountAgeDays > 0
+                    ? status.eligibility.accountAgeDays / status.criteria.minAccountAgeDays
+                    : 1.0,
+              ),
+              _buildCreatorMetricCard(
+                title: lc.t('settings.creator.followersLabel'),
+                currentValue: '${status.eligibility.followersCount}',
+                requirement: lc.t('settings.creator.minimum', {'value': status.criteria.minFollowersCount}),
+                isMet: status.eligibility.followersCount >= status.criteria.minFollowersCount,
+                progress: status.criteria.minFollowersCount > 0
+                    ? status.eligibility.followersCount / status.criteria.minFollowersCount
+                    : 1.0,
+              ),
+              _buildCreatorMetricCard(
+                title: lc.t('settings.profile.publishedPosts'),
+                currentValue: '${status.eligibility.postsCount}',
+                requirement: lc.t('settings.creator.minimum', {'value': status.criteria.minPostsCount}),
+                isMet: status.eligibility.postsCount >= status.criteria.minPostsCount,
+                progress: status.criteria.minPostsCount > 0
+                    ? status.eligibility.postsCount / status.criteria.minPostsCount
+                    : 1.0,
+              ),
+              _buildCreatorMetricCard(
+                title: lc.t('settings.creator.activePostingDays'),
+                currentValue: '${status.eligibility.activePostingDays30d}',
+                requirement: lc.t('settings.creator.minimum', {'value': status.criteria.minActivePostingDays30d}),
+                isMet: status.eligibility.activePostingDays30d >= status.criteria.minActivePostingDays30d,
+                progress: status.criteria.minActivePostingDays30d > 0
+                    ? status.eligibility.activePostingDays30d / status.criteria.minActivePostingDays30d
+                    : 1.0,
+              ),
+              _buildCreatorMetricCard(
+                title: lc.t('settings.creator.avgEngagement'),
+                currentValue: _formatNum(status.eligibility.engagementPerPost30d),
+                requirement: lc.t('settings.creator.minimum', {'value': _formatNum(status.criteria.minEngagementPerPost30d)}),
+                isMet: status.eligibility.engagementPerPost30d >= status.criteria.minEngagementPerPost30d,
+                progress: status.criteria.minEngagementPerPost30d > 0
+                    ? (status.eligibility.engagementPerPost30d / status.criteria.minEngagementPerPost30d).toDouble()
+                    : 1.0,
+              ),
+              _buildCreatorMetricCard(
+                title: lc.t('settings.creator.recentViolations'),
+                currentValue: '${status.eligibility.recentViolations90d}',
+                requirement: lc.t('settings.creator.maximum', {'value': status.criteria.maxRecentViolations90d}),
+                isMet: status.eligibility.recentViolations90d <= status.criteria.maxRecentViolations90d,
+                progress: status.criteria.maxRecentViolations90d > 0
+                    ? 1.0 - (status.eligibility.recentViolations90d / (status.criteria.maxRecentViolations90d + 1))
+                    : (status.eligibility.recentViolations90d == 0 ? 1.0 : 0.0),
+              ),
+            ],
+          ),
+
+          if (status.eligibility.failedRequirements.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: unmetColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: unmetColor.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: unmetColor, size: 14),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      lc.t('settings.creator.missingRequirements', {
+                        'list': status.eligibility.failedRequirements
+                            .map(_formatRequirementLabel)
+                            .join(', '),
+                      }),
+                      style: const TextStyle(color: unmetColor, fontSize: 12),
                     ),
-                  ],
-                  if (_creatorError != null && status == null)
-                    Text(
-                      _creatorError!,
-                      style: TextStyle(color: _danger, fontSize: 12),
-                    ),
+                  ),
                 ],
               ),
             ),
           ],
-        ),
+
+          if (status.latestRequest != null) ...[
+            const SizedBox(height: 12),
+            _buildCreatorLatestRequest(status.latestRequest!),
+          ],
+
+          const SizedBox(height: 14),
+          Text(
+            lc.t('settings.creator.requestNote'),
+            style: TextStyle(
+              color: _textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            key: const ValueKey('creator-request-note-input'),
+            minLines: 4,
+            maxLines: 4,
+            onChanged: (v) => _creatorNote = v,
+            style: TextStyle(color: _textPrimary),
+            decoration: _emailInputDecoration(
+              lc.t('settings.creator.requestNotePlaceholder'),
+            ),
+          ),
+          if (_creatorError != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _creatorError!,
+              style: TextStyle(color: _danger, fontSize: 12),
+            ),
+          ],
+          if (_creatorSuccess != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _creatorSuccess!,
+              style: const TextStyle(color: metColor, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: (_creatorLoading || _creatorSubmitting)
+                      ? null
+                      : _loadCreatorVerificationStatus,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _textPrimary,
+                    disabledForegroundColor: _textSecondary,
+                    side: BorderSide(color: _border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(lc.t('settings.refreshStatus')),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: (_creatorSubmitting || _creatorLoading || !status.canRequest)
+                      ? null
+                      : _submitCreatorVerification,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accent,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF2C456A),
+                    disabledForegroundColor: _textPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    _creatorSubmitting
+                        ? lc.t('settings.creator.submittingDots')
+                        : lc.t('settings.creator.requestCreator'),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+
+        if (_creatorError != null && status == null)
+          Text(
+            _creatorError!,
+            style: TextStyle(color: _danger, fontSize: 12),
+          ),
       ],
     );
   }
@@ -5758,39 +6043,11 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
                             ),
                           ),
                           const SizedBox(width: 8),
-                          if (thumbUrl != null && thumbUrl.isNotEmpty)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                thumbUrl,
-                                width: 36,
-                                height: 36,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: _surface,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            )
-                          else
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: _surface,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  '📝',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ),
+                          _buildThumbnail(
+                            url: thumbUrl,
+                            type: _activityThumbType(item),
+                            size: 36,
+                          ),
                         ],
                       ),
                     ),
@@ -5860,9 +6117,7 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
                   post.content,
                   fallback: 'No caption',
                 );
-                final thumbUrl = post.media.isNotEmpty
-                    ? post.media.first.url
-                    : null;
+                final firstMedia = post.media.isNotEmpty ? post.media.first : null;
                 final isSubmitting = _unhideSubmitting[post.id] == true;
 
                 return InkWell(
@@ -5878,29 +6133,10 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
                     ),
                     child: Row(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: thumbUrl != null && thumbUrl.isNotEmpty
-                              ? Image.network(
-                                  thumbUrl,
-                                  width: 42,
-                                  height: 42,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 42,
-                                    height: 42,
-                                    color: _surface,
-                                    alignment: Alignment.center,
-                                    child: Text('📝'),
-                                  ),
-                                )
-                              : Container(
-                                  width: 42,
-                                  height: 42,
-                                  color: _surface,
-                                  alignment: Alignment.center,
-                                  child: Text('📝'),
-                                ),
+                        _buildThumbnail(
+                          url: firstMedia?.url,
+                          type: firstMedia?.type,
+                          size: 42,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -6077,11 +6313,47 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
   }
 
   Widget _buildViolationsTab() {
+    final lc = LanguageController.instance;
+    final n = _currentStrikeTotal;
+
+    final Color strikeColor;
+    final String statusLabel;
+    final Color barColor;
+    final double barValue;
+    const int maxBar = 10;
+    final Color statusBg, statusText, statusBorder;
+
+    if (n == 0) {
+      strikeColor = const Color(0xFF10b981);
+      statusLabel = lc.t('settings.violations.statusClean');
+      barColor = const Color(0xFF10b981);
+      barValue = 0.0;
+      statusBg = const Color(0xFF10b981).withValues(alpha: 0.12);
+      statusText = const Color(0xFF34d399);
+      statusBorder = const Color(0xFF34d399).withValues(alpha: 0.25);
+    } else if (n <= 3) {
+      strikeColor = const Color(0xFFfbbf24);
+      statusLabel = lc.t('settings.violations.statusLow');
+      barColor = const Color(0xFFf59e0b);
+      barValue = (n / maxBar).clamp(0.0, 1.0);
+      statusBg = const Color(0xFFf59e0b).withValues(alpha: 0.12);
+      statusText = const Color(0xFFfbbf24);
+      statusBorder = const Color(0xFFfbbf24).withValues(alpha: 0.25);
+    } else {
+      strikeColor = const Color(0xFFf87171);
+      statusLabel = lc.t('settings.violations.statusHigh');
+      barColor = const Color(0xFFef4444);
+      barValue = (n / maxBar).clamp(0.0, 1.0);
+      statusBg = const Color(0xFFef4444).withValues(alpha: 0.12);
+      statusText = const Color(0xFFf87171);
+      statusBorder = const Color(0xFFf87171).withValues(alpha: 0.25);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Violation Center',
+          lc.t('settings.violations.title'),
           style: TextStyle(
             color: _textPrimary,
             fontSize: 18,
@@ -6090,169 +6362,431 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
         ),
         const SizedBox(height: 6),
         Text(
-          'Review moderation actions and your strike history.',
+          lc.t('settings.violations.description'),
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
-        _buildCard(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Row(
+        // Score card
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFF7c3aed).withValues(alpha: 0.22),
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF7c3aed).withValues(alpha: 0.09),
+                _surface,
+              ],
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Current strike total',
+                          lc.t('settings.violations.currentStrikeTotal'),
                           style: TextStyle(color: _textSecondary, fontSize: 12),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '$_currentStrikeTotal',
+                          '$n',
                           style: TextStyle(
-                            color: _textPrimary,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
+                            color: strikeColor,
+                            fontSize: 38,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusBg,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: statusBorder),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              color: statusText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: _violationLoading ? null : _loadViolationCenter,
-                    child: Text(
-                      _violationLoading ? 'Refreshing...' : 'Refresh',
+                    icon: _violationLoading
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _textSecondary,
+                            ),
+                          )
+                        : const Icon(Icons.refresh_rounded, size: 16),
+                    label: Text(
+                      _violationLoading
+                          ? lc.t('settings.violations.refreshing')
+                          : 'Refresh',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      minimumSize: Size.zero,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              if (n > 0) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: barValue,
+                    minHeight: 6,
+                    backgroundColor: barColor.withValues(alpha: 0.14),
+                    valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Text(
+                lc.t('settings.violations.strikeHint'),
+                style: TextStyle(color: _textSecondary, fontSize: 11),
+              ),
+            ],
+          ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        _buildCard(
-          children: [
-            if (_violationLoading)
-              Padding(
-                padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
-                child: Text(
-                  'Loading violation history...',
-                  style: TextStyle(color: _textSecondary, fontSize: 12),
-                ),
-              ),
-            if (_violationError != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                child: Text(
-                  _violationError!,
-                  style: TextStyle(color: _danger, fontSize: 12),
-                ),
-              ),
-            if (!_violationLoading && _violationItems.isEmpty)
-              Padding(
-                padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
-                child: Text(
-                  'No violations found.',
-                  style: TextStyle(color: _textSecondary, fontSize: 12),
-                ),
-              ),
-            ..._violationItems.map((item) {
-              final canOpen = _canOpenViolationDetail(item);
-              final timeLabel = _formatRelativeTime(item.createdAt);
-              return InkWell(
-                onTap: canOpen ? () => _openViolationDetail(item) : null,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.04),
-                      ),
-                    ),
+        // Violation history
+        if (_violationLoading && _violationItems.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            child: Center(
+              child: Column(
+                children: [
+                  CircularProgressIndicator(color: _accent),
+                  const SizedBox(height: 10),
+                  Text(
+                    lc.t('settings.violations.loadingHistory'),
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
                   ),
-                  child: Row(
+                ],
+              ),
+            ),
+          )
+        else if (_violationError != null)
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _danger.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _danger.withValues(alpha: 0.22)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: _danger, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    lc.t('settings.violations.unableToLoad'),
+                    style: TextStyle(color: _danger, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (!_violationLoading && _violationItems.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            alignment: Alignment.center,
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.verified_user_rounded,
+                  color: Color(0xFF10b981),
+                  size: 36,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  lc.t('settings.violations.noViolations'),
+                  style: TextStyle(color: _textSecondary, fontSize: 13),
+                ),
+              ],
+            ),
+          )
+        else
+          ..._violationItems.map((item) => _buildViolationCard(item)),
+      ],
+    );
+  }
+
+  Widget _buildViolationCard(_ViolationHistoryItem item) {
+    final lc = LanguageController.instance;
+    final canOpen = _canOpenViolationDetail(item);
+    final isDecay = item.strikeDelta < 0;
+    final sev = item.severity ?? '';
+
+    // Left border + card border color based on severity / decay
+    final Color leftColor;
+    final Color edgeColor;
+    if (isDecay) {
+      leftColor = const Color(0xFF10b981);
+      edgeColor = const Color(0xFF10b981).withValues(alpha: 0.18);
+    } else {
+      switch (sev) {
+        case 'high':
+          leftColor = const Color(0xFFef4444);
+          edgeColor = const Color(0xFFef4444).withValues(alpha: 0.20);
+        case 'medium':
+          leftColor = const Color(0xFFf59e0b);
+          edgeColor = const Color(0xFFf59e0b).withValues(alpha: 0.20);
+        case 'low':
+          leftColor = const Color(0xFF0ea5e9);
+          edgeColor = const Color(0xFF0ea5e9).withValues(alpha: 0.20);
+        default:
+          leftColor = const Color(0xFF94a3b8).withValues(alpha: 0.45);
+          edgeColor = const Color(0xFF94a3b8).withValues(alpha: 0.16);
+      }
+    }
+
+    // Severity badge colors
+    final Color sevBg, sevText, sevBorder;
+    if (isDecay) {
+      sevBg = const Color(0xFF10b981).withValues(alpha: 0.10);
+      sevText = const Color(0xFF34d399);
+      sevBorder = const Color(0xFF34d399).withValues(alpha: 0.22);
+    } else {
+      switch (sev) {
+        case 'high':
+          sevBg = const Color(0xFFef4444).withValues(alpha: 0.10);
+          sevText = const Color(0xFFf87171);
+          sevBorder = const Color(0xFFf87171).withValues(alpha: 0.22);
+        case 'medium':
+          sevBg = const Color(0xFFfbbf24).withValues(alpha: 0.10);
+          sevText = const Color(0xFFfbbf24);
+          sevBorder = const Color(0xFFfbbf24).withValues(alpha: 0.22);
+        case 'low':
+          sevBg = const Color(0xFF38bdf8).withValues(alpha: 0.10);
+          sevText = const Color(0xFF38bdf8);
+          sevBorder = const Color(0xFF38bdf8).withValues(alpha: 0.22);
+        default:
+          sevBg = const Color(0xFF94a3b8).withValues(alpha: 0.10);
+          sevText = _textSecondary;
+          sevBorder = const Color(0xFF94a3b8).withValues(alpha: 0.18);
+      }
+    }
+
+    // Strike delta badge colors
+    final Color deltaBg, deltaText, deltaBorder;
+    if (item.strikeDelta < 0) {
+      deltaBg = const Color(0xFF10b981).withValues(alpha: 0.10);
+      deltaText = const Color(0xFF34d399);
+      deltaBorder = const Color(0xFF34d399).withValues(alpha: 0.22);
+    } else if (item.strikeDelta > 0) {
+      deltaBg = const Color(0xFFef4444).withValues(alpha: 0.10);
+      deltaText = const Color(0xFFf87171);
+      deltaBorder = const Color(0xFFf87171).withValues(alpha: 0.22);
+    } else {
+      deltaBg = const Color(0xFF94a3b8).withValues(alpha: 0.10);
+      deltaText = _textSecondary;
+      deltaBorder = const Color(0xFF94a3b8).withValues(alpha: 0.16);
+    }
+
+    // Strike delta badge label
+    final String deltaLabel;
+    if (item.action == 'mute_interaction') {
+      deltaLabel = lc.t('settings.violations.action.interactionMuted');
+    } else {
+      final prefix = item.strikeDelta >= 0 ? '+' : '';
+      deltaLabel = lc.t('settings.violations.strikeBadge', {
+        'delta': '$prefix${item.strikeDelta}',
+        'total': '${item.strikeTotalAfter}',
+      });
+    }
+
+    final reason = item.reason.isNotEmpty
+        ? item.reason
+        : lc.t('settings.violations.noReasonProvided');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: canOpen ? () => _openViolationDetail(item) : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: edgeColor),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top row: action label + target chip + timestamp
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: _accent.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.flag_rounded,
-                          color: _accent,
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
-                              '${_formatViolationActionLabel(item.action)} · ${item.targetType.toUpperCase()}',
+                              _formatViolationActionLabel(item.action),
                               style: TextStyle(
                                 color: _textPrimary,
                                 fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _violationSubtitle(item),
-                              style: TextStyle(
-                                color: _textSecondary,
-                                fontSize: 12,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Reason: ${item.reason.isEmpty ? 'No reason provided.' : item.reason}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: _textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                            if (timeLabel.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                timeLabel,
-                                style: TextStyle(
-                                  color: _textSecondary,
-                                  fontSize: 11,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7c3aed).withValues(alpha: 0.09),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: const Color(0xFF7c3aed).withValues(alpha: 0.20),
                                 ),
                               ),
-                            ],
-                            if (canOpen) ...[
-                              const SizedBox(height: 3),
-                              Text(
-                                'Tap to view violated content',
-                                style: TextStyle(
-                                  color: _textSecondary,
-                                  fontSize: 11,
+                              child: Text(
+                                item.targetType.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Color(0xFFa78bfa),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatRelativeTime(item.createdAt),
+                        style: TextStyle(color: _textSecondary, fontSize: 11),
+                      ),
                     ],
                   ),
+                  const SizedBox(height: 6),
+                  // Reason text
+                  Text(
+                    reason,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  // Badge row: severity + strike delta + tap hint
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: sevBg,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: sevBorder),
+                        ),
+                        child: Text(
+                          _formatViolationSeverityLabel(
+                            isDecay ? null : item.severity,
+                          ),
+                          style: TextStyle(
+                            color: sevText,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: deltaBg,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: deltaBorder),
+                        ),
+                        child: Text(
+                          deltaLabel,
+                          style: TextStyle(
+                            color: deltaText,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (canOpen) ...[
+                        const Spacer(),
+                        Text(
+                          lc.t('settings.violations.tapToView'),
+                          style: const TextStyle(
+                            color: Color(0xFFa78bfa),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: 4,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: leftColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                  ),
                 ),
-              );
-            }),
+              ),
+            ),
           ],
         ),
-      ],
+      ),
     );
   }
 
@@ -6922,4 +7456,56 @@ class _ViolationDetailScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ScoreRingPainter extends CustomPainter {
+  final double score;
+  final double maxScore;
+  final bool pass;
+
+  const _ScoreRingPainter({
+    required this.score,
+    required this.maxScore,
+    required this.pass,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width * 0.42;
+    const strokeWidth = 7.0;
+
+    // Background ring
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.08)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth,
+    );
+
+    final fraction = maxScore > 0 ? (score / maxScore).clamp(0.0, 1.0) : 0.0;
+    if (fraction <= 0) return;
+
+    final sweepAngle = fraction * 2 * math.pi;
+    const startAngle = -math.pi / 2;
+    final arcColor = pass ? const Color(0xFF10b981) : const Color(0xFFef4444);
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      Paint()
+        ..color = arcColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ScoreRingPainter old) =>
+      old.score != score || old.maxScore != maxScore || old.pass != pass;
 }

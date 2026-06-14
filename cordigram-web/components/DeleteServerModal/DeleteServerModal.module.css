@@ -1,153 +1,235 @@
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: perspective(1000px) rotateX(7deg) translateY(22px) scale(0.96);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1000px) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+
 .overlay {
   position: fixed;
   inset: 0;
-  background: var(--color-overlay);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   z-index: 10003;
-  animation: fadeIn 0.2s ease-out;
+  animation: overlayIn 0.18s ease-out;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+/* ── Modal ───────────────────────────────────────────────────────────────── */
 
 .modal {
   background: var(--color-panel-bg);
-  border-radius: 8px;
-  width: 90%;
+  border-radius: 18px;
+  width: 100%;
   max-width: 440px;
   position: relative;
-  padding: 24px;
-  border: 1px solid var(--color-panel-border);
-  animation: slideUp 0.25s ease-out;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  padding: 28px 26px 24px;
+  border: 1.5px solid var(--color-panel-border);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 32px 80px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: modalIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes slideUp {
-  from { transform: translateY(16px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
+/* ── Close button ────────────────────────────────────────────────────────── */
 
 .closeBtn {
   position: absolute;
-  top: 16px; right: 16px;
+  top: 14px;
+  right: 14px;
   width: 32px;
   height: 32px;
-  border: none;
-  background: transparent;
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-hover);
   color: var(--color-panel-text-muted);
-  font-size: 20px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, transform 0.20s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .closeBtn:hover {
-  background: var(--color-panel-hover);
+  background: var(--color-panel-deep);
   color: var(--color-panel-text);
+  transform: rotate(8deg) scale(1.08);
 }
+
+/* ── Warning icon ────────────────────────────────────────────────────────── */
+
+.warningIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(237, 66, 69, 0.12);
+  border: 1.5px solid rgba(237, 66, 69, 0.22);
+  color: var(--color-panel-danger, #ed4245);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+/* ── Title ───────────────────────────────────────────────────────────────── */
 
 .title {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--color-panel-text);
-  padding-right: 32px;
+  padding-right: 28px;
 }
 
+/* ── Message ─────────────────────────────────────────────────────────────── */
+
 .message {
-  margin: 0 0 20px;
+  margin: 0 0 22px;
   font-size: 14px;
   color: var(--color-panel-text-muted);
-  line-height: 1.5;
+  line-height: 1.55;
 }
+
+/* ── Label ───────────────────────────────────────────────────────────────── */
 
 .label {
   display: block;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
   color: var(--color-panel-text-muted);
   margin-bottom: 8px;
 }
 
+/* ── Input ───────────────────────────────────────────────────────────────── */
+
 .input {
   width: 100%;
-  padding: 10px 12px;
+  box-sizing: border-box;
+  padding: 11px 14px;
   background: var(--color-panel-deep);
-  border: 1px solid var(--color-panel-deep-border);
-  border-radius: 4px;
+  border: 1.5px solid var(--color-panel-deep-border);
+  border-radius: 10px;
   color: var(--color-panel-text);
   font-size: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   outline: none;
-  box-sizing: border-box;
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
 
-.input::placeholder {
-  color: var(--color-panel-text-faint);
-}
+.input::placeholder { color: var(--color-panel-text-faint); }
 
 .input:focus {
-  border-color: var(--color-panel-accent);
-  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
+  border-color: rgba(237, 66, 69, 0.55);
+  box-shadow: 0 0 0 3px rgba(237, 66, 69, 0.12);
 }
 
+/* ── Error ───────────────────────────────────────────────────────────────── */
+
 .error {
-  margin: -8px 0 12px;
+  margin: -10px 0 14px;
+  padding: 9px 13px;
+  background: rgba(237, 66, 69, 0.08);
+  border: 1px solid rgba(237, 66, 69, 0.22);
+  border-radius: 8px;
   font-size: 13px;
-  color: var(--color-panel-danger);
+  color: var(--color-panel-danger, #ed4245);
+  line-height: 1.45;
 }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
 
 .footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 8px;
+  align-items: center;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-panel-border);
+  margin-top: 4px;
 }
+
+/* ── Cancel button ───────────────────────────────────────────────────────── */
 
 .cancelBtn {
-  padding: 10px 16px;
-  border-radius: 4px;
+  padding: 9px 18px;
+  border-radius: 10px;
   border: none;
-  background: var(--color-panel-sidebar);
+  background: transparent;
   color: var(--color-panel-text);
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.cancelBtn:hover:not(:disabled) {
-  background: var(--color-panel-hover);
-}
-
-.cancelBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.deleteBtn {
-  padding: 10px 20px;
-  border-radius: 4px;
-  border: none;
-  background: var(--color-panel-danger);
-  color: #fff;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.cancelBtn:hover:not(:disabled) { background: var(--color-panel-hover); }
+.cancelBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Delete button ───────────────────────────────────────────────────────── */
+
+.deleteBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 22px;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-panel-danger, #ed4245);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
 }
 
 .deleteBtn:hover:not(:disabled) {
-  background: var(--color-panel-danger-hover);
+  background: var(--color-panel-danger-hover, #c0393b);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(237, 66, 69, 0.38);
 }
 
-.deleteBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.deleteBtn:disabled { opacity: 0.48; cursor: not-allowed; transform: none; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GALAXY THEME OVERRIDES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:global([data-messages-theme="galaxy"]) .modal {
+  background: rgba(8, 10, 24, 0.96);
+  backdrop-filter: blur(24px);
+  border-color: rgba(237, 66, 69, 0.14);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.60),
+    0 32px 80px rgba(0, 0, 0, 0.44),
+    0 0 60px rgba(237, 66, 69, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:global([data-messages-theme="galaxy"]) .footer {
+  border-color: rgba(237, 66, 69, 0.10);
 }

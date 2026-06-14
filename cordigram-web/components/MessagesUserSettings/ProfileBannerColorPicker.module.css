@@ -1,3 +1,7 @@
+/* ProfileBannerColorPicker — theme-aware
+   Uses --ms-* tokens from [data-messages-theme] on .popover.
+*/
+
 .backdrop {
   position: fixed;
   inset: 0;
@@ -5,15 +9,46 @@
   background: transparent;
 }
 
+/* ── Popover — CSS variable root (dark defaults) ── */
 .popover {
+  --ms-bg:         #2b2d31;
+  --ms-bg-alt:     #1e1f22;
+  --ms-border:     rgba(255, 255, 255, 0.12);
+  --ms-text:       #f2f3f5;
+  --ms-text-muted: #b5bac1;
+
   position: fixed;
   z-index: 4001;
   width: min(280px, 92vw);
   padding: 12px;
   border-radius: 8px;
-  background: #2b2d31;
-  border: 1px solid #1e1f22;
+  background: var(--ms-bg);
+  border: 1px solid var(--ms-border);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+:global([data-messages-theme="light"]) .popover {
+  --ms-bg:         #ffffff;
+  --ms-bg-alt:     #f0f3f9;
+  --ms-border:     rgba(0, 0, 0, 0.1);
+  --ms-text:       #0f1629;
+  --ms-text-muted: #5b6378;
+
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+}
+
+:global([data-messages-theme="galaxy"]) .popover {
+  --ms-bg:         rgba(12, 16, 32, 0.97);
+  --ms-bg-alt:     rgba(6, 8, 20, 0.99);
+  --ms-border:     rgba(124, 58, 237, 0.3);
+  --ms-text:       #dde2f0;
+  --ms-text-muted: #7a8db8;
+
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.5),
+    0 0 24px rgba(88, 101, 242, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .sv {
@@ -87,9 +122,9 @@
   flex: 1;
   padding: 8px 10px;
   border-radius: 6px;
-  border: 1px solid #4e5058;
-  background: #1e1f22;
-  color: #f2f3f5;
+  border: 1px solid var(--ms-border);
+  background: var(--ms-bg-alt);
+  color: var(--ms-text);
   font-size: 13px;
   font-family: ui-monospace, monospace;
 }
@@ -103,14 +138,20 @@
   width: 36px;
   height: 36px;
   border-radius: 6px;
-  border: 1px solid #4e5058;
-  background: #313338;
-  color: #dbdee1;
+  border: 1px solid var(--ms-border);
+  background: var(--ms-bg);
+  color: var(--ms-text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.eyedropper:hover {
+  background: var(--ms-bg-alt);
+  border-color: rgba(88, 101, 242, 0.4);
 }
 
 .eyedropper:disabled {
@@ -132,9 +173,14 @@
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.preset:hover {
+  transform: scale(1.1);
 }
 
 .presetActive {
   border-color: #fff;
-  box-shadow: 0 0 0 1px #1e1f22;
+  box-shadow: 0 0 0 1px var(--ms-bg-alt);
 }

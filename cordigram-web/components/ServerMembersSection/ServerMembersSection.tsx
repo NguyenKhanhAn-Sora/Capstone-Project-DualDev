@@ -2,6 +2,12 @@
 
 import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+
+const IcoCrown = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M12 2L9 9 2 7l4 8h16l4-8-7 2-3-7z" opacity=".9"/>
+  </svg>
+);
 import * as serversApi from "@/lib/servers-api";
 import { blockUser, ignoreUser } from "@/lib/api";
 import MemberProfilePopup from "@/components/MemberProfilePopup/MemberProfilePopup";
@@ -336,7 +342,7 @@ export default function ServerMembersSection({
                     </div>
                     <div className={styles.nameBlock}>
                       <span className={styles.displayName} style={{ color: row.displayColor || "#fff" }}>
-                        {row.displayName || row.username}{row.isOwner && <span className={styles.ownerCrown}> 👑</span>}
+                        {row.displayName || row.username}{row.isOwner && <span className={styles.ownerCrown}><IcoCrown /></span>}
                       </span>
                       <span className={styles.username}>{row.username}</span>
                     </div>

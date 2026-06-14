@@ -1,144 +1,479 @@
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: perspective(1100px) rotateX(7deg) translateY(22px) scale(0.96);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1100px) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
+}
+
+@keyframes planCardHover {
+  from { transform: perspective(800px) rotateX(0deg) translateY(0) scale(1); }
+  to   { transform: perspective(800px) rotateX(-2deg) translateY(-6px) scale(1.01); }
+}
+
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(250,204,21,0.3); }
+  50%       { box-shadow: 0 0 24px rgba(250,204,21,0.6); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Overlay ───────────────────────────────────────────────────────────────── */
+
 .overlay {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(900px 520px at 20% -10%, rgba(168, 85, 247, 0.18), transparent 55%),
-    radial-gradient(900px 520px at 80% 0%, rgba(56, 189, 248, 0.12), transparent 60%),
-    var(--color-bg-home);
+    radial-gradient(ellipse 80% 55% at 50% -20%, rgba(124,58,237,0.38), transparent 65%),
+    radial-gradient(ellipse 55% 45% at 90% 20%, rgba(56,189,248,0.13), transparent 55%),
+    rgba(5,3,14,0.97);
+  animation: overlayIn 0.22s ease-out;
+  position: relative;
+  overflow: hidden;
 }
 
-.card {
-  width: min(760px, 100%);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  background: var(--color-surface);
-  padding: 18px;
-  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.22);
+/* Star particles behind modal */
+.overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.55), transparent),
+    radial-gradient(1.5px 1.5px at 30% 6%,  rgba(255,255,255,0.35), transparent),
+    radial-gradient(1px 1px at 62% 12%, rgba(165,180,252,0.6), transparent),
+    radial-gradient(2px 2px at 80% 5%,  rgba(165,180,252,0.7), transparent),
+    radial-gradient(1px 1px at 94% 28%, rgba(255,255,255,0.35), transparent),
+    radial-gradient(1px 1px at 5%  50%, rgba(255,255,255,0.25), transparent),
+    radial-gradient(1.5px 1.5px at 48% 72%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 72% 80%, rgba(165,180,252,0.45), transparent),
+    radial-gradient(2px 2px at 20% 88%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 88% 92%, rgba(255,255,255,0.35), transparent);
+  pointer-events: none;
+  z-index: 0;
 }
+
+/* ── Modal card ────────────────────────────────────────────────────────────── */
+
+.card {
+  width: min(800px, 100%);
+  border: 1px solid rgba(88,101,242,0.28);
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse 110% 70% at 50% 0%, rgba(88,101,242,0.18), transparent 65%),
+    rgba(8,6,22,0.9);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  padding: 26px 24px;
+  box-shadow:
+    0 0 0 1px rgba(88,101,242,0.1) inset,
+    0 30px 90px rgba(0,0,0,0.7),
+    0 0 160px rgba(88,101,242,0.08);
+  animation: cardIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+/* Nebula accent in top-right */
+.card::before {
+  content: "";
+  position: absolute;
+  top: -60px;
+  right: -80px;
+  width: 360px;
+  height: 260px;
+  background: radial-gradient(ellipse at center, rgba(124,58,237,0.2), rgba(88,101,242,0.06) 55%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+/* ── Head row ──────────────────────────────────────────────────────────────── */
 
 .headRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 900;
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #fff 0%, #c4b5fd 50%, #7c3aed 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 5s linear infinite;
 }
 
 .close {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
   cursor: pointer;
   font-size: 20px;
   line-height: 1;
-  color: var(--color-text);
+  color: rgba(255,255,255,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+  flex-shrink: 0;
 }
+
+.close:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  transform: rotate(8deg) scale(1.1);
+}
+
+/* ── Plan grid ─────────────────────────────────────────────────────────────── */
 
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
 }
 
-@media (max-width: 720px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 600px) {
+  .grid { grid-template-columns: 1fr; }
 }
+
+/* ── Plan cards ────────────────────────────────────────────────────────────── */
 
 .planCard {
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08));
-  padding: 16px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(88,101,242,0.1), rgba(124,58,237,0.06) 60%, rgba(56,189,248,0.04)),
+    rgba(255,255,255,0.02);
+  padding: 22px 20px;
   cursor: pointer;
   text-align: left;
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 0.22s,
+    box-shadow 0.22s,
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.22s;
+  font-family: inherit;
+  color: var(--color-text, #fff);
 }
 
+.planCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 100% 60% at 50% 0%, rgba(88,101,242,0.12), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.22s;
+  pointer-events: none;
+}
+
+.planCard:hover {
+  border-color: rgba(88,101,242,0.4);
+  transform: translateY(-6px) scale(1.01);
+  box-shadow:
+    0 16px 48px rgba(0,0,0,0.45),
+    0 0 60px rgba(88,101,242,0.12);
+}
+
+.planCard:hover::before { opacity: 1; }
+
+/* Premium (Boost) card active */
 .planCardActive {
-  border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%);
-  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.18);
+  border-color: rgba(88,101,242,0.7);
+  background:
+    linear-gradient(145deg, rgba(88,101,242,0.22), rgba(124,58,237,0.14) 60%, rgba(56,189,248,0.08)),
+    rgba(255,255,255,0.03);
+  box-shadow:
+    0 0 0 1px rgba(88,101,242,0.2) inset,
+    0 8px 40px rgba(88,101,242,0.3),
+    0 0 80px rgba(88,101,242,0.14);
 }
 
+/* Basic card active (dimmer) */
+.planCardActiveBasic {
+  border-color: rgba(124,58,237,0.55);
+  background:
+    linear-gradient(145deg, rgba(124,58,237,0.16), rgba(88,101,242,0.1) 60%),
+    rgba(255,255,255,0.02);
+  box-shadow:
+    0 0 0 1px rgba(124,58,237,0.16) inset,
+    0 8px 32px rgba(124,58,237,0.2);
+}
+
+/* Popular badge */
+.planBadge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #1a1200;
+  box-shadow: 0 2px 12px rgba(250,204,21,0.35);
+  animation: badgePulse 3s ease-in-out infinite;
+}
+
+/* Checkmark icon for active — inside planHeader */
+.planActiveCheck {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5865f2, #7c3aed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(88,101,242,0.5);
+  z-index: 2;
+}
+
+/* Premium header strip (Boost card only) */
+.planHeader {
+  margin: -22px -20px 16px;
+  padding: 14px 20px 14px;
+  background: linear-gradient(135deg, rgba(88,101,242,0.38), rgba(124,58,237,0.3));
+  border-bottom: 1px solid rgba(88,101,242,0.32);
+  border-radius: 16px 16px 0 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.planHeader::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 120% 80% at 50% 0%, rgba(165,180,252,0.12), transparent 70%);
+  pointer-events: none;
+}
+
+.planHeaderBasic {
+  margin: -22px -20px 16px;
+  padding: 14px 20px 14px;
+  background: linear-gradient(135deg, rgba(124,58,237,0.22), rgba(88,101,242,0.16));
+  border-bottom: 1px solid rgba(124,58,237,0.22);
+  border-radius: 16px 16px 0 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Plan icon */
+.planIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.planIconBoost {
+  background: linear-gradient(135deg, rgba(88,101,242,0.6), rgba(124,58,237,0.8));
+  border: 1px solid rgba(165,180,252,0.3);
+  box-shadow: 0 0 20px rgba(88,101,242,0.4);
+  color: #fff;
+}
+
+.planIconBasic {
+  background: rgba(124,58,237,0.25);
+  border: 1px solid rgba(124,58,237,0.3);
+  color: #c4b5fd;
+}
+
+/* Plan name */
 .planName {
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 950;
-  margin: 0 0 6px;
+  margin: 0 0 2px;
+  letter-spacing: -0.02em;
+  color: #fff;
+  padding-right: 70px;
+  position: relative;
+  z-index: 1;
+}
+
+.planCardActive .planName {
+  background: linear-gradient(135deg, #fff 0%, #c4b5fd 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Price */
+.planPriceWrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.planPriceAmount {
+  font-size: 22px;
+  font-weight: 900;
+  color: rgba(165,180,252,0.9);
+  letter-spacing: -0.01em;
+}
+
+.planCardActive .planPriceAmount {
+  color: #a5b4fc;
+}
+
+.planPricePeriod {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 600;
 }
 
 .planPrice {
-  margin: 0 0 10px;
+  margin: 0 0 14px;
   font-size: 13px;
-  color: var(--color-text-muted);
+  color: rgba(255,255,255,0.45);
 }
 
+/* Feature list */
 .list {
   margin: 0;
-  padding-left: 18px;
-  color: var(--color-text);
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 9px;
+  color: rgba(255,255,255,0.72);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
-.footer {
+.list li {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 14px;
+  align-items: flex-start;
+  gap: 9px;
 }
 
-.btnPrimary,
-.btnSecondary {
-  border: none;
-  border-radius: 12px;
-  padding: 10px 14px;
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
+.listCheck {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(88,101,242,0.22);
+  border: 1px solid rgba(88,101,242,0.4);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a5b4fc;
+  margin-top: 1px;
 }
 
-.btnPrimary {
-  color: #fff;
-  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+.planCardActive .listCheck {
+  background: rgba(88,101,242,0.38);
+  border-color: rgba(88,101,242,0.65);
 }
 
-.btnSecondary {
-  color: var(--color-text);
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
+.planCardActiveBasic .listCheck {
+  background: rgba(124,58,237,0.25);
+  border-color: rgba(124,58,237,0.45);
+  color: #c4b5fd;
 }
+
+/* Divider */
+.planDivider {
+  height: 1px;
+  background: rgba(255,255,255,0.07);
+  margin: 14px 0;
+}
+
+/* ── Gift section ──────────────────────────────────────────────────────────── */
 
 .giftRow {
-  margin-top: 12px;
+  margin-top: 18px;
   display: grid;
   gap: 10px;
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.35s 0.1s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+.giftLabel {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(165,180,252,0.7);
+  margin: 0;
 }
 
 .input {
   width: 100%;
+  box-sizing: border-box;
   border-radius: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  padding: 10px 12px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  padding: 10px 14px;
   font-size: 14px;
-  color: var(--color-text);
+  color: #fff;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  font-family: inherit;
+}
+
+.input::placeholder { color: rgba(255,255,255,0.3); }
+
+.input:focus {
+  border-color: rgba(88,101,242,0.55);
+  box-shadow: 0 0 0 3px rgba(88,101,242,0.14);
 }
 
 .hint {
   margin: 0;
-  color: var(--color-text-muted);
+  color: rgba(255,255,255,0.38);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .userList {
@@ -146,27 +481,38 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
-  max-height: 240px;
+  gap: 6px;
+  max-height: 220px;
   overflow: auto;
 }
 
 .userItem {
   width: 100%;
   text-align: left;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border: 1.5px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  font-family: inherit;
+  color: #fff;
+  transition: background 0.15s, border-color 0.15s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.userItem:hover {
+  background: rgba(88,101,242,0.1);
+  border-color: rgba(88,101,242,0.3);
+  transform: translateX(3px);
 }
 
 .userItemActive {
-  border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%);
+  border-color: rgba(88,101,242,0.6);
+  background: rgba(88,101,242,0.15);
+  box-shadow: 0 2px 12px rgba(88,101,242,0.2);
 }
 
 .userMeta {
@@ -176,17 +522,132 @@
 }
 
 .userName {
-  font-weight: 900;
+  font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 14px;
 }
 
 .userSub {
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: rgba(255,255,255,0.4);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.userCheckIcon {
+  color: #a5b4fc;
+  flex-shrink: 0;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  position: relative;
+  z-index: 1;
+}
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 28px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  color: #fff;
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 55%, #22d3ee 100%);
+  background-size: 200% auto;
+  box-shadow:
+    0 4px 20px rgba(88,101,242,0.48),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+  transition: background-position 0.4s, transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.22s;
+  letter-spacing: 0.01em;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background-position: right center;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow:
+    0 8px 30px rgba(88,101,242,0.62),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+}
+
+.btnPrimary:active:not(:disabled) { transform: translateY(-1px) scale(1.01); }
+.btnPrimary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  color: rgba(255,255,255,0.7);
+  background: transparent;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  transition: background 0.15s, border-color 0.15s, transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.btnSecondary:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.18);
+  transform: translateY(-1px);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GALAXY THEME OVERRIDES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:global([data-messages-theme="galaxy"]) .card {
+  background:
+    radial-gradient(ellipse 110% 70% at 50% 0%, rgba(88,101,242,0.22), transparent 65%),
+    rgba(5,3,14,0.94);
+  backdrop-filter: blur(32px) saturate(170%);
+  border-color: rgba(88,101,242,0.34);
+  box-shadow:
+    0 0 0 1px rgba(88,101,242,0.12) inset,
+    0 40px 110px rgba(0,0,0,0.75),
+    0 0 200px rgba(88,101,242,0.1);
+}
+
+:global([data-messages-theme="galaxy"]) .title {
+  background: linear-gradient(135deg, #fff 0%, #c4b5fd 45%, #7c3aed 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+:global([data-messages-theme="galaxy"]) .planCardActive {
+  border-color: rgba(88,101,242,0.8);
+  background:
+    linear-gradient(145deg, rgba(88,101,242,0.28), rgba(124,58,237,0.18) 60%, rgba(56,189,248,0.1)),
+    rgba(8,6,22,0.5);
+  box-shadow:
+    0 0 0 1px rgba(88,101,242,0.25) inset,
+    0 10px 50px rgba(88,101,242,0.38),
+    0 0 100px rgba(88,101,242,0.18);
+}
+
+:global([data-messages-theme="galaxy"]) .btnPrimary {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 55%, #06b6d4 100%);
+  box-shadow:
+    0 4px 24px rgba(88,101,242,0.58),
+    0 0 60px rgba(124,58,237,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.22);
+}

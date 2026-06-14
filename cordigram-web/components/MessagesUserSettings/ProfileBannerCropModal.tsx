@@ -13,6 +13,7 @@ type Props = {
   sourceFile: File | null;
   onClose: () => void;
   onSubmit: (file: File) => Promise<void>;
+  theme?: string;
 };
 
 async function getThumbDataUrl(
@@ -45,6 +46,7 @@ export default function ProfileBannerCropModal({
   sourceFile,
   onClose,
   onSubmit,
+  theme,
 }: Props) {
   const { t } = useLanguage();
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -110,6 +112,7 @@ export default function ProfileBannerCropModal({
     <div
       className={styles.overlay}
       role="presentation"
+      data-messages-theme={theme ?? "dark"}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !submitting) onClose();
       }}

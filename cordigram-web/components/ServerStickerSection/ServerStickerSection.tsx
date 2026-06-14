@@ -2,6 +2,27 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./ServerStickerSection.module.css";
+
+const IcoCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+const IcoLock = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
+const IcoDiamond = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 22 12 12 22 2 12"/>
+  </svg>
+);
+const IcoUpload = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+  </svg>
+);
 import * as serversApi from "@/lib/servers-api";
 import { fetchBoostStatus } from "@/lib/api";
 import AddServerStickerModal from "@/components/AddServerStickerModal/AddServerStickerModal";
@@ -285,7 +306,7 @@ export default function ServerStickerSection({
       <div className={styles.timeline}>
         <div className={styles.tierRow}>
           <div className={styles.rail}>
-            <div className={styles.railDot}>✓</div>
+            <div className={styles.railDot}><IcoCheck /></div>
             <div className={styles.railLine} />
           </div>
           <div className={styles.tierCard}>
@@ -306,7 +327,7 @@ export default function ServerStickerSection({
                 onChange={(e) => handlePick(e.target.files)}
               />
               <button type="button" className={styles.uploadBtn} disabled={remaining <= 0} onClick={() => inputRef.current?.click()}>
-                {t("chat.serverSticker.uploadBtn")}
+                <IcoUpload />{t("chat.serverSticker.uploadBtn")}
               </button>
             </div>
             <div className={styles.slotGrid} style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
@@ -315,9 +336,7 @@ export default function ServerStickerSection({
                   {st ? (
                     <img src={st.imageUrl} alt={st.name || ""} className={`${styles.slotImg} ${st.animated ? styles.slotImgAnim : ""}`} loading="lazy" />
                   ) : (
-                    <span className={styles.slotPh} aria-hidden>
-                      ◆
-                    </span>
+                    <span className={styles.slotPh} aria-hidden><IcoDiamond /></span>
                   )}
                 </div>
               ))}
@@ -339,7 +358,7 @@ export default function ServerStickerSection({
           return (
             <div key={tier.level} className={styles.tierRow}>
               <div className={styles.rail}>
-                <div className={`${styles.railDot} ${unlocked ? "" : styles.railDotLocked}`}>{unlocked ? "✓" : "◆"}</div>
+                <div className={`${styles.railDot} ${unlocked ? "" : styles.railDotLocked}`}>{unlocked ? <IcoCheck /> : <IcoLock />}</div>
                 <div className={styles.railLine} />
               </div>
               <div className={`${styles.tierCard} ${unlocked ? styles.tierCardOpen : styles.tierCardLocked}`}>
@@ -349,18 +368,16 @@ export default function ServerStickerSection({
                     <p className={styles.tierSub}>{tierSubFor(tier.level, unlocked)}</p>
                   </div>
                   {unlocked ? (
-                    <div className={styles.tierMetaUnlocked} aria-hidden>
-                      ✓
-                    </div>
+                    <div className={styles.tierMetaUnlocked} aria-hidden><IcoCheck /></div>
                   ) : (
                     <div className={styles.tierMeta}>
                       <span>{t("chat.serverSticker.boosts").replace("{n}", String(tier.boosts))}</span>
-                      <span aria-hidden>🔒</span>
+                      <IcoLock />
                     </div>
                   )}
                 </div>
                 <div className={unlocked ? styles.unlockedBody : styles.lockedBody}>
-                  <div className={unlocked ? styles.unlockedPh : styles.lockedPh}>◇</div>
+                  <div className={unlocked ? styles.unlockedPh : styles.lockedPh}><IcoDiamond /></div>
                   <div>{tier.bonus}</div>
                   <button type="button" className={unlocked ? styles.btnIncluded : styles.btnFake} disabled>
                     {unlocked ? t("chat.serverSticker.includedBtn") : t("chat.serverSticker.buyBtn")}

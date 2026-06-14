@@ -26,6 +26,8 @@ type Props = {
   onToast?: (message: string) => void;
   /** Gọi khi draft đổi (debounce) để cập nhật DM/sidebar không cần lưu API. */
   onDraftPreview?: (next: DisplayNameStyleValue) => void;
+  /** Current messages shell theme — sets data-messages-theme for CSS gating. */
+  theme?: string;
 };
 
 const DEFAULT_VALUE: DisplayNameStyleValue = {
@@ -70,6 +72,7 @@ export default function DisplayNameStyleModal({
   onChange,
   onToast,
   onDraftPreview,
+  theme,
 }: Props) {
   const { t } = useLanguage();
   const [draft, setDraft] = useState<DisplayNameStyleValue>(value || DEFAULT_VALUE);
@@ -109,6 +112,7 @@ export default function DisplayNameStyleModal({
     <div
       className={styles.backdrop}
       role="presentation"
+      data-messages-theme={theme ?? "dark"}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) handleCancel();
       }}
@@ -129,7 +133,10 @@ export default function DisplayNameStyleModal({
             aria-label={t("chat.displayNameStyleModal.closeAria")}
             onClick={handleCancel}
           >
-            ×
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
 

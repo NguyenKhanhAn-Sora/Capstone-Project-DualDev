@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:convert';
 import '../../core/config/app_config.dart';
@@ -123,8 +124,14 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
       for (final f in _files) {
         final bytes = await f.xFile.readAsBytes();
+        final mime = f.xFile.mimeType ?? _mimeFromExtension(f.name);
         request.files.add(
-          http.MultipartFile.fromBytes('files', bytes, filename: f.name),
+          http.MultipartFile.fromBytes(
+            'files',
+            bytes,
+            filename: f.name,
+            contentType: MediaType.parse(mime),
+          ),
         );
       }
 
@@ -206,6 +213,25 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         }
       });
     });
+  }
+
+  static String _mimeFromExtension(String filename) {
+    final ext = filename.split('.').last.toLowerCase();
+    const map = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'heic': 'image/heic',
+      'heif': 'image/heif',
+      'mp4': 'video/mp4',
+      'mov': 'video/quicktime',
+      'avi': 'video/x-msvideo',
+      'mkv': 'video/x-matroska',
+      'webm': 'video/webm',
+    };
+    return map[ext] ?? 'application/octet-stream';
   }
 
   void _clear() {

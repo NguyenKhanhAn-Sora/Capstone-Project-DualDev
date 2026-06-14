@@ -1177,14 +1177,14 @@ class _ItemPageState extends State<_ItemPage> {
       } else {
         await PostInteractionService.save(id);
       }
-      _showSnack(before ? 'Removed from saved' : 'Saved');
+      _showSnack(before ? LanguageController.instance.t('reels.snack.removedFromSaved') : LanguageController.instance.t('reels.snack.saved'));
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _saved = before;
         if (stats != null) stats['saves'] = prevSaves;
       });
-      _showSnack('Failed to update save', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.saveError'), error: true);
     }
   }
 
@@ -1228,7 +1228,7 @@ class _ItemPageState extends State<_ItemPage> {
   Future<void> _onRepostTap() async {
     final token = AuthStorage.accessToken;
     if (token == null) {
-      _showSnack('Please sign in to repost', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.signInToRepost'), error: true);
       return;
     }
 
@@ -1265,20 +1265,20 @@ class _ItemPageState extends State<_ItemPage> {
       try {
         await PostInteractionService.quickRepost(originalId);
         _incrementRepostStat(normalized['stats']);
-        _showSnack('Reposted');
+        _showSnack(LanguageController.instance.t('reels.snack.reposted'));
       } on ApiException catch (e) {
         try {
           await PostInteractionService.repost(originalId);
           _incrementRepostStat(normalized['stats']);
-          _showSnack('Reposted');
+          _showSnack(LanguageController.instance.t('reels.snack.reposted'));
         } catch (_) {
           _showSnack(
-            e.message.isNotEmpty ? e.message : 'Failed to repost',
+            e.message.isNotEmpty ? e.message : LanguageController.instance.t('reels.snack.repostError'),
             error: true,
           );
         }
       } catch (_) {
-        _showSnack('Failed to repost', error: true);
+        _showSnack(LanguageController.instance.t('reels.snack.repostError'), error: true);
       }
       return;
     }
@@ -1303,14 +1303,14 @@ class _ItemPageState extends State<_ItemPage> {
         kind: kind,
       );
       _incrementRepostStat(normalized['stats']);
-      _showSnack('Reposted with quote');
+      _showSnack(LanguageController.instance.t('reels.snack.repostedWithQuote'));
     } on ApiException catch (e) {
       _showSnack(
-        e.message.isNotEmpty ? e.message : 'Failed to repost with quote',
+        e.message.isNotEmpty ? e.message : LanguageController.instance.t('reels.snack.repostWithQuoteError'),
         error: true,
       );
     } catch (_) {
-      _showSnack('Failed to repost with quote', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.repostWithQuoteError'), error: true);
     }
   }
 
@@ -1328,7 +1328,7 @@ class _ItemPageState extends State<_ItemPage> {
         .toList();
 
     if (!allowDownload || media == null || media.isEmpty) {
-      _showSnack('Download is disabled for this reel', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.downloadDisabled'), error: true);
       return;
     }
 
@@ -1338,7 +1338,7 @@ class _ItemPageState extends State<_ItemPage> {
     );
     final url = (chosen['url'] as String?) ?? '';
     if (url.isEmpty) {
-      _showSnack('Failed to download reel', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.downloadError'), error: true);
       return;
     }
 
@@ -1355,9 +1355,9 @@ class _ItemPageState extends State<_ItemPage> {
       final filename = _buildFilename(url, chosen['type'] as String?, bytes);
       final file = File('${dir.path}${Platform.pathSeparator}$filename');
       await file.writeAsBytes(bytes, flush: true);
-      _showSnack('Downloaded: ${file.path}');
+      _showSnack(LanguageController.instance.t('reels.snack.downloaded', {'path': file.path}));
     } catch (_) {
-      _showSnack('Failed to download reel', error: true);
+      _showSnack(LanguageController.instance.t('reels.snack.downloadError'), error: true);
     }
   }
 
@@ -1430,7 +1430,7 @@ class _ItemPageState extends State<_ItemPage> {
           widget.item['hideLikeCount'] = updated.hideLikeCount;
           widget.item['visibility'] = updated.visibility;
         });
-        _showSnack('Reel updated');
+        _showSnack(LanguageController.instance.t('reels.snack.reelUpdated'));
         return;
       case PostMenuAction.editVisibility:
         final currentVisibility =
@@ -1442,7 +1442,7 @@ class _ItemPageState extends State<_ItemPage> {
         );
         if (nextVisibility == null || !mounted) return;
         setState(() => widget.item['visibility'] = nextVisibility);
-        _showSnack('Visibility updated');
+        _showSnack(LanguageController.instance.t('reels.snack.visibilityUpdated'));
         return;
       case PostMenuAction.toggleComments:
         final currentAllowed = !_asBool(normalized['allowComments'])
@@ -1453,12 +1453,12 @@ class _ItemPageState extends State<_ItemPage> {
         try {
           await PostInteractionService.setAllowComments(id, nextAllowed);
           _showSnack(
-            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+            nextAllowed ? LanguageController.instance.t('reels.snack.commentsOn') : LanguageController.instance.t('reels.snack.commentsOff'),
           );
         } catch (_) {
           if (!mounted) return;
           setState(() => widget.item['allowComments'] = currentAllowed);
-          _showSnack('Failed to update comments', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.commentsError'), error: true);
         }
         return;
       case PostMenuAction.toggleHideLike:
@@ -1467,18 +1467,18 @@ class _ItemPageState extends State<_ItemPage> {
         setState(() => widget.item['hideLikeCount'] = nextHidden);
         try {
           await PostInteractionService.setHideLikeCount(id, nextHidden);
-          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+          _showSnack(nextHidden ? LanguageController.instance.t('reels.snack.likeHidden') : LanguageController.instance.t('reels.snack.likeVisible'));
         } catch (_) {
           if (!mounted) return;
           setState(() => widget.item['hideLikeCount'] = currentHidden);
-          _showSnack('Failed to update like visibility', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.likeError'), error: true);
         }
         return;
       case PostMenuAction.copyLink:
         await Clipboard.setData(
           ClipboardData(text: PostInteractionService.reelPermalink(id)),
         );
-        _showSnack('Link copied');
+        _showSnack(LanguageController.instance.t('reels.snack.linkCopied'));
         return;
       case PostMenuAction.muteNotifications:
         final muted = await showPostMuteOverlay(
@@ -1486,25 +1486,25 @@ class _ItemPageState extends State<_ItemPage> {
           postId: id,
           kindLabel: 'reel',
         );
-        if (muted) _showSnack('Reel notifications muted');
+        if (muted) _showSnack(LanguageController.instance.t('reels.snack.notificationsMuted'));
         return;
       case PostMenuAction.deletePost:
         final confirmed = await showPostConfirmDialog(
           context,
           title: LanguageController.instance.t('profile.itemViewer.deleteReel.title'),
           message: LanguageController.instance.t('common.cannotUndo'),
-          confirmLabel: 'Delete',
+          confirmLabel: LanguageController.instance.t('common.delete'),
           danger: true,
         );
         if (confirmed != true) return;
         try {
           await PostInteractionService.deletePost(id);
-          _showSnack('Reel deleted');
+          _showSnack(LanguageController.instance.t('reels.snack.reelDeleted'));
           if (mounted) {
             Navigator.of(context).pop({'deletedPostId': id});
           }
         } catch (_) {
-          _showSnack('Failed to delete reel', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.deleteError'), error: true);
         }
         return;
       case PostMenuAction.followToggle:
@@ -1514,16 +1514,16 @@ class _ItemPageState extends State<_ItemPage> {
       case PostMenuAction.hidePost:
         try {
           await PostInteractionService.hide(id);
-          _showSnack('Reel hidden');
+          _showSnack(LanguageController.instance.t('reels.snack.reelHidden'));
           if (mounted) Navigator.of(context).pop();
         } catch (_) {
-          _showSnack('Failed to hide reel', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.hideError'), error: true);
         }
         return;
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack('Please sign in first', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.signInFirst'), error: true);
           return;
         }
         final reported = await showReportPostSheet(
@@ -1532,7 +1532,7 @@ class _ItemPageState extends State<_ItemPage> {
           authHeader: {'Authorization': 'Bearer $token'},
           subjectLabel: 'reel',
         );
-        if (reported) _showSnack('Report submitted');
+        if (reported) _showSnack(LanguageController.instance.t('reels.reportSubmitted'));
         return;
       case PostMenuAction.blockAccount:
         final author = _asStringKeyMap(normalized['author']);
@@ -1547,21 +1547,30 @@ class _ItemPageState extends State<_ItemPage> {
           context,
           title: LanguageController.instance.t('profile.itemViewer.blockUser.title', {'username': username}),
           message: LanguageController.instance.t('profile.itemViewer.blockUser.message'),
-          confirmLabel: 'Block',
+          confirmLabel: LanguageController.instance.t('common.block'),
           danger: true,
         );
         if (confirmed != true) return;
         try {
           await PostInteractionService.blockUser(userId);
-          _showSnack('Account blocked');
+          _showSnack(LanguageController.instance.t('reels.snack.accountBlocked'));
           if (mounted) Navigator.of(context).pop();
         } catch (_) {
-          _showSnack('Failed to block account', error: true);
+          _showSnack(LanguageController.instance.t('reels.snack.blockError'), error: true);
         }
         return;
       case PostMenuAction.goToAdsPost:
       case PostMenuAction.detailAds:
-        _showSnack('Ads actions are only available in Home feed', error: true);
+        _showSnack(LanguageController.instance.t('reels.snack.adsNotAvailable'), error: true);
+        return;
+      case PostMenuAction.seeLikes:
+        if (!mounted) return;
+        showPostLikesSheet(
+          context,
+          postId: id,
+          viewerId: widget.viewerId,
+          title: LanguageController.instance.t('post.menu.seeLikes'),
+        );
         return;
     }
   }
@@ -1604,12 +1613,12 @@ class _ItemPageState extends State<_ItemPage> {
       ));
       entries.add((
         id: 'toggleComments',
-        label: allowComments ? 'Turn off comments' : 'Turn on comments',
+        label: allowComments ? lc.t('reels.menu.commentsOff') : lc.t('reels.menu.commentsOn'),
         danger: false,
       ));
       entries.add((
         id: 'toggleHideLike',
-        label: hideLike ? 'Show like' : 'Hide like',
+        label: hideLike ? lc.t('reels.menu.showLike') : lc.t('reels.menu.hideLike'),
         danger: false,
       ));
       entries.add((id: 'muteReel', label: lc.t('profile.itemViewer.menu.muteReel'), danger: false));
@@ -1633,12 +1642,12 @@ class _ItemPageState extends State<_ItemPage> {
       entries.add((id: 'copyLink', label: lc.t('profile.itemViewer.menu.copyLink'), danger: false));
       entries.add((
         id: 'followToggle',
-        label: _following ? 'Unfollow' : 'Follow',
+        label: _following ? lc.t('reels.menu.unfollow') : lc.t('reels.menu.follow'),
         danger: false,
       ));
       entries.add((
         id: 'saveToggle',
-        label: _saved ? 'Unsave this reel' : 'Save this reel',
+        label: _saved ? lc.t('reels.menu.unsaveReel') : lc.t('reels.menu.saveReel'),
         danger: false,
       ));
       entries.add((id: 'hideReel', label: lc.t('profile.itemViewer.menu.hideReel'), danger: false));
@@ -1765,7 +1774,7 @@ class _ItemPageState extends State<_ItemPage> {
     );
     final commentsLocked = normalized['allowComments'] == false;
     if (commentsLocked) {
-      _showSnack('Comments are turned off for this reel');
+      _showSnack(LanguageController.instance.t('reels.commentsTurnedOff'));
       return;
     }
 
@@ -2283,7 +2292,7 @@ class _ItemPageState extends State<_ItemPage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            _following ? 'Following' : 'Follow',
+                            _following ? LanguageController.instance.t('reels.following') : LanguageController.instance.t('reels.follow'),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,

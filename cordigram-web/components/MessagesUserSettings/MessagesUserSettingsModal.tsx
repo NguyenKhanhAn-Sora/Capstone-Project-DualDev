@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import styles from "./MessagesUserSettingsModal.module.css";
+import GalaxySelect from "@/components/GalaxySelect/GalaxySelect";
 import { useLanguage } from "@/component/language-provider";
 import {
   clearMessagesShellThemeOverride,
@@ -205,11 +206,13 @@ export default function MessagesUserSettingsModal({
     setMessagesShellTheme(getMessagesShellTheme());
   }, [open, currentUserId]);
 
-  const cardClass = `${styles.card} ${
-    messagesShellTheme === "dark" || messagesShellTheme === "galaxy"
-      ? styles.cardDark
-      : ""
-  }`;
+  const isGalaxy = messagesShellTheme === "galaxy";
+  const isLight = messagesShellTheme === "light";
+  const cardClass = [
+    styles.card,
+    isGalaxy ? styles.cardGalaxy : "",
+    isLight ? styles.cardLight : "",
+  ].filter(Boolean).join(" ");
 
   const loadCore = useCallback(async () => {
     try {
@@ -287,35 +290,56 @@ export default function MessagesUserSettingsModal({
     }
   };
 
+  const navIcons: Record<string, React.ReactNode> = {
+    general: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    ),
+    privacy: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    ),
+    messages: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    ),
+    appearance: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor"/>
+        <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor"/>
+        <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor"/>
+        <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor"/>
+        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10a1 1 0 0 0 1-1c0-.5-.2-1-.4-1.4a.9.9 0 0 1 .7-1.6H16a4 4 0 0 0 4-4C20 6.3 16.4 2 12 2z"/>
+      </svg>
+    ),
+    notifications: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+    ),
+    profile: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    ),
+  };
+
   const nav = useMemo(
     () =>
       [
-        {
-          id: "general" as const,
-          label: t("settings.sections.general"),
-          icon: "⚙",
-        },
-        {
-          id: "privacy" as const,
-          label: t("settings.sections.privacy"),
-          icon: "🔒",
-        },
-        {
-          id: "messages" as const,
-          label: t("settings.sections.messages"),
-          icon: "💬",
-        },
-        {
-          id: "appearance" as const,
-          label: t("settings.sections.appearance"),
-          icon: "🎨",
-        },
-        {
-          id: "notifications" as const,
-          label: t("settings.sections.notifications"),
-          icon: "🔔",
-        },
-        { id: "profile" as const, label: t("settings.sections.profile"), icon: "👤" },
+        { id: "general" as const,       label: t("settings.sections.general") },
+        { id: "privacy" as const,        label: t("settings.sections.privacy") },
+        { id: "messages" as const,       label: t("settings.sections.messages") },
+        { id: "appearance" as const,     label: t("settings.sections.appearance") },
+        { id: "notifications" as const,  label: t("settings.sections.notifications") },
+        { id: "profile" as const,        label: t("settings.sections.profile") },
       ] as const,
     [t],
   );
@@ -345,7 +369,7 @@ export default function MessagesUserSettingsModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={cardClass} onMouseDown={(e) => e.stopPropagation()}>
+      <div className={cardClass} data-messages-theme={messagesShellTheme} onMouseDown={(e) => e.stopPropagation()}>
         <aside className={styles.sidebar}>
           <h2 className={styles.sidebarTitle}>{t("settings.title")}</h2>
           {nav.map((item) => (
@@ -355,7 +379,7 @@ export default function MessagesUserSettingsModal({
               className={`${styles.navBtn} ${section === item.id ? styles.navActive : ""}`}
               onClick={() => setSection(item.id)}
             >
-              <span aria-hidden>{item.icon}</span>
+              <span className={styles.navIcon} aria-hidden>{navIcons[item.id]}</span>
               {item.label}
             </button>
           ))}
@@ -368,7 +392,10 @@ export default function MessagesUserSettingsModal({
               aria-label={t("settings.close")}
               onClick={onClose}
             >
-              ×
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
             </button>
           </div>
           <div className={styles.body}>
@@ -419,26 +446,17 @@ export default function MessagesUserSettingsModal({
                     <span className={styles.rowLabel}>
                       {t("settings.general.languageLabel")}
                     </span>
-                    <select
-                      className={styles.select}
+                    <GalaxySelect
+                      style={{ minWidth: 180 }}
                       value={language}
-                      onChange={(e) =>
-                        setLanguage(e.target.value as any)
-                      }
-                    >
-                      <option value="vi">
-                        {t("settings.general.languageNames.vi")}
-                      </option>
-                      <option value="en">
-                        {t("settings.general.languageNames.en")}
-                      </option>
-                      <option value="ja">
-                        {t("settings.general.languageNames.ja")}
-                      </option>
-                      <option value="zh">
-                        {t("settings.general.languageNames.zh")}
-                      </option>
-                    </select>
+                      onChange={(val) => setLanguage(val as any)}
+                      options={[
+                        { value: "vi", label: t("settings.general.languageNames.vi") },
+                        { value: "en", label: t("settings.general.languageNames.en") },
+                        { value: "ja", label: t("settings.general.languageNames.ja") },
+                        { value: "zh", label: t("settings.general.languageNames.zh") },
+                      ]}
+                    />
                   </div>
                 </div>
               </>
@@ -506,43 +524,34 @@ export default function MessagesUserSettingsModal({
                   <label className={styles.fieldLabel}>
                     {t("settings.messages.allowMessageLabel")}
                   </label>
-                  <select
-                    className={styles.select}
-                    style={{ width: "100%", marginBottom: 12 }}
+                  <GalaxySelect
+                    style={{ marginBottom: 12 }}
                     value={userSettings?.dmListFrom ?? "everyone"}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       void saveUserPatch({
-                        dmListFrom: e.target.value as
-                          | "everyone"
-                          | "followers_only",
+                        dmListFrom: val as "everyone" | "followers_only",
                       })
                     }
-                  >
-                    <option value="everyone">{t("settings.messages.everyone")}</option>
-                    <option value="followers_only">
-                      {t("settings.messages.followersOnly")}
-                    </option>
-                  </select>
+                    options={[
+                      { value: "everyone",        label: t("settings.messages.everyone") },
+                      { value: "followers_only",  label: t("settings.messages.followersOnly") },
+                    ]}
+                  />
                   <label className={styles.fieldLabel}>
                     {t("settings.messages.allowCallLabel")}
                   </label>
-                  <select
-                    className={styles.select}
-                    style={{ width: "100%" }}
+                  <GalaxySelect
                     value={userSettings?.dmCallFrom ?? "everyone"}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       void saveUserPatch({
-                        dmCallFrom: e.target.value as
-                          | "everyone"
-                          | "followers_only",
+                        dmCallFrom: val as "everyone" | "followers_only",
                       })
                     }
-                  >
-                    <option value="everyone">{t("settings.messages.everyone")}</option>
-                    <option value="followers_only">
-                      {t("settings.messages.followersOnly")}
-                    </option>
-                  </select>
+                    options={[
+                      { value: "everyone",        label: t("settings.messages.everyone") },
+                      { value: "followers_only",  label: t("settings.messages.followersOnly") },
+                    ]}
+                  />
                 </div>
                 <h3 className={styles.sectionTitle}>
                   {t("settings.messages.blockTitle")}
@@ -566,7 +575,6 @@ export default function MessagesUserSettingsModal({
                       <button
                         type="button"
                         className={styles.smallBtnGhost}
-                        style={{ background: "#4e5058" }}
                         onClick={() => setListOpen("none")}
                       >
                         {t("settings.close")}
@@ -884,6 +892,7 @@ export default function MessagesUserSettingsModal({
                   servers={servers}
                   onToast={onToast}
                   boostUnlocked={boostUnlocked}
+                  theme={messagesShellTheme}
                 />
               </>
             ) : null}

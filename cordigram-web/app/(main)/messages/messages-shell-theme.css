@@ -73,45 +73,66 @@
   --color-voice-received: #e8ecf4;
   --color-voice-received-hover: #dde3ef;
   --color-voice-received-text: #1a2035;
+
+  /* ── GALAXY EXTRAS (light — subtle) ── */
+  --nebula-1: rgba(124, 58, 237, 0.04);
+  --nebula-2: rgba(14, 165, 233, 0.03);
+  --nebula-3: rgba(34, 211, 238, 0.02);
+  --cosmic-glow: none;
+  --cosmic-glow-sm: none;
 }
 
+/* ═══════════════════════════════════════════════════
+   GALAXY DARK — Aligned with Cordigram design system
+   Colors: cosmic-violet · electric-blue · deep-space
+   ═══════════════════════════════════════════════════ */
 #cordigram-messages-root[data-messages-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #0c1220;
-  --color-surface: #0f172a;
-  --color-surface-muted: #131c31;
-  --color-border: #1f2a3d;
-  --color-text: #e5e7ef;
-  --color-text-muted: #98a3c7;
-  --color-overlay: rgba(5, 8, 16, 0.65);
+
+  /* ── GALAXY FOUNDATION ── */
+  --color-bg: #060810;
+  --color-surface: rgba(9, 12, 24, 0.98);
+  --color-surface-muted: rgba(12, 16, 32, 0.98);
+  --color-border: rgba(124, 58, 237, 0.16);
+  --color-text: #dde2f0;
+  --color-text-muted: #7a8db8;
+  --color-overlay: rgba(4, 5, 15, 0.72);
+
+  /* ── ACCENT (Cordigram galaxy palette) ── */
   --accent-color: #5865f2;
   --accent-hover: #4752c4;
   --accent-active: #3d46a5;
   --accent-soft: rgba(88, 101, 242, 0.18);
   --color-on-accent: #ffffff;
+
+  /* ── PRIMARY ── */
+  --color-primary: #5865f2;
+  --color-primary-strong: #4752c4;
+  --color-primary-accent: #3d46a5;
+
+  /* ── MISC ── */
   --color-button-x: #ffffff;
-  --color-border-button-x: #434f65;
-  --color-primary: #559ac2;
-  --color-primary-strong: #2b74b0;
-  --color-primary-accent: #1b5f9d;
-  --shadow-strong: 0 24px 80px rgba(0, 0, 0, 0.45);
-  --gradient-surface: linear-gradient(135deg, #111b30, #0c1220);
-  --color-title-primary: #e5e7ef;
-  --color-bg-home: #0c1220;
-  --color-scrollbar-thumb: #293653;
-  --color-background-stat-reel: #ffffff0f;
-  --color-panel-bg: #313338;
-  --color-panel-sidebar: #2b2d31;
-  --color-panel-sidebar-border: #1e1f22;
-  --color-panel-hover: #35373c;
-  --color-panel-active: #404249;
-  --color-panel-text: #f2f3f5;
-  --color-panel-text-muted: #b5bac1;
-  --color-panel-text-faint: #949ba4;
-  --color-panel-border: #3f4147;
-  --color-panel-deep: #1e1f22;
-  --color-panel-deep-border: #383a40;
-  --color-panel-context: #111214;
+  --color-border-button-x: rgba(124, 58, 237, 0.35);
+  --shadow-strong: 0 24px 80px rgba(0, 0, 0, 0.7), 0 0 60px rgba(124, 58, 237, 0.06);
+  --gradient-surface: linear-gradient(135deg, rgba(12, 16, 32, 0.98), rgba(6, 8, 16, 0.98));
+  --color-title-primary: #dde2f0;
+  --color-bg-home: #060810;
+  --color-scrollbar-thumb: rgba(124, 58, 237, 0.25);
+  --color-background-stat-reel: rgba(255, 255, 255, 0.05);
+
+  /* ── PANEL TOKENS ── */
+  --color-panel-bg: rgba(10, 13, 28, 0.98);
+  --color-panel-sidebar: rgba(7, 9, 20, 0.98);
+  --color-panel-sidebar-border: rgba(124, 58, 237, 0.16);
+  --color-panel-hover: rgba(124, 58, 237, 0.09);
+  --color-panel-active: rgba(88, 101, 242, 0.18);
+  --color-panel-text: #dde2f0;
+  --color-panel-text-muted: #7a8db8;
+  --color-panel-text-faint: #4a5878;
+  --color-panel-border: rgba(124, 58, 237, 0.16);
+  --color-panel-deep: rgba(4, 6, 14, 0.98);
+  --color-panel-deep-border: rgba(100, 40, 210, 0.18);
+  --color-panel-context: rgba(4, 5, 12, 0.98);
   --color-panel-accent: #5865f2;
   --color-panel-accent-hover: #4752c4;
   --color-panel-danger: #f23f43;
@@ -119,38 +140,52 @@
   --color-panel-warning: #fee75c;
   --color-panel-success: #23a55a;
   --color-panel-success-hover: #1a7d45;
-  --color-panel-neutral: #4e5058;
-  --color-panel-neutral-hover: #5d6069;
-  --color-chat-received: #182236;
-  --color-chat-received-hover: #1e2c44;
-  --color-chat-overlay: rgba(4, 8, 18, 0.72);
-  --color-chat-modal: #15203a;
-  --color-chat-modal-border: #243347;
-  --color-chat-input: #101828;
-  --color-chat-input-border: #243347;
-  --color-chat-hover: #1c2b42;
+  --color-panel-neutral: rgba(124, 58, 237, 0.18);
+  --color-panel-neutral-hover: rgba(124, 58, 237, 0.28);
+
+  /* ── CHAT TOKENS ── */
+  --color-chat-received: rgba(14, 18, 38, 0.82);
+  --color-chat-received-hover: rgba(18, 24, 52, 0.88);
+  --color-chat-overlay: rgba(4, 5, 15, 0.75);
+  --color-chat-modal: rgba(9, 12, 26, 0.97);
+  --color-chat-modal-border: rgba(124, 58, 237, 0.22);
+  --color-chat-input: rgba(7, 9, 22, 0.88);
+  --color-chat-input-border: rgba(100, 60, 220, 0.24);
+  --color-chat-hover: rgba(124, 58, 237, 0.07);
   --color-chat-text-strong: #dde2f0;
-  --color-chat-text-secondary: #8799bf;
-  --color-chat-accent: #4a9eff;
+  --color-chat-text-secondary: #7a8db8;
+  --color-chat-accent: #5865f2;
   --color-chat-danger: #f06060;
   --color-chat-danger-hover: #da4848;
-  --color-chat-spinner-track: #253449;
-  --color-chat-empty: #5e728f;
-  --color-chat-read: #4a9eff;
-  --color-chat-typing-bg: rgba(255, 255, 255, 0.05);
-  --color-chat-typing-border: rgba(255, 255, 255, 0.1);
+  --color-chat-spinner-track: rgba(124, 58, 237, 0.22);
+  --color-chat-empty: #4a5878;
+  --color-chat-read: #5865f2;
+  --color-chat-typing-bg: rgba(88, 101, 242, 0.07);
+  --color-chat-typing-border: rgba(88, 101, 242, 0.15);
+
+  /* ── VOICE ── */
   --color-voice-sent: #5865f2;
   --color-voice-sent-hover: #4752c4;
-  --color-voice-received: #182236;
-  --color-voice-received-hover: #1e2c44;
+  --color-voice-received: rgba(14, 18, 38, 0.82);
+  --color-voice-received-hover: rgba(18, 24, 52, 0.88);
   --color-voice-received-text: #dde2f0;
+
+  /* ── GALAXY EXTRAS ── */
+  --nebula-1: rgba(124, 58, 237, 0.13);
+  --nebula-2: rgba(14, 165, 233, 0.09);
+  --nebula-3: rgba(34, 211, 238, 0.06);
+  --cosmic-glow: 0 0 24px rgba(124, 58, 237, 0.22), 0 0 12px rgba(14, 165, 233, 0.12);
+  --cosmic-glow-sm: 0 0 12px rgba(124, 58, 237, 0.2);
+  --cosmic-glow-accent: 0 0 20px rgba(88, 101, 242, 0.4), 0 0 8px rgba(124, 58, 237, 0.25);
+  --glass-bg: rgba(9, 12, 28, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.06);
 }
 
 #cordigram-messages-root[data-messages-theme="galaxy"] {
   color-scheme: dark;
   --color-bg: transparent;
-  --color-surface: rgba(12, 18, 32, 0.78);
-  --color-surface-muted: rgba(16, 24, 42, 0.82);
+  --color-surface: rgba(8, 12, 26, 0.55);
+  --color-surface-muted: rgba(10, 14, 30, 0.62);
   --color-border: rgba(31, 42, 61, 0.75);
   --color-text: #e5e7ef;
   --color-text-muted: #98a3c7;
@@ -172,15 +207,15 @@
   --user-appearance-bg: transparent;
   --color-scrollbar-thumb: #293653;
   --color-background-stat-reel: #ffffff0f;
-  --color-panel-bg: rgba(49, 51, 56, 0.82);
-  --color-panel-sidebar: rgba(43, 45, 49, 0.88);
-  --color-panel-sidebar-border: rgba(30, 31, 34, 0.88);
-  --color-panel-hover: rgba(53, 55, 60, 0.85);
-  --color-panel-active: rgba(64, 66, 73, 0.9);
+  --color-panel-bg: rgba(10, 12, 28, 0.58);
+  --color-panel-sidebar: rgba(6, 8, 18, 0.65);
+  --color-panel-sidebar-border: rgba(124, 58, 237, 0.08);
+  --color-panel-hover: rgba(88, 101, 242, 0.10);
+  --color-panel-active: rgba(88, 101, 242, 0.18);
   --color-panel-text: #f2f3f5;
   --color-panel-text-muted: #b5bac1;
   --color-panel-text-faint: #949ba4;
-  --color-panel-border: rgba(63, 65, 71, 0.8);
+  --color-panel-border: rgba(255, 255, 255, 0.05);
   --color-panel-deep: rgba(30, 31, 34, 0.9);
   --color-panel-deep-border: rgba(56, 58, 64, 0.85);
   --color-panel-context: rgba(17, 18, 20, 0.92);
@@ -193,13 +228,13 @@
   --color-panel-success-hover: #1a7d45;
   --color-panel-neutral: #4e5058;
   --color-panel-neutral-hover: #5d6069;
-  --color-chat-received: rgba(24, 34, 54, 0.82);
-  --color-chat-received-hover: rgba(30, 44, 68, 0.88);
+  --color-chat-received: rgba(12, 16, 36, 0.50);
+  --color-chat-received-hover: rgba(16, 22, 46, 0.62);
   --color-chat-overlay: rgba(4, 8, 18, 0.75);
-  --color-chat-modal: rgba(21, 32, 58, 0.9);
-  --color-chat-modal-border: rgba(36, 51, 71, 0.85);
-  --color-chat-input: rgba(16, 24, 40, 0.88);
-  --color-chat-input-border: rgba(36, 51, 71, 0.85);
+  --color-chat-modal: rgba(8, 12, 28, 0.72);
+  --color-chat-modal-border: rgba(124, 58, 237, 0.18);
+  --color-chat-input: rgba(8, 10, 22, 0.68);
+  --color-chat-input-border: rgba(124, 58, 237, 0.18);
   --color-chat-hover: rgba(28, 43, 66, 0.85);
   --color-chat-text-strong: #dde2f0;
   --color-chat-text-secondary: #8799bf;
@@ -213,9 +248,22 @@
   --color-chat-typing-border: rgba(255, 255, 255, 0.1);
   --color-voice-sent: #5865f2;
   --color-voice-sent-hover: #4752c4;
-  --color-voice-received: rgba(24, 34, 54, 0.82);
-  --color-voice-received-hover: rgba(30, 44, 68, 0.88);
+  --color-voice-received: rgba(12, 16, 36, 0.50);
+  --color-voice-received-hover: rgba(16, 22, 46, 0.62);
   --color-voice-received-text: #dde2f0;
+
+  /* ── GLASS / 3D depth tokens ── */
+  --glass-blur: blur(24px) saturate(180%);
+  --glass-blur-sm: blur(16px) saturate(160%);
+  --glass-blur-xs: blur(10px) saturate(140%);
+  --glass-bg-nav: rgba(5, 7, 14, 0.68);
+  --glass-bg-panel: rgba(8, 10, 22, 0.60);
+  --glass-bg-surface: rgba(10, 12, 26, 0.52);
+  --glass-border-hi: rgba(255, 255, 255, 0.07);
+  --glass-border-cosmic: rgba(124, 58, 237, 0.14);
+  --glass-inner-top: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --glass-inner-cosmic: inset 0 1px 0 rgba(124, 58, 237, 0.10);
+  --glass-outer-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 #cordigram-messages-root[data-messages-theme="light"],

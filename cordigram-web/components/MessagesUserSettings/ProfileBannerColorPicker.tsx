@@ -71,6 +71,7 @@ type Props = {
   valueHex: string;
   onChange: (hex: string) => void;
   onClose: () => void;
+  theme?: string;
 };
 
 export default function ProfileBannerColorPicker({
@@ -79,6 +80,7 @@ export default function ProfileBannerColorPicker({
   valueHex,
   onChange,
   onClose,
+  theme,
 }: Props) {
   const { t } = useLanguage();
   const svRef = useRef<HTMLDivElement>(null);
@@ -224,6 +226,7 @@ export default function ProfileBannerColorPicker({
         style={{ top, left }}
         role="dialog"
         aria-label={t("chat.profileEditor.changeBannerColorAria")}
+        data-messages-theme={theme ?? "dark"}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div

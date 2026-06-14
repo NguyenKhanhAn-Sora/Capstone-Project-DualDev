@@ -1,0 +1,386 @@
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+
+.wrap {
+  display: grid;
+  gap: 6px;
+}
+
+/* ── Error / feedback ────────────────────────────────────────────────────── */
+
+.errorBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(237, 66, 69, 0.08);
+  border: 1px solid rgba(237, 66, 69, 0.25);
+  border-radius: 10px;
+  color: #ed4245;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+/* ── Section ─────────────────────────────────────────────────────────────── */
+
+.sectionCard {
+  background: var(--color-panel-sidebar);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-panel-text-faint);
+}
+
+.sectionDesc {
+  margin: 0;
+  color: var(--color-panel-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* ── Checkbox row ────────────────────────────────────────────────────────── */
+
+.checkRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  background: var(--color-panel-deep);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.15s;
+}
+
+.checkRow:hover:not(.checkRowDisabled) {
+  border-color: var(--color-panel-deep-border);
+  background: var(--color-panel-hover);
+}
+
+.checkRowDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.checkLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-panel-text);
+  line-height: 1.4;
+  user-select: none;
+}
+
+/* ── Custom toggle ───────────────────────────────────────────────────────── */
+
+.toggle {
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(148, 155, 164, 0.28);
+  border: none;
+  cursor: inherit;
+  padding: 2px;
+  transition: background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  pointer-events: none;
+}
+
+.toggleOn {
+  background: var(--color-panel-accent);
+}
+
+.toggleThumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.toggleOn .toggleThumb {
+  transform: translateX(20px);
+}
+
+/* ── Field group (label + control) ──────────────────────────────────────── */
+
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-panel-text-muted);
+}
+
+/* ── Custom select ───────────────────────────────────────────────────────── */
+
+.selectWrap {
+  position: relative;
+}
+
+.selectBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-panel-deep);
+  border: 1.5px solid var(--color-panel-deep-border);
+  border-radius: 10px;
+  color: var(--color-panel-text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  font-family: inherit;
+}
+
+.selectBtn:hover:not(:disabled) {
+  border-color: var(--color-panel-accent);
+}
+
+.selectBtn:focus-visible {
+  outline: none;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-panel-accent) 18%, transparent);
+}
+
+.selectBtnOpen {
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-panel-accent) 18%, transparent);
+}
+
+.selectBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.selectChevron {
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s;
+}
+
+.selectBtnOpen .selectChevron,
+.selectBtn:hover:not(:disabled) .selectChevron {
+  opacity: 0.85;
+}
+
+.selectBtnOpen .selectChevron {
+  transform: rotate(180deg);
+}
+
+.selectDropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: var(--color-panel-context, var(--color-panel-bg));
+  border: 1.5px solid var(--color-panel-border);
+  border-radius: 10px;
+  padding: 5px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.28),
+    0 16px 40px rgba(0, 0, 0, 0.20);
+  animation: dropIn 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.selectOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: var(--color-panel-text);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.13s;
+}
+
+.selectOption:hover {
+  background: var(--color-panel-hover);
+}
+
+.selectOptionActive {
+  color: var(--color-panel-accent);
+  font-weight: 600;
+}
+
+.selectOptionActive::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-panel-accent);
+  margin-left: auto;
+  box-shadow: 0 0 6px color-mix(in oklab, var(--color-panel-accent) 60%, transparent);
+}
+
+/* ── Notif form ──────────────────────────────────────────────────────────── */
+
+.notifForm {
+  display: grid;
+  gap: 10px;
+}
+
+.sendBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-panel-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  justify-self: start;
+  transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
+}
+
+.sendBtn:hover:not(:disabled) {
+  background: var(--color-panel-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--color-panel-accent) 40%, transparent);
+}
+
+.sendBtn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.sendBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────────── */
+
+.loading {
+  color: var(--color-panel-text-muted);
+  font-size: 13px;
+  padding: 16px 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GALAXY THEME OVERRIDES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:global([data-messages-theme="galaxy"]) .sectionCard {
+  background: rgba(8, 10, 26, 0.55);
+  border-color: rgba(88, 101, 242, 0.12);
+}
+
+:global([data-messages-theme="galaxy"]) .sectionTitle {
+  color: rgba(124, 58, 237, 0.65);
+}
+
+:global([data-messages-theme="galaxy"]) .sectionDesc {
+  color: rgba(165, 180, 252, 0.50);
+}
+
+:global([data-messages-theme="galaxy"]) .checkRow {
+  background: rgba(6, 8, 20, 0.60);
+  border-color: rgba(88, 101, 242, 0.08);
+}
+
+:global([data-messages-theme="galaxy"]) .checkRow:hover:not(.checkRowDisabled) {
+  background: rgba(88, 101, 242, 0.08);
+  border-color: rgba(88, 101, 242, 0.16);
+}
+
+:global([data-messages-theme="galaxy"]) .checkLabel {
+  color: rgba(225, 232, 252, 0.88);
+}
+
+:global([data-messages-theme="galaxy"]) .toggleOn {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: 0 0 10px rgba(88, 101, 242, 0.35);
+}
+
+:global([data-messages-theme="galaxy"]) .fieldLabel {
+  color: rgba(124, 58, 237, 0.60);
+}
+
+:global([data-messages-theme="galaxy"]) .selectBtn {
+  background: rgba(6, 8, 20, 0.68);
+  border-color: rgba(88, 101, 242, 0.18);
+  color: rgba(225, 232, 252, 0.90);
+}
+
+:global([data-messages-theme="galaxy"]) .selectBtn:hover:not(:disabled) {
+  border-color: rgba(124, 58, 237, 0.45);
+}
+
+:global([data-messages-theme="galaxy"]) .selectBtnOpen {
+  border-color: rgba(124, 58, 237, 0.55);
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.14), 0 0 16px rgba(124, 58, 237, 0.08);
+}
+
+:global([data-messages-theme="galaxy"]) .selectDropdown {
+  background: rgba(8, 10, 24, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(88, 101, 242, 0.18);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.55),
+    0 20px 50px rgba(0, 0, 0, 0.40),
+    0 0 50px rgba(88, 101, 242, 0.06);
+}
+
+:global([data-messages-theme="galaxy"]) .selectOption {
+  color: rgba(225, 232, 252, 0.85);
+}
+
+:global([data-messages-theme="galaxy"]) .selectOption:hover {
+  background: rgba(88, 101, 242, 0.10);
+}
+
+:global([data-messages-theme="galaxy"]) .selectOptionActive {
+  color: #a5b4fc;
+}
+
+:global([data-messages-theme="galaxy"]) .sendBtn {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: 0 2px 12px rgba(88, 101, 242, 0.35);
+}
+
+:global([data-messages-theme="galaxy"]) .sendBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4752c4 0%, #6d28d9 100%);
+  box-shadow: 0 4px 18px rgba(88, 101, 242, 0.52), 0 0 14px rgba(124, 58, 237, 0.28);
+}

@@ -6,6 +6,42 @@ import * as serversApi from "@/lib/servers-api";
 import styles from "./ServerAccessSection.module.css";
 import { useLanguage } from "@/component/language-provider";
 
+const IcoLock = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
+const IcoEnvelope = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+  </svg>
+);
+const IcoGlobe = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+);
+const IcoCheck = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+const IcoWarn = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+);
+const IcoX = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+const IcoGear = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+
 type AccessMode = "invite_only" | "apply" | "discoverable";
 type RuleRow = { id: string; content: string };
 type JoinFormQuestionType = "short" | "paragraph" | "multiple_choice";
@@ -360,52 +396,48 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
       <section>
         <div className={styles.cardGrid} style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
           <button type="button" className={`${styles.cardBtn} ${accessMode === "invite_only" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => setAccessMode("invite_only")}>
-            <div style={{ fontSize: 24, marginBottom: 8 }}>🔒</div>
+            <div className={styles.cardIcon}><IcoLock /></div>
             <div className={styles.cardTitle}>{t("chat.serverAccess.inviteOnlyTitle")}</div>
             <div className={styles.cardHint}>{t("chat.serverAccess.inviteOnlyHint")}</div>
           </button>
           <button type="button" className={`${styles.cardBtn} ${accessMode === "apply" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => setAccessMode("apply")}>
-            <div style={{ fontSize: 24, marginBottom: 8 }}>✉️</div>
+            <div className={styles.cardIcon}><IcoEnvelope /></div>
             <div className={styles.cardTitle}>{t("chat.serverAccess.applyTitle")}</div>
             <div className={styles.cardHint}>{t("chat.serverAccess.applyHint")}</div>
           </button>
           <button type="button" className={`${styles.cardBtn} ${accessMode === "discoverable" ? styles.cardSelected : ""}`} disabled={!canEdit || saving} onClick={() => setAccessMode("discoverable")}>
-            <div style={{ fontSize: 24, marginBottom: 8 }}>🌐</div>
+            <div className={styles.cardIcon}><IcoGlobe /></div>
             <div className={styles.cardTitle}>{t("chat.serverAccess.discoverTitle")}</div>
             <div className={styles.cardHint}>{t("chat.serverAccess.discoverHint")}</div>
           </button>
         </div>
       </section>
 
-      <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 20, marginTop: 4 }}>
-        <div style={{ background: "var(--color-panel-deep)", border: "1px solid var(--color-panel-border)", borderRadius: 12, padding: "20px 24px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", background: discoveryEligible ? "rgba(35,165,90,0.15)" : "rgba(88,101,242,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
-              {discoveryEligible ? "✓" : "⚙"}
+      <section>
+        <div className={styles.discoveryPanel}>
+          <div className={styles.discoveryHeader}>
+            <div className={`${styles.discoveryStatusIcon} ${discoveryEligible ? styles.discoveryStatusIconPass : styles.discoveryStatusIconPending}`}>
+              {discoveryEligible ? <IcoCheck /> : <IcoGear />}
             </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-panel-text)" }}>
-                {discoveryEligible
-                  ? t("chat.serverAccess.discoveryMet")
-                  : t("chat.serverAccess.discoveryNotMet")}
-              </div>
+            <div className={styles.discoveryStatusText}>
+              {discoveryEligible
+                ? t("chat.serverAccess.discoveryMet")
+                : t("chat.serverAccess.discoveryNotMet")}
             </div>
           </div>
           {discoveryLoading && <div style={{ textAlign: "center", padding: 16, color: "var(--color-panel-text-muted)" }}>{t("chat.serverAccess.checkingDiscovery")}</div>}
           {!discoveryLoading && discoveryChecks.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <div className={styles.checkList}>
               {discoveryChecks.map((check) => {
                 const row = localizedDiscoveryCheck(check, t);
                 return (
-                <div key={check.id} style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "14px 0", borderTop: "1px solid var(--color-panel-border)" }}>
-                  <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800,
-                    background: check.passed ? "rgba(35,165,90,0.15)" : check.warning ? "rgba(254,231,92,0.15)" : "rgba(242,63,67,0.15)",
-                    color: check.passed ? "var(--color-panel-success)" : check.warning ? "var(--color-panel-warning)" : "var(--color-panel-danger)" }}>
-                    {check.passed ? "✓" : check.warning ? "!" : "✕"}
+                <div key={check.id} className={styles.checkRow}>
+                  <div className={`${styles.checkIcon} ${check.passed ? styles.checkIconPass : check.warning ? styles.checkIconWarn : styles.checkIconFail}`}>
+                    {check.passed ? <IcoCheck /> : check.warning ? <IcoWarn /> : <IcoX />}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--color-panel-text)" }}>{row.label}</div>
-                    <div style={{ fontSize: 13, color: "var(--color-panel-text-muted)", marginTop: 2, lineHeight: 1.45 }}>{row.description}</div>
+                  <div className={styles.checkBody}>
+                    <div className={styles.checkLabel}>{row.label}</div>
+                    <div className={styles.checkDesc}>{row.description}</div>
                   </div>
                 </div>
                 );
@@ -417,26 +449,30 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
 
       <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
         <div className={styles.toggleGrid}>
-          <label className={styles.toggleRow}>
+          <div className={styles.toggleRow} onClick={() => { if (canEdit && !saving) setIsAgeRestricted((v) => !v); }} style={{ cursor: canEdit && !saving ? "pointer" : "default" }}>
             <div className={styles.toggleLabel}>
               <div className={styles.toggleTitle}>{t("chat.serverAccess.ageTitle")}</div>
               <div className={styles.toggleDesc}>{t("chat.serverAccess.ageDesc")}</div>
             </div>
-            <input className={styles.toggleInput} type="checkbox" checked={isAgeRestricted} disabled={!canEdit || saving} onChange={(e) => { setIsAgeRestricted(e.target.checked); }} />
-          </label>
-          <label className={styles.toggleRow}>
+            <button type="button" className={styles.togglePill} data-on={String(isAgeRestricted)} disabled={!canEdit || saving} onClick={(e) => { e.stopPropagation(); if (canEdit && !saving) setIsAgeRestricted((v) => !v); }}>
+              <span className={styles.toggleThumb} />
+            </button>
+          </div>
+          <div className={styles.toggleRow} onClick={() => { if (canEdit && !saving) setHasRules((v) => !v); }} style={{ cursor: canEdit && !saving ? "pointer" : "default" }}>
             <div className={styles.toggleLabel}>
               <div className={styles.toggleTitle}>{t("chat.serverAccess.rulesToggleTitle")}</div>
               <div className={styles.toggleDesc}>{t("chat.serverAccess.rulesToggleDesc")}</div>
             </div>
-            <input className={styles.toggleInput} type="checkbox" checked={hasRules} disabled={!canEdit || saving} onChange={(e) => { setHasRules(e.target.checked); }} />
-          </label>
+            <button type="button" className={styles.togglePill} data-on={String(hasRules)} disabled={!canEdit || saving} onClick={(e) => { e.stopPropagation(); if (canEdit && !saving) setHasRules((v) => !v); }}>
+              <span className={styles.toggleThumb} />
+            </button>
+          </div>
         </div>
       </section>
 
-      <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
-        <h4 style={{ margin: 0, fontSize: 20 }}>{t("chat.serverAccess.rulesSection")}</h4>
-        <p style={{ marginTop: 4, color: "var(--color-panel-text-muted)", fontSize: 13 }}>
+      <section>
+        <h4 className={styles.subTitle}>{t("chat.serverAccess.rulesSection")}</h4>
+        <p className={styles.subDesc}>
           {hasRules ? t("chat.serverAccess.rulesEnabledDesc") : t("chat.serverAccess.rulesDisabledDesc")}
         </p>
         <div className={styles.ruleEditor} style={{ marginTop: 12 }}>
@@ -483,15 +519,17 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
       </section>
 
       {accessMode === "apply" && (
-        <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
-          <div className={styles.applyHeaderRow}>
+        <section>
+          <div className={styles.applyHeaderRow} onClick={async () => { if (!canEdit || saving) return; const next = !joinFormEnabled; setJoinFormEnabled(next); if (next) await ensureDefaultQuestion(); await saveJoinForm(next, joinFormQuestions); }} style={{ cursor: canEdit && !saving ? "pointer" : "default" }}>
             <div>
               <h4 className={styles.applyTitle}>{t("chat.serverAccess.joinFormTitle")}</h4>
               <p className={styles.applySubtitle}>{t("chat.serverAccess.joinFormDesc")}</p>
             </div>
-            <input className={styles.toggleInput} type="checkbox" checked={joinFormEnabled} disabled={!canEdit || saving}
-              onChange={async (e) => { const next = e.target.checked; setJoinFormEnabled(next); if (next) await ensureDefaultQuestion(); await saveJoinForm(next, joinFormQuestions); }}
-              title={t("chat.serverAccess.joinFormToggleTitle")} />
+            <button type="button" className={styles.togglePill} data-on={String(joinFormEnabled)} disabled={!canEdit || saving}
+              onClick={async (e) => { e.stopPropagation(); if (!canEdit || saving) return; const next = !joinFormEnabled; setJoinFormEnabled(next); if (next) await ensureDefaultQuestion(); await saveJoinForm(next, joinFormQuestions); }}
+              title={t("chat.serverAccess.joinFormToggleTitle")}>
+              <span className={styles.toggleThumb} />
+            </button>
           </div>
           {joinFormEnabled && (
             <div className={styles.applyCard}>
@@ -554,7 +592,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalTitleRow}>
               <h3 className={styles.modalTitle}>{t("chat.serverAccess.pickTypeTitle")}</h3>
-              <button className={styles.closeBtn} onClick={() => setShowTypePicker(false)} aria-label="Close">×</button>
+              <button className={styles.closeBtn} onClick={() => setShowTypePicker(false)} aria-label="Close"><IcoX /></button>
             </div>
             <div className={styles.modalBody}>
               <button className={styles.secondaryBtn} onClick={() => startModalForType("short")}>{t("chat.serverAccess.typeShort")}</button>
@@ -570,7 +608,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalTitleRow}>
               <h3 className={styles.modalTitle}>{showShortModal ? t("chat.serverAccess.typeShort") : t("chat.serverAccess.typeParagraph")}</h3>
-              <button className={styles.closeBtn} onClick={() => { setShowShortModal(false); setShowParagraphModal(false); }} aria-label="Close">×</button>
+              <button className={styles.closeBtn} onClick={() => { setShowShortModal(false); setShowParagraphModal(false); }} aria-label="Close"><IcoX /></button>
             </div>
             <div className={styles.modalBody}>
               <input type="text" placeholder={t("chat.serverAccess.questionPlaceholder")} value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} />
@@ -640,7 +678,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalTitleRow}>
               <h3 className={styles.modalTitle}>{t("chat.serverAccess.typeMultiple")}</h3>
-              <button className={styles.closeBtn} onClick={() => setShowMultipleModal(false)} aria-label="Close">×</button>
+              <button className={styles.closeBtn} onClick={() => setShowMultipleModal(false)} aria-label="Close"><IcoX /></button>
             </div>
             <div className={styles.modalBody}>
               <input type="text" placeholder={t("chat.serverAccess.questionPlaceholder")} value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} />
@@ -649,7 +687,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
                 <div key={idx} style={{ display: "grid", gridTemplateColumns: "18px 1fr 28px", gap: 10, alignItems: "center" }}>
                   <span style={{ width: 14, height: 14, borderRadius: 999, border: "2px solid var(--color-panel-text-muted)", display: "inline-block", opacity: 0.7 }} />
                   <input type="text" placeholder={t("chat.serverAccess.optionPlaceholder").replace("{n}", String(idx + 1))} value={opt} onChange={(e) => { const next = [...draftOptions]; next[idx] = e.target.value; setDraftOptions(next); }} />
-                  <button type="button" className={styles.linkBtn} onClick={() => { const next = draftOptions.filter((_, i) => i !== idx); setDraftOptions(next.length ? next : [""]); }} title={t("chat.serverAccess.removeOptionTitle")}>×</button>
+                  <button type="button" className={styles.linkBtn} onClick={() => { const next = draftOptions.filter((_, i) => i !== idx); setDraftOptions(next.length ? next : [""]); }} title={t("chat.serverAccess.removeOptionTitle")}><IcoX /></button>
                 </div>
               ))}
               <button type="button" className={styles.linkBtn} onClick={() => setDraftOptions([...draftOptions, ""])}>{t("chat.serverAccess.addOption")}</button>

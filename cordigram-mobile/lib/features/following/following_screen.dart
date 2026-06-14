@@ -396,7 +396,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;
         if (token == null) {
-          _showSnack('Please sign in first', error: true);
+          _showSnack(LanguageController.instance.t('home.snack.signInFirst'), error: true);
           return;
         }
         final reported = await showReportPostSheet(
@@ -439,6 +439,15 @@ class _FollowingScreenState extends State<FollowingScreen> {
       case PostMenuAction.goToAdsPost:
       case PostMenuAction.detailAds:
         _showSnack(LanguageController.instance.t('following.actionNotAvailable'));
+        return;
+      case PostMenuAction.seeLikes:
+        if (!mounted) return;
+        showPostLikesSheet(
+          context,
+          postId: post.id,
+          viewerId: _viewerId,
+          title: LanguageController.instance.t('post.menu.seeLikes'),
+        );
         return;
     }
   }

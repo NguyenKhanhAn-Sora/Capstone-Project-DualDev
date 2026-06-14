@@ -1,0 +1,159 @@
+/* GalaxySelect — theme-gated dropdown
+   Inherits --ms-* tokens from ancestor .card.
+   Galaxy-exclusive effects via [data-messages-theme="galaxy"].
+*/
+
+.root {
+  position: relative;
+  width: 100%;
+}
+
+/* ── Trigger button ── */
+.trigger {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--ms-border, rgba(255,255,255,0.1));
+  background: var(--ms-bg-input, #2b2d31);
+  color: var(--ms-text, #dcddde);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.15s;
+}
+
+.trigger:hover {
+  border-color: rgba(88, 101, 242, 0.45);
+  background: var(--ms-bg-hover, rgba(255,255,255,0.06));
+}
+
+:global([data-messages-theme="galaxy"]) .trigger {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+:global([data-messages-theme="galaxy"]) .trigger:hover {
+  background: rgba(8, 10, 26, 0.94);
+}
+
+.triggerOpen {
+  border-color: rgba(88, 101, 242, 0.6);
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1);
+  background: var(--ms-bg-hover, rgba(255,255,255,0.06));
+}
+
+:global([data-messages-theme="galaxy"]) .triggerOpen {
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1), 0 0 14px rgba(124, 58, 237, 0.1);
+}
+
+.triggerLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Chevron ── */
+.chevron {
+  color: var(--ms-text-faint, #4e5058);
+  flex-shrink: 0;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.15s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+  color: #a78bfa;
+}
+
+/* ── Dropdown panel ── */
+.dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: var(--ms-bg, #1e1f22);
+  border: 1px solid var(--ms-border, rgba(255,255,255,0.12));
+  border-radius: 12px;
+  padding: 5px;
+  margin: 0;
+  list-style: none;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  animation: dropIn 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: top center;
+}
+
+:global([data-messages-theme="light"]) .dropdown {
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+}
+
+:global([data-messages-theme="galaxy"]) .dropdown {
+  background: rgba(9, 12, 28, 0.97);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 24px rgba(88, 101, 242, 0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Option item ── */
+.option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--ms-text-muted, #dcddde);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  user-select: none;
+}
+
+.option:hover {
+  background: var(--ms-bg-hover, rgba(255,255,255,0.06));
+  color: var(--ms-text, #f2f3f5);
+}
+
+:global([data-messages-theme="galaxy"]) .option:hover {
+  background: rgba(88, 101, 242, 0.15);
+  color: #edf0fb;
+}
+
+.optionActive {
+  background: var(--ms-bg-active, rgba(88,101,242,0.2));
+  color: var(--ms-text, #f2f3f5);
+  font-weight: 600;
+}
+
+:global([data-messages-theme="galaxy"]) .optionActive {
+  color: #a78bfa;
+}
+
+.optionActive:hover {
+  background: rgba(88, 101, 242, 0.28);
+}
+
+.checkIcon {
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+.checkSpacer {
+  width: 14px;
+  flex-shrink: 0;
+}

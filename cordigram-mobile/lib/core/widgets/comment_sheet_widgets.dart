@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../config/app_theme.dart';
+import '../services/language_controller.dart';
 
 class CommentSheetAction {
   const CommentSheetAction({
@@ -80,20 +81,20 @@ class EditCommentSheet extends StatefulWidget {
     super.key,
     required this.initialContent,
     required this.onSubmit,
-    this.title = 'Edit Comment',
-    this.hintText = 'Edit your comment...',
-    this.submitLabel = 'Save',
-    this.successMessage = 'Comment updated',
-    this.failureMessage = 'Failed to update comment',
+    this.title,
+    this.hintText,
+    this.submitLabel,
+    this.successMessage,
+    this.failureMessage,
   });
 
   final String initialContent;
   final Future<void> Function(String newContent) onSubmit;
-  final String title;
-  final String hintText;
-  final String submitLabel;
-  final String successMessage;
-  final String failureMessage;
+  final String? title;
+  final String? hintText;
+  final String? submitLabel;
+  final String? successMessage;
+  final String? failureMessage;
 
   @override
   State<EditCommentSheet> createState() => _EditCommentSheetState();
@@ -115,7 +116,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(String successMsg, String failureMsg) async {
     final text = _ctrl.text.trim();
     if (text.isEmpty || _submitting) return;
     setState(() => _submitting = true);
@@ -125,7 +126,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.successMessage),
+          content: Text(successMsg),
           backgroundColor: const Color(0xFF1A2235),
           duration: const Duration(seconds: 2),
         ),
@@ -135,7 +136,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.failureMessage),
+          content: Text(failureMsg),
           backgroundColor: const Color(0xFFEF4444),
           duration: const Duration(seconds: 2),
         ),
@@ -145,6 +146,13 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final lc = LanguageController.instance;
+    final effectiveTitle = widget.title ?? lc.t('post.detail.commentMenu.edit');
+    final effectiveHint = widget.hintText ?? lc.t('post.detail.comments.editHint');
+    final effectiveSubmit = widget.submitLabel ?? lc.t('common.save');
+    final effectiveSuccess = widget.successMessage ?? lc.t('post.detail.comments.editSuccess');
+    final effectiveFailure = widget.failureMessage ?? lc.t('post.detail.comments.editError');
+
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final tokens =
@@ -180,7 +188,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
             child: Row(
               children: [
                 Text(
-                  widget.title,
+                  effectiveTitle,
                   style: TextStyle(
                     color: tokens.text,
                     fontSize: 16,
@@ -212,7 +220,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
                   minLines: 2,
                   style: TextStyle(color: tokens.text, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: widget.hintText,
+                    hintText: effectiveHint,
                     hintStyle: TextStyle(color: scheme.onSurfaceVariant),
                     filled: true,
                     fillColor: tokens.panel,
@@ -232,7 +240,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
-                  onPressed: _submitting ? null : _submit,
+                  onPressed: _submitting ? null : () => _submit(effectiveSuccess, effectiveFailure),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: scheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 13),
@@ -250,7 +258,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
                           ),
                         )
                       : Text(
-                          widget.submitLabel,
+                          effectiveSubmit,
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,

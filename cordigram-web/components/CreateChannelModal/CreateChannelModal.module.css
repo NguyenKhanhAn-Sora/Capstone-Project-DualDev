@@ -1,73 +1,101 @@
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+
 .modalOverlay {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   background: var(--color-overlay);
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  animation: fadeIn 0.2s ease-out;
+  padding: 16px;
+  animation: channelOverlayIn 0.2s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes channelOverlayIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
+
+@keyframes channelCardIn {
+  from {
+    opacity: 0;
+    transform: perspective(1000px) rotateX(8deg) translateY(24px) scale(0.96);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1000px) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
 
 .modalContent {
   background: var(--color-panel-bg);
-  border-radius: 8px;
-  width: 90%;
-  max-width: 440px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 460px;
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
-  padding: 24px;
+  padding: 0;
   border: 1px solid var(--color-panel-border);
-  animation: slideUp 0.3s ease-out;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 32px 80px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: channelCardIn 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+/* form inherits layout */
+.modalContent form {
+  padding: 24px 24px 0;
 }
+
+/* ── Close button ────────────────────────────────────────────────────────── */
 
 .closeButton {
   position: absolute;
-  top: 16px; right: 16px;
-  background: transparent;
-  border: none;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  background: var(--color-panel-hover);
   color: var(--color-panel-text-muted);
-  font-size: 28px;
+  font-size: 22px;
   cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
-  z-index: 10;
+  z-index: 2;
+  transition: background 0.18s, color 0.18s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .closeButton:hover {
-  background: var(--color-panel-hover);
+  transform: rotate(8deg) scale(1.08);
+  background: var(--color-panel-deep);
   color: var(--color-panel-text);
 }
+
+/* ── Title ───────────────────────────────────────────────────────────────── */
 
 .title {
-  margin: 0 0 4px;
+  margin: 0 0 22px;
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
   color: var(--color-panel-text);
+  padding-right: 44px;
 }
 
-.subtitle {
-  margin: 0 0 20px;
-  font-size: 13px;
-  color: var(--color-panel-text-muted);
-}
+/* ── Section ─────────────────────────────────────────────────────────────── */
 
 .section {
   margin-bottom: 20px;
@@ -75,44 +103,61 @@
 
 .sectionLabel {
   display: block;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   color: var(--color-panel-text-muted);
   margin-bottom: 8px;
-  text-transform: uppercase;
 }
+
+/* ── Type option cards ───────────────────────────────────────────────────── */
 
 .typeOptions {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .typeOption {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 4px;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
   cursor: pointer;
   background: var(--color-panel-sidebar);
-  border: 1px solid transparent;
-  transition: background 0.2s, border-color 0.2s;
+  border: 1.5px solid transparent;
+  transition: background 0.18s, border-color 0.18s;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .typeOption:hover {
   background: var(--color-panel-hover);
 }
 
-.typeOption input {
-  margin-top: 4px;
+.typeOption:has(input:checked) {
+  border-color: var(--color-panel-accent);
+  background: color-mix(in oklab, var(--color-panel-accent) 8%, var(--color-panel-sidebar));
+}
+
+.typeOption input[type="radio"] {
+  margin-top: 2px;
   accent-color: var(--color-panel-accent);
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
 }
 
 .typeIcon {
   font-size: 20px;
+  font-weight: 700;
   color: var(--color-panel-text-muted);
   flex-shrink: 0;
+  line-height: 1.2;
+  width: 22px;
+  text-align: center;
 }
 
 .typeIconVoice {
@@ -121,151 +166,66 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 22px;
 }
 
 .typeName {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-panel-text);
+  line-height: 1.3;
+  display: block;
 }
 
 .typeDesc {
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--color-panel-text-muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
+
+/* ── Name input ──────────────────────────────────────────────────────────── */
 
 .nameInputWrap {
   display: flex;
   align-items: center;
   background: var(--color-panel-deep);
-  border: 1px solid var(--color-panel-deep-border);
-  border-radius: 4px;
+  border: 1.5px solid var(--color-panel-deep-border);
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.nameInputWrap:focus-within {
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-panel-accent) 18%, transparent);
 }
 
 .namePrefix {
-  padding: 10px 0 10px 12px;
+  padding: 10px 0 10px 14px;
   color: var(--color-panel-text-muted);
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .nameInput {
   flex: 1;
   background: transparent;
   border: none;
-  padding: 10px 12px;
+  padding: 10px 10px;
   color: var(--color-panel-text);
   font-size: 14px;
   outline: none;
 }
 
 .nameInput::placeholder {
-  color: var(--color-panel-text-faint);
-}
-
-.privateRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px;
-  background: var(--color-panel-sidebar);
-  border-radius: 4px;
-}
-
-.privateLabel {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-panel-text);
-}
-
-.privateDesc {
-  margin: 4px 0 0;
-  font-size: 12px;
   color: var(--color-panel-text-muted);
-  line-height: 1.4;
+  opacity: 0.55;
 }
 
-.toggle {
-  width: 44px;
-  height: 24px;
-  border-radius: 12px;
-  background: var(--color-panel-neutral);
-  border: none;
-  cursor: pointer;
-  padding: 2px;
-  flex-shrink: 0;
-  transition: background 0.2s;
-}
+/* ── Emoji button ────────────────────────────────────────────────────────── */
 
-.toggleOn {
-  background: var(--color-panel-accent);
-}
-
-.toggleOn:hover {
-  background: var(--color-panel-accent-hover);
-}
-
-.toggleThumb {
-  display: block;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.2s;
-}
-
-.toggleOn .toggleThumb {
-  transform: translateX(20px);
-}
-
-.footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-panel-border);
-}
-
-.cancelBtn {
-  padding: 10px 16px;
-  border-radius: 4px;
-  border: none;
-  background: transparent;
-  color: var(--color-panel-text);
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.cancelBtn:hover {
-  background: var(--color-panel-hover);
-}
-
-.submitBtn {
-  padding: 10px 20px;
-  border-radius: 4px;
-  border: none;
-  background: var(--color-panel-accent);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.submitBtn:hover:not(:disabled) {
-  background: var(--color-panel-accent-hover);
-}
-
-.submitBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Emoji picker for channel name */
 .emojiWrapper {
   position: relative;
   flex-shrink: 0;
@@ -274,50 +234,266 @@
 .emojiBtn {
   background: transparent;
   border: none;
-  padding: 8px 10px;
+  padding: 8px 12px;
   cursor: pointer;
   font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--color-panel-text-muted);
-  border-radius: 4px;
-  transition: background 0.15s;
+  border-radius: 8px;
+  transition: background 0.15s, transform 0.15s;
 }
 
 .emojiBtn:hover {
   background: var(--color-panel-hover);
+  transform: scale(1.1);
+}
+
+/* ── Private toggle row ──────────────────────────────────────────────────── */
+
+.privateRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--color-panel-sidebar);
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+
+.privateLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--color-panel-text);
+  line-height: 1.3;
+  margin-bottom: 4px;
 }
 
-.emojiPicker {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  background: var(--color-panel-context);
-  border: 1px solid var(--color-panel-border);
-  border-radius: 8px;
-  padding: 8px;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
-  z-index: 100;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-  min-width: 180px;
+.privateDesc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-panel-text-muted);
+  line-height: 1.45;
 }
 
-.emojiItem {
-  background: transparent;
+/* ── Toggle switch ───────────────────────────────────────────────────────── */
+
+.toggle {
+  width: 46px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--color-panel-neutral, rgba(148,155,164,0.3));
   border: none;
-  font-size: 22px;
-  padding: 4px;
   cursor: pointer;
-  border-radius: 4px;
-  text-align: center;
-  line-height: 1.2;
-  transition: background 0.1s;
+  padding: 3px;
+  flex-shrink: 0;
+  transition: background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
 }
 
-.emojiItem:hover {
+.toggleOn {
+  background: var(--color-panel-accent);
+}
+
+.toggleThumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.toggleOn .toggleThumb {
+  transform: translateX(20px);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+  margin-top: 20px;
+  border-top: 1px solid var(--color-panel-border);
+  position: sticky;
+  bottom: 0;
+  background: var(--color-panel-bg);
+}
+
+.cancelBtn {
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-panel-text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.cancelBtn:hover {
   background: var(--color-panel-hover);
+}
+
+.submitBtn {
+  padding: 9px 22px;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-panel-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: var(--color-panel-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--color-panel-accent) 40%, transparent);
+}
+
+.submitBtn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.submitBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GALAXY THEME OVERRIDES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:global([data-messages-theme="galaxy"]) .modalOverlay {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+
+:global([data-messages-theme="galaxy"]) .modalContent {
+  background: rgba(8, 10, 24, 0.88);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  border-color: rgba(88, 101, 242, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 32px 90px rgba(0, 0, 0, 0.45),
+    0 0 80px rgba(88, 101, 242, 0.08);
+}
+
+:global([data-messages-theme="galaxy"]) .closeButton {
+  background: rgba(88, 101, 242, 0.10);
+  border-color: rgba(88, 101, 242, 0.16);
+  color: rgba(165, 180, 252, 0.72);
+}
+
+:global([data-messages-theme="galaxy"]) .closeButton:hover {
+  background: rgba(237, 66, 69, 0.16);
+  border-color: rgba(237, 66, 69, 0.32);
+  color: rgba(255, 120, 120, 0.92);
+}
+
+:global([data-messages-theme="galaxy"]) .title {
+  background-image: linear-gradient(130deg, #e8ecf8 0%, #c4cef5 45%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:global([data-messages-theme="galaxy"]) .sectionLabel {
+  color: rgba(124, 58, 237, 0.72);
+}
+
+:global([data-messages-theme="galaxy"]) .typeOption {
+  background: rgba(8, 10, 26, 0.55);
+  border-color: transparent;
+}
+
+:global([data-messages-theme="galaxy"]) .typeOption:hover {
+  background: rgba(88, 101, 242, 0.08);
+}
+
+:global([data-messages-theme="galaxy"]) .typeOption:has(input:checked) {
+  border-color: rgba(124, 58, 237, 0.55);
+  background: rgba(88, 101, 242, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 18px rgba(124, 58, 237, 0.08);
+}
+
+:global([data-messages-theme="galaxy"]) .typeName {
+  color: rgba(225, 232, 252, 0.92);
+}
+
+:global([data-messages-theme="galaxy"]) .typeDesc {
+  color: rgba(165, 180, 252, 0.55);
+}
+
+:global([data-messages-theme="galaxy"]) .typeIcon,
+:global([data-messages-theme="galaxy"]) .typeIconVoice {
+  color: rgba(124, 58, 237, 0.80);
+}
+
+:global([data-messages-theme="galaxy"]) .nameInputWrap {
+  background: rgba(6, 8, 20, 0.68);
+  border-color: rgba(88, 101, 242, 0.18);
+}
+
+:global([data-messages-theme="galaxy"]) .nameInputWrap:focus-within {
+  border-color: rgba(124, 58, 237, 0.60);
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.14), 0 0 18px rgba(124, 58, 237, 0.10);
+}
+
+:global([data-messages-theme="galaxy"]) .namePrefix {
+  color: rgba(124, 58, 237, 0.72);
+}
+
+:global([data-messages-theme="galaxy"]) .nameInput {
+  color: rgba(225, 232, 252, 0.92);
+}
+
+:global([data-messages-theme="galaxy"]) .privateRow {
+  background: rgba(8, 10, 26, 0.55);
+  border-color: rgba(88, 101, 242, 0.10);
+}
+
+:global([data-messages-theme="galaxy"]) .privateLabel {
+  color: rgba(225, 232, 252, 0.92);
+}
+
+:global([data-messages-theme="galaxy"]) .privateDesc {
+  color: rgba(165, 180, 252, 0.55);
+}
+
+:global([data-messages-theme="galaxy"]) .toggleOn {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: 0 0 10px rgba(88, 101, 242, 0.35);
+}
+
+:global([data-messages-theme="galaxy"]) .footer {
+  background: rgba(8, 10, 24, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(88, 101, 242, 0.12);
+}
+
+:global([data-messages-theme="galaxy"]) .submitBtn {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: 0 2px 12px rgba(88, 101, 242, 0.35);
+}
+
+:global([data-messages-theme="galaxy"]) .submitBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4752c4 0%, #6d28d9 100%);
+  box-shadow: 0 4px 18px rgba(88, 101, 242, 0.52), 0 0 14px rgba(124, 58, 237, 0.28);
 }

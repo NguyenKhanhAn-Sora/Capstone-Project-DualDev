@@ -1,110 +1,169 @@
+/* ── Container ───────────────────────────────────────────────────────────── */
+
 .container {
-  padding: 24px;
-  color: var(--color-panel-text);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px 0;
 }
 
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
 .title {
-  font-size: 24px;
-  font-weight: 700;
-  text-align: center;
-  margin: 0 0 8px 0;
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--color-panel-text);
+  padding-right: 44px;
+  line-height: 1.22;
 }
 
 .subtitle {
-  font-size: 16px;
+  margin: 0 0 16px;
+  font-size: 13px;
   color: var(--color-panel-text-muted);
-  text-align: center;
-  line-height: 1.5;
-  margin: 0 0 24px 0;
+  line-height: 1.55;
 }
+
+/* ── Section label ───────────────────────────────────────────────────────── */
+
+.sectionLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-panel-text-muted);
+  padding: 10px 4px 6px;
+  opacity: 0.65;
+}
+
+/* ── Template list ───────────────────────────────────────────────────────── */
 
 .templateList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 2px;
+  overflow-y: auto;
+  max-height: 330px;
+  margin: 0 -4px;
+  padding: 0 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-panel-border) transparent;
 }
 
-.sectionLabel {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-panel-text-muted);
-  margin: 16px 0 8px 0;
-  letter-spacing: 0.5px;
-}
+.templateList::-webkit-scrollbar { width: 3px; }
+.templateList::-webkit-scrollbar-thumb { border-radius: 2px; background: var(--color-panel-border); }
+
+/* ── Template button ─────────────────────────────────────────────────────── */
 
 .templateButton {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--color-panel-sidebar);
-  border: 1px solid var(--color-panel-sidebar-border);
-  border-radius: 8px;
+  gap: 14px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: transparent;
   cursor: pointer;
-  transition: all 0.2s;
-  color: var(--color-panel-text);
-  font-size: 16px;
-  font-weight: 500;
   text-align: left;
+  color: var(--color-panel-text);
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .templateButton:hover {
   background: var(--color-panel-hover);
   border-color: var(--color-panel-border);
+  transform: translateX(3px);
 }
 
+.templateButton:hover .arrow {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+.templateButton:active {
+  transform: translateX(1px) scale(0.99);
+}
+
+/* ── Icon box ────────────────────────────────────────────────────────────── */
+
 .templateIcon {
-  font-size: 24px;
-  width: 40px;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-panel-accent);
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   flex-shrink: 0;
+  /* color + background set via inline style per template */
 }
+
+/* ── Name ────────────────────────────────────────────────────────────────── */
 
 .templateName {
   flex: 1;
+  font-size: 14px;
   font-weight: 600;
+  color: var(--color-panel-text);
+  letter-spacing: -0.01em;
 }
+
+/* ── Chevron ─────────────────────────────────────────────────────────────── */
 
 .arrow {
-  font-size: 24px;
+  display: flex;
+  align-items: center;
   color: var(--color-panel-text-muted);
+  opacity: 0.4;
   flex-shrink: 0;
+  transition:
+    opacity 0.16s,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
 .footer {
-  text-align: center;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-panel-sidebar-border);
-  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0 22px;
+  margin-top: 8px;
+  border-top: 1px solid var(--color-panel-border);
+  position: sticky;
+  bottom: 0;
+  background: var(--color-panel-bg);
 }
 
 .footerQuestion {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--color-panel-text);
-  margin: 0 0 16px 0;
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-panel-text-muted);
 }
 
 .joinButton {
-  width: 100%;
-  padding: 12px 16px;
-  background: var(--color-panel-neutral);
-  border: none;
-  border-radius: 4px;
+  padding: 9px 24px;
+  border-radius: 10px;
+  border: 1.5px solid var(--color-panel-border);
+  background: transparent;
   color: var(--color-panel-text);
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s;
 }
 
 .joinButton:hover {
-  background: var(--color-panel-neutral-hover);
+  background: var(--color-panel-hover);
+  border-color: var(--color-panel-accent);
+  transform: translateY(-1px);
+}
+
+.joinButton:active {
+  transform: translateY(0);
 }

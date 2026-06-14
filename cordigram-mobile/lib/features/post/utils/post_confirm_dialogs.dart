@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/config/app_theme.dart';
+import '../../../core/services/language_controller.dart';
 
 Future<bool> showPostConfirmDialog(
   BuildContext context, {
@@ -29,7 +30,7 @@ Future<bool> showPostConfirmDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: Text('Cancel', style: TextStyle(color: tokens.textMuted)),
+          child: Text(LanguageController.instance.t('common.cancel'), style: TextStyle(color: tokens.textMuted)),
         ),
         TextButton(
           onPressed: () => Navigator.pop(ctx, true),

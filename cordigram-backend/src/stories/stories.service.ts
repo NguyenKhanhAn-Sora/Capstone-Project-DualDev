@@ -48,6 +48,7 @@ export type StoryItem = {
   reactionCount: number;
   viewed: boolean;
   myReaction: string | null;
+  visibility: 'public' | 'followers' | 'private';
   createdAt: string;
   expiresAt: string;
 };
@@ -141,11 +142,22 @@ export class StoriesService {
       .find({ followerId: new Types.ObjectId(viewerId) })
       .lean();
     const followedIds = follows.map((f) => f.followeeId);
-    const authorIds = [new Types.ObjectId(viewerId), ...followedIds];
 
     const now = new Date();
     const stories = await this.storyModel
-      .find({ authorId: { $in: authorIds }, expiresAt: { $gt: now } })
+      .find({
+        expiresAt: { $gt: now },
+        $or: [
+          // Story của chính mình — luôn thấy dù visibility là gì
+          { authorId: new Types.ObjectId(viewerId) },
+          // Story của người mình follow — thấy public + followers, không thấy private
+          ...(followedIds.length > 0
+            ? [{ authorId: { $in: followedIds }, visibility: { $in: ['public', 'followers'] } }]
+            : []),
+          // Story public của bất kỳ ai — kể cả người không follow
+          { visibility: 'public' },
+        ],
+      })
       .sort({ authorId: 1, createdAt: -1 })
       .lean();
 
@@ -270,6 +282,24 @@ export class StoriesService {
     return { ok: true };
   }
 
+  async updateVisibility(
+    userId: string,
+    storyId: string,
+    visibility: 'public' | 'followers' | 'private',
+  ): Promise<{ visibility: 'public' | 'followers' | 'private'; updated: boolean }> {
+    const story = await this.storyModel.findById(storyId);
+    if (!story) throw new NotFoundException('Story not found');
+    if (story.authorId.toString() !== userId) {
+      throw new ForbiddenException("Cannot update another user's story");
+    }
+    if ((story as any).visibility === visibility) {
+      return { visibility, updated: false };
+    }
+    (story as any).visibility = visibility;
+    await story.save();
+    return { visibility, updated: true };
+  }
+
   // ─── helpers ─────────────────────────────────────────────────────────────────
 
   private buildGroup(
@@ -335,6 +365,7 @@ export class StoriesService {
       reactionCount: story.reactions?.length ?? 0,
       viewed,
       myReaction,
+      visibility: (story as any).visibility ?? 'followers',
       createdAt: (story as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
       expiresAt: (story as any).expiresAt?.toISOString?.() ?? new Date().toISOString(),
     };
