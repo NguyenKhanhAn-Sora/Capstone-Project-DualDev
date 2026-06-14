@@ -14,6 +14,7 @@ type Props = {
   onClose: () => void;
   onPickFile: (file: File) => void;
   onPickRecentAvatar: (url: string) => void;
+  theme?: string;
 };
 
 export default function ProfileImagePickerModal({
@@ -23,6 +24,7 @@ export default function ProfileImagePickerModal({
   onClose,
   onPickFile,
   onPickRecentAvatar,
+  theme,
 }: Props) {
   const { t } = useLanguage();
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -38,6 +40,7 @@ export default function ProfileImagePickerModal({
     <div
       className={styles.overlay}
       role="presentation"
+      data-messages-theme={theme ?? "dark"}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

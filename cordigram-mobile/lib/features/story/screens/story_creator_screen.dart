@@ -7,6 +7,7 @@ import '../../../core/services/language_controller.dart';
 import '../models/story_models.dart';
 import '../services/story_service.dart';
 import '../widgets/story_music_picker.dart';
+import 'photo_text_editor.dart';
 
 // ── Visibility option ─────────────────────────────────────────────────────────
 
@@ -33,6 +34,17 @@ extension _VisExt on _Vis {
         return t('story.optPublic');
       case _Vis.private:
         return t('story.optPrivate');
+    }
+  }
+
+  String desc(String Function(String) t) {
+    switch (this) {
+      case _Vis.followers:
+        return t('story.descFollowers');
+      case _Vis.public:
+        return t('story.descPublic');
+      case _Vis.private:
+        return t('story.descPrivate');
     }
   }
 }
@@ -78,6 +90,12 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
 
   // Music
   StoryMusic? _selectedMusic;
+
+  // Photo text overlays
+  List<StoryTextLayer> _textLayers = [];
+  String? _textSelectedId;
+  int _textAddTrigger = 0;
+  bool _textInputActive = false;
 
   // Trim state
   double _trimStart = 0.0; // 0–1 fraction
@@ -217,6 +235,15 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         final dur = (uploadResult['mediaDurationMs'] as num?)?.toInt() ??
             _mediaDurationMs;
 
+        // Canvas height used to normalise fontSize to % (matches web logic)
+        const double canvasH = 896;
+        final overlaysPayload = type == 'image'
+            ? _textLayers
+                .where((l) => l.text.trim().isNotEmpty)
+                .map((l) => l.toApiJson(canvasH))
+                .toList()
+            : [];
+
         body = {
           'type': 'media',
           'mediaType': type,
@@ -227,6 +254,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
           'visibility': _vis.key,
           if (_selectedMusic != null && _mediaType != 'video')
             'music': _selectedMusic!.toJson(),
+          if (overlaysPayload.isNotEmpty) 'textOverlays': overlaysPayload,
         };
       }
 
@@ -302,6 +330,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
       },
       child: Scaffold(
         backgroundColor: bg,
+        resizeToAvoidBottomInset: false,
         body: SafeArea(
           child: _step == 'select'
               ? _buildSelectScreen(t, isDark)
@@ -625,9 +654,29 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
       String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
     return Container(
       color: Colors.black,
-      child: _isText
-          ? _buildTextPreview(t)
-          : _buildMediaPreview(t, isDark),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxW = constraints.maxWidth;
+          final maxH = constraints.maxHeight;
+          double pw = maxW;
+          double ph = pw * 16 / 9;
+          if (ph > maxH) {
+            ph = maxH;
+            pw = ph * 9 / 16;
+          }
+          return Center(
+            child: SizedBox(
+              width: pw,
+              height: ph,
+              child: ClipRect(
+                child: _isText
+                    ? _buildTextPreview(t)
+                    : _buildMediaPreview(t, isDark),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -689,10 +738,90 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
     if (_mediaFile == null) {
       return _buildMediaPicker(t, isDark);
     }
-    if (_mediaType == 'video') {
-      return _buildVideoPreview(t, isDark);
+
+    // Floating overlay button (semi-transparent pill)
+    Widget floatingBtn({
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+    }) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: Colors.black.withValues(alpha: 0.55),
+            border:
+                Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 15),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
-    return _buildImagePreview(t);
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Photo wrapped with text editor, video plain
+        if (_mediaType == 'video')
+          _buildVideoPreview(t, isDark)
+        else
+          PhotoTextEditor(
+            photoChild: _buildImagePreview(t),
+            layers: _textLayers,
+            onLayersChanged: (layers) =>
+                setState(() => _textLayers = layers),
+            addTrigger: _textAddTrigger,
+            selectedId: _textSelectedId,
+            onSelectChanged: (id) =>
+                setState(() => _textSelectedId = id),
+            onInputModeChanged: (active) =>
+                setState(() => _textInputActive = active),
+          ),
+
+        // Top-right: change media (hidden during text input)
+        if (!_textInputActive)
+          Positioned(
+            top: 12,
+            right: 12,
+            child: floatingBtn(
+              icon: Icons.swap_horiz_rounded,
+              label: _mediaType == 'image'
+                  ? t('story.btnChangePhoto')
+                  : t('story.btnChangeVideo'),
+              onTap: () => _showMediaPicker(isDark),
+            ),
+          ),
+
+        // Top-left: add text (image only, hidden during text input)
+        if (_mediaType == 'image' && !_textInputActive)
+          Positioned(
+            top: 12,
+            left: 12,
+            child: floatingBtn(
+              icon: Icons.text_fields_rounded,
+              label: 'Thêm chữ',
+              onTap: () =>
+                  setState(() => _textAddTrigger = _textAddTrigger + 1),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildMediaPicker(
@@ -744,10 +873,11 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
 
   Widget _buildImagePreview(
       String Function(String, [Map<String, dynamic>?]) t) {
+    // Base photo layer — rendered as photoChild inside PhotoTextEditor.
+    // Music sticker sits below text layers so it's placed here.
     return Stack(
       fit: StackFit.expand,
       children: [
-        // cover = fills the entire preview with no black bars, matching how the viewer displays it
         Image.file(_mediaFile!, fit: BoxFit.cover),
         if (_selectedMusic != null)
           Positioned(
@@ -820,14 +950,37 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
           // Music row (text and image stories — not video)
           if (_mediaType != 'video')
             _buildMusicRow(t, isDark),
-          // Media action buttons
-          if (!_isText && _mediaFile != null)
+          // Trim button (video only)
+          if (!_isText && _mediaFile != null && _mediaType == 'video')
             _buildActionRow(t, isDark),
 
-          const SizedBox(height: 10),
+          // Text layer controls (shown when a text overlay is selected)
+          if (!_isText && _mediaType == 'image' && _textSelectedId != null)
+            Builder(builder: (_) {
+              final idx = _textLayers
+                  .indexWhere((l) => l.id == _textSelectedId);
+              if (idx < 0) return const SizedBox.shrink();
+              final layer = _textLayers[idx];
+              return TextLayerControls(
+                layer: layer,
+                isDark: isDark,
+                onUpdate: (updated) => setState(() {
+                  final copy = List<StoryTextLayer>.from(_textLayers);
+                  copy[idx] = updated;
+                  _textLayers = copy;
+                }),
+                onDelete: () {
+                  setState(() {
+                    _textLayers =
+                        _textLayers.where((l) => l.id != _textSelectedId).toList();
+                    _textSelectedId = null;
+                  });
+                },
+              );
+            }),
 
-          // Visibility selector
-          _buildVisibilityRow(t, isDark),
+          // Visibility selector (opens overlay)
+          _buildVisibilityButton(t, isDark),
 
           // Error
           if (_error != null)
@@ -1014,107 +1167,215 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
 
   Widget _buildActionRow(
       String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
+    // Change-media is now a floating overlay on the preview; only trim stays here
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _ActionChip(
+            icon: Icons.content_cut_rounded,
+            label: t('story.editVideo'),
+            onTap: () => setState(() => _mediaStep = 'trim'),
+            isDark: isDark,
+            active: _mediaStep == 'trim',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Single-row button that opens the visibility picker overlay
+  Widget _buildVisibilityButton(
+      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
+    return GestureDetector(
+      onTap: () => _showVisibilityPicker(t, isDark),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: isDark ? const Color(0xFF1A2435) : const Color(0xFFF0F4FA),
+          border: Border.all(
+            color: isDark ? const Color(0xFF1E2D48) : const Color(0xFFE3EAF5),
+          ),
+        ),
         child: Row(
           children: [
-            // Change media
-            _ActionChip(
-              icon: _mediaType == 'image'
-                  ? Icons.image_outlined
-                  : Icons.videocam_outlined,
-              label: _mediaType == 'image'
-                  ? t('story.btnChangePhoto')
-                  : t('story.btnChangeVideo'),
-              onTap: () =>
-                  _mediaType == 'image' ? _pickImage() : _pickVideo(),
-              isDark: isDark,
-            ),
-            const SizedBox(width: 8),
-            // Trim video
-            if (_mediaType == 'video')
-              _ActionChip(
-                icon: Icons.content_cut_rounded,
-                label: t('story.editVideo'),
-                onTap: () => setState(() => _mediaStep = 'trim'),
-                isDark: isDark,
-                active: _mediaStep == 'trim',
+            Container(
+              width: 30,
+              height: 30,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
+                ),
               ),
+              child: Icon(_vis.icon, color: Colors.white, size: 15),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    t('story.labelVisibility'),
+                    style: const TextStyle(
+                      color: Color(0xFF7A8BB0),
+                      fontSize: 11,
+                    ),
+                  ),
+                  Text(
+                    _vis.label(t),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F1629),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.expand_more_rounded,
+                color: Color(0xFF7A8BB0), size: 18),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildVisibilityRow(
+  void _showVisibilityPicker(
       String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
-    final labelColor =
-        isDark ? const Color(0xFF7A8BB0) : const Color(0xFF5B6378);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Label row
-        Row(
-          children: [
-            Icon(Icons.remove_red_eye_outlined, color: labelColor, size: 15),
-            const SizedBox(width: 5),
-            Text(
-              t('story.labelVisibility'),
-              style: TextStyle(color: labelColor, fontSize: 12),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        // Buttons row — wraps to prevent overflow on any screen width
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: _Vis.values.map((v) {
-            final active = _vis == v;
-            return GestureDetector(
-              onTap: () => setState(() => _vis = v),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: active
-                      ? const LinearGradient(
-                          colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
-                        )
-                      : null,
-                  color: active
-                      ? null
-                      : (isDark
-                          ? const Color(0xFF1E2D48)
-                          : const Color(0xFFE3EAF5)),
-                ),
+    final bg = isDark ? const Color(0xFF1A2435) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF1E2D48) : const Color(0xFFE3EAF5);
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 16, 14),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(v.icon,
-                        size: 12,
-                        color: active
-                            ? Colors.white
-                            : const Color(0xFF7A8BB0)),
-                    const SizedBox(width: 4),
-                    Text(
-                      v.label(t),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: active ? Colors.white : const Color(0xFF7A8BB0),
+                    const Icon(Icons.remove_red_eye_outlined,
+                        color: Color(0xFF4AA3E4), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        t('story.labelVisibility'),
+                        style: TextStyle(
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF0F1629),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
                       ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(ctx),
+                      child: const Icon(Icons.close_rounded,
+                          color: Color(0xFF7A8BB0), size: 20),
                     ),
                   ],
                 ),
               ),
-            );
-          }).toList(),
+              Divider(color: borderColor, height: 1),
+              // Options
+              ..._Vis.values.map((v) {
+                final selected = _vis == v;
+                return InkWell(
+                  onTap: () {
+                    setState(() => _vis = v);
+                    Navigator.pop(ctx);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? const Color(0xFF4AA3E4).withValues(alpha: 0.07)
+                          : Colors.transparent,
+                      border: Border(
+                        top: BorderSide(color: borderColor, width: 0.5),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: selected
+                                ? const LinearGradient(
+                                    colors: [
+                                      Color(0xFF4AA3E4),
+                                      Color(0xFF7C3AED),
+                                    ],
+                                  )
+                                : null,
+                            color: selected
+                                ? null
+                                : (isDark
+                                    ? const Color(0xFF1E2D48)
+                                    : const Color(0xFFEEF2FA)),
+                          ),
+                          child: Icon(v.icon,
+                              size: 18,
+                              color: selected
+                                  ? Colors.white
+                                  : const Color(0xFF7A8BB0)),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                v.label(t),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F1629),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                v.desc(t),
+                                style: const TextStyle(
+                                  color: Color(0xFF7A8BB0),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (selected)
+                          const Icon(Icons.check_circle_rounded,
+                              color: Color(0xFF4AA3E4), size: 22),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 }

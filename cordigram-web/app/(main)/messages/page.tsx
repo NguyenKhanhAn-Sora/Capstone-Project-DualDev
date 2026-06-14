@@ -3359,8 +3359,11 @@ export default function MessagesPage() {
     try {
       const usersList = await getAvailableUsers({ token });
       setFriends(usersList);
-    } catch (err) {
-      console.error("Failed to load available users", err);
+    } catch (err: any) {
+      console.error(
+        "Failed to load available users",
+        err?.status ?? err?.message ?? err,
+      );
       // Fallback to loading following if available users endpoint is not ready
       loadFollowing();
     }
@@ -10168,65 +10171,187 @@ export default function MessagesPage() {
 
                       {boostModalStep === "plan" ? (
                         <>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "stretch" }}>
+                            {/* ── BOOST card ─────────────────────────────── */}
                             <button
                               type="button"
                               onClick={() => setBoostTier("boost")}
                               style={{
-                                textAlign: "left",
-                                borderRadius: 16,
-                                padding: 14,
-                                cursor: "pointer",
-                                border:
-                                  boostTier === "boost"
-                                    ? "1px solid color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%)"
-                                    : "1px solid var(--color-border)",
-                                background:
-                                  "linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08))",
+                                textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+                                borderRadius: 18, padding: 0, overflow: "hidden",
+                                display: "flex", flexDirection: "column",
+                                border: boostTier === "boost"
+                                  ? "1.5px solid rgba(88,101,242,0.7)"
+                                  : "1.5px solid var(--color-border)",
+                                background: "var(--color-surface)",
+                                boxShadow: boostTier === "boost"
+                                  ? "0 0 0 1px rgba(88,101,242,0.12) inset, 0 8px 40px rgba(88,101,242,0.22)"
+                                  : "0 2px 12px rgba(0,0,0,0.08)",
+                                transition: "border-color 0.2s, box-shadow 0.2s",
                               }}
                             >
-                              <div style={{ fontSize: 30, fontWeight: 950, marginBottom: 6 }}>
-                                {t("chat.boostStore.plans.boost.name")}
+                              {/* Header strip — semi-transparent so adapts to any theme bg */}
+                              <div style={{
+                                padding: "16px 18px 14px",
+                                background: "linear-gradient(135deg, rgba(88,101,242,0.38), rgba(124,58,237,0.3))",
+                                borderBottom: "1px solid rgba(88,101,242,0.2)",
+                                position: "relative", overflow: "hidden",
+                              }}>
+                                <div style={{
+                                  position: "absolute", inset: 0, pointerEvents: "none",
+                                  background: "radial-gradient(ellipse 110% 70% at 50% 0%, rgba(165,180,252,0.1), transparent 70%)",
+                                }} />
+                                {/* Rocket icon */}
+                                <div style={{
+                                  width: 40, height: 40, borderRadius: 12, marginBottom: 10,
+                                  background: "linear-gradient(135deg, #5865f2, #7c3aed)",
+                                  boxShadow: "0 0 20px rgba(88,101,242,0.5)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  color: "#fff", position: "relative", zIndex: 1,
+                                }}>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M4.5 16.5c-1.5 1.5-2 4-2 4s2.5-.5 4-2l-.5-.5A1 1 0 0 0 4.5 16.5Z"/>
+                                    <path d="M12 2c-3 0-6 3-6 6 0 1.8.8 3.4 2 4.5l3.5 3.5c1.1 1.2 2.7 2 4.5 2 3 0 6-3 6-6 0-4.4-3.6-10-10-10Z"/>
+                                    <circle cx="16" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+                                  </svg>
+                                </div>
+                                {/* Badge / check */}
+                                {boostTier === "boost" ? (
+                                  <span style={{
+                                    position: "absolute", top: 12, right: 12, zIndex: 2,
+                                    width: 26, height: 26, borderRadius: "50%",
+                                    background: "linear-gradient(135deg, #5865f2, #7c3aed)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    color: "#fff", fontSize: 13, fontWeight: 900,
+                                    boxShadow: "0 2px 12px rgba(88,101,242,0.55)",
+                                  }}>✓</span>
+                                ) : (
+                                  <span style={{
+                                    position: "absolute", top: 12, right: 12, zIndex: 2,
+                                    padding: "3px 10px", borderRadius: 999,
+                                    fontSize: 11, fontWeight: 900, letterSpacing: "0.04em",
+                                    background: "linear-gradient(135deg, #facc15, #f59e0b)",
+                                    color: "#1a1200", boxShadow: "0 2px 10px rgba(250,204,21,0.35)",
+                                  }}>Phổ biến</span>
+                                )}
+                                {/* Plan name — white text always readable on the gradient header */}
+                                <div style={{
+                                  fontSize: 24, fontWeight: 950, marginBottom: 3,
+                                  letterSpacing: "-0.02em", paddingRight: 48,
+                                  color: "#fff", position: "relative", zIndex: 1,
+                                  textShadow: "0 1px 4px rgba(0,0,0,0.3)",
+                                }}>
+                                  {t("chat.boostStore.plans.boost.name")}
+                                </div>
+                                {/* Price */}
+                                <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(220,215,255,0.95)", position: "relative", zIndex: 1 }}>
+                                  {t("chat.boostStore.plans.boost.priceMonthly")}
+                                </div>
                               </div>
-                              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                                {t("chat.boostStore.plans.boost.priceMonthly")}
+                              {/* Feature rows — use theme text color */}
+                              <div style={{ padding: "14px 18px 16px", display: "grid", gap: 9, flex: 1, alignContent: "start" }}>
+                                {[
+                                  t("chat.boostStore.plans.boost.feature1"),
+                                  t("chat.boostStore.plans.boost.feature2"),
+                                  t("chat.boostStore.plans.boost.feature3"),
+                                  t("chat.boostStore.plans.boost.feature4"),
+                                  t("chat.boostStore.plans.boost.feature5"),
+                                ].map((feat, i) => (
+                                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+                                    <span style={{
+                                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                                      background: "rgba(88,101,242,0.14)",
+                                      border: "1.5px solid rgba(88,101,242,0.5)",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      color: "#5865f2", fontSize: 10, fontWeight: 900, lineHeight: "1",
+                                    }}>✓</span>
+                                    <span style={{ fontSize: 13, color: "var(--color-text)", lineHeight: 1.45 }}>{feat}</span>
+                                  </div>
+                                ))}
                               </div>
-                              <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.45 }}>
-                                <li>{t("chat.boostStore.plans.boost.feature1")}</li>
-                                <li>{t("chat.boostStore.plans.boost.feature2")}</li>
-                                <li>{t("chat.boostStore.plans.boost.feature3")}</li>
-                                <li>{t("chat.boostStore.plans.boost.feature4")}</li>
-                                <li>{t("chat.boostStore.plans.boost.feature5")}</li>
-                              </ul>
                             </button>
 
+                            {/* ── BASIC card ─────────────────────────────── */}
                             <button
                               type="button"
                               onClick={() => setBoostTier("basic")}
                               style={{
-                                textAlign: "left",
-                                borderRadius: 16,
-                                padding: 14,
-                                cursor: "pointer",
-                                border:
-                                  boostTier === "basic"
-                                    ? "1px solid color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%)"
-                                    : "1px solid var(--color-border)",
-                                background:
-                                  "linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08))",
+                                textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+                                borderRadius: 18, padding: 0, overflow: "hidden",
+                                display: "flex", flexDirection: "column",
+                                border: boostTier === "basic"
+                                  ? "1.5px solid rgba(124,58,237,0.65)"
+                                  : "1.5px solid var(--color-border)",
+                                background: "var(--color-surface)",
+                                boxShadow: boostTier === "basic"
+                                  ? "0 0 0 1px rgba(124,58,237,0.1) inset, 0 8px 36px rgba(124,58,237,0.18)"
+                                  : "0 2px 12px rgba(0,0,0,0.08)",
+                                transition: "border-color 0.2s, box-shadow 0.2s",
                               }}
                             >
-                              <div style={{ fontSize: 26, fontWeight: 950, marginBottom: 6 }}>
-                                {t("chat.boostStore.plans.basic.name")}
+                              {/* Header strip */}
+                              <div style={{
+                                padding: "16px 18px 14px",
+                                background: "linear-gradient(135deg, rgba(124,58,237,0.28), rgba(88,101,242,0.2))",
+                                borderBottom: "1px solid rgba(124,58,237,0.18)",
+                                position: "relative", overflow: "hidden",
+                              }}>
+                                {/* Star icon */}
+                                <div style={{
+                                  width: 40, height: 40, borderRadius: 12, marginBottom: 10,
+                                  background: "rgba(124,58,237,0.45)",
+                                  border: "1px solid rgba(124,58,237,0.5)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  color: "#e2d9f3", position: "relative", zIndex: 1,
+                                }}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" opacity="0.9"/>
+                                  </svg>
+                                </div>
+                                {/* Check */}
+                                {boostTier === "basic" && (
+                                  <span style={{
+                                    position: "absolute", top: 12, right: 12, zIndex: 2,
+                                    width: 26, height: 26, borderRadius: "50%",
+                                    background: "linear-gradient(135deg, #7c3aed, #5865f2)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    color: "#fff", fontSize: 13, fontWeight: 900,
+                                    boxShadow: "0 2px 12px rgba(124,58,237,0.5)",
+                                  }}>✓</span>
+                                )}
+                                {/* Plan name */}
+                                <div style={{
+                                  fontSize: 22, fontWeight: 950, marginBottom: 3,
+                                  letterSpacing: "-0.02em", color: "#fff", paddingRight: 40,
+                                  position: "relative", zIndex: 1,
+                                  textShadow: "0 1px 4px rgba(0,0,0,0.3)",
+                                }}>
+                                  {t("chat.boostStore.plans.basic.name")}
+                                </div>
+                                {/* Price */}
+                                <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(220,215,255,0.9)", position: "relative", zIndex: 1 }}>
+                                  {t("chat.boostStore.plans.basic.priceMonthly")}
+                                </div>
                               </div>
-                              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                                {t("chat.boostStore.plans.basic.priceMonthly")}
+                              {/* Feature rows */}
+                              <div style={{ padding: "14px 18px 16px", display: "grid", gap: 9, flex: 1, alignContent: "start" }}>
+                                {[
+                                  t("chat.boostStore.plans.basic.feature1"),
+                                  t("chat.boostStore.plans.basic.feature2"),
+                                  t("chat.boostStore.plans.basic.feature3"),
+                                ].map((feat, i) => (
+                                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+                                    <span style={{
+                                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                                      background: "rgba(124,58,237,0.12)",
+                                      border: "1.5px solid rgba(124,58,237,0.48)",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      color: "#7c3aed", fontSize: 10, fontWeight: 900, lineHeight: "1",
+                                    }}>✓</span>
+                                    <span style={{ fontSize: 13, color: "var(--color-text)", lineHeight: 1.45 }}>{feat}</span>
+                                  </div>
+                                ))}
                               </div>
-                              <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.45 }}>
-                                <li>{t("chat.boostStore.plans.basic.feature1")}</li>
-                                <li>{t("chat.boostStore.plans.basic.feature2")}</li>
-                                <li>{t("chat.boostStore.plans.basic.feature3")}</li>
-                              </ul>
                             </button>
                           </div>
 
@@ -10452,7 +10577,9 @@ export default function MessagesPage() {
                       style={{
                         position: "fixed",
                         inset: 0,
-                        background: "rgba(0,0,0,0.45)",
+                        background: "rgba(0,0,0,0.78)",
+                        backdropFilter: "blur(14px) saturate(140%)",
+                        WebkitBackdropFilter: "blur(14px) saturate(140%)",
                         display: "grid",
                         placeItems: "center",
                         padding: 24,
@@ -10463,20 +10590,21 @@ export default function MessagesPage() {
                         onMouseDown={(e) => e.stopPropagation()}
                         style={{
                           width: "min(440px, 92vw)",
-                          borderRadius: 14,
-                          border: "1px solid var(--color-border)",
-                          background: "var(--color-surface)",
-                          padding: 16,
-                          boxShadow: "0 16px 48px rgba(2,6,23,0.4)",
+                          borderRadius: 18,
+                          border: "1px solid rgba(88,101,242,0.28)",
+                          background: "rgba(8,6,22,0.96)",
+                          backdropFilter: "blur(24px)",
+                          padding: "22px 20px",
+                          boxShadow: "0 0 0 1px rgba(88,101,242,0.08) inset, 0 24px 70px rgba(0,0,0,0.7), 0 0 80px rgba(88,101,242,0.08)",
                           display: "grid",
-                          gap: 12,
-                          color: "var(--color-text)",
+                          gap: 14,
+                          color: "#fff",
                         }}
                       >
-                        <div style={{ fontWeight: 950, fontSize: 16 }}>
+                        <div style={{ fontWeight: 950, fontSize: 17, color: "#fff", letterSpacing: "-0.01em" }}>
                           {t("chat.boostStore.warnings.activeTitle")}
                         </div>
-                        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "var(--color-text-muted)" }}>
+                        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.6)" }}>
                           {t("chat.boostStore.warnings.activeBodyPrefix")}
                           {boostStatus?.expiresAt
                             ? ` đến ${new Date(boostStatus.expiresAt).toLocaleString(localeTagForLanguage(language), {
@@ -10486,19 +10614,20 @@ export default function MessagesPage() {
                             : ""}
                           . {t("chat.boostStore.warnings.activeBodySuffix")}
                         </p>
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
                           <button
                             type="button"
                             onClick={() => setBoostActivePeriodWarnOpen(false)}
                             style={{
                               borderRadius: 12,
-                              padding: "10px 14px",
+                              padding: "10px 18px",
                               fontSize: 14,
-                              fontWeight: 900,
+                              fontWeight: 700,
                               cursor: "pointer",
-                              color: "var(--color-text)",
-                              background: "var(--color-surface-muted)",
-                              border: "1px solid var(--color-border)",
+                              color: "rgba(255,255,255,0.7)",
+                              background: "rgba(255,255,255,0.06)",
+                              border: "1.5px solid rgba(255,255,255,0.1)",
+                              fontFamily: "inherit",
                             }}
                           >
                             {t("chat.boostStore.actions.abort")}
@@ -10512,13 +10641,14 @@ export default function MessagesPage() {
                             style={{
                               border: "none",
                               borderRadius: 12,
-                              padding: "10px 14px",
+                              padding: "10px 22px",
                               fontSize: 14,
-                              fontWeight: 900,
+                              fontWeight: 800,
                               cursor: "pointer",
                               color: "#fff",
-                              background:
-                                "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
+                              background: "linear-gradient(135deg, #5865f2, #7c3aed)",
+                              boxShadow: "0 4px 18px rgba(88,101,242,0.45)",
+                              fontFamily: "inherit",
                             }}
                           >
                             {t("chat.boostStore.actions.continue")}
@@ -10539,7 +10669,9 @@ export default function MessagesPage() {
                       style={{
                         position: "fixed",
                         inset: 0,
-                        background: "rgba(0,0,0,0.45)",
+                        background: "rgba(0,0,0,0.78)",
+                        backdropFilter: "blur(14px) saturate(140%)",
+                        WebkitBackdropFilter: "blur(14px) saturate(140%)",
                         display: "grid",
                         placeItems: "center",
                         padding: 24,
@@ -10550,22 +10682,23 @@ export default function MessagesPage() {
                         onMouseDown={(e) => e.stopPropagation()}
                         style={{
                           width: "min(460px, 92vw)",
-                          borderRadius: 14,
-                          border: "1px solid var(--color-border)",
-                          background: "var(--color-surface)",
-                          padding: 16,
-                          boxShadow: "0 16px 48px rgba(2,6,23,0.4)",
+                          borderRadius: 18,
+                          border: "1px solid rgba(88,101,242,0.28)",
+                          background: "rgba(8,6,22,0.96)",
+                          backdropFilter: "blur(24px)",
+                          padding: "22px 20px",
+                          boxShadow: "0 0 0 1px rgba(88,101,242,0.08) inset, 0 24px 70px rgba(0,0,0,0.7), 0 0 80px rgba(88,101,242,0.08)",
                           display: "grid",
-                          gap: 12,
-                          color: "var(--color-text)",
+                          gap: 14,
+                          color: "#fff",
                         }}
                       >
-                        <div style={{ fontWeight: 950, fontSize: 16 }}>
+                        <div style={{ fontWeight: 950, fontSize: 17, color: "#fff", letterSpacing: "-0.01em" }}>
                           {t("chat.boostStore.warnings.switchTitle")}
                         </div>
-                        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--color-text-muted)" }}>
+                        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.6)" }}>
                           {t("chat.boostStore.warnings.switchBodyPrefix")}{" "}
-                          <strong style={{ color: "var(--color-text)" }}>
+                          <strong style={{ color: "#c4b5fd" }}>
                             {boostStatus?.tier === "basic"
                               ? t("chat.boostStore.plans.basic.name")
                               : boostStatus?.tier === "boost"
@@ -10573,27 +10706,28 @@ export default function MessagesPage() {
                                 : t("chat.boostStore.warnings.switchCurrentFallback")}
                           </strong>{" "}
                           {t("chat.boostStore.warnings.switchBodyMiddle")}{" "}
-                          <strong style={{ color: "var(--color-text)" }}>
+                          <strong style={{ color: "#a5b4fc" }}>
                             {boostTier === "basic"
                               ? t("chat.boostStore.plans.basic.name")
                               : t("chat.boostStore.plans.boost.name")}
                           </strong>
                           . {t("chat.boostStore.warnings.switchBodySuffix")}{" "}
-                          <strong>{t("chat.boostStore.warnings.switchBodyStrong")}</strong>.
+                          <strong style={{ color: "#fff" }}>{t("chat.boostStore.warnings.switchBodyStrong")}</strong>.
                         </p>
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
                           <button
                             type="button"
                             onClick={() => setBoostTierSwitchWarnOpen(false)}
                             style={{
                               borderRadius: 12,
-                              padding: "10px 14px",
+                              padding: "10px 18px",
                               fontSize: 14,
-                              fontWeight: 900,
+                              fontWeight: 700,
                               cursor: "pointer",
-                              color: "var(--color-text)",
-                              background: "var(--color-surface-muted)",
-                              border: "1px solid var(--color-border)",
+                              color: "rgba(255,255,255,0.7)",
+                              background: "rgba(255,255,255,0.06)",
+                              border: "1.5px solid rgba(255,255,255,0.1)",
+                              fontFamily: "inherit",
                             }}
                           >
                             {t("chat.boostStore.actions.abort")}
@@ -10609,14 +10743,15 @@ export default function MessagesPage() {
                             style={{
                               border: "none",
                               borderRadius: 12,
-                              padding: "10px 14px",
+                              padding: "10px 22px",
                               fontSize: 14,
-                              fontWeight: 900,
+                              fontWeight: 800,
                               cursor: boostCheckoutBusy ? "wait" : "pointer",
                               color: "#fff",
-                              background:
-                                "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
+                              background: "linear-gradient(135deg, #5865f2, #7c3aed)",
+                              boxShadow: "0 4px 18px rgba(88,101,242,0.45)",
                               opacity: boostCheckoutBusy ? 0.65 : 1,
+                              fontFamily: "inherit",
                             }}
                           >
                             {boostCheckoutBusy
@@ -11847,7 +11982,22 @@ export default function MessagesPage() {
             </>
             ) : (
               <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>💬</div>
+                <div className={styles.emptyOrbitScene}>
+                  <div className={styles.emptyOrbitRing1}>
+                    <div className={styles.emptyOrbitDot1} />
+                  </div>
+                  <div className={styles.emptyOrbitRing2}>
+                    <div className={styles.emptyOrbitDot2} />
+                  </div>
+                  <div className={styles.emptyIcon}>
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      <circle cx="9" cy="10.5" r="1" fill="currentColor" stroke="none"/>
+                      <circle cx="12" cy="10.5" r="1" fill="currentColor" stroke="none"/>
+                      <circle cx="15" cy="10.5" r="1" fill="currentColor" stroke="none"/>
+                    </svg>
+                  </div>
+                </div>
                 <p className={styles.emptyText}>
                   {loading
                     ? t("chat.chatPage.loadingSelectServer")

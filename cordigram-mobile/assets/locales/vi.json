@@ -89,7 +89,13 @@
     "profile": {
       "title": "Hồ sơ",
       "main": "Hồ sơ chính",
-      "server": "Hồ sơ máy chủ"
+      "server": "Hồ sơ máy chủ",
+      "profilePage": "Trang hồ sơ",
+      "aboutThisUser": "Giới thiệu người dùng",
+      "followersList": "Danh sách người theo dõi",
+      "followingList": "Danh sách đang theo dõi",
+      "accountAge": "Tuổi tài khoản",
+      "publishedPosts": "Bài đã xuất bản"
     },
     "activity": {
       "activityLog": "Nhật ký hoạt động",
@@ -351,10 +357,15 @@
       "loadingHistory": "Đang tải lịch sử vi phạm...",
       "noViolations": "Không tìm thấy vi phạm.",
       "refreshing": "Đang làm mới...",
-      "tapToView": "Nhấn để xem nội dung vi phạm",
+      "tapToView": "Xem chi tiết ›",
       "unableToLoad": "Không thể tải lịch sử vi phạm.",
       "reason": "Lý do: {reason}",
       "noReasonProvided": "Không có lý do.",
+      "statusClean": "Sạch sẽ",
+      "statusLow": "Mức thấp",
+      "statusHigh": "Mức cao",
+      "strikeBadge": "Strike {delta} (Tổng {total})",
+      "strikeHint": "Điểm vi phạm sẽ giảm theo thời gian khi hành vi tốt.",
       "severity": {
         "high": "Cao",
         "medium": "Trung bình",
@@ -393,7 +404,41 @@
       "masterHint": "Bật: thông báo bình thường. Tắt: tắt mọi thông báo (social + DM/server qua cài đặt tài khoản).",
       "enabledToast": "Đã bật thông báo.",
       "disabledToast": "Đã tắt thông báo.",
-      "soundLabel": "Âm thanh thông báo (tin & thông báo mới)"
+      "soundLabel": "Âm thanh thông báo (tin & thông báo mới)",
+      "pushNotifications": "Thông báo đẩy",
+      "muteNotifications": "Tắt thông báo",
+      "chooseHowLongCategory": "Chọn thời gian tắt {label}",
+      "status": {
+        "enabled": "Đã bật",
+        "muted": "Đã tắt",
+        "mutedIndefinitely": "Đã tắt vô thời hạn",
+        "mutedLessThanMinute": "Đã tắt (ít hơn 1 phút)",
+        "mutedMinutes": "Đã tắt {n} phút",
+        "mutedHours": "Đã tắt {n} giờ",
+        "mutedDays": "Đã tắt {n} ngày"
+      },
+      "categories": {
+        "follow": "Theo dõi",
+        "followDesc": "Khi ai đó theo dõi bạn.",
+        "comment": "Bình luận",
+        "commentDesc": "Khi ai đó bình luận bài viết của bạn.",
+        "like": "Lượt thích",
+        "likeDesc": "Khi ai đó thích bài viết của bạn.",
+        "mentions": "Đề cập",
+        "mentionsDesc": "Khi ai đó đề cập đến bạn.",
+        "system": "Hệ thống",
+        "systemDesc": "Cập nhật quan trọng từ Cordigram."
+      },
+      "muteOptions": {
+        "5m": "5 phút",
+        "10m": "10 phút",
+        "15m": "15 phút",
+        "30m": "30 phút",
+        "1h": "1 giờ",
+        "1d": "1 ngày",
+        "until": "Cho đến khi tôi tắt",
+        "custom": "Chọn ngày & giờ"
+      }
     },
     "hubHint": "Tùy chỉnh tin nhắn, quyền riêng tư và giao diện. Cài đặt đồng bộ với web khi đăng nhập cùng tài khoản.",
     "sections": {
@@ -3835,6 +3880,9 @@
     "optFollowers": "Người theo dõi",
     "optPublic": "Công khai",
     "optPrivate": "Chỉ mình tôi",
+    "descFollowers": "Chỉ người đang theo dõi bạn",
+    "descPublic": "Tất cả mọi người có thể xem",
+    "descPrivate": "Chỉ mình bạn xem được",
     "btnPost": "Đăng Story",
     "btnPosting": "Đang đăng...",
     "btnChangePhoto": "Đổi ảnh",

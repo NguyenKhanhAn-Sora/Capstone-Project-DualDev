@@ -5,6 +5,22 @@ import * as serversApi from "@/lib/servers-api";
 import styles from "./AutoModSection.module.css";
 import { useLanguage } from "@/component/language-provider";
 
+const IcoVoice = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+  </svg>
+);
+const IcoUser = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+const IcoXSmall = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+
 interface Props {
   serverId: string;
   canManageSettings: boolean;
@@ -77,7 +93,7 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
     const tags: Array<{ icon: string; label: string }> = [];
     if (src.responses.blockMessage) tags.push({ icon: "✕", label: t("chat.autoMod.tagBlock") });
     if (src.responses.sendWarning) tags.push({ icon: "#", label: t("chat.autoMod.tagWarn") });
-    if (src.responses.restrictMember) tags.push({ icon: "👤", label: t("chat.autoMod.tagRestrict") });
+    if (src.responses.restrictMember) tags.push({ icon: "@", label: t("chat.autoMod.tagRestrict") });
     return tags;
   }, [draft, savedMsf, dirty, t]);
 
@@ -175,7 +191,7 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
               <h3 className={styles.sectionTitle}>{t("chat.autoMod.section2Title")}</h3>
             </div>
             <div className={styles.responseList}>
-              <label className={styles.responseItem}>
+              <div className={styles.responseItem} onClick={() => canManageSettings && updateDraftResponses({ blockMessage: !draft.responses.blockMessage })}>
                 <div className={`${styles.responseIcon} ${styles.responseIconBlock}`}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.36 5.64a1 1 0 0 0-1.41 0L12 10.59 7.05 5.64a1 1 0 1 0-1.41 1.41L10.59 12l-4.95 4.95a1 1 0 1 0 1.41 1.41L12 13.41l4.95 4.95a1 1 0 0 0 1.41-1.41L13.41 12l4.95-4.95a1 1 0 0 0 0-1.41z" />
@@ -191,17 +207,21 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
                     </button>
                   </p>
                 </div>
-                <input type="checkbox" className={styles.responseCheckbox} checked={draft.responses.blockMessage} disabled={!canManageSettings} onChange={() => updateDraftResponses({ blockMessage: !draft.responses.blockMessage })} />
-              </label>
-              <label className={styles.responseItem}>
-                <div className={`${styles.responseIcon} ${styles.responseIconWarn}`}><span style={{ fontWeight: 700, fontSize: 16 }}>#</span></div>
+                <button type="button" className={styles.responseToggle} data-on={String(draft.responses.blockMessage)} disabled={!canManageSettings} onClick={(e) => { e.stopPropagation(); updateDraftResponses({ blockMessage: !draft.responses.blockMessage }); }}>
+                  <span className={styles.responseToggleThumb} />
+                </button>
+              </div>
+              <div className={styles.responseItem} onClick={() => canManageSettings && updateDraftResponses({ sendWarning: !draft.responses.sendWarning })}>
+                <div className={`${styles.responseIcon} ${styles.responseIconWarn}`}><span style={{ fontWeight: 800, fontSize: 15 }}>#</span></div>
                 <div className={styles.responseBody}>
                   <p className={styles.responseTitle}>{t("chat.autoMod.warnTitle")}</p>
                   <p className={styles.responseDesc}>{t("chat.autoMod.warnDesc")}</p>
                 </div>
-                <input type="checkbox" className={styles.responseCheckbox} checked={draft.responses.sendWarning} disabled={!canManageSettings} onChange={() => updateDraftResponses({ sendWarning: !draft.responses.sendWarning })} />
-              </label>
-              <label className={styles.responseItem}>
+                <button type="button" className={styles.responseToggle} data-on={String(draft.responses.sendWarning)} disabled={!canManageSettings} onClick={(e) => { e.stopPropagation(); updateDraftResponses({ sendWarning: !draft.responses.sendWarning }); }}>
+                  <span className={styles.responseToggleThumb} />
+                </button>
+              </div>
+              <div className={styles.responseItem} onClick={() => canManageSettings && updateDraftResponses({ restrictMember: !draft.responses.restrictMember })}>
                 <div className={`${styles.responseIcon} ${styles.responseIconRestrict}`}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v2h20v-2c0-3.3-6.7-5-10-5z" /></svg>
                 </div>
@@ -209,8 +229,10 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
                   <p className={styles.responseTitle}>{t("chat.autoMod.restrictTitle")}</p>
                   <p className={styles.responseDesc}>{t("chat.autoMod.restrictDesc")}</p>
                 </div>
-                <input type="checkbox" className={styles.responseCheckbox} checked={draft.responses.restrictMember} disabled={!canManageSettings} onChange={() => updateDraftResponses({ restrictMember: !draft.responses.restrictMember })} />
-              </label>
+                <button type="button" className={styles.responseToggle} data-on={String(draft.responses.restrictMember)} disabled={!canManageSettings} onClick={(e) => { e.stopPropagation(); updateDraftResponses({ restrictMember: !draft.responses.restrictMember }); }}>
+                  <span className={styles.responseToggleThumb} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -230,7 +252,7 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
                       <div className={styles.dropdownGroupTitle}>{t("chat.autoMod.groupChannels")}</div>
                       {filteredChannels.map((ch) => (
                         <div key={ch._id} className={styles.dropdownItem} onMouseDown={(e) => e.preventDefault()} onClick={() => { addExemptChannel(ch._id); setSearchQuery(""); setSearchOpen(false); }}>
-                          <span className={styles.dropdownItemIcon}>{ch.type === "voice" ? "🔊" : "#"}</span>{ch.name}
+                          <span className={styles.dropdownItemIcon}>{ch.type === "voice" ? <IcoVoice /> : "#"}</span>{ch.name}
                         </div>
                       ))}
                     </>
@@ -240,7 +262,7 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
                       <div className={styles.dropdownGroupTitle}>{t("chat.autoMod.groupRoles")}</div>
                       {filteredRoles.map((r) => (
                         <div key={r._id} className={styles.dropdownItem} onMouseDown={(e) => e.preventDefault()} onClick={() => { addExemptRole(r._id); setSearchQuery(""); setSearchOpen(false); }}>
-                          <span className={styles.dropdownItemIcon} style={{ color: r.color || undefined }}>@</span>{r.name}
+                          <span className={styles.dropdownItemIcon} style={{ color: r.color || undefined }}><IcoUser /></span>{r.name}
                         </div>
                       ))}
                     </>
@@ -255,10 +277,10 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
             {(exemptChannelNames.length > 0 || exemptRoleNames.length > 0) && (
               <div className={styles.exemptTags}>
                 {exemptChannelNames.map((c) => (
-                  <span key={c.id} className={styles.exemptTag}># {c.name}<button type="button" className={styles.exemptTagRemove} onClick={() => removeExemptChannel(c.id)}>×</button></span>
+                  <span key={c.id} className={styles.exemptTag}># {c.name}<button type="button" className={styles.exemptTagRemove} onClick={() => removeExemptChannel(c.id)}><IcoXSmall /></button></span>
                 ))}
                 {exemptRoleNames.map((r) => (
-                  <span key={r.id} className={styles.exemptTag}>@ {r.name}<button type="button" className={styles.exemptTagRemove} onClick={() => removeExemptRole(r.id)}>×</button></span>
+                  <span key={r.id} className={styles.exemptTag}>@ {r.name}<button type="button" className={styles.exemptTagRemove} onClick={() => removeExemptRole(r.id)}><IcoXSmall /></button></span>
                 ))}
               </div>
             )}

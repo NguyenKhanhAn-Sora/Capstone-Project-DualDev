@@ -1,131 +1,202 @@
+/* ══════════════════════════════════════════════════════════════
+   Invite Popup — Server & Voice Channel
+   Layout/UI: global (all themes)
+   Colors: CSS variables — galaxy-specific overrides at bottom
+══════════════════════════════════════════════════════════════ */
+
+/* ── Backdrop ── */
 .overlay {
   position: fixed;
   inset: 0;
-  background: var(--color-overlay);
+  background: var(--color-overlay, rgba(0, 0, 0, 0.65));
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10003;
-  animation: fadeIn 0.2s ease-out;
+  padding: 16px;
+  animation: inviteOverlayIn 0.22s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes inviteOverlayIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
+}
+
+/* ── Card ── */
+@keyframes inviteCardIn {
+  from {
+    opacity: 0;
+    transform: perspective(1000px) rotateX(10deg) translateY(28px) scale(0.95);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1000px) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0);
+  }
 }
 
 .modal {
   position: relative;
   background: var(--color-panel-bg);
-  border-radius: 12px;
-  width: 90%;
-  max-width: 440px;
-  max-height: 90vh;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 24px 24px 20px;
+  overflow: hidden;
   border: 1px solid var(--color-panel-border);
-  animation: slideUp 0.3s ease-out;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 32px 80px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: inviteCardIn 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
+/* ── Close button ── */
 .closeBtn {
   position: absolute;
-  top: 16px; right: 16px;
-  background: transparent;
-  border: none;
+  top: 16px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  background: var(--color-panel-hover);
   color: var(--color-panel-text-muted);
-  font-size: 24px;
+  font-size: 22px;
   cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  line-height: 1;
+  z-index: 2;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .closeBtn:hover {
+  background: var(--color-panel-deep);
   color: var(--color-panel-text);
-  background: var(--color-panel-hover);
+  transform: rotate(8deg) scale(1.08);
 }
 
+/* ── Header ── */
 .headerTitle {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 600;
+  margin: 0 0 5px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.022em;
+  line-height: 1.22;
   color: var(--color-panel-text);
-  padding-right: 36px;
+  padding-right: 44px;
 }
 
 .headerSub {
-  margin: 0 0 16px;
+  margin: 0 0 18px;
   font-size: 13px;
   color: var(--color-panel-text-muted);
   display: flex;
   align-items: center;
   gap: 6px;
+  line-height: 1.45;
 }
 
+/* ── Search ── */
 .searchWrap {
-  margin-bottom: 12px;
   position: relative;
-}
-
-.searchInput {
-  width: 100%;
-  padding: 10px 12px 10px 36px;
-  border-radius: 4px;
-  border: 1px solid var(--color-panel-deep-border);
-  background: var(--color-panel-deep);
-  color: var(--color-panel-text);
-  font-size: 14px;
-  box-sizing: border-box;
-  outline: none;
-}
-
-.searchInput:focus {
-  border-color: var(--color-panel-accent);
+  margin-bottom: 14px;
 }
 
 .searchWrap svg {
   position: absolute;
-  left: 12px;
+  left: 13px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-panel-text-muted);
   pointer-events: none;
+  transition: color 0.18s ease;
 }
 
+.searchInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px 10px 40px;
+  border-radius: 10px;
+  border: 1.5px solid var(--color-panel-deep-border);
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.searchInput::placeholder {
+  color: var(--color-panel-text-muted);
+  opacity: 0.72;
+}
+
+.searchInput:focus {
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-panel-accent) 18%, transparent);
+}
+
+.searchWrap:focus-within svg {
+  color: var(--color-panel-accent);
+}
+
+/* ── Section label ── */
 .sectionLabel {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-panel-text-muted);
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  margin-bottom: 8px;
+  color: var(--color-panel-text-muted);
+  margin-bottom: 6px;
+  padding: 0 2px;
 }
 
+/* ── Friend list ── */
 .friendList {
-  max-height: 200px;
+  max-height: 224px;
   overflow-y: auto;
-  margin-bottom: 16px;
+  margin: 0 -4px 14px;
+  padding: 0 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-panel-border) transparent;
 }
 
+.friendList::-webkit-scrollbar {
+  width: 4px;
+}
+
+.friendList::-webkit-scrollbar-thumb {
+  border-radius: 2px;
+  background: var(--color-panel-border);
+}
+
+.emptyFriends {
+  padding: 20px 8px;
+  font-size: 13px;
+  color: var(--color-panel-text-muted);
+  text-align: center;
+  opacity: 0.72;
+}
+
+/* ── Friend row ── */
 .friendRow {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
-  border-radius: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
 }
 
 .friendRow:hover {
@@ -133,8 +204,8 @@
 }
 
 .friendAvatar {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--color-panel-accent);
   flex-shrink: 0;
@@ -142,11 +213,11 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  overflow: hidden;
+  font-weight: 700;
+  font-size: 16px;
   background-size: cover;
   background-position: center;
+  overflow: hidden;
 }
 
 .friendInfo {
@@ -156,83 +227,140 @@
 
 .friendDisplayName {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-panel-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .friendUsername {
   font-size: 12px;
   color: var(--color-panel-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
 }
 
+/* ── Invite button ── */
 .inviteFriendBtn {
-  padding: 6px 14px;
-  border-radius: 4px;
+  padding: 7px 16px;
+  border-radius: 20px;
   border: none;
   background: var(--color-panel-accent);
   color: #fff;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
   flex-shrink: 0;
+  letter-spacing: 0.01em;
+  transition: background 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
 }
 
-.inviteFriendBtn:hover {
+.inviteFriendBtn:hover:not(:disabled) {
   background: var(--color-panel-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--color-panel-accent) 50%, transparent);
 }
 
+.inviteFriendBtn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.inviteFriendBtn:disabled {
+  opacity: 0.52;
+  cursor: default;
+}
+
+/* ── Divider ── */
 .dividerWrap {
-  text-align: center;
-  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 14px;
+}
+
+.dividerWrap::before,
+.dividerWrap::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-panel-border);
 }
 
 .dividerText {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-panel-text-muted);
-  margin: 0 0 12px;
+  margin: 0;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  opacity: 0.80;
 }
 
+/* ── Link row ── */
 .linkWrap {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .linkInput {
   flex: 1;
+  min-width: 0;
   padding: 10px 12px;
-  border-radius: 4px;
-  border: 1px solid var(--color-panel-deep-border);
+  border-radius: 10px;
+  border: 1.5px solid var(--color-panel-deep-border);
   background: var(--color-panel-deep);
   color: var(--color-panel-text);
-  font-size: 13px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .copyBtn {
   padding: 10px 20px;
-  border-radius: 4px;
+  border-radius: 10px;
   border: none;
   background: var(--color-panel-accent);
   color: #fff;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+  transition: background 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
 }
 
 .copyBtn:hover {
   background: var(--color-panel-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--color-panel-accent) 45%, transparent);
+}
+
+.copyBtn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .copyBtn.copied {
-  background: var(--color-panel-success);
+  background: var(--color-panel-success, #23a55a);
 }
 
+/* ── Expire note ── */
 .expireNote {
   margin: 0;
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
   color: var(--color-panel-text-muted);
+  opacity: 0.68;
 }
 
 .expireNote a {
@@ -244,8 +372,149 @@
   text-decoration: underline;
 }
 
-.emptyFriends {
-  padding: 12px 0;
-  font-size: 13px;
-  color: var(--color-panel-text-muted);
+
+/* ══════════════════════════════════════════════════════════════
+   GALAXY THEME — color + glass overrides
+   Selector: [data-messages-theme="galaxy"] on ancestor root
+══════════════════════════════════════════════════════════════ */
+
+:global([data-messages-theme="galaxy"]) .overlay {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+
+:global([data-messages-theme="galaxy"]) .modal {
+  background: rgba(8, 10, 24, 0.84);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  border-color: rgba(88, 101, 242, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 32px 90px rgba(0, 0, 0, 0.45),
+    0 0 80px rgba(88, 101, 242, 0.09),
+    0 0 160px rgba(124, 58, 237, 0.06);
+}
+
+:global([data-messages-theme="galaxy"]) .closeBtn {
+  background: rgba(88, 101, 242, 0.10);
+  border-color: rgba(88, 101, 242, 0.16);
+  color: rgba(165, 180, 252, 0.72);
+}
+
+:global([data-messages-theme="galaxy"]) .closeBtn:hover {
+  background: rgba(237, 66, 69, 0.16);
+  border-color: rgba(237, 66, 69, 0.32);
+  color: rgba(255, 120, 120, 0.92);
+}
+
+:global([data-messages-theme="galaxy"]) .headerTitle {
+  background-image: linear-gradient(130deg, #e8ecf8 0%, #c4cef5 45%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:global([data-messages-theme="galaxy"]) .headerSub {
+  color: rgba(165, 180, 252, 0.60);
+}
+
+:global([data-messages-theme="galaxy"]) .searchInput {
+  background: rgba(6, 8, 20, 0.68);
+  border-color: rgba(88, 101, 242, 0.18);
+  color: rgba(225, 232, 252, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:global([data-messages-theme="galaxy"]) .searchInput::placeholder {
+  color: rgba(165, 180, 252, 0.38);
+  opacity: 1;
+}
+
+:global([data-messages-theme="galaxy"]) .searchInput:focus {
+  border-color: rgba(124, 58, 237, 0.60);
+  box-shadow:
+    0 0 0 3px rgba(88, 101, 242, 0.14),
+    0 0 18px rgba(124, 58, 237, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: rgba(8, 10, 26, 0.80);
+}
+
+:global([data-messages-theme="galaxy"]) .searchWrap svg {
+  color: rgba(124, 58, 237, 0.65);
+}
+
+:global([data-messages-theme="galaxy"]) .sectionLabel {
+  color: rgba(124, 58, 237, 0.68);
+}
+
+:global([data-messages-theme="galaxy"]) .friendRow:hover {
+  background: rgba(88, 101, 242, 0.09);
+  box-shadow: 0 0 0 1px rgba(88, 101, 242, 0.12) inset;
+}
+
+:global([data-messages-theme="galaxy"]) .friendDisplayName {
+  color: rgba(225, 232, 252, 0.92);
+}
+
+:global([data-messages-theme="galaxy"]) .friendUsername {
+  color: rgba(165, 180, 252, 0.55);
+}
+
+:global([data-messages-theme="galaxy"]) .inviteFriendBtn {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: 0 2px 12px rgba(88, 101, 242, 0.35);
+}
+
+:global([data-messages-theme="galaxy"]) .inviteFriendBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4752c4 0%, #6d28d9 100%);
+  box-shadow: 0 4px 18px rgba(88, 101, 242, 0.52), 0 0 14px rgba(124, 58, 237, 0.28);
+}
+
+:global([data-messages-theme="galaxy"]) .dividerWrap::before,
+:global([data-messages-theme="galaxy"]) .dividerWrap::after {
+  background: rgba(88, 101, 242, 0.18);
+}
+
+:global([data-messages-theme="galaxy"]) .dividerText {
+  color: rgba(165, 180, 252, 0.52);
+}
+
+:global([data-messages-theme="galaxy"]) .linkInput {
+  background: rgba(6, 8, 20, 0.68);
+  border-color: rgba(88, 101, 242, 0.18);
+  color: rgba(165, 180, 252, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+:global([data-messages-theme="galaxy"]) .copyBtn {
+  background: linear-gradient(135deg, #5865f2 0%, #7c3aed 100%);
+  box-shadow: 0 2px 12px rgba(88, 101, 242, 0.40);
+}
+
+:global([data-messages-theme="galaxy"]) .copyBtn:hover {
+  background: linear-gradient(135deg, #4752c4 0%, #6d28d9 100%);
+  box-shadow:
+    0 4px 20px rgba(88, 101, 242, 0.55),
+    0 0 14px rgba(124, 58, 237, 0.30);
+}
+
+:global([data-messages-theme="galaxy"]) .copyBtn.copied {
+  background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+  box-shadow: 0 2px 12px rgba(35, 165, 90, 0.40);
+}
+
+:global([data-messages-theme="galaxy"]) .expireNote {
+  color: rgba(165, 180, 252, 0.40);
+  opacity: 1;
+}
+
+:global([data-messages-theme="galaxy"]) .expireNote a {
+  color: rgba(124, 58, 237, 0.82);
+}
+
+:global([data-messages-theme="galaxy"]) .emptyFriends {
+  color: rgba(165, 180, 252, 0.48);
+  opacity: 1;
 }

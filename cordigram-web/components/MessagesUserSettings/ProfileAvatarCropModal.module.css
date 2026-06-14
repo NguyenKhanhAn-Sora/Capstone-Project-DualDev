@@ -1,3 +1,7 @@
+/* ProfileAvatarCropModal — theme-aware
+   Uses --ms-* tokens from [data-messages-theme] on overlay.
+*/
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -9,14 +13,42 @@
   padding: 20px;
 }
 
+/* ── Card — CSS variable root (dark defaults) ── */
 .card {
+  --ms-bg:         #313338;
+  --ms-bg-alt:     #1e1f22;
+  --ms-bg-input:   #2b2d31;
+  --ms-border:     rgba(255, 255, 255, 0.08);
+  --ms-text:       #f2f3f5;
+  --ms-text-muted: #b5bac1;
+
   width: min(520px, 96vw);
-  background: #313338;
+  background: var(--ms-bg);
   border-radius: 12px;
-  border: 1px solid #1e1f22;
-  color: #f2f3f5;
+  border: 1px solid var(--ms-border);
+  color: var(--ms-text);
   max-height: 90vh;
   overflow: auto;
+}
+
+:global([data-messages-theme="light"]) .card {
+  --ms-bg:         #f6f8fb;
+  --ms-bg-alt:     #eef1f7;
+  --ms-bg-input:   #e8edf5;
+  --ms-border:     rgba(0, 0, 0, 0.09);
+  --ms-text:       #0f1629;
+  --ms-text-muted: #5b6378;
+}
+
+:global([data-messages-theme="galaxy"]) .card {
+  --ms-bg:         rgba(14, 18, 32, 0.98);
+  --ms-bg-alt:     rgba(8, 10, 22, 0.99);
+  --ms-bg-input:   rgba(6, 8, 20, 0.88);
+  --ms-border:     rgba(124, 58, 237, 0.25);
+  --ms-text:       #dde2f0;
+  --ms-text-muted: #7a8db8;
+
+  box-shadow: 0 0 40px rgba(88, 101, 242, 0.12);
 }
 
 .head {
@@ -24,7 +56,7 @@
   align-items: flex-start;
   justify-content: space-between;
   padding: 16px 18px;
-  border-bottom: 1px solid #2b2d31;
+  border-bottom: 1px solid var(--ms-border);
 }
 
 .head h3 {
@@ -36,16 +68,20 @@
 .head p {
   margin: 6px 0 0;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--ms-text-muted);
 }
 
 .close {
   border: none;
   background: transparent;
-  color: #b5bac1;
+  color: var(--ms-text-muted);
   font-size: 22px;
   cursor: pointer;
   line-height: 1;
+}
+
+.close:hover {
+  color: var(--ms-text);
 }
 
 .body {
@@ -67,7 +103,7 @@
   height: 280px;
   border-radius: 10px;
   overflow: hidden;
-  background: #1e1f22;
+  background: var(--ms-bg-alt);
 }
 
 .side {
@@ -81,7 +117,7 @@
   height: 88px;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid #1e1f22;
+  border: 3px solid var(--ms-bg-alt);
   align-self: center;
 }
 
@@ -96,7 +132,7 @@
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--ms-text-muted);
 }
 
 .sliderRow input[type="range"] {
@@ -118,11 +154,17 @@
 .btnGhost {
   padding: 8px 14px;
   border-radius: 6px;
-  border: none;
-  background: #4e5058;
-  color: #fff;
+  border: 1px solid var(--ms-border);
+  background: transparent;
+  color: var(--ms-text-muted);
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btnGhost:hover {
+  background: var(--ms-bg-input);
+  color: var(--ms-text);
 }
 
 .btnPrimary {
@@ -133,6 +175,11 @@
   color: #fff;
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btnPrimary:hover {
+  background: #4752c4;
 }
 
 .btnPrimary:disabled,

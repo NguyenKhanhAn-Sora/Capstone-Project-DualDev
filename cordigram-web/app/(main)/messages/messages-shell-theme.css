@@ -184,8 +184,8 @@
 #cordigram-messages-root[data-messages-theme="galaxy"] {
   color-scheme: dark;
   --color-bg: transparent;
-  --color-surface: rgba(12, 18, 32, 0.78);
-  --color-surface-muted: rgba(16, 24, 42, 0.82);
+  --color-surface: rgba(8, 12, 26, 0.55);
+  --color-surface-muted: rgba(10, 14, 30, 0.62);
   --color-border: rgba(31, 42, 61, 0.75);
   --color-text: #e5e7ef;
   --color-text-muted: #98a3c7;
@@ -207,15 +207,15 @@
   --user-appearance-bg: transparent;
   --color-scrollbar-thumb: #293653;
   --color-background-stat-reel: #ffffff0f;
-  --color-panel-bg: rgba(49, 51, 56, 0.82);
-  --color-panel-sidebar: rgba(43, 45, 49, 0.88);
-  --color-panel-sidebar-border: rgba(30, 31, 34, 0.88);
-  --color-panel-hover: rgba(53, 55, 60, 0.85);
-  --color-panel-active: rgba(64, 66, 73, 0.9);
+  --color-panel-bg: rgba(10, 12, 28, 0.58);
+  --color-panel-sidebar: rgba(6, 8, 18, 0.65);
+  --color-panel-sidebar-border: rgba(124, 58, 237, 0.08);
+  --color-panel-hover: rgba(88, 101, 242, 0.10);
+  --color-panel-active: rgba(88, 101, 242, 0.18);
   --color-panel-text: #f2f3f5;
   --color-panel-text-muted: #b5bac1;
   --color-panel-text-faint: #949ba4;
-  --color-panel-border: rgba(63, 65, 71, 0.8);
+  --color-panel-border: rgba(255, 255, 255, 0.05);
   --color-panel-deep: rgba(30, 31, 34, 0.9);
   --color-panel-deep-border: rgba(56, 58, 64, 0.85);
   --color-panel-context: rgba(17, 18, 20, 0.92);
@@ -228,13 +228,13 @@
   --color-panel-success-hover: #1a7d45;
   --color-panel-neutral: #4e5058;
   --color-panel-neutral-hover: #5d6069;
-  --color-chat-received: rgba(24, 34, 54, 0.82);
-  --color-chat-received-hover: rgba(30, 44, 68, 0.88);
+  --color-chat-received: rgba(12, 16, 36, 0.50);
+  --color-chat-received-hover: rgba(16, 22, 46, 0.62);
   --color-chat-overlay: rgba(4, 8, 18, 0.75);
-  --color-chat-modal: rgba(21, 32, 58, 0.9);
-  --color-chat-modal-border: rgba(36, 51, 71, 0.85);
-  --color-chat-input: rgba(16, 24, 40, 0.88);
-  --color-chat-input-border: rgba(36, 51, 71, 0.85);
+  --color-chat-modal: rgba(8, 12, 28, 0.72);
+  --color-chat-modal-border: rgba(124, 58, 237, 0.18);
+  --color-chat-input: rgba(8, 10, 22, 0.68);
+  --color-chat-input-border: rgba(124, 58, 237, 0.18);
   --color-chat-hover: rgba(28, 43, 66, 0.85);
   --color-chat-text-strong: #dde2f0;
   --color-chat-text-secondary: #8799bf;
@@ -248,9 +248,22 @@
   --color-chat-typing-border: rgba(255, 255, 255, 0.1);
   --color-voice-sent: #5865f2;
   --color-voice-sent-hover: #4752c4;
-  --color-voice-received: rgba(24, 34, 54, 0.82);
-  --color-voice-received-hover: rgba(30, 44, 68, 0.88);
+  --color-voice-received: rgba(12, 16, 36, 0.50);
+  --color-voice-received-hover: rgba(16, 22, 46, 0.62);
   --color-voice-received-text: #dde2f0;
+
+  /* ── GLASS / 3D depth tokens ── */
+  --glass-blur: blur(24px) saturate(180%);
+  --glass-blur-sm: blur(16px) saturate(160%);
+  --glass-blur-xs: blur(10px) saturate(140%);
+  --glass-bg-nav: rgba(5, 7, 14, 0.68);
+  --glass-bg-panel: rgba(8, 10, 22, 0.60);
+  --glass-bg-surface: rgba(10, 12, 26, 0.52);
+  --glass-border-hi: rgba(255, 255, 255, 0.07);
+  --glass-border-cosmic: rgba(124, 58, 237, 0.14);
+  --glass-inner-top: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --glass-inner-cosmic: inset 0 1px 0 rgba(124, 58, 237, 0.10);
+  --glass-outer-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 #cordigram-messages-root[data-messages-theme="light"],

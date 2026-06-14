@@ -206,11 +206,13 @@ export default function MessagesUserSettingsModal({
     setMessagesShellTheme(getMessagesShellTheme());
   }, [open, currentUserId]);
 
-  const cardClass = `${styles.card} ${
-    messagesShellTheme === "dark" || messagesShellTheme === "galaxy"
-      ? styles.cardDark
-      : ""
-  }`;
+  const isGalaxy = messagesShellTheme === "galaxy";
+  const isLight = messagesShellTheme === "light";
+  const cardClass = [
+    styles.card,
+    isGalaxy ? styles.cardGalaxy : "",
+    isLight ? styles.cardLight : "",
+  ].filter(Boolean).join(" ");
 
   const loadCore = useCallback(async () => {
     try {
@@ -367,7 +369,7 @@ export default function MessagesUserSettingsModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={cardClass} onMouseDown={(e) => e.stopPropagation()}>
+      <div className={cardClass} data-messages-theme={messagesShellTheme} onMouseDown={(e) => e.stopPropagation()}>
         <aside className={styles.sidebar}>
           <h2 className={styles.sidebarTitle}>{t("settings.title")}</h2>
           {nav.map((item) => (
@@ -838,6 +840,7 @@ export default function MessagesUserSettingsModal({
                   servers={servers}
                   onToast={onToast}
                   boostUnlocked={boostUnlocked}
+                  theme={messagesShellTheme}
                 />
               </>
             ) : null}
