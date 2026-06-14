@@ -66,6 +66,13 @@ const ACCENT_OVERRIDE_KEYS = [
   "--color-on-accent",
   "--color-button-x",
   "--color-border-button-x",
+  // Galaxy-only ambient tints: must be neutralized when a custom chrome is
+  // applied so the chosen background/accent color stays clean (no purple/blue bleed).
+  "--nebula-1",
+  "--nebula-2",
+  "--nebula-3",
+  "--cosmic-glow",
+  "--cosmic-glow-sm",
 ] as const;
 
 function clamp(value: number, min: number, max: number) {
@@ -272,6 +279,13 @@ export function applyAccentColor(
     );
     s.setProperty("--color-chat-read", accentUi);
     s.setProperty("--color-on-accent", onAccent);
+    // Custom background / accent → drop the galaxy ambient tints so the chosen
+    // color is not muddied by the cosmic nebula/glow layers from the dark theme.
+    s.setProperty("--nebula-1", "transparent");
+    s.setProperty("--nebula-2", "transparent");
+    s.setProperty("--nebula-3", "transparent");
+    s.setProperty("--cosmic-glow", "none");
+    s.setProperty("--cosmic-glow-sm", "none");
     if (el) {
       const panelL = getLuminance(panelBg);
       const buttonX = panelL > 0.55 ? "#1F2A3D" : "#FFFFFF";

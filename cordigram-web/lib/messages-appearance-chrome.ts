@@ -134,12 +134,18 @@ export function resolveMessagesChromeApplyHex(
   if (!u) return DEFAULT_MESSAGES_CHROME_HEX;
   migrateMessagesChromeStorageOnce(u);
 
+  // Galaxy là chế độ độc lập: không bao giờ phủ chrome nền/accent lên trên,
+  // tránh ghi đè token galaxy (giữ nền trong suốt + canvas thiên hà).
+  if (messagesShellTheme === "galaxy") {
+    return null;
+  }
+
   const source = readMessagesAppearanceSource(u);
   const stored = readMessagesChromeHex(u);
   if (source === "accent") {
     return stored;
   }
-  if (messagesShellTheme === "light" || messagesShellTheme === "galaxy") {
+  if (messagesShellTheme === "light") {
     return null;
   }
   return stored;
