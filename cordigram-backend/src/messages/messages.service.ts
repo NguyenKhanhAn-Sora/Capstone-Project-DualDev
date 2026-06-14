@@ -156,6 +156,14 @@ export class MessagesService {
     };
   }
 
+  private viewerHasWavedWelcome(msg: any, viewerId?: string): boolean {
+    if (!viewerId) return false;
+    const wavedBy = Array.isArray(msg?.welcomeWavedBy) ? msg.welcomeWavedBy : [];
+    return wavedBy.some(
+      (id: any) => String(id?._id ?? id ?? '').trim() === String(viewerId),
+    );
+  }
+
   private async handleMentionSpamViolation(
     server: any,
     userId: string,
@@ -918,7 +926,7 @@ export class MessagesService {
 
     const server = await this.serverModel
       .findById(channel.serverId)
-      .select('ownerId members safetySettings isAgeRestricted')
+      .select('ownerId members safetySettings isAgeRestricted interactionSettings')
       .lean()
       .exec();
     if (!server) throw new NotFoundException('Server not found');
@@ -954,6 +962,39 @@ export class MessagesService {
       server as any,
     );
     this.assertChatGateOrThrow(gate);
+
+    const stickerReplyEnabled =
+      (server as any)?.interactionSettings?.stickerReplyWelcomeEnabled ?? true;
+    if (!stickerReplyEnabled) {
+      throw new ForbiddenException(
+        'Tính năng vẫy tay chào đã được tắt trên máy chủ này',
+      );
+    }
+
+    if (replyTo) {
+      const welcomeMsg = await this.messageModel
+        .findOne({
+          _id: new Types.ObjectId(replyTo),
+          channelId: new Types.ObjectId(channelId),
+          messageType: 'welcome',
+          isDeleted: { $ne: true },
+        })
+        .select('_id welcomeWavedBy')
+        .exec();
+      if (!welcomeMsg) {
+        throw new BadRequestException('Không tìm thấy tin nhắn chào mừng');
+      }
+      const userOid = new Types.ObjectId(userId);
+      const alreadyWaved = (welcomeMsg.welcomeWavedBy ?? []).some(
+        (id) => id.toString() === userId,
+      );
+      if (!alreadyWaved) {
+        await this.messageModel.updateOne(
+          { _id: welcomeMsg._id },
+          { $addToSet: { welcomeWavedBy: userOid } },
+        );
+      }
+    }
 
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
@@ -1451,6 +1492,11 @@ export class MessagesService {
         for (const m of enriched) {
           if (m.messageType === 'welcome') {
             m.stickerReplyWelcomeEnabled = stickerReply;
+            m.welcomeWaveDismissedByMe = this.viewerHasWavedWelcome(
+              m,
+              viewerId,
+            );
+            delete m.welcomeWavedBy;
           }
         }
       }

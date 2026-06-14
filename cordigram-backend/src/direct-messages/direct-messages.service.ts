@@ -29,6 +29,11 @@ import { Server } from '../servers/server.schema';
 import { BoostService } from '../boost/boost.service';
 import { LinkPreviewService } from '../comment/link-preview.service';
 import { BlocksService } from '../users/blocks.service';
+import {
+  DmConversationPreferenceService,
+  DmConversationPreferencePayload,
+} from './dm-conversation-preference.service';
+import { DmConversationCategory } from './dm-conversation-preference.schema';
 
 @Injectable()
 export class DirectMessagesService {
@@ -47,6 +52,7 @@ export class DirectMessagesService {
     private readonly boostService: BoostService,
     private readonly linkPreviewService: LinkPreviewService,
     private readonly blocksService: BlocksService,
+    private readonly dmPrefService: DmConversationPreferenceService,
   ) {}
 
   /** Lần hoạt động gần nhất từ thiết bị đăng nhập (fallback khi không có socket presence). */
@@ -812,23 +818,98 @@ export class DirectMessagesService {
       unreadCount: conv.unreadCount,
     }));
 
+    const peerIds = rows
+      .map((r) => String(r.userId ?? ''))
+      .filter((id) => id && Types.ObjectId.isValid(id));
+
+    const [prefMap, followingSet, blockedByMeSet] = await Promise.all([
+      this.dmPrefService.getMapForUser(userId, peerIds),
+      this.getFollowingPeerIds(userId, peerIds),
+      this.getBlockedByMePeerIds(userId, peerIds),
+    ]);
+
     return Promise.all(
       rows.map(async (row) => {
         if (!row.userId || !Types.ObjectId.isValid(String(row.userId))) {
           return row;
         }
+        const peerId = String(row.userId);
         const part =
           await this.messagingProfilesService.buildDmParticipantPayload(
-            new Types.ObjectId(String(row.userId)),
+            new Types.ObjectId(peerId),
             row.email || '',
           );
+        const preferences =
+          prefMap.get(peerId) ?? this.dmPrefService.emptyPreference();
         return {
           ...row,
           username: part.displayName,
           avatar: part.avatar,
+          preferences,
+          isFollowing: followingSet.has(peerId),
+          isBlockedByMe: blockedByMeSet.has(peerId),
         };
       }),
     );
+  }
+
+  private async getFollowingPeerIds(
+    userId: string,
+    peerIds: string[],
+  ): Promise<Set<string>> {
+    const set = new Set<string>();
+    if (!peerIds.length || !Types.ObjectId.isValid(userId)) return set;
+    const ids = peerIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (!ids.length) return set;
+    const rows = await this.followModel
+      .find({
+        followerId: new Types.ObjectId(userId),
+        followeeId: { $in: ids },
+      })
+      .select('followeeId')
+      .lean()
+      .exec();
+    for (const row of rows as any[]) {
+      const id = row.followeeId?.toString?.();
+      if (id) set.add(id);
+    }
+    return set;
+  }
+
+  private async getBlockedByMePeerIds(
+    userId: string,
+    peerIds: string[],
+  ): Promise<Set<string>> {
+    const set = new Set<string>();
+    if (!peerIds.length || !Types.ObjectId.isValid(userId)) return set;
+    const ids = peerIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (!ids.length) return set;
+    const rows = await this.blocksService.listBlockedUserIds(userId, ids);
+    for (const id of rows) set.add(id);
+    return set;
+  }
+
+  async updateConversationPreferences(
+    userId: string,
+    peerUserId: string,
+    patch: {
+      mutedUntil?: string | null;
+      mutedForever?: boolean;
+      category?: DmConversationCategory | null;
+    },
+  ): Promise<DmConversationPreferencePayload> {
+    return this.dmPrefService.upsert(userId, peerUserId, patch);
+  }
+
+  async isDmConversationMuted(
+    userId: string,
+    peerUserId: string,
+  ): Promise<boolean> {
+    return this.dmPrefService.isMuted(userId, peerUserId);
   }
 
   /** Unread DM conversations for inbox, excluding ignored users. Returns displayName and last message. */

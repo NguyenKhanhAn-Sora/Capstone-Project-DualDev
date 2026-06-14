@@ -204,6 +204,7 @@ export interface Message {
   voiceUrl?: string;
   voiceDuration?: number;
   stickerReplyWelcomeEnabled?: boolean;
+  welcomeWaveDismissedByMe?: boolean;
   contentModerationResult?: "none" | "blurred" | "rejected";
 }
 

@@ -22,6 +22,7 @@ import 'widgets/display_name_styled_text.dart';
 import 'widgets/message_folder_dropdown.dart';
 import 'widgets/messages_inbox_sheet.dart';
 import 'widgets/message_thread_tile.dart';
+import 'widgets/dm_conversation_actions_sheet.dart';
 import 'messages_settings_screen.dart';
 import '../../core/services/accent_color_controller.dart';
 import '../../core/services/appearance_preset_controller.dart';
@@ -1070,6 +1071,13 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                             thread: thread,
                             showActivityLabel: !_isServerMode,
                             onTap: () => _openThread(thread),
+                            onLongPress: _isServerMode
+                                ? null
+                                : () => DmConversationActionsSheet.show(
+                                      context,
+                                      thread: thread,
+                                      controller: _messagesController,
+                                    ),
                           );
                         },
                       ),

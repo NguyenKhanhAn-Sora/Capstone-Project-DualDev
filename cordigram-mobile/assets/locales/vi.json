@@ -3565,8 +3565,7 @@
     "welcome": {
       "title": "Chào mừng đến với",
       "serverOf": "Máy chủ của {name}",
-      "channelBegin": "Đây là khởi đầu của kênh",
-      "startTalking": ". Hãy bắt đầu cuộc trò chuyện!",
+      "channelIntro": "Chào mừng bạn đến {serverName}. Hãy bắt đầu cuộc trò chuyện của bạn.",
       "greeting": "Rất vui được gặp bạn, {name}!",
       "unknownUser": "Ai đó",
       "waving": "Đang gửi...",
@@ -3745,13 +3744,28 @@
     "dmConversation": {
       "muteUntilForever": "Tắt thông báo đến khi tôi bật lại",
       "unmuteNotifications": "Mở lại thông báo",
+      "muteNotifications": "Tắt thông báo",
+      "mute1h": "Trong 1 giờ",
+      "mute4h": "Trong 4 giờ",
+      "muteUntil8am": "Cho đến 8:00 AM",
+      "categorize": "Phân loại",
+      "clearCategory": "Bỏ phân loại",
+      "unfollow": "Bỏ theo dõi",
       "block": "Chặn",
       "unblock": "Gỡ chặn",
       "muteDialogTitle": "Tắt thông báo tin nhắn",
       "muteDialogActiveTitle": "Thông báo đang tắt",
       "turnOnNotifications": "Bật thông báo trở lại",
       "blockUpdateError": "Không thể cập nhật chặn",
-      "now": "vừa xong"
+      "now": "vừa xong",
+      "categories": {
+        "customer": "Khách hàng",
+        "family": "Gia đình",
+        "work": "Công việc",
+        "friends": "Bạn bè",
+        "reply_later": "Trả lời sau",
+        "colleague": "Đồng nghiệp"
+      }
     }
   },
   "player": {

@@ -440,6 +440,11 @@
         "noDescription": "No description yet."
       }
     },
+    "serverProfileDropdown": {
+      "title": "Server profile",
+      "editProfile": "Edit server profile",
+      "invitePeople": "Invite people"
+    },
     "popups": {
       "closeAria": "Close",
       "loading": "Loading...",
@@ -1621,8 +1626,7 @@
     "welcome": {
       "title": "Welcome to",
       "serverOf": "{name}'s Server",
-      "channelBegin": "This is the beginning of the",
-      "startTalking": " channel. Start chatting!",
+      "channelIntro": "Welcome to {serverName}. Start your conversation.",
       "greeting": "Nice to meet you, {name}!",
       "unknownUser": "Someone",
       "waving": "Sending...",
@@ -1631,6 +1635,29 @@
     "dmList": {
       "sent": "Sent",
       "seen": "Seen"
+    },
+    "dmConversation": {
+      "menuLabel": "Conversation options for {name}",
+      "categorize": "Categorize",
+      "clearCategory": "Remove category",
+      "muteNotifications": "Mute notifications",
+      "unmuteNotifications": "Unmute notifications",
+      "mute1h": "For 1 hour",
+      "mute4h": "For 4 hours",
+      "muteUntil8am": "Until 8:00 AM",
+      "muteForever": "Until I turn it back on",
+      "unfollow": "Unfollow",
+      "block": "Block",
+      "unblock": "Unblock",
+      "moreActions": "Options",
+      "categories": {
+        "customer": "Customer",
+        "family": "Family",
+        "work": "Work",
+        "friends": "Friends",
+        "reply_later": "Reply later",
+        "colleague": "Colleague"
+      }
     },
     "mention": {
       "tooltip": "Mention (@mention)"

@@ -580,14 +580,17 @@
   pointer-events: none;
 }
 
-/* Server header (tên máy chủ + mời) */
+/* Server header (tên máy chủ + hồ sơ + mời) */
+.serverHeaderBlock {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
 .serverHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
+  padding: 12px 16px 8px;
 }
 
 .serverNameBtn {
@@ -610,6 +613,19 @@
 
 .serverNameBtn:hover {
   background: var(--color-surface-hover, rgba(255, 255, 255, 0.06));
+}
+
+.serverNameBtnOpen {
+  background: var(--color-surface-hover, rgba(255, 255, 255, 0.06));
+}
+
+.serverNameChevron {
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.serverNameChevronOpen {
+  transform: rotate(180deg);
 }
 
 .serverNameText {

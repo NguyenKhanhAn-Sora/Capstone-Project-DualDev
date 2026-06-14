@@ -123,6 +123,74 @@ class DirectMessagesService {
         mutedForever: forever,
       ),
     );
+    unawaited(
+      patchConversationPreferences(
+        peerUserId,
+        mutedUntil: duration == null && !forever ? null : mutedUntilIso,
+        mutedForever: forever ? true : (duration == null ? false : null),
+        clearMute: duration == null && !forever,
+      ),
+    );
+  }
+
+  static Future<Map<String, dynamic>> patchConversationPreferences(
+    String peerUserId, {
+    String? mutedUntil,
+    bool? mutedForever,
+    String? category,
+    bool clearCategory = false,
+    bool clearMute = false,
+  }) async {
+    final body = <String, dynamic>{};
+    if (clearMute) {
+      body['mutedUntil'] = null;
+      body['mutedForever'] = false;
+    } else {
+      if (mutedUntil != null) body['mutedUntil'] = mutedUntil;
+      if (mutedForever != null) body['mutedForever'] = mutedForever;
+    }
+    if (clearCategory) {
+      body['category'] = null;
+    } else if (category != null) {
+      body['category'] = category;
+    }
+    return ApiService.patch(
+      '/direct-messages/conversations/$peerUserId/preferences',
+      body: body,
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static void applyConversationPreferencesFromApi(
+    String peerUserId,
+    Map<String, dynamic>? prefs,
+  ) {
+    if (peerUserId.trim().isEmpty || prefs == null) return;
+    final forever = prefs['mutedForever'] == true;
+    final untilRaw = prefs['mutedUntil']?.toString();
+    if (forever) {
+      _dmMutedForever.add(peerUserId);
+      _dmMutedUntil.remove(peerUserId);
+      return;
+    }
+    _dmMutedForever.remove(peerUserId);
+    if (untilRaw == null || untilRaw.isEmpty) {
+      _dmMutedUntil.remove(peerUserId);
+      return;
+    }
+    final until = DateTime.tryParse(untilRaw);
+    if (until != null && until.isAfter(DateTime.now())) {
+      _dmMutedUntil[peerUserId] = until;
+    } else {
+      _dmMutedUntil.remove(peerUserId);
+    }
+  }
+
+  static Future<void> unfollowUser(String targetUserId) async {
+    await ApiService.delete(
+      '/users/$targetUserId/follow',
+      extraHeaders: _authHeaders,
+    );
   }
 
   static bool isConversationMuted(String peerUserId) {
@@ -497,6 +565,25 @@ class DirectMessagesService {
         avatarUrl: conv.avatarUrl ?? existing.avatarUrl,
         isOnline: conv.isOnline || existing.isOnline,
         lastActiveAt: conv.lastActiveAt ?? existing.lastActiveAt,
+        lastMessageType: conv.lastMessageType ?? existing.lastMessageType,
+        lastCallType: conv.lastCallType ?? existing.lastCallType,
+        lastCallStatus: conv.lastCallStatus ?? existing.lastCallStatus,
+        lastCallDurationSec:
+            conv.lastCallDurationSec ?? existing.lastCallDurationSec,
+        lastCallInitiatorId:
+            conv.lastCallInitiatorId ?? existing.lastCallInitiatorId,
+        mutedUntil: conv.mutedUntil ?? existing.mutedUntil,
+        mutedForever: conv.mutedForever || existing.mutedForever,
+        category: conv.category ?? existing.category,
+        isFollowing: conv.isFollowing || existing.isFollowing,
+        isBlockedByMe: conv.isBlockedByMe || existing.isBlockedByMe,
+      );
+      applyConversationPreferencesFromApi(
+        conv.userId,
+        {
+          'mutedUntil': conv.mutedUntil?.toIso8601String(),
+          'mutedForever': conv.mutedForever,
+        },
       );
     }
 

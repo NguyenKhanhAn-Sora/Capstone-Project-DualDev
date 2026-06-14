@@ -22,6 +22,7 @@ import 'widgets/sticker_toolbar_icon.dart';
 import 'widgets/dm_call_message_card.dart';
 import 'widgets/dm_giphy_message.dart';
 import 'widgets/conversation_details_sheet.dart';
+import 'widgets/dm_conversation_actions_sheet.dart';
 import 'widgets/dm_peer_profile_sheet.dart';
 import 'widgets/chat_link_preview.dart';
 import 'widgets/report_dm_message_sheet.dart';
@@ -1302,72 +1303,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   }
 
   Future<void> _showHamburgerMenu() async {
-    await showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.2),
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: 350,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0A1737),
-                border: Border.all(color: const Color(0xFF5D6B87)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _MenuActionRow(
-                    title:
-                        widget.controller.isConversationMuted(widget.thread.id)
-                        ? MessagesI18n.dmUnmuteNotifications()
-                        : MessagesI18n.dmMuteUntilForever(),
-                    onTap: () async {
-                      Navigator.of(dialogContext).pop();
-                      if (widget.controller.isConversationMuted(
-                        widget.thread.id,
-                      )) {
-                        widget.controller.setConversationMuteDuration(
-                          widget.thread.id,
-                          duration: null,
-                          forever: false,
-                        );
-                      } else {
-                        await _showMuteDurationMenu();
-                      }
-                    },
-                  ),
-                  _MenuActionRow(
-                    title: widget.controller.isUserBlocked(widget.thread.id)
-                        ? MessagesI18n.dmUnblock()
-                        : MessagesI18n.dmBlock(),
-                    onTap: () async {
-                      Navigator.of(dialogContext).pop();
-                      try {
-                        if (widget.controller.isUserBlocked(widget.thread.id)) {
-                          await widget.controller.unblockUser(widget.thread.id);
-                        } else {
-                          await widget.controller.blockUser(widget.thread.id);
-                        }
-                      } catch (_) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(MessagesI18n.dmBlockUpdateError()),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+    await DmConversationActionsSheet.show(
+      context,
+      thread: widget.thread,
+      controller: widget.controller,
     );
   }
 

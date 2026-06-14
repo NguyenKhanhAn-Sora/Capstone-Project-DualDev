@@ -120,6 +120,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   StreamSubscription<ChannelMessage>? _newMessageSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
+  StreamSubscription<Map<String, dynamic>>? _interactionSettingsSub;
 
   @override
   void initState() {
@@ -133,6 +134,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     _newMessageSub?.cancel();
     _reactionSub?.cancel();
     _deletedSub?.cancel();
+    _interactionSettingsSub?.cancel();
     ChannelMessagesRealtimeService.leaveChannel(widget.channel.id);
     _inputController.dispose();
     _scrollController.dispose();
@@ -174,26 +176,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         final idx = _messages.indexWhere((m) => m.id == messageId);
         if (idx == -1) return;
         final curr = _messages[idx];
-        final next = ChannelMessage(
-          id: curr.id,
-          channelId: curr.channelId,
-          senderId: curr.senderId,
-          senderName: curr.senderName,
-          content: curr.content,
-          createdAt: curr.createdAt,
-          type: curr.type,
-          voiceUrl: curr.voiceUrl,
-          voiceDurationSec: curr.voiceDurationSec,
-          giphyId: curr.giphyId,
-          customStickerUrl: curr.customStickerUrl,
-          attachments: curr.attachments,
-          reactions: incomingReactions,
-          isPinned: curr.isPinned,
-          pinnedAt: curr.pinnedAt,
-          replyTo: curr.replyTo,
-          senderAvatarUrl: curr.senderAvatarUrl,
-          stickerReplyWelcomeEnabled: curr.stickerReplyWelcomeEnabled,
-        );
+        final next = curr.copyWith(reactions: incomingReactions);
         final copied = [..._messages];
         copied[idx] = next;
         setState(() => _messages = copied);
@@ -206,6 +189,27 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         if (messageId.isEmpty) return;
         setState(() {
           _messages = _messages.where((m) => m.id != messageId).toList();
+        });
+      });
+      _interactionSettingsSub =
+          ChannelMessagesRealtimeService.serverRealtime.listen((payload) {
+        if (!mounted) return;
+        if ((payload['event'] ?? '').toString() !=
+            'interaction-settings-updated') {
+          return;
+        }
+        if ((payload['serverId'] ?? '').toString() != widget.server.id) {
+          return;
+        }
+        final enabled = payload['stickerReplyWelcomeEnabled'] != false;
+        setState(() {
+          _messages = _messages
+              .map(
+                (m) => m.type == 'welcome'
+                    ? m.copyWith(stickerReplyWelcomeEnabled: enabled)
+                    : m,
+              )
+              .toList();
         });
       });
 
@@ -308,7 +312,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
 
   Future<void> _sendWaveToWelcome(ChannelMessage welcomeMsg) async {
     if (_chatBlocked) return;
-    if (!welcomeMsg.stickerReplyWelcomeEnabled) return;
+    if (!welcomeMsg.stickerReplyWelcomeEnabled ||
+        welcomeMsg.welcomeWaveDismissedByMe) {
+      return;
+    }
     final me = widget.currentUserId ?? '';
     final isNewMember = me.isNotEmpty && welcomeMsg.senderId == me;
     setState(() => _wavingWelcomeIds.add(welcomeMsg.id));
@@ -321,9 +328,20 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       );
       if (sent != null && mounted) {
         setState(() {
-          if (!_messages.any((m) => m.id == sent.id)) {
-            _messages = [..._messages, sent];
+          var next = _messages;
+          if (!next.any((m) => m.id == sent.id)) {
+            next = [...next, sent];
           }
+          if (!isNewMember) {
+            next = next
+                .map(
+                  (m) => m.id == welcomeMsg.id
+                      ? m.copyWith(welcomeWaveDismissedByMe: true)
+                      : m,
+                )
+                .toList();
+          }
+          _messages = next;
         });
         _scrollToBottom();
       }
@@ -358,7 +376,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         ? 'Thành viên'
         : msg.senderName.trim();
     final waving = _wavingWelcomeIds.contains(msg.id);
-    final showWave = msg.stickerReplyWelcomeEnabled;
+    final showWave =
+        msg.stickerReplyWelcomeEnabled && !msg.welcomeWaveDismissedByMe;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Align(

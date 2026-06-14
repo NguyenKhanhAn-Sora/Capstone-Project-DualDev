@@ -116,6 +116,13 @@ class ChannelMessagesRealtimeService {
       _serverRealtimeController.add(mapped);
     });
 
+    socket.on('interaction-settings-updated', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'interaction-settings-updated';
+      _serverRealtimeController.add(mapped);
+    });
+
     socket.on('connect', (_) {
       for (final id in _joinedChannelIds) {
         _emitJoinChannel(id);
@@ -158,6 +165,7 @@ class ChannelMessagesRealtimeService {
       socket.off('server-updated');
       socket.off('server-membership-updated');
       socket.off('join-application-updated');
+      socket.off('interaction-settings-updated');
       socket.off('connect');
       socket.disconnect();
       socket.dispose();

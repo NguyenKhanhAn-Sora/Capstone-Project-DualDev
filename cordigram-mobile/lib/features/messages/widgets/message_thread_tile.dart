@@ -9,11 +9,13 @@ class MessageThreadTile extends StatelessWidget {
     super.key,
     required this.thread,
     required this.onTap,
+    this.onLongPress,
     this.showActivityLabel = true,
   });
 
   final MessageThread thread;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final bool showActivityLabel;
 
   String get _unreadLabel {
@@ -42,6 +44,7 @@ class MessageThreadTile extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       onTap: onTap,
+      onLongPress: onLongPress,
       leading: Stack(
         clipBehavior: Clip.none,
         children: [

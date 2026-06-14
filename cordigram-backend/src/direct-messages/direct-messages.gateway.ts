@@ -230,11 +230,21 @@ export class DirectMessagesGateway
     return Boolean(sockets && sockets.size > 0);
   }
 
-  private maybePushDmMessage(params: {
+  private async maybePushDmMessage(params: {
     receiverId: string;
     senderId: string;
     message: any;
-  }): void {
+  }): Promise<void> {
+    try {
+      const muted = await this.directMessagesService.isDmConversationMuted(
+        params.receiverId,
+        params.senderId,
+      );
+      if (muted) return;
+    } catch {
+      // best-effort — still attempt push if preference lookup fails
+    }
+
     const sender = params.message?.senderId ?? {};
     const senderName =
       (sender.displayName as string | undefined)?.trim() ||

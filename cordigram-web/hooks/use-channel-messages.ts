@@ -255,6 +255,26 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
       setTimeout(() => setServerUpdated(null), 500);
     });
 
+    socket.on(
+      "interaction-settings-updated",
+      (data: {
+        serverId?: string;
+        systemChannelId?: string | null;
+        stickerReplyWelcomeEnabled?: boolean;
+      }) => {
+        if (!data?.serverId) return;
+        try {
+          window.dispatchEvent(
+            new CustomEvent("cordigram-interaction-settings-updated", {
+              detail: data,
+            }),
+          );
+        } catch {
+          // ignore
+        }
+      },
+    );
+
     socket.on("server-membership-updated", (data: ServerMembershipUpdatedEvent) => {
       if (!data?.serverId || !data?.userId) return;
       setServerMembershipUpdated(data);

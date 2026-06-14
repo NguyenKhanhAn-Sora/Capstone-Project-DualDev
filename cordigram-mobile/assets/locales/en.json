@@ -3564,8 +3564,7 @@
     "welcome": {
       "title": "Welcome to",
       "serverOf": "{name}'s Server",
-      "channelBegin": "This is the beginning of the",
-      "startTalking": " channel. Start chatting!",
+      "channelIntro": "Welcome to {serverName}. Start your conversation.",
       "greeting": "Nice to meet you, {name}!",
       "unknownUser": "Someone",
       "waving": "Sending...",

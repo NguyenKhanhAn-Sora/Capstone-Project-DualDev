@@ -2545,6 +2545,16 @@ export class ServersService {
 
     (server as any).interactionSettings = next;
     await server.save();
+
+    const recipients = this.memberUserIdsForRealtime(server);
+    const systemChannelId =
+      next.systemChannelId != null ? String(next.systemChannelId) : null;
+    this.channelMessagesGateway.emitInteractionSettingsUpdated(recipients, {
+      serverId: String(serverId),
+      systemChannelId,
+      stickerReplyWelcomeEnabled: next.stickerReplyWelcomeEnabled ?? true,
+    });
+
     return this.getInteractionSettings(serverId, userId);
   }
 

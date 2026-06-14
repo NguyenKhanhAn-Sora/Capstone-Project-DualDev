@@ -3553,8 +3553,7 @@
     "welcome": {
       "title": "ようこそ",
       "serverOf": "{name}のサーバーへ",
-      "channelBegin": "これが",
-      "startTalking": "チャンネルの最初です。チャットを始めましょう！",
+      "channelIntro": "{serverName}へようこそ。会話を始めましょう。",
       "greeting": "はじめまして、{name}！",
       "unknownUser": "誰か",
       "waving": "送信中...",

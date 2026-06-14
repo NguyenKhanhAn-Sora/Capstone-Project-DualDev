@@ -78,6 +78,10 @@ import {
   fetchUserSettings,
   fetchBoostStatus,
   fetchApiHealth,
+  patchDmConversationPreferences,
+  blockUser,
+  unblockUser,
+  unfollowUser,
   type BoostStatusResponse,
   fetchMessagingProfileByUserId,
   fetchMessagingProfileMe,
@@ -119,6 +123,7 @@ import EventCreatedDetailPopup from "@/components/ServerEvents/EventCreatedDetai
 import InviteToServerPopup from "@/components/InviteToServerPopup/InviteToServerPopup";
 import MessagesInbox from "@/components/MessagesInbox/MessagesInbox";
 import ServerContextMenu from "@/components/ServerContextMenu/ServerContextMenu";
+import ServerProfileDropdown from "@/components/ServerProfileDropdown/ServerProfileDropdown";
 import ChannelContextMenu from "@/components/ChannelContextMenu/ChannelContextMenu";
 import CategoryContextMenu from "@/components/CategoryContextMenu/CategoryContextMenu";
 import * as sidebarPrefs from "@/lib/sidebar-prefs";
@@ -175,6 +180,14 @@ import { buildServerEmojiRenderMapFromPickerGroups } from "@/lib/server-emoji-re
 import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
 import ChatMediaViewer, { type ChatMediaItem } from "@/components/ChatMediaViewer";
 import { ConversationDetailsPanel, type DetailsPanelMessage, type DetailsPanelPinnedItem } from "@/components/ConversationDetailsPanel/ConversationDetailsPanel";
+import DmConversationContextMenu from "@/components/DmConversationContextMenu/DmConversationContextMenu";
+import {
+  parseDmConversationPreferences,
+  isDmConversationMuted,
+  type DmConversationPreferences,
+  type DmConversationCategory,
+  emptyDmConversationPreferences,
+} from "@/lib/dm-conversation-prefs";
 
 // Dynamic import VoiceChannelCall to avoid SSR issues with LiveKit
 const VoiceChannelCall = dynamic<VoiceChannelCallProps>(
@@ -300,6 +313,7 @@ interface UIMessage {
   isPinned?: boolean;
   replyTo?: string;
   stickerReplyWelcomeEnabled?: boolean;
+  welcomeWaveDismissedByMe?: boolean;
   contentModerationResult?: "none" | "blurred" | "rejected";
   replyToMessage?: {
     id: string;
@@ -1584,6 +1598,8 @@ export default function MessagesPage() {
   const [serverSettingsPermissions, setServerSettingsPermissions] =
     useState<serversApi.CurrentUserServerPermissions | null>(null);
   const [showServerSettingsPanel, setShowServerSettingsPanel] = useState(false);
+  const [showServerProfileDropdown, setShowServerProfileDropdown] = useState(false);
+  const serverProfileDropdownRef = useRef<HTMLDivElement>(null);
   const [serverSettingsTarget, setServerSettingsTarget] = useState<{
     serverId: string;
     serverName: string;
@@ -1726,6 +1742,19 @@ export default function MessagesPage() {
   const [showMessagesUserSettings, setShowMessagesUserSettings] =
     useState(false);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [dmConversationPrefs, setDmConversationPrefs] = useState<
+    Record<string, DmConversationPreferences>
+  >({});
+  const [dmBlockedByMe, setDmBlockedByMe] = useState<Set<string>>(new Set());
+  const [dmContextMenu, setDmContextMenu] = useState<{
+    x: number;
+    y: number;
+    friend: {
+      _id: string;
+      displayName?: string;
+      username?: string;
+    };
+  } | null>(null);
   const [chatUserSettings, setChatUserSettings] =
     useState<UserSettingsResponse | null>(null);
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(
@@ -2685,6 +2714,7 @@ export default function MessagesPage() {
       voiceUrl: msg.voiceUrl ?? undefined,
       voiceDuration: msg.voiceDuration ?? undefined,
       stickerReplyWelcomeEnabled: msg.stickerReplyWelcomeEnabled,
+      welcomeWaveDismissedByMe: (msg as any).welcomeWaveDismissedByMe === true,
       contentModerationResult: msg.contentModerationResult ?? "none",
       reactions: normalizeReactions(msg.reactions),
       replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
@@ -3745,6 +3775,114 @@ export default function MessagesPage() {
     });
   }, []);
 
+  const handleDmMutePreference = useCallback(
+    async (
+      peerId: string,
+      patch: Pick<DmConversationPreferences, "mutedUntil" | "mutedForever">,
+    ) => {
+      if (!token || !peerId) return;
+      try {
+        const next = await patchDmConversationPreferences({
+          token,
+          peerUserId: peerId,
+          mutedUntil: patch.mutedUntil,
+          mutedForever: patch.mutedForever,
+        });
+        const parsed = parseDmConversationPreferences(next);
+        setDmConversationPrefs((prev) => ({ ...prev, [peerId]: parsed }));
+        if (isDmConversationMuted(parsed)) {
+          setDmUnreadCounts((prev) => ({ ...prev, [peerId]: 0 }));
+        }
+      } catch (e) {
+        console.error("Failed to update DM mute preference", e);
+      }
+    },
+    [token],
+  );
+
+  const handleDmCategoryPreference = useCallback(
+    async (peerId: string, category: DmConversationCategory | null) => {
+      if (!token || !peerId) return;
+      try {
+        const next = await patchDmConversationPreferences({
+          token,
+          peerUserId: peerId,
+          category,
+        });
+        setDmConversationPrefs((prev) => ({
+          ...prev,
+          [peerId]: parseDmConversationPreferences(next),
+        }));
+      } catch (e) {
+        console.error("Failed to update DM category", e);
+      }
+    },
+    [token],
+  );
+
+  const handleDmUnfollowPeer = useCallback(
+    async (peerId: string) => {
+      if (!token || !peerId) return;
+      try {
+        await unfollowUser({ token, userId: peerId });
+        setFollowingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(peerId);
+          return next;
+        });
+      } catch (e) {
+        console.error("Failed to unfollow DM peer", e);
+      }
+    },
+    [token],
+  );
+
+  const handleDmBlockPeer = useCallback(
+    async (peerId: string) => {
+      if (!token || !peerId) return;
+      try {
+        await blockUser({ token, userId: peerId });
+        setDmBlockedByMe((prev) => new Set(prev).add(peerId));
+      } catch (e) {
+        console.error("Failed to block DM peer", e);
+      }
+    },
+    [token],
+  );
+
+  const handleDmUnblockPeer = useCallback(
+    async (peerId: string) => {
+      if (!token || !peerId) return;
+      try {
+        await unblockUser({ token, userId: peerId });
+        setDmBlockedByMe((prev) => {
+          const next = new Set(prev);
+          next.delete(peerId);
+          return next;
+        });
+      } catch (e) {
+        console.error("Failed to unblock DM peer", e);
+      }
+    },
+    [token],
+  );
+
+  const openDmContextMenu = useCallback(
+    (
+      e: React.MouseEvent,
+      friend: { _id: string; displayName?: string; username?: string },
+    ) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDmContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        friend,
+      });
+    },
+    [],
+  );
+
   const friendsForDmSidebar = useMemo(() => {
     // Apply realtime presence overrides when available
     let list = friends.map((f) => {
@@ -4555,16 +4693,29 @@ export default function MessagesPage() {
         if (cancelled) return;
         const counts: Record<string, number> = {};
         const activity: Record<string, number> = {};
+        const prefs: Record<string, DmConversationPreferences> = {};
+        const blocked = new Set<string>();
         list.forEach((c) => {
           const peerId = String(c.userId ?? "");
           if (!peerId) return;
           const apiCount = Math.max(0, Number(c.unreadCount) || 0);
-          counts[peerId] = dmReadPeersRef.current.has(peerId) ? 0 : apiCount;
+          const pref = parseDmConversationPreferences(c.preferences);
+          prefs[peerId] = pref;
+          if (c.isBlockedByMe) blocked.add(peerId);
+          if (c.isFollowing) {
+            setFollowingIds((prev) => new Set(prev).add(peerId));
+          }
+          counts[peerId] =
+            dmReadPeersRef.current.has(peerId) || isDmConversationMuted(pref)
+              ? 0
+              : apiCount;
           if (c.lastMessageTime) {
             const t = new Date(c.lastMessageTime).getTime();
             if (!Number.isNaN(t)) activity[peerId] = t;
           }
         });
+        setDmConversationPrefs((prev) => ({ ...prev, ...prefs }));
+        setDmBlockedByMe((prev) => new Set([...prev, ...blocked]));
         const activeDmId = selectedDmFriendRef.current?._id;
         if (activeDmId) counts[String(activeDmId)] = 0;
         setDmUnreadCounts(counts);
@@ -5232,6 +5383,7 @@ export default function MessagesPage() {
         voiceUrl: (msg as any).voiceUrl ?? undefined,
         voiceDuration: (msg as any).voiceDuration ?? undefined,
         stickerReplyWelcomeEnabled: (msg as any).stickerReplyWelcomeEnabled,
+        welcomeWaveDismissedByMe: (msg as any).welcomeWaveDismissedByMe === true,
         contentModerationResult: (msg as any).contentModerationResult ?? "none",
         reactions: normalizeReactions(msg.reactions),
         replyTo:
@@ -7431,7 +7583,15 @@ export default function MessagesPage() {
           replyToMessage,
           reactions: [],
         };
-        setMessages((prev) => appendServerMessage(prev, uiMsg));
+        setMessages((prev) => {
+          const withWave = appendServerMessage(prev, uiMsg);
+          if (isNewMember) return withWave;
+          return withWave.map((m) =>
+            m.id === welcomeMessageId
+              ? { ...m, welcomeWaveDismissedByMe: true }
+              : m,
+          );
+        });
       } catch (e) {
         console.error("Wave sticker failed", e);
       } finally {
@@ -7633,7 +7793,9 @@ export default function MessagesPage() {
 
       if (messageType === "welcome") {
         const isWaving = wavingIds.has(message.id);
-        const showWaveButton = message.stickerReplyWelcomeEnabled !== false;
+        const showWaveButton =
+          message.stickerReplyWelcomeEnabled !== false &&
+          !message.welcomeWaveDismissedByMe;
         const displayName =
           message.senderDisplayName || message.senderName || t("chat.welcome.unknownUser");
         return (
@@ -8646,6 +8808,28 @@ export default function MessagesPage() {
   }, [selectedServer]);
 
   useEffect(() => {
+    setShowServerProfileDropdown(false);
+  }, [selectedServer]);
+
+  useEffect(() => {
+    if (!showServerProfileDropdown) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (serverProfileDropdownRef.current?.contains(target)) return;
+      setShowServerProfileDropdown(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowServerProfileDropdown(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showServerProfileDropdown]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = (ev: Event) => {
       const d = (ev as CustomEvent<{ serverId: string }>).detail;
@@ -8768,6 +8952,37 @@ export default function MessagesPage() {
       "cordigram-server-membership-updated",
       onMembership as EventListener,
     );
+
+    const onInteractionSettings = (ev: Event) => {
+      const d = (ev as CustomEvent<any>).detail;
+      if (!d?.serverId) return;
+      if (String(d.serverId) !== String(selectedServerRef.current)) return;
+      const stickerEnabled = d.stickerReplyWelcomeEnabled !== false;
+      setServerInteractionSettings((prev) =>
+        prev
+          ? {
+              ...prev,
+              stickerReplyWelcomeEnabled: stickerEnabled,
+              systemChannelId:
+                d.systemChannelId != null
+                  ? String(d.systemChannelId)
+                  : prev.systemChannelId,
+            }
+          : prev,
+      );
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.messageType === "welcome"
+            ? { ...m, stickerReplyWelcomeEnabled: stickerEnabled }
+            : m,
+        ),
+      );
+    };
+    window.addEventListener(
+      "cordigram-interaction-settings-updated",
+      onInteractionSettings as EventListener,
+    );
+
     return () => {
       window.removeEventListener(
         "cordigram-server-updated",
@@ -8776,6 +8991,10 @@ export default function MessagesPage() {
       window.removeEventListener(
         "cordigram-server-membership-updated",
         onMembership as EventListener,
+      );
+      window.removeEventListener(
+        "cordigram-interaction-settings-updated",
+        onInteractionSettings as EventListener,
       );
     };
   }, [currentUserId]);
@@ -9261,6 +9480,7 @@ export default function MessagesPage() {
                             onClick={() =>
                               handleSelectDirectMessageFriend(friend)
                             }
+                            onContextMenu={(e) => openDmContextMenu(e, friend)}
                             style={{ cursor: "pointer" }}
                           >
                             <div
@@ -9297,7 +9517,10 @@ export default function MessagesPage() {
                                 })}
                               </p>
                             </div>
-                            {(dmUnreadCounts[String(friend._id)] ?? 0) > 0 && (
+                            {(dmUnreadCounts[String(friend._id)] ?? 0) > 0 &&
+                              !isDmConversationMuted(
+                                dmConversationPrefs[friend._id],
+                              ) && (
                               <span className={styles.friendUnreadWrap}>
                                 <span className={styles.dmUnreadDot} aria-hidden />
                                 <span className={styles.dmUnreadBadge}>
@@ -9447,40 +9670,72 @@ export default function MessagesPage() {
               // Server Selected - Header (tên máy chủ + mời) + Sự kiện + Kênh Chat & Kênh đàm thoại
               <>
                 <div className={styles.conversationsScrollArea}>
-                {/* Server header: tên máy chủ + mời tham gia */}
-                <div className={styles.serverHeader}>
-                  <button
-                    type="button"
-                    className={styles.serverNameBtn}
-                    title={currentServer?.name}
-                  >
-                    <span className={styles.serverNameText}>
-                      {currentServer?.name || "Máy chủ"}
-                    </span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.inviteServerBtn}
-                    title={t("chat.sidebar.inviteServer")}
-                    onClick={() => {
-                      if (currentServer)
+                {/* Server header: tên máy chủ + hồ sơ máy chủ + mời tham gia */}
+                <div ref={serverProfileDropdownRef} className={styles.serverHeaderBlock}>
+                  <div className={styles.serverHeader}>
+                    <button
+                      type="button"
+                      className={`${styles.serverNameBtn} ${showServerProfileDropdown ? styles.serverNameBtnOpen : ""}`}
+                      title={currentServer?.name}
+                      aria-expanded={showServerProfileDropdown}
+                      aria-haspopup="dialog"
+                      onClick={() => setShowServerProfileDropdown((open) => !open)}
+                    >
+                      <span className={styles.serverNameText}>
+                        {currentServer?.name || t("chat.sidebar.serverFallback")}
+                      </span>
+                      <svg
+                        className={`${styles.serverNameChevron} ${showServerProfileDropdown ? styles.serverNameChevronOpen : ""}`}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        aria-hidden
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.inviteServerBtn}
+                      title={t("chat.sidebar.inviteServer")}
+                      onClick={() => {
+                        if (currentServer)
+                          setInviteToServerTarget({
+                            serverId: currentServer._id,
+                            serverName: currentServer.name || t("chat.sidebar.serverFallback"),
+                          });
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                    </button>
+                  </div>
+                  {showServerProfileDropdown && currentServer && (
+                    <ServerProfileDropdown
+                      server={currentServer}
+                      canManageProfile={canManageJoinApplications}
+                      canCreateInvite={currentServerPermissions?.canCreateInvite ?? true}
+                      onEditProfile={() => {
+                        setShowServerProfileDropdown(false);
+                        void openServerSettingsFromMediaPicker(currentServer._id, "profile");
+                      }}
+                      onInvite={() => {
+                        setShowServerProfileDropdown(false);
                         setInviteToServerTarget({
                           serverId: currentServer._id,
                           serverName: currentServer.name || t("chat.sidebar.serverFallback"),
                         });
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </button>
+                      }}
+                    />
+                  )}
                 </div>
                 {/* Sự kiện đang diễn ra - hiển thị bên trên Sự kiện khi đến đúng thời gian */}
                 {activeServerEvents.length > 0 && (
@@ -11102,6 +11357,20 @@ export default function MessagesPage() {
                       <>
                         <button
                           type="button"
+                          title={t("chat.dmConversation.moreActions")}
+                          aria-label={t("chat.dmConversation.moreActions")}
+                          onClick={(e) =>
+                            openDmContextMenu(e, selectedDirectMessageFriend)
+                          }
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="5" cy="12" r="2" />
+                            <circle cx="12" cy="12" r="2" />
+                            <circle cx="19" cy="12" r="2" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
                           title={t("chat.composer.voiceCall")}
                           onClick={() => handleStartCall(false)}
                           disabled={isSamePeerCallBlocked}
@@ -11470,16 +11739,10 @@ export default function MessagesPage() {
                             maxWidth: 560,
                             textAlign: "left",
                           }}>
-                            {t("chat.welcome.channelBegin")}{" "}
-                            <strong style={{ color: "var(--color-text)" }}>
-                              #
-                              {translateChannelName(
-                                allChannels.find((c) => c._id === selectedChannel)?.name ??
-                                  "chung",
-                                language,
-                              )}
-                            </strong>
-                            {t("chat.welcome.startTalking")}
+                            {t("chat.welcome.channelIntro").replace(
+                              "{serverName}",
+                              currentServer.name,
+                            )}
                           </p>
                           {/* Welcome messages: nằm dưới phần chào mừng, không bị trôi theo chat */}
                           <div style={{
@@ -13147,6 +13410,36 @@ export default function MessagesPage() {
         />
       )}
 
+      {dmContextMenu && (
+        <DmConversationContextMenu
+          x={dmContextMenu.x}
+          y={dmContextMenu.y}
+          peerName={
+            dmContextMenu.friend.displayName ||
+            dmContextMenu.friend.username ||
+            ""
+          }
+          preferences={
+            dmConversationPrefs[dmContextMenu.friend._id] ??
+            emptyDmConversationPreferences()
+          }
+          isFollowing={followingIds.has(dmContextMenu.friend._id)}
+          isBlockedByMe={dmBlockedByMe.has(dmContextMenu.friend._id)}
+          onClose={() => setDmContextMenu(null)}
+          onMute={(patch) =>
+            void handleDmMutePreference(dmContextMenu.friend._id, patch)
+          }
+          onCategory={(category) =>
+            void handleDmCategoryPreference(dmContextMenu.friend._id, category)
+          }
+          onUnfollow={() =>
+            void handleDmUnfollowPeer(dmContextMenu.friend._id)
+          }
+          onBlock={() => void handleDmBlockPeer(dmContextMenu.friend._id)}
+          onUnblock={() => void handleDmUnblockPeer(dmContextMenu.friend._id)}
+        />
+      )}
+
       {channelContextMenu && selectedServer && currentUserId && (() => {
         const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
         const chId = channelContextMenu.channel._id;
@@ -13435,6 +13728,19 @@ export default function MessagesPage() {
                   Boolean(serverSettingsPermissions?.canManageServer)
                 }
                 textChannels={allChannels.filter((c) => c.type !== "voice")}
+                onSettingsChange={(next) => {
+                  if (serverSettingsTarget.serverId === selectedServer) {
+                    setServerInteractionSettings(next);
+                    const stickerEnabled = next.stickerReplyWelcomeEnabled !== false;
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.messageType === "welcome"
+                          ? { ...m, stickerReplyWelcomeEnabled: stickerEnabled }
+                          : m,
+                      ),
+                    );
+                  }
+                }}
               />
             );
           }

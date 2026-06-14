@@ -6,6 +6,11 @@ import { LinkPreviewService } from '../comment/link-preview.service';
 import { DirectMessagesController } from './direct-messages.controller';
 import { DirectMessagesGateway } from './direct-messages.gateway';
 import { DirectMessage, DirectMessageSchema } from './direct-message.schema';
+import {
+  DmConversationPreference,
+  DmConversationPreferenceSchema,
+} from './dm-conversation-preference.schema';
+import { DmConversationPreferenceService } from './dm-conversation-preference.service';
 import { User, UserSchema } from '../users/user.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { Follow, FollowSchema } from '../users/follow.schema';
@@ -24,6 +29,10 @@ import { Server, ServerSchema } from '../servers/server.schema';
     NotificationsModule,
     MongooseModule.forFeature([
       { name: DirectMessage.name, schema: DirectMessageSchema },
+      {
+        name: DmConversationPreference.name,
+        schema: DmConversationPreferenceSchema,
+      },
       { name: User.name, schema: UserSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: Follow.name, schema: FollowSchema },
@@ -34,8 +43,17 @@ import { Server, ServerSchema } from '../servers/server.schema';
       secret: process.env.JWT_SECRET || 'your_secret_key',
     }),
   ],
-  providers: [DirectMessagesService, DirectMessagesGateway, LinkPreviewService],
+  providers: [
+    DirectMessagesService,
+    DirectMessagesGateway,
+    LinkPreviewService,
+    DmConversationPreferenceService,
+  ],
   controllers: [DirectMessagesController],
-  exports: [DirectMessagesService, DirectMessagesGateway],
+  exports: [
+    DirectMessagesService,
+    DirectMessagesGateway,
+    DmConversationPreferenceService,
+  ],
 })
 export class DirectMessagesModule {}

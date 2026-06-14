@@ -3553,8 +3553,7 @@
     "welcome": {
       "title": "欢迎来到",
       "serverOf": "{name}的服务器",
-      "channelBegin": "这是",
-      "startTalking": "频道的开始。开始聊天吧！",
+      "channelIntro": "欢迎来到{serverName}。开始你的对话吧。",
       "greeting": "很高兴认识你，{name}！",
       "unknownUser": "某人",
       "waving": "发送中...",

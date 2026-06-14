@@ -14,6 +14,7 @@ import {
 import { Types } from 'mongoose';
 import { DirectMessagesService } from './direct-messages.service';
 import { DirectMessagesGateway } from './direct-messages.gateway';
+import type { DmConversationCategory } from './dm-conversation-preference.schema';
 import {
   CreateDirectMessageDto,
   MarkAsReadDto,
@@ -157,6 +158,28 @@ export class DirectMessagesController {
   @Get('conversations')
   async getConversationList(@CurrentUser() user: any) {
     return this.directMessagesService.getConversationList(user.userId);
+  }
+
+  @Patch('conversations/:peerUserId/preferences')
+  async updateConversationPreferences(
+    @Param('peerUserId') peerUserId: string,
+    @Body()
+    body: {
+      mutedUntil?: string | null;
+      mutedForever?: boolean;
+      category?: string | null;
+    },
+    @CurrentUser() user: any,
+  ) {
+    return this.directMessagesService.updateConversationPreferences(
+      user.userId,
+      peerUserId,
+      {
+        mutedUntil: body.mutedUntil,
+        mutedForever: body.mutedForever,
+        category: body.category as DmConversationCategory | null | undefined,
+      },
+    );
   }
 
   @Get('unread/count')

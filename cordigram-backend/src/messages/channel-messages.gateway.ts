@@ -150,6 +150,24 @@ export class ChannelMessagesGateway
     }
   }
 
+  /** Interaction settings changed (e.g. sticker welcome replies toggled). */
+  emitInteractionSettingsUpdated(
+    recipientUserIds: string[],
+    payload: {
+      serverId: string;
+      systemChannelId: string | null;
+      stickerReplyWelcomeEnabled: boolean;
+    },
+  ): void {
+    const seen = new Set<string>();
+    for (const raw of recipientUserIds) {
+      const uid = String(raw ?? '').trim();
+      if (!uid || seen.has(uid)) continue;
+      seen.add(uid);
+      this.emitToUser(uid, 'interaction-settings-updated', payload);
+    }
+  }
+
   /** Join applications: notify connected owner/members/applicant without page reload. */
   emitJoinApplicationUpdated(
     recipientUserIds: string[],

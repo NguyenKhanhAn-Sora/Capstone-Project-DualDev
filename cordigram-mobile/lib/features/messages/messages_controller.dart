@@ -310,6 +310,9 @@ class MessagesController extends ChangeNotifier {
                 isOnline: c.isOnline,
                 lastSeenAt: c.lastActiveAt,
               ),
+              category: c.category,
+              isFollowing:
+                  c.isFollowing || _followingUserIds.contains(c.userId),
             ),
           ),
         );
@@ -879,6 +882,57 @@ class MessagesController extends ChangeNotifier {
   Future<void> unblockUser(String userId) async {
     await DirectMessagesService.unblockUser(userId);
     _blockedUsers.remove(userId);
+    notifyListeners();
+  }
+
+  Future<void> unfollowUser(String userId) async {
+    await DirectMessagesService.unfollowUser(userId);
+    _followingUserIds.remove(userId);
+    final idx = _threads.indexWhere((e) => e.id == userId);
+    if (idx != -1) {
+      final t = _threads[idx];
+      _threads[idx] = MessageThread(
+        id: t.id,
+        name: t.name,
+        lastMessage: t.lastMessage,
+        lastActiveLabel: t.lastActiveLabel,
+        unreadCount: t.unreadCount,
+        avatarUrl: t.avatarUrl,
+        isOnline: t.isOnline,
+        isPinned: t.isPinned,
+        lastSeenAt: t.lastSeenAt,
+        presenceLabel: t.presenceLabel,
+        category: t.category,
+        isFollowing: false,
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> setConversationCategory(String userId, String? category) async {
+    await DirectMessagesService.patchConversationPreferences(
+      userId,
+      category: category,
+      clearCategory: category == null,
+    );
+    final idx = _threads.indexWhere((e) => e.id == userId);
+    if (idx != -1) {
+      final t = _threads[idx];
+      _threads[idx] = MessageThread(
+        id: t.id,
+        name: t.name,
+        lastMessage: t.lastMessage,
+        lastActiveLabel: t.lastActiveLabel,
+        unreadCount: t.unreadCount,
+        avatarUrl: t.avatarUrl,
+        isOnline: t.isOnline,
+        isPinned: t.isPinned,
+        lastSeenAt: t.lastSeenAt,
+        presenceLabel: t.presenceLabel,
+        category: category,
+        isFollowing: t.isFollowing,
+      );
+    }
     notifyListeners();
   }
 

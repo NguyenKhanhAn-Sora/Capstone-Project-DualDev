@@ -10,12 +10,14 @@ interface ServerInteractionsSectionProps {
   serverId: string;
   canManageSettings: boolean;
   textChannels: serversApi.Channel[];
+  onSettingsChange?: (settings: serversApi.ServerInteractionSettings) => void;
 }
 
 export default function ServerInteractionsSection({
   serverId,
   canManageSettings,
   textChannels,
+  onSettingsChange,
 }: ServerInteractionsSectionProps) {
   const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
@@ -76,6 +78,7 @@ export default function ServerInteractionsSection({
     try {
       const next = await serversApi.updateInteractionSettings(serverId, patch);
       setSettings(next);
+      onSettingsChange?.(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("chat.serverInteractions.saveError"));
     } finally {

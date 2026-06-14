@@ -441,6 +441,11 @@
         "noDescription": "Chưa có mô tả."
       }
     },
+    "serverProfileDropdown": {
+      "title": "Hồ sơ máy chủ",
+      "editProfile": "Chỉnh sửa hồ sơ máy chủ",
+      "invitePeople": "Mời thành viên"
+    },
     "popups": {
       "closeAria": "Đóng",
       "loading": "Đang tải...",
@@ -1622,8 +1627,7 @@
     "welcome": {
       "title": "Chào mừng đến với",
       "serverOf": "Máy chủ của {name}",
-      "channelBegin": "Đây là khởi đầu của kênh",
-      "startTalking": ". Hãy bắt đầu cuộc trò chuyện!",
+      "channelIntro": "Chào mừng bạn đến {serverName}. Hãy bắt đầu cuộc trò chuyện của bạn.",
       "greeting": "Rất vui được gặp bạn, {name}!",
       "unknownUser": "Ai đó",
       "waving": "Đang gửi...",
@@ -1632,6 +1636,29 @@
     "dmList": {
       "sent": "Đã gửi",
       "seen": "Đã xem"
+    },
+    "dmConversation": {
+      "menuLabel": "Tùy chọn hội thoại với {name}",
+      "categorize": "Phân loại",
+      "clearCategory": "Bỏ phân loại",
+      "muteNotifications": "Tắt thông báo",
+      "unmuteNotifications": "Bật lại thông báo",
+      "mute1h": "Trong 1 giờ",
+      "mute4h": "Trong 4 giờ",
+      "muteUntil8am": "Cho đến 8:00 AM",
+      "muteForever": "Cho đến khi được mở lại",
+      "unfollow": "Bỏ theo dõi",
+      "block": "Chặn",
+      "unblock": "Bỏ chặn",
+      "moreActions": "Tùy chọn",
+      "categories": {
+        "customer": "Khách hàng",
+        "family": "Gia đình",
+        "work": "Công việc",
+        "friends": "Bạn bè",
+        "reply_later": "Trả lời sau",
+        "colleague": "Đồng nghiệp"
+      }
     },
     "applyPending": {
       "title": "Đơn đăng ký tham gia {server} của bạn đang được xem xét!",

@@ -98,6 +98,10 @@ export class Message extends Document {
   @Prop({ type: [Types.ObjectId], ref: 'User', default: [] })
   mentions: Types.ObjectId[];
 
+  /** Users who waved at this welcome message (per-user wave button dismissal). */
+  @Prop({ type: [Types.ObjectId], ref: 'User', default: [] })
+  welcomeWavedBy: Types.ObjectId[];
+
   @Prop({
     type: [
       {
