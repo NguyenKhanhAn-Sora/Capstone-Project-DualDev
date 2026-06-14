@@ -1615,6 +1615,8 @@ export default function MessagesPage() {
   const [notificationRoleNames, setNotificationRoleNames] = useState<string[]>([]);
   const [currentServerPermissions, setCurrentServerPermissions] =
     useState<serversApi.CurrentUserServerPermissions | null>(null);
+  const [currentServerPermissionsForId, setCurrentServerPermissionsForId] =
+    useState<string | null>(null);
   const [sidebarPrefsTick, setSidebarPrefsTick] = useState(0);
   const bumpSidebarPrefs = useCallback(() => setSidebarPrefsTick((t) => t + 1), []);
   const [wavingIds, setWavingIds] = useState<Set<string>>(new Set());
@@ -8809,30 +8811,44 @@ export default function MessagesPage() {
     if (!selectedServer || !token) {
       prevSelectedServerForMyPermsRef.current = null;
       setCurrentServerPermissions(null);
+      setCurrentServerPermissionsForId(null);
       return;
     }
     if (isAdminView && adminViewServerId && selectedServer === adminViewServerId) {
       prevSelectedServerForMyPermsRef.current = selectedServer;
       setCurrentServerPermissions(null);
+      setCurrentServerPermissionsForId(null);
       return;
     }
     if (prevSelectedServerForMyPermsRef.current !== selectedServer) {
       prevSelectedServerForMyPermsRef.current = selectedServer;
       setCurrentServerPermissions(null);
+      setCurrentServerPermissionsForId(null);
     }
     let cancelled = false;
     serversApi
       .getCurrentUserPermissions(selectedServer)
       .then((p) => {
-        if (!cancelled) setCurrentServerPermissions(p);
+        if (!cancelled) {
+          setCurrentServerPermissions(p);
+          setCurrentServerPermissionsForId(selectedServer);
+        }
       })
       .catch(() => {
-        if (!cancelled) setCurrentServerPermissions(null);
+        if (!cancelled) {
+          setCurrentServerPermissions(null);
+          setCurrentServerPermissionsForId(null);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [selectedServer, token, isAdminView, adminViewServerId]);
+
+  const serverPermissionsReady =
+    Boolean(selectedServer) &&
+    currentServerPermissionsForId === selectedServer &&
+    currentServerPermissions != null;
 
   useEffect(() => {
     if (!currentUserId || !selectedServer) return;
@@ -8895,10 +8911,15 @@ export default function MessagesPage() {
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
   const canManageJoinApplications = useMemo(() => {
-    if (!currentUserId || !selectedServerEntity) return false;
+    if (!serverPermissionsReady || !currentUserId || !selectedServerEntity) return false;
     if (currentServerPermissions?.isOwner) return true;
     return Boolean(currentServerPermissions?.canManageServer);
-  }, [currentUserId, selectedServerEntity, currentServerPermissions]);
+  }, [
+    serverPermissionsReady,
+    currentUserId,
+    selectedServerEntity,
+    currentServerPermissions,
+  ]);
 
   const canManageEventsOnServer = useMemo(() => {
     if (!currentUserId || !selectedServerEntity) return false;
@@ -11389,7 +11410,7 @@ export default function MessagesPage() {
                   </>
                 ) : null}
               </div>
-            ) : showJoinApplicationsView && currentServer && !selectedDirectMessageFriend ? (
+            ) : showJoinApplicationsView && currentServer && !selectedDirectMessageFriend && serverPermissionsReady ? (
               <div style={{ flex: 1, display: "flex", minHeight: 0, minWidth: 0 }}>
                 <ServerJoinApplicationsPanel
                   serverId={currentServer._id}

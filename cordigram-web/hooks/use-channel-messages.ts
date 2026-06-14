@@ -82,7 +82,7 @@ export interface BoostEntitlementUpdatedEvent {
 export interface JoinApplicationUpdatedEvent {
   serverId: string;
   userId: string;
-  status: "accepted" | "rejected" | "withdrawn";
+  status: "pending" | "accepted" | "rejected" | "withdrawn";
 }
 
 export interface ServerUpdatedEvent {

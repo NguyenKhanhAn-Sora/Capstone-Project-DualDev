@@ -174,7 +174,7 @@ export class ChannelMessagesGateway
     payload: {
       serverId: string;
       userId: string;
-      status: 'accepted' | 'rejected' | 'withdrawn';
+      status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
     },
   ): void {
     const seen = new Set<string>();

@@ -1274,6 +1274,7 @@ export class ServersService {
     memberId: string,
     role: 'moderator' | 'member' = 'member',
     nickname?: string | null,
+    opts?: { skipWelcome?: boolean },
   ): Promise<Server> {
     const server = await this.serverModel.findById(serverId);
 
@@ -1309,9 +1310,11 @@ export class ServersService {
       recipients: this.memberUserIdsForRealtime(saved),
     });
 
-    this.sendWelcomeMessage(serverId, memberId).catch((err) => {
-      console.error('[sendWelcomeMessage] Failed:', err?.message || err);
-    });
+    if (!opts?.skipWelcome) {
+      this.sendWelcomeMessage(serverId, memberId).catch((err) => {
+        console.error('[sendWelcomeMessage] Failed:', err?.message || err);
+      });
+    }
 
     return saved;
   }
@@ -2734,26 +2737,13 @@ export class ServersService {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
 
-    // Kiểm tra có phải member không
-    const isMember = server.members.some((m) => m.userId.toString() === userId);
-    if (!isMember) {
-      throw new ForbiddenException('Bạn không phải thành viên của server này');
-    }
+    await this.ensureOwnerMemberRow(server);
 
     const isOwner = server.ownerId.toString() === userId;
-
-    // Kiểm tra user có vai trò nào ngoài @everyone không
-    const memberRoles = await this.rolesService.getMemberRoles(
-      serverId,
-      userId,
-    );
-    const hasCustomRole = memberRoles.some((r) => !r.isDefault);
-
-    // Owner có tất cả quyền
     if (isOwner) {
       return {
         isOwner: true,
-        hasCustomRole: true, // Owner luôn có quyền
+        hasCustomRole: true,
         canKick: true,
         canBan: true,
         canTimeout: true,
@@ -2765,6 +2755,19 @@ export class ServersService {
         mentionEveryone: true,
       };
     }
+
+    // Kiểm tra có phải member không
+    const isMember = server.members.some((m) => m.userId.toString() === userId);
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+
+    // Kiểm tra user có vai trò nào ngoài @everyone không
+    const memberRoles = await this.rolesService.getMemberRoles(
+      serverId,
+      userId,
+    );
+    const hasCustomRole = memberRoles.some((r) => !r.isDefault);
 
     // Lấy permissions từ roles
     const permissions = await this.rolesService.calculateMemberPermissions(
