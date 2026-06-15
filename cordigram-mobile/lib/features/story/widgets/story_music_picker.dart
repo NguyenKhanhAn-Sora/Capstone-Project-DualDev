@@ -43,6 +43,7 @@ class JamendoTrack {
         artist: artistName,
         coverUrl: albumImage,
         audioUrl: audioUrl,
+        duration: duration,
       );
 
   String get formattedDuration {
@@ -716,6 +717,16 @@ class StoryMusicSticker extends StatefulWidget {
   State<StoryMusicSticker> createState() => _StoryMusicStickerState();
 }
 
+// Bar config: [minHeight, maxHeight, durationMs]
+const _kBars = [
+  [3.0, 14.0, 280],
+  [6.0, 18.0, 360],
+  [2.0, 10.0, 220],
+  [8.0, 20.0, 430],
+  [4.0, 16.0, 310],
+  [5.0, 12.0, 260],
+];
+
 class _StoryMusicStickerState extends State<StoryMusicSticker>
     with TickerProviderStateMixin {
   late final List<AnimationController> _waveCtrs;
@@ -724,28 +735,29 @@ class _StoryMusicStickerState extends State<StoryMusicSticker>
   @override
   void initState() {
     super.initState();
-    _waveCtrs = List.generate(
-      4,
-      (i) => AnimationController(
+    // Stagger each bar's starting phase so they don't all move in sync.
+    _waveCtrs = List.generate(_kBars.length, (i) {
+      final phase = i / _kBars.length; // 0.0 → 1.0
+      return AnimationController(
         vsync: this,
-        duration: Duration(milliseconds: 350 + i * 80),
-      )..repeat(reverse: true),
-    );
-    _waveAnims = _waveCtrs
-        .map((c) => Tween<double>(begin: 2, end: 10).animate(
-              CurvedAnimation(parent: c, curve: Curves.easeInOut),
-            ))
-        .toList();
-    for (var i = 0; i < _waveCtrs.length; i++) {
-      Future.delayed(Duration(milliseconds: i * 60), () {
-        if (mounted) { _waveCtrs[i].forward(); }
-      });
-    }
+        duration: Duration(milliseconds: _kBars[i][2].toInt()),
+        value: phase, // start at different points in the cycle
+      )..repeat(reverse: true);
+    });
+
+    _waveAnims = List.generate(_kBars.length, (i) {
+      return Tween<double>(
+        begin: _kBars[i][0].toDouble(),
+        end: _kBars[i][1].toDouble(),
+      ).animate(CurvedAnimation(parent: _waveCtrs[i], curve: Curves.easeInOut));
+    });
   }
 
   @override
   void dispose() {
-    for (final c in _waveCtrs) { c.dispose(); }
+    for (final c in _waveCtrs) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -837,24 +849,28 @@ class _StoryMusicStickerState extends State<StoryMusicSticker>
           ),
           const SizedBox(width: 8),
 
-          // Waveform
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: List.generate(4, (i) {
-              return AnimatedBuilder(
-                animation: _waveAnims[i],
-                builder: (_, __) => Container(
-                  width: 2.5,
-                  height: _waveAnims[i].value,
-                  margin: const EdgeInsets.only(right: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4AA3E4),
-                    borderRadius: BorderRadius.circular(2),
+          // Animated waveform — 6 bars with independent phases and heights
+          SizedBox(
+            width: _kBars.length * 5.0,
+            height: 22,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: List.generate(_kBars.length, (i) {
+                return AnimatedBuilder(
+                  animation: _waveAnims[i],
+                  builder: (_, __) => Container(
+                    width: 2.5,
+                    height: _waveAnims[i].value,
+                    margin: const EdgeInsets.symmetric(horizontal: 1.0),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4AA3E4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ],
       ),

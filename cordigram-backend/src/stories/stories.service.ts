@@ -76,6 +76,8 @@ export class StoriesService {
       buffer: file.buffer,
       folder: 'stories',
       resourceType: isVideo ? 'video' : 'image',
+      // Auto-compress images on upload (reduces 50–70% file size for photos).
+      ...(isImage && { quality: 'auto' }),
     });
 
     return {
@@ -83,6 +85,19 @@ export class StoriesService {
       type: isVideo ? 'video' : 'image',
       mediaDurationMs: result.duration ? Math.round(result.duration * 1000) : undefined,
     };
+  }
+
+  async trimAudio(
+    audioUrl: string,
+    startSec: number,
+    durationSec: number,
+  ): Promise<{ clippedUrl: string }> {
+    const clippedUrl = await this.cloudinaryService.trimAudioFromUrl({
+      audioUrl,
+      startSec,
+      durationSec,
+    });
+    return { clippedUrl };
   }
 
   async createStory(userId: string, dto: CreateStoryDto): Promise<StoryItem> {

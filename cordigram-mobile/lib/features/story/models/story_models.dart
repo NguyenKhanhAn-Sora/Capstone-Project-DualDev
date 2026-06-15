@@ -11,6 +11,7 @@ class StoryMusic {
     required this.coverUrl,
     required this.audioUrl,
     this.startTime = 0,
+    this.duration = 180,
     this.stickerX = 5,
     this.stickerY = 72,
     this.stickerWidth = 90,
@@ -22,6 +23,7 @@ class StoryMusic {
   final String coverUrl;
   final String audioUrl;
   final int startTime;
+  final int duration; // total track length in seconds
   final double stickerX;
   final double stickerY;
   final double stickerWidth;
@@ -33,6 +35,7 @@ class StoryMusic {
         coverUrl: j['coverUrl'] as String? ?? '',
         audioUrl: j['audioUrl'] as String? ?? '',
         startTime: (j['startTime'] as num?)?.toInt() ?? 0,
+        duration: (j['duration'] as num?)?.toInt() ?? 180,
         stickerX: (j['stickerX'] as num?)?.toDouble() ?? 5,
         stickerY: (j['stickerY'] as num?)?.toDouble() ?? 72,
         stickerWidth: (j['stickerWidth'] as num?)?.toDouble() ?? 90,
@@ -49,6 +52,31 @@ class StoryMusic {
         'stickerY': stickerY,
         'stickerWidth': stickerWidth,
       };
+
+  StoryMusic copyWith({
+    String? trackId,
+    String? title,
+    String? artist,
+    String? coverUrl,
+    String? audioUrl,
+    int? startTime,
+    int? duration,
+    double? stickerX,
+    double? stickerY,
+    double? stickerWidth,
+  }) =>
+      StoryMusic(
+        trackId: trackId ?? this.trackId,
+        title: title ?? this.title,
+        artist: artist ?? this.artist,
+        coverUrl: coverUrl ?? this.coverUrl,
+        audioUrl: audioUrl ?? this.audioUrl,
+        startTime: startTime ?? this.startTime,
+        duration: duration ?? this.duration,
+        stickerX: stickerX ?? this.stickerX,
+        stickerY: stickerY ?? this.stickerY,
+        stickerWidth: stickerWidth ?? this.stickerWidth,
+      );
 }
 
 // ── StoryTextOverlay ─────────────────────────────────────────────────────────
@@ -129,11 +157,11 @@ class StoryItem {
   /// Display duration for progress bar (ms)
   int get displayDurationMs {
     if (type == 'media' && mediaType == 'video') {
-      final end = trimEndMs ?? mediaDurationMs ?? 5000;
+      final end = trimEndMs ?? mediaDurationMs ?? 10000;
       final start = trimStartMs ?? 0;
-      return (end - start).clamp(1000, 20000);
+      return (end - start).clamp(1000, 30000);
     }
-    return 5000;
+    return 10000; // match web default (10s for image/text stories)
   }
 
   factory StoryItem.fromJson(Map<String, dynamic> j) {

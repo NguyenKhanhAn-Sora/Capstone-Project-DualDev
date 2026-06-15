@@ -41,12 +41,53 @@ export class CloudinaryService implements OnModuleInit {
     });
   }
 
+  /**
+   * Fetches a remote audio URL, trims it to [startSec, startSec+durationSec],
+   * uploads the trimmed clip to Cloudinary, and returns its secure URL.
+   * The original (un-trimmed) asset is deleted asynchronously to save storage.
+   */
+  async trimAudioFromUrl(params: {
+    audioUrl: string;
+    startSec: number;
+    durationSec: number;
+  }): Promise<string> {
+    const { audioUrl, startSec, durationSec } = params;
+
+    const res = await cloudinary.uploader.upload(audioUrl, {
+      resource_type: 'video',
+      folder: 'story-audio',
+      unique_filename: true,
+      // Eagerly create the trimmed clip synchronously.
+      eager: [
+        {
+          start_offset: startSec,
+          end_offset: startSec + durationSec,
+          audio_codec: 'aac',
+          format: 'm4a',
+        },
+      ],
+      eager_async: false,
+      timeout: 60000,
+    } as UploadApiOptions);
+
+    const eagerUrl: string = (res as any).eager?.[0]?.secure_url ?? res.secure_url;
+
+    // Delete the full-length original to conserve storage (fire-and-forget).
+    cloudinary.uploader
+      .destroy(res.public_id, { resource_type: 'video' })
+      .catch(() => {});
+
+    return eagerUrl;
+  }
+
   async uploadBuffer(params: {
     buffer: Buffer;
     folder?: string;
     publicId?: string;
     resourceType?: 'image' | 'video' | 'raw';
     overwrite?: boolean;
+    /** Apply quality compression on upload (images) */
+    quality?: 'auto' | 'auto:best' | 'auto:good' | 'auto:eco' | number;
     /** Pre-generate quality variants in background (video only) */
     eagerQualityHeights?: number[];
   }): Promise<UploadResult> {
@@ -56,6 +97,7 @@ export class CloudinaryService implements OnModuleInit {
       publicId,
       resourceType = 'image',
       overwrite,
+      quality,
       eagerQualityHeights,
     } = params;
 
@@ -65,6 +107,7 @@ export class CloudinaryService implements OnModuleInit {
       resource_type: resourceType,
       overwrite: overwrite ?? false,
       unique_filename: true,
+      ...(quality !== undefined && { quality }),
     };
 
     if (eagerQualityHeights && eagerQualityHeights.length > 0) {

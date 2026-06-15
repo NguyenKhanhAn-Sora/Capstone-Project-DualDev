@@ -451,6 +451,9 @@ export default function Sidebar() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("ui-theme");
+      localStorage.removeItem("ui-appearance-preset");
+      localStorage.removeItem("ui-appearance-sync");
+      localStorage.removeItem("accentColor");
     }
 
     setProfile(null);

@@ -39,10 +39,18 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   bool _videoReady = false;
   AudioPlayer? _audioPlayer;
 
+  // True while waiting for audio to buffer before starting progress.
+  bool _waitingForAudio = false;
+  // Tracks which story the current audio-load belongs to (cancels stale loads).
+  String? _audioLoadForStoryId;
+
   List<StoryViewer> _viewers = [];
   bool _loadingViewers = false;
   final Map<String, bool> _followMap = {};
   final Set<String> _loadingFollow = {};
+
+  // Local visibility override (so UI updates immediately after PATCH)
+  String? _localVisibility;
 
   @override
   void initState() {
@@ -63,35 +71,71 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _disposeProgress();
     _videoReady = false;
     _showViewers = false;
+    _waitingForAudio = false;
+    // Cancel any stale audio load from a previous story.
+    _audioLoadForStoryId = null;
+    _localVisibility = _story.visibility;
     StoryService.markViewed(_story.id);
 
     if (_story.type == 'media' &&
         _story.mediaType == 'video' &&
         _story.mediaUrl != null) {
       _loadVideo(_story.mediaUrl!);
+    } else if (_story.music != null && _story.music!.audioUrl.isNotEmpty) {
+      // Sync story + music: wait for audio to buffer, then start both together.
+      _initMusicPlayerWithSync(_story.music!);
     } else {
       _startProgress();
-      // Play background music for text/image stories
-      if (_story.music != null && _story.music!.audioUrl.isNotEmpty) {
-        _initMusicPlayer(_story.music!);
-      }
     }
   }
 
-  Future<void> _initMusicPlayer(StoryMusic music) async {
+  /// Buffers audio first, then starts story progress and audio simultaneously.
+  Future<void> _initMusicPlayerWithSync(StoryMusic music) async {
     _stopAudio();
+    final storyId = _story.id;
+    _audioLoadForStoryId = storyId;
+
+    setState(() => _waitingForAudio = true);
+
     final player = AudioPlayer();
     _audioPlayer = player;
+
     try {
-      await player.play(UrlSource(music.audioUrl));
-      if (music.startTime > 0) {
-        await player.seek(Duration(seconds: music.startTime));
-      }
       await player.setReleaseMode(ReleaseMode.loop);
+
+      // Wait until the player reports it is actually playing (buffered + started).
+      final completer = Completer<void>();
+      StreamSubscription<PlayerState>? sub;
+      sub = player.onPlayerStateChanged.listen((state) {
+        if (state == PlayerState.playing && !completer.isCompleted) {
+          completer.complete();
+          sub?.cancel();
+        }
+      });
+
+      // Kick off playback (this begins buffering from the network).
+      await player.play(
+        UrlSource(music.audioUrl),
+        position: Duration(seconds: music.startTime),
+      );
+
+      // Wait until actually playing, up to 6 s; after timeout proceed anyway.
+      await completer.future.timeout(
+        const Duration(seconds: 6),
+        onTimeout: () {},
+      );
+      sub.cancel();
     } catch (_) {
+      // Audio failed — continue without it.
       _audioPlayer = null;
       player.dispose();
     }
+
+    // Check we haven't navigated to a different story while waiting.
+    if (!mounted || _audioLoadForStoryId != storyId) return;
+
+    setState(() => _waitingForAudio = false);
+    _startProgress();
   }
 
   void _stopAudio() {
@@ -184,7 +228,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   void _resume() {
     _paused = false;
-    _progressCtrl?.forward(from: _progressCtrl!.value);
+    // If still buffering, don't restart progress — the sync routine will do it.
+    if (!_waitingForAudio) {
+      _progressCtrl?.forward(from: _progressCtrl!.value);
+    }
     _videoCtrl?.play();
     _audioPlayer?.resume();
     setState(() {});
@@ -254,10 +301,43 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ── Delete ────────────────────────────────────────────────────────────────
 
   Future<void> _deleteStory() async {
+    _pause();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A2435),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Xóa story',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: const Text(
+          'Story này sẽ bị xóa vĩnh viễn và không thể khôi phục.',
+          style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy',
+                style: TextStyle(color: Color(0xFF4AA3E4))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xóa',
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      if (mounted) _resume();
+      return;
+    }
     try {
       await StoryService.deleteStory(_story.id);
       if (mounted) _goNext();
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) _resume();
+    }
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────
@@ -281,6 +361,29 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     super.dispose();
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /// Computes the 9:16 preview box within [screenW]×[screenH].
+  /// Returns (offsetX, offsetY, boxW, boxH).
+  static (double, double, double, double) _previewBox(double screenW, double screenH) {
+    double pw = screenW;
+    double ph = pw * 16 / 9;
+    if (ph > screenH) {
+      ph = screenH;
+      pw = ph * 9 / 16;
+    }
+    return ((screenW - pw) / 2, (screenH - ph) / 2, pw, ph);
+  }
+
+  static Color _hexColor(String hex) {
+    try {
+      final s = hex.replaceFirst('#', '');
+      if (s.length == 6) return Color(int.parse('FF$s', radix: 16));
+      if (s.length == 8) return Color(int.parse(s, radix: 16));
+    } catch (_) {}
+    return Colors.white;
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -296,20 +399,79 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         child: Stack(
           children: [
             Positioned.fill(child: _buildContent()),
+            // Tap areas sit BELOW all interactive controls so that buttons in
+            // the top overlay and bottom bar win the gesture arena.
+            if (!_showViewers)
+              Positioned.fill(child: _buildTapAreas()),
+            // Music sticker — positioned using saved stickerX/Y/Width
+            // (same 9:16 coordinate system as the creator).
+            if (_story.music != null && !_showViewers)
+              Positioned.fill(
+                child: LayoutBuilder(builder: (ctx, cs) {
+                  final (ox, oy, pw, ph) =
+                      _previewBox(cs.maxWidth, cs.maxHeight);
+                  final m = _story.music!;
+                  return Stack(
+                    children: [
+                      Positioned(
+                        left: ox + (m.stickerX / 100) * pw,
+                        top: oy + (m.stickerY / 100) * ph,
+                        width: (m.stickerWidth / 100) * pw,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: StoryMusicSticker(music: m),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            // Buffering indicator while waiting for audio to load.
+            if (_waitingForAudio)
+              Positioned(
+                bottom: 80,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.8,
+                            valueColor:
+                                AlwaysStoppedAnimation(Colors.white70),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Đang tải nhạc...',
+                          style: TextStyle(
+                              color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            // UI controls at the top of Z-order → their buttons take priority.
             Positioned(
               top: 0, left: 0, right: 0,
               child: _buildTopOverlay(),
             ),
-            // Music sticker (text/image stories with music)
-            if (_story.music != null && !_showViewers)
-              Positioned(
-                bottom: 90,
-                left: 16,
-                right: 70,
-                child: StoryMusicSticker(music: _story.music!),
-              ),
-            if (!_showViewers)
-              Positioned.fill(child: _buildTapAreas()),
             if (!_showViewers)
               Positioned(
                 bottom: 0, left: 0, right: 0,
@@ -361,14 +523,47 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       );
     }
     if (story.mediaUrl != null) {
-      return Image.network(
-        story.mediaUrl!,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        errorBuilder: (_, __, ___) =>
-            Container(color: const Color(0xFF0F1829)),
-      );
+      // Render image + text overlays using the same 9:16 coordinate system
+      // as the creator so positions match.
+      return LayoutBuilder(builder: (ctx, cs) {
+        final (ox, oy, pw, ph) = _previewBox(cs.maxWidth, cs.maxHeight);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              story.mediaUrl!,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (_, __, ___) =>
+                  Container(color: const Color(0xFF0F1829)),
+            ),
+            // Text overlays
+            ...story.textOverlays.map((ov) {
+              final fontPx = ((ov.fontSize / 100) * ph).clamp(8.0, 120.0);
+              return Positioned(
+                left: ox + (ov.x / 100) * pw,
+                top: oy + (ov.y / 100) * ph,
+                child: FractionalTranslation(
+                  translation: const Offset(-0.5, -0.5),
+                  child: Text(
+                    ov.text,
+                    style: TextStyle(
+                      color: _hexColor(ov.color),
+                      fontSize: fontPx,
+                      fontWeight: FontWeight.w700,
+                      shadows: const [
+                        Shadow(color: Colors.black54, blurRadius: 4),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }),
+          ],
+        );
+      });
     }
     return Container(color: const Color(0xFF0F1829));
   }
@@ -697,7 +892,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => SafeArea(
+      builder: (sheetCtx) => SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -711,26 +906,59 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ),
             ),
             const SizedBox(height: 8),
-            if (_isOwn)
+            if (_isOwn) ...[
+              // View viewers
+              ListTile(
+                leading: const Icon(Icons.remove_red_eye_outlined,
+                    color: Color(0xFFE8ECF8)),
+                title: Text(t('story.viewers', {'count': _story.viewCount}),
+                    style: const TextStyle(color: Color(0xFFE8ECF8))),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  setState(() => _showViewers = true);
+                  _loadViewers();
+                },
+              ),
+              // Edit visibility
+              ListTile(
+                leading: const Icon(Icons.tune_rounded,
+                    color: Color(0xFFE8ECF8)),
+                title: const Text('Chỉnh sửa quyền xem',
+                    style: TextStyle(color: Color(0xFFE8ECF8))),
+                trailing: _visibilityChip(_localVisibility ?? 'followers'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _showVisibilityPicker();
+                },
+              ),
+              // Delete
               ListTile(
                 leading: const Icon(Icons.delete_outline_rounded,
                     color: Colors.redAccent),
                 title: Text(t('story.deleteStory'),
                     style: const TextStyle(color: Colors.redAccent)),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetCtx);
                   _deleteStory();
                 },
-              )
-            else
+              ),
+            ] else ...[
               ListTile(
                 leading: const Icon(Icons.flag_outlined,
                     color: Color(0xFF7A8BB0)),
                 title: Text(t('story.report'),
-                    style:
-                        const TextStyle(color: Color(0xFFE8ECF8))),
-                onTap: () => Navigator.pop(context),
+                    style: const TextStyle(color: Color(0xFFE8ECF8))),
+                onTap: () => Navigator.pop(sheetCtx),
               ),
+            ],
+            // Close
+            ListTile(
+              leading: const Icon(Icons.close_rounded,
+                  color: Color(0xFF7A8BB0)),
+              title: const Text('Đóng',
+                  style: TextStyle(color: Color(0xFF7A8BB0))),
+              onTap: () => Navigator.pop(sheetCtx),
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -738,6 +966,133 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     ).then((_) {
       if (!_showViewers && mounted) _resume();
     });
+  }
+
+  Widget _visibilityChip(String vis) {
+    final label = switch (vis) {
+      'public' => 'Công khai',
+      'private' => 'Riêng tư',
+      _ => 'Người theo dõi',
+    };
+    final icon = switch (vis) {
+      'public' => Icons.public_rounded,
+      'private' => Icons.lock_outline_rounded,
+      _ => Icons.people_outline_rounded,
+    };
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: const Color(0xFF7A8BB0)),
+        const SizedBox(width: 4),
+        Text(label,
+            style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 12)),
+      ],
+    );
+  }
+
+  void _showVisibilityPicker() {
+    _pause();
+    const options = [
+      ('followers', 'Người theo dõi', 'Chỉ người theo dõi mới xem được',
+          Icons.people_outline_rounded),
+      ('public', 'Công khai', 'Tất cả mọi người đều có thể xem',
+          Icons.public_rounded),
+      ('private', 'Riêng tư', 'Chỉ mình bạn xem được',
+          Icons.lock_outline_rounded),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A2435),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setLocal) => SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 6),
+              Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Icon(Icons.tune_rounded,
+                        color: Color(0xFF4AA3E4), size: 18),
+                    SizedBox(width: 8),
+                    Text('Chỉnh sửa quyền xem',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...options.map((opt) {
+                final (key, label, desc, icon) = opt;
+                final selected = (_localVisibility ?? 'followers') == key;
+                return ListTile(
+                  leading: Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: selected
+                          ? const LinearGradient(
+                              colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)])
+                          : null,
+                      color: selected ? null : const Color(0xFF253347),
+                    ),
+                    child: Icon(icon,
+                        color: selected ? Colors.white : const Color(0xFF7A8BB0),
+                        size: 18),
+                  ),
+                  title: Text(label,
+                      style: TextStyle(
+                          color: selected ? Colors.white : const Color(0xFFE8ECF8),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14)),
+                  subtitle: Text(desc,
+                      style: const TextStyle(
+                          color: Color(0xFF7A8BB0), fontSize: 12)),
+                  trailing: selected
+                      ? const Icon(Icons.check_circle_rounded,
+                          color: Color(0xFF4AA3E4), size: 22)
+                      : null,
+                  onTap: () {
+                    setLocal(() {});
+                    Navigator.pop(sheetCtx);
+                    _updateVisibility(key);
+                  },
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    ).then((_) {
+      if (mounted) _resume();
+    });
+  }
+
+  Future<void> _updateVisibility(String visibility) async {
+    final prev = _localVisibility;
+    setState(() => _localVisibility = visibility);
+    try {
+      await StoryService.updateVisibility(_story.id, visibility);
+    } catch (_) {
+      if (mounted) setState(() => _localVisibility = prev);
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

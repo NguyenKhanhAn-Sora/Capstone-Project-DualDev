@@ -45,6 +45,25 @@ class StoryService {
     return res;
   }
 
+  /// Trims an external audio URL to [startTime, startTime+duration] seconds
+  /// and uploads the clip to Cloudinary. Returns the clipped URL.
+  static Future<String> trimAudio({
+    required String audioUrl,
+    required int startTime,
+    int duration = 20,
+  }) async {
+    final res = await ApiService.post(
+      '/stories/trim-audio',
+      body: {
+        'audioUrl': audioUrl,
+        'startTime': startTime,
+        'duration': duration,
+      },
+      extraHeaders: _auth,
+    );
+    return res['clippedUrl'] as String;
+  }
+
   static Future<StoryItem> createStory(Map<String, dynamic> body) async {
     final res = await ApiService.post(
       '/stories',

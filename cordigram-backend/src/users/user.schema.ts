@@ -25,7 +25,7 @@ export type UserSettings = {
   theme: 'light' | 'dark';
   language: 'vi' | 'en' | 'ja' | 'zh';
   appearanceBackground?: string | null;
-  appearancePreset?: 'default' | 'graphite' | 'charcoal' | 'indigo';
+  appearancePreset?: 'default' | 'graphite' | 'charcoal' | 'indigo' | 'galaxy';
   appearanceSync?: boolean;
   /** Ai hiện trong danh sách DM (chỉ UI + lọc client; mặc định everyone). */
   dmListFrom?: 'everyone' | 'followers_only';
@@ -179,7 +179,7 @@ export class User extends Document {
       appearanceBackground: { type: String, default: null },
       appearancePreset: {
         type: String,
-        enum: ['default', 'graphite', 'charcoal', 'indigo'],
+        enum: ['default', 'graphite', 'charcoal', 'indigo', 'galaxy'],
         default: 'default',
       },
       appearanceSync: { type: Boolean, default: false },
