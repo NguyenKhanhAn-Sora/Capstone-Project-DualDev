@@ -1880,8 +1880,8 @@
       "mutualHint": "Messages chỉ lưu một màu giao diện: preset Nền và màu chủ đề Boost dùng chung một giá trị, không chồng trong storage. Mỗi ô tô lại toàn bộ chrome Messages (nền, panel, accent). Chưa Boost chỉ dùng Nền; có Boost có thể chuyển sang Màu chủ đề.",
       "modeBackground": "Đang dùng: Nền có sẵn",
       "modeAccent": "Đang dùng: Màu chủ đề (Boost)",
-      "modeFollowSocial": "Đang dùng: Giống Social",
-      "followSocialTitle": "Giống Social",
+      "modeFollowSocial": "Đang dùng: Giao diện mặc định",
+      "followSocialTitle": "Giao diện mặc định",
       "followSocialHint": "Theo chế độ Sáng, Tối hoặc Galaxy của Social. Chỉ áp dụng cho Messages.",
       "followSocialPick": "Dùng giao diện giống Social"
     },
@@ -1904,7 +1904,7 @@
       "unlockToast": "Nâng cấp Boost để mở khóa tùy chỉnh nền."
     },
     "themeColors": {
-      "title": "Màu sắc chủ đề",
+      "title": "Màu sắc tùy chọn",
       "hint": "Chỉ khi có Boost: chọn màu hoặc tùy chỉnh — tô lại toàn bộ giao diện Messages giống preset Nền. Chọn ở đây sẽ tắt highlight Nền.",
       "lockedHint": "Đăng ký Boost Cordigram để mở màu chủ đề tùy chỉnh. Bạn vẫn dùng được phần Nền phía trên."
     },

@@ -69,6 +69,7 @@ export default function ChannelContextMenu({
   const dialogRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notify" | null>(null);
   const [submenuPos, setSubmenuPos] = useState({ left: 0, top: 0 });
+  const [menuPos, setMenuPos] = useState({ left: x, top: y });
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [editName, setEditName] = useState(channel.name);
@@ -95,18 +96,26 @@ export default function ChannelContextMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
+    const pad = 8;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    if (rect.right > vw) {
-      menuRef.current.style.left = `${Math.max(4, vw - rect.width - 8)}px`;
+    let left = x;
+    let top = y;
+    if (left + rect.width > vw - pad) {
+      left = Math.max(pad, vw - pad - rect.width);
     }
-    if (rect.bottom > vh) {
-      menuRef.current.style.top = `${Math.max(4, vh - rect.height - 8)}px`;
+    const spaceBelow = vh - y - pad;
+    const spaceAbove = y - pad;
+    if (rect.height > spaceBelow && spaceAbove > spaceBelow) {
+      top = Math.max(pad, y - rect.height);
+    } else if (top + rect.height > vh - pad) {
+      top = Math.max(pad, vh - pad - rect.height);
     }
-  }, [x, y]);
+    setMenuPos({ left, top });
+  }, [x, y, submenu, showEdit, showDelete]);
 
   useEffect(() => {
     if (showEdit && editInputRef.current) {
@@ -265,7 +274,7 @@ export default function ChannelContextMenu({
       <div
         ref={menuRef}
         className={styles.menu}
-        style={{ left: x, top: y }}
+        style={{ left: menuPos.left, top: menuPos.top }}
         role="menu"
         aria-label="Menu kênh"
       >

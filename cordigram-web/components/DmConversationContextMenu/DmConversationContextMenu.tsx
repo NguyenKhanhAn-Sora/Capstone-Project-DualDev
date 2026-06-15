@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { useLanguage } from "@/component/language-provider";
 import {
   DM_CATEGORY_COLORS,
@@ -51,6 +51,28 @@ export default function DmConversationContextMenu({
   const [openSubmenu, setOpenSubmenu] = useState<"mute" | "category" | null>(
     null,
   );
+  const [menuPos, setMenuPos] = useState({ left: x, top: y });
+
+  useLayoutEffect(() => {
+    if (!menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = x;
+    let top = y;
+    if (left + rect.width > vw - pad) {
+      left = Math.max(pad, vw - pad - rect.width);
+    }
+    const spaceBelow = vh - y - pad;
+    const spaceAbove = y - pad;
+    if (rect.height > spaceBelow && spaceAbove > spaceBelow) {
+      top = Math.max(pad, y - rect.height);
+    } else if (top + rect.height > vh - pad) {
+      top = Math.max(pad, vh - pad - rect.height);
+    }
+    setMenuPos({ left, top });
+  }, [x, y, isFollowing, isBlockedByMe, preferences]);
 
   const showSubmenu = useCallback((key: "mute" | "category") => {
     if (submenuCloseTimerRef.current) {
@@ -99,7 +121,7 @@ export default function DmConversationContextMenu({
       <div
         ref={menuRef}
         className={styles.menu}
-        style={{ left: x, top: y }}
+        style={{ left: menuPos.left, top: menuPos.top }}
         role="menu"
         aria-label={t("chat.dmConversation.menuLabel").replace("{name}", peerName)}
       >

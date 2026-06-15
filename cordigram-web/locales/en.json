@@ -1882,8 +1882,8 @@
       "mutualHint": "Messages saves one UI tint: Background presets and Boost theme colors share the same value, so they never stack in storage. Each swatch repaints the whole Messages chrome (backgrounds, panels, and accents). Without Boost you only use Background; with Boost you can switch to Theme colors.",
       "modeBackground": "Active: Background presets",
       "modeAccent": "Active: Theme colors (Boost)",
-      "modeFollowSocial": "Active: Match Social",
-      "followSocialTitle": "Match Social",
+      "modeFollowSocial": "Active: Default appearance",
+      "followSocialTitle": "Default appearance",
       "followSocialHint": "Follow Social light, dark, or Galaxy. Messages only — does not change Social.",
       "followSocialPick": "Use Social appearance"
     },
@@ -1906,7 +1906,7 @@
       "unlockToast": "Upgrade Boost to unlock background customization."
     },
     "themeColors": {
-      "title": "Theme colors",
+      "title": "Custom colors",
       "hint": "Boost only: pick any color or a custom value — it tints the whole Messages UI like Background presets. Selecting here clears Background highlights.",
       "lockedHint": "Subscribe to Cordigram Boost to unlock custom theme colors. You can still use Background presets above."
     },

@@ -205,21 +205,24 @@ export default function ServerContextMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
-  useEffect(() => {
-    setMenuPos({ left: x, top: y });
-  }, [x, y]);
-
   useLayoutEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
     const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
     let left = x;
     let top = y;
-    if (left + rect.width > window.innerWidth - pad) {
-      left = Math.max(pad, window.innerWidth - pad - rect.width);
+    if (left + rect.width > vw - pad) {
+      left = Math.max(pad, vw - pad - rect.width);
     }
-    if (top + rect.height > window.innerHeight - pad) {
-      top = Math.max(pad, window.innerHeight - pad - rect.height);
+    // Lật lên trên nếu không đủ chỗ phía dưới mà phía trên còn chỗ.
+    const spaceBelow = vh - y - pad;
+    const spaceAbove = y - pad;
+    if (rect.height > spaceBelow && spaceAbove > spaceBelow) {
+      top = Math.max(pad, y - rect.height);
+    } else if (top + rect.height > vh - pad) {
+      top = Math.max(pad, vh - pad - rect.height);
     }
     setMenuPos({ left, top });
   }, [x, y, submenu, canManageServer, canManageChannels, canManageEvents, canCreateInvite, isOwner]);
