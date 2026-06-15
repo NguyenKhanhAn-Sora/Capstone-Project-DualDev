@@ -423,15 +423,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const res = await fetchUserSettings({ token });
         if (!cancelled) {
           const sync = res.appearanceSync === true;
-          // localStorage is source of truth for appearancePreset —
-          // server may not persist all presets (e.g. "galaxy"), so we
-          // never let the server response override a locally saved value.
+          // Server is source of truth for appearancePreset after login.
+          // localStorage is only used as fallback when the server has no value,
+          // preventing previous user's galaxy/custom preset from leaking into
+          // a newly logged-in account with different settings.
+          const serverPreset = res.appearancePreset as AppearancePreset | undefined;
           const localPreset =
             typeof window !== "undefined"
               ? (localStorage.getItem(APPEARANCE_PRESET_KEY) as AppearancePreset | null)
               : null;
           const nextPreset: AppearancePreset =
-            localPreset ?? (res.appearancePreset as AppearancePreset | undefined) ?? "default";
+            serverPreset ?? localPreset ?? "default";
           setAppearanceSyncState(sync);
           setAppearancePresetState(nextPreset);
           if (sync && typeof window !== "undefined") {

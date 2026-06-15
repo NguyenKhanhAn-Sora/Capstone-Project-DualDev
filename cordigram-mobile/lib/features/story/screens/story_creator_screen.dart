@@ -8,6 +8,8 @@ import '../models/story_models.dart';
 import '../services/story_service.dart';
 import '../widgets/story_music_picker.dart';
 import 'photo_text_editor.dart';
+import 'story_music_editor.dart';
+import 'story_success_screen.dart';
 
 // ── Visibility option ─────────────────────────────────────────────────────────
 
@@ -97,6 +99,9 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
   int _textAddTrigger = 0;
   bool _textInputActive = false;
 
+  // Music sticker selection
+  bool _musicStickerSelected = false;
+
   // Trim state
   double _trimStart = 0.0; // 0–1 fraction
   double _trimEnd = 1.0;
@@ -117,6 +122,35 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
   }
 
   bool get _isText => _tabCtrl.index == 1;
+
+  // ── Reset for new story ───────────────────────────────────────────────────
+
+  void _resetForNewStory() {
+    _videoCtrl?.dispose();
+    _videoCtrl = null;
+    _textCtrl.clear();
+    setState(() {
+      _step = 'select';
+      _mediaStep = 'preview';
+      _mediaFile = null;
+      _mediaType = null;
+      _mediaDurationMs = null;
+      _trimStartMs = null;
+      _trimEndMs = null;
+      _trimStart = 0;
+      _trimEnd = 1;
+      _bgStyle = kStoryBgOptions[1];
+      _selectedMusic = null;
+      _textLayers = [];
+      _textSelectedId = null;
+      _textAddTrigger = 0;
+      _textInputActive = false;
+      _musicStickerSelected = false;
+      _uploading = false;
+      _uploadProgress = 0;
+      _error = null;
+    });
+  }
 
   // ── Pick media ────────────────────────────────────────────────────────────
 
@@ -184,7 +218,13 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
       selected: _selectedMusic,
       isDark: isDark,
       onResult: (music) {
-        if (mounted) setState(() => _selectedMusic = music);
+        if (mounted) {
+          setState(() {
+            _selectedMusic = music;
+            // Auto-select sticker so trim panel opens immediately
+            _musicStickerSelected = music != null;
+          });
+        }
       },
     );
   }
@@ -258,12 +298,38 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         };
       }
 
-      setState(() => _uploadProgress = 85);
+      // If story has music, trim the audio clip now and replace the URL.
+      // This uploads a short ~20s clip to Cloudinary so viewers load it fast.
+      if (body['music'] != null) {
+        final music = body['music'] as Map<String, dynamic>;
+        final rawUrl = music['audioUrl'] as String? ?? '';
+        final startSec = (music['startTime'] as num?)?.toInt() ?? 0;
+        if (rawUrl.isNotEmpty) {
+          setState(() => _uploadProgress = 80);
+          try {
+            final clippedUrl = await StoryService.trimAudio(
+              audioUrl: rawUrl,
+              startTime: startSec,
+              duration: 20,
+            );
+            // Update body with trimmed URL and reset startTime to 0.
+            body['music'] = {
+              ...music,
+              'audioUrl': clippedUrl,
+              'startTime': 0,
+            };
+          } catch (_) {
+            // Trim failed — fall back to original URL (slower but functional).
+          }
+        }
+      }
+
+      setState(() => _uploadProgress = 90);
       await StoryService.createStory(body);
       setState(() => _uploadProgress = 100);
 
       await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) setState(() => _step = 'success');
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -332,9 +398,15 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         backgroundColor: bg,
         resizeToAvoidBottomInset: false,
         body: SafeArea(
-          child: _step == 'select'
-              ? _buildSelectScreen(t, isDark)
-              : _buildEditorScreen(t, isDark),
+          child: _step == 'success'
+              ? StorySuccessScreen(
+                  onGoHome: () =>
+                      Navigator.of(context, rootNavigator: true).pop(true),
+                  onPostAnother: _resetForNewStory,
+                )
+              : _step == 'select'
+                  ? _buildSelectScreen(t, isDark)
+                  : _buildEditorScreen(t, isDark),
         ),
       ),
     );
@@ -718,13 +790,19 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
               ),
             ),
           ),
-          // Music sticker overlay
+          // Music sticker (interactive)
           if (_selectedMusic != null)
-            Positioned(
-              bottom: 16,
-              left: 16,
-              right: 64,
-              child: StoryMusicSticker(music: _selectedMusic!),
+            MusicStickerEditor(
+              music: _selectedMusic!,
+              isSelected: _musicStickerSelected,
+              onTap: () => setState(() {
+                _musicStickerSelected = !_musicStickerSelected;
+              }),
+              onUpdate: (m) => setState(() => _selectedMusic = m),
+              onRemove: () => setState(() {
+                _selectedMusic = null;
+                _musicStickerSelected = false;
+              }),
             ),
         ],
       ),
@@ -788,10 +866,28 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
                 setState(() => _textLayers = layers),
             addTrigger: _textAddTrigger,
             selectedId: _textSelectedId,
-            onSelectChanged: (id) =>
-                setState(() => _textSelectedId = id),
+            onSelectChanged: (id) => setState(() {
+              _textSelectedId = id;
+              if (id != null) _musicStickerSelected = false;
+            }),
             onInputModeChanged: (active) =>
                 setState(() => _textInputActive = active),
+          ),
+
+        // Music sticker for image stories (above photo+text layers)
+        if (_mediaType == 'image' && _selectedMusic != null)
+          MusicStickerEditor(
+            music: _selectedMusic!,
+            isSelected: _musicStickerSelected,
+            onTap: () => setState(() {
+              _musicStickerSelected = !_musicStickerSelected;
+              if (_musicStickerSelected) _textSelectedId = null;
+            }),
+            onUpdate: (m) => setState(() => _selectedMusic = m),
+            onRemove: () => setState(() {
+              _selectedMusic = null;
+              _musicStickerSelected = false;
+            }),
           ),
 
         // Top-right: change media (hidden during text input)
@@ -873,21 +969,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
 
   Widget _buildImagePreview(
       String Function(String, [Map<String, dynamic>?]) t) {
-    // Base photo layer — rendered as photoChild inside PhotoTextEditor.
-    // Music sticker sits below text layers so it's placed here.
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.file(_mediaFile!, fit: BoxFit.cover),
-        if (_selectedMusic != null)
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 64,
-            child: StoryMusicSticker(music: _selectedMusic!),
-          ),
-      ],
-    );
+    return Image.file(_mediaFile!, fit: BoxFit.cover);
   }
 
   Widget _buildVideoPreview(
@@ -945,20 +1027,20 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Text bg selector (only for text tab)
-          if (_isText) _buildBgStrip(isDark),
-          // Music row (text and image stories — not video)
-          if (_mediaType != 'video')
-            _buildMusicRow(t, isDark),
-          // Trim button (video only)
-          if (!_isText && _mediaFile != null && _mediaType == 'video')
-            _buildActionRow(t, isDark),
-
-          // Text layer controls (shown when a text overlay is selected)
-          if (!_isText && _mediaType == 'image' && _textSelectedId != null)
+          // ── Music trim panel when sticker is selected ────────────
+          if (_musicStickerSelected && _selectedMusic != null)
+            MusicTrimPanel(
+              music: _selectedMusic!,
+              isDark: isDark,
+              onUpdate: (m) => setState(() => _selectedMusic = m),
+              onDone: () => setState(() => _musicStickerSelected = false),
+            )
+          // ── Text layer controls when layer is selected ────────────
+          else if (!_isText && _mediaType == 'image' &&
+              _textSelectedId != null)
             Builder(builder: (_) {
-              final idx = _textLayers
-                  .indexWhere((l) => l.id == _textSelectedId);
+              final idx =
+                  _textLayers.indexWhere((l) => l.id == _textSelectedId);
               if (idx < 0) return const SizedBox.shrink();
               final layer = _textLayers[idx];
               return TextLayerControls(
@@ -971,16 +1053,22 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
                 }),
                 onDelete: () {
                   setState(() {
-                    _textLayers =
-                        _textLayers.where((l) => l.id != _textSelectedId).toList();
+                    _textLayers = _textLayers
+                        .where((l) => l.id != _textSelectedId)
+                        .toList();
                     _textSelectedId = null;
                   });
                 },
               );
-            }),
-
-          // Visibility selector (opens overlay)
-          _buildVisibilityButton(t, isDark),
+            })
+          // ── Normal options ────────────────────────────────────────
+          else ...[
+            if (_isText) _buildBgStrip(isDark),
+            if (_mediaType != 'video') _buildMusicRow(t, isDark),
+            if (!_isText && _mediaFile != null && _mediaType == 'video')
+              _buildActionRow(t, isDark),
+            _buildVisibilityButton(t, isDark),
+          ],
 
           // Error
           if (_error != null)

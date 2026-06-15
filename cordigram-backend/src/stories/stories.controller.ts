@@ -35,6 +35,23 @@ export class StoriesController {
   constructor(private readonly storiesService: StoriesService) {}
 
   @UseGuards(JwtAuthGuard)
+  @Post('trim-audio')
+  @HttpCode(200)
+  async trimAudio(
+    @Req() req: Request,
+    @Body('audioUrl') audioUrl: string,
+    @Body('startTime') startTime: number,
+    @Body('duration') duration: number,
+  ) {
+    if (!audioUrl || typeof audioUrl !== 'string') {
+      throw new BadRequestException('audioUrl is required');
+    }
+    const startSec = Number(startTime) || 0;
+    const durationSec = Number(duration) || 20;
+    return this.storiesService.trimAudio(audioUrl, startSec, durationSec);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: STORY_MAX_BYTES } }))
   async uploadMedia(

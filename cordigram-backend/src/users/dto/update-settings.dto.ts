@@ -45,8 +45,8 @@ export class UpdateSettingsDto {
   appearanceBackground?: string;
 
   @IsOptional()
-  @IsIn(['default', 'graphite', 'charcoal', 'indigo'])
-  appearancePreset?: 'default' | 'graphite' | 'charcoal' | 'indigo';
+  @IsIn(['default', 'graphite', 'charcoal', 'indigo', 'galaxy'])
+  appearancePreset?: 'default' | 'graphite' | 'charcoal' | 'indigo' | 'galaxy';
 
   @IsOptional()
   @IsBoolean()

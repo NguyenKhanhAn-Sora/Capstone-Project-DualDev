@@ -107,7 +107,6 @@ class _PhotoTextEditorState extends State<PhotoTextEditor> {
       // Defer to post-frame to avoid setState during build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _inputCtrl.clear();
         widget.onSelectChanged(null);
         _openInputOverlay();
       });
@@ -121,8 +120,20 @@ class _PhotoTextEditorState extends State<PhotoTextEditor> {
     super.dispose();
   }
 
-  void _openInputOverlay() {
+  String? _editingLayerId;
+
+  void _openInputOverlay({StoryTextLayer? editing}) {
     if (_overlayEntry != null) return;
+    _editingLayerId = editing?.id;
+    if (editing != null) {
+      _inputCtrl.text = editing.text;
+      _inputColor = editing.color;
+      _inputFontSize = editing.fontSize;
+    } else {
+      _inputCtrl.clear();
+      _inputColor = const Color(0xFFFFFFFF);
+      _inputFontSize = 28;
+    }
     _overlayEntry = OverlayEntry(
       builder: (_) => Material(
         type: MaterialType.transparency,
@@ -157,24 +168,41 @@ class _PhotoTextEditorState extends State<PhotoTextEditor> {
   void _confirmInput() {
     final text = _inputCtrl.text.trim();
     if (text.isNotEmpty) {
-      widget.onLayersChanged([
-        ...widget.layers,
-        StoryTextLayer(
-          id: '${DateTime.now().microsecondsSinceEpoch}',
-          text: text,
-          color: _inputColor,
-          fontSize: _inputFontSize,
-          x: 50,
-          y: 50,
-        ),
-      ]);
+      if (_editingLayerId != null) {
+        // Update existing layer
+        final idx = widget.layers.indexWhere((l) => l.id == _editingLayerId);
+        if (idx >= 0) {
+          final updated = List<StoryTextLayer>.from(widget.layers);
+          updated[idx] = updated[idx].copyWith(
+            text: text,
+            color: _inputColor,
+            fontSize: _inputFontSize,
+          );
+          widget.onLayersChanged(updated);
+        }
+      } else {
+        // Add new layer
+        widget.onLayersChanged([
+          ...widget.layers,
+          StoryTextLayer(
+            id: '${DateTime.now().microsecondsSinceEpoch}',
+            text: text,
+            color: _inputColor,
+            fontSize: _inputFontSize,
+            x: 50,
+            y: 50,
+          ),
+        ]);
+      }
     }
+    _editingLayerId = null;
     _closeInputOverlay();
     _inputCtrl.clear();
-    if (mounted) setState(() {}); // refresh layers
+    if (mounted) setState(() {});
   }
 
   void _cancelInput() {
+    _editingLayerId = null;
     _closeInputOverlay();
     _inputCtrl.clear();
   }
@@ -216,6 +244,7 @@ class _PhotoTextEditorState extends State<PhotoTextEditor> {
                   containerSize: size,
                   isSelected: widget.selectedId == layer.id,
                   onSelect: () => widget.onSelectChanged(layer.id),
+                  onEdit: () => _openInputOverlay(editing: layer),
                   onUpdate: _updateLayer,
                   onDelete: () => _deleteLayer(layer.id),
                 ),
@@ -230,13 +259,14 @@ class _PhotoTextEditorState extends State<PhotoTextEditor> {
 
 // ── Draggable text overlay item ───────────────────────────────────────────────
 
-class _TextLayerItem extends StatelessWidget {
+class _TextLayerItem extends StatefulWidget {
   const _TextLayerItem({
     super.key,
     required this.layer,
     required this.containerSize,
     required this.isSelected,
     required this.onSelect,
+    required this.onEdit,
     required this.onUpdate,
     required this.onDelete,
   });
@@ -245,13 +275,61 @@ class _TextLayerItem extends StatelessWidget {
   final Size containerSize;
   final bool isSelected;
   final VoidCallback onSelect;
+  final VoidCallback onEdit;
   final void Function(StoryTextLayer) onUpdate;
   final VoidCallback onDelete;
 
   @override
+  State<_TextLayerItem> createState() => _TextLayerItemState();
+}
+
+class _TextLayerItemState extends State<_TextLayerItem> {
+  Offset? _dragStartGlobal;
+  double _startX = 0;
+  double _startY = 0;
+
+  // Measured size of the text box — used to clamp so box never exits preview
+  final _contentKey = GlobalKey();
+  Size _contentSize = Size.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+  }
+
+  @override
+  void didUpdateWidget(_TextLayerItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.layer.text != widget.layer.text ||
+        oldWidget.layer.fontSize != widget.layer.fontSize) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+    }
+  }
+
+  void _measure() {
+    if (!mounted) return;
+    final box =
+        _contentKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize) {
+      setState(() => _contentSize = box.size);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final px = (layer.x / 100) * containerSize.width;
-    final py = (layer.y / 100) * containerSize.height;
+    final px = (widget.layer.x / 100) * widget.containerSize.width;
+    final py = (widget.layer.y / 100) * widget.containerSize.height;
+
+    // Clamp so the entire text box stays inside the preview
+    final halfW = _contentSize == Size.zero
+        ? 5.0
+        : (_contentSize.width / 2 / widget.containerSize.width * 100)
+            .clamp(5.0, 48.0);
+    final halfH = _contentSize == Size.zero
+        ? 5.0
+        : (_contentSize.height / 2 / widget.containerSize.height * 100)
+            .clamp(3.0, 45.0);
 
     return Positioned(
       left: px,
@@ -259,27 +337,43 @@ class _TextLayerItem extends StatelessWidget {
       child: FractionalTranslation(
         translation: const Offset(-0.5, -0.5),
         child: GestureDetector(
-          onTap: onSelect,
-          onPanStart: (_) => onSelect(),
+          onTap: () {
+            if (widget.isSelected) {
+              widget.onEdit();
+            } else {
+              widget.onSelect();
+            }
+          },
+          onPanStart: (details) {
+            widget.onSelect();
+            _dragStartGlobal = details.globalPosition;
+            _startX = widget.layer.x;
+            _startY = widget.layer.y;
+          },
           onPanUpdate: (details) {
-            final dx = details.delta.dx;
-            final dy = details.delta.dy;
-            onUpdate(layer.copyWith(
-              x: (layer.x + (dx / containerSize.width) * 100)
-                  .clamp(5.0, 95.0),
-              y: (layer.y + (dy / containerSize.height) * 100)
-                  .clamp(5.0, 95.0),
+            if (_dragStartGlobal == null) return;
+            final totalDx =
+                details.globalPosition.dx - _dragStartGlobal!.dx;
+            final totalDy =
+                details.globalPosition.dy - _dragStartGlobal!.dy;
+            widget.onUpdate(widget.layer.copyWith(
+              x: (_startX + (totalDx / widget.containerSize.width) * 100)
+                  .clamp(halfW, 100.0 - halfW),
+              y: (_startY + (totalDy / widget.containerSize.height) * 100)
+                  .clamp(halfH, 100.0 - halfH),
             ));
           },
+          onPanEnd: (_) => _dragStartGlobal = null,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               Container(
-                constraints:
-                    BoxConstraints(maxWidth: containerSize.width * 0.82),
+                key: _contentKey,
+                constraints: BoxConstraints(
+                    maxWidth: widget.containerSize.width * 0.82),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: isSelected
+                decoration: widget.isSelected
                     ? BoxDecoration(
                         borderRadius: BorderRadius.circular(5),
                         border: Border.all(
@@ -289,10 +383,10 @@ class _TextLayerItem extends StatelessWidget {
                       )
                     : null,
                 child: Text(
-                  layer.text,
+                  widget.layer.text,
                   style: TextStyle(
-                    color: layer.color,
-                    fontSize: layer.fontSize,
+                    color: widget.layer.color,
+                    fontSize: widget.layer.fontSize,
                     fontWeight: FontWeight.w700,
                     height: 1.25,
                     shadows: const [
@@ -306,13 +400,13 @@ class _TextLayerItem extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-              // Delete button — top-left corner when selected
-              if (isSelected)
+              // Delete button — top-left when selected
+              if (widget.isSelected)
                 Positioned(
                   top: -12,
                   left: -12,
                   child: GestureDetector(
-                    onTap: onDelete,
+                    onTap: widget.onDelete,
                     behavior: HitTestBehavior.opaque,
                     child: Container(
                       width: 24,
@@ -325,11 +419,33 @@ class _TextLayerItem extends StatelessWidget {
                           width: 1,
                         ),
                       ),
-                      child: const Icon(
-                        Icons.close_rounded,
-                        color: Colors.white,
-                        size: 14,
+                      child: const Icon(Icons.close_rounded,
+                          color: Colors.white, size: 14),
+                    ),
+                  ),
+                ),
+              // Edit button — top-right when selected
+              if (widget.isSelected)
+                Positioned(
+                  top: -12,
+                  right: -12,
+                  child: GestureDetector(
+                    onTap: widget.onEdit,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            const Color(0xFF4AA3E4).withValues(alpha: 0.90),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
                       ),
+                      child: const Icon(Icons.edit_rounded,
+                          color: Colors.white, size: 13),
                     ),
                   ),
                 ),
