@@ -40,6 +40,7 @@ import {
 } from '../direct-messages/direct-message.schema';
 import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
 import { BoostModule } from '../boost/boost.module';
+import { DirectMessagesModule } from '../direct-messages/direct-messages.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { BoostModule } from '../boost/boost.module';
     OtpModule,
     ActivityModule,
     forwardRef(() => BoostModule),
+    forwardRef(() => DirectMessagesModule),
   ],
   controllers: [UsersController],
   providers: [

@@ -3,25 +3,22 @@ import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api_service.dart';
 import 'auth_storage.dart';
-import '../../features/messages/call/dm_call_manager.dart';
-import '../../features/messages/call/pending_dm_call_storage.dart';
-import '../../features/messages/services/direct_messages_realtime_service.dart';
+import 'messages_push_handler.dart';
+import 'push_notification_background.dart';
+import 'social_push_handler.dart';
 import '../../features/messages/services/direct_messages_service.dart';
-import '../../features/notifications/notification_screen.dart';
-import '../../features/post/post_detail_screen.dart';
-import '../../features/profile/profile_screen.dart';
-import '../../features/reels/reels_screen.dart';
 
+/// FCM entry point: token sync + delegates to Messages/Social handlers.
+/// Social logic mirrors [/notifications] socket + FCM on backend.
+/// Messages logic covers calls/DM/mentions/events/role notices only.
 class PushNotificationService {
   PushNotificationService._();
-
-  static const String _androidSmallIcon = 'ic_stat_cordigram';
-  static const String _androidLargeIcon = 'cordigram_logo';
 
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _local =
@@ -31,40 +28,42 @@ class PushNotificationService {
   static GlobalKey<NavigatorState>? _navigatorKey;
   static Map<String, dynamic>? _pendingTapData;
   static bool _drainScheduled = false;
-
-  static const AndroidNotificationChannel _highChannel =
-      AndroidNotificationChannel(
-        'cordigram_push_high',
-        'Cordigram Push',
-        description: 'High priority notifications for account activity.',
-        importance: Importance.max,
-      );
+  static const Duration _dedupeWindow = Duration(seconds: 8);
+  static final Map<String, DateTime> _recentIds = {};
 
   static Future<void> initialize({
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
     _navigatorKey = navigatorKey;
-
     if (_initialized) return;
 
     await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     await DirectMessagesService.hydrateConversationMutes();
+
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
 
     await _local.initialize(
       const InitializationSettings(
-        android: AndroidInitializationSettings(_androidSmallIcon),
+        android: AndroidInitializationSettings(
+          MessagesPushHandler.androidSmallIcon,
+        ),
+        iOS: iosSettings,
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
         if (payload == null || payload.isEmpty) {
-          _openNotifications();
+          _openSocialNotifications();
           return;
         }
         try {
-          final data = jsonDecode(payload) as Map<String, dynamic>;
-          _handleTapData(data);
+          _handleTapData(jsonDecode(payload) as Map<String, dynamic>);
         } catch (_) {
-          _openNotifications();
+          _openSocialNotifications();
         }
       },
     );
@@ -73,55 +72,25 @@ class PushNotificationService {
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
-    await androidLocal?.createNotificationChannel(_highChannel);
+    await androidLocal?.createNotificationChannel(
+      SocialPushHandler.socialChannel,
+    );
+    await androidLocal?.createNotificationChannel(
+      MessagesPushHandler.messagesChannel,
+    );
+    await androidLocal?.createNotificationChannel(
+      MessagesPushHandler.callsChannel,
+    );
 
     await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
       provisional: false,
-      announcement: false,
-      criticalAlert: false,
-      carPlay: false,
     );
 
     FirebaseMessaging.onMessage.listen((message) async {
-      final data = Map<String, dynamic>.from(message.data);
-      final type = (data['type'] ?? '').toString();
-      if (_isDmCallIncomingType(type)) {
-        await _routeDmCallIncoming(data);
-        return;
-      }
-
-      if (_isDmMessagePushType(type)) {
-        final dmPeerId = _readDmPeerIdFromPushData(data);
-        if (dmPeerId.isNotEmpty &&
-            DirectMessagesService.isConversationMuted(dmPeerId)) {
-          return;
-        }
-      }
-
-      final title = message.notification?.title ?? 'Cordigram';
-      final body = message.notification?.body ?? 'You have a new notification.';
-
-      await _local.show(
-        message.hashCode,
-        title,
-        body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _highChannel.id,
-            _highChannel.name,
-            channelDescription: _highChannel.description,
-            icon: _androidSmallIcon,
-            largeIcon: DrawableResourceAndroidBitmap(_androidLargeIcon),
-            importance: Importance.max,
-            priority: Priority.high,
-            visibility: NotificationVisibility.public,
-          ),
-        ),
-        payload: jsonEncode(message.data),
-      );
+      await _handleForegroundMessage(message);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
@@ -140,40 +109,103 @@ class PushNotificationService {
     try {
       final token = await _messaging.getToken();
       if (token != null && token.trim().isNotEmpty) {
-        await _syncTokenWithBackend(token);
+        await syncCurrentToken();
       }
-    } catch (_) {
-      // Google Play Services unavailable on this device/session — push
-      // notifications won't work but the app should still launch normally.
+    } catch (err) {
+      if (kDebugMode) {
+        debugPrint('[Push] getToken failed during init: $err');
+      }
     }
 
     _initialized = true;
   }
 
-  static Future<void> syncCurrentToken() async {
-    try {
-      final token = await _messaging
-          .getToken()
-          .timeout(const Duration(seconds: 8));
-      if (token == null || token.trim().isEmpty) return;
-      await _syncTokenWithBackend(token);
-    } catch (_) {
-      // Ignore — token will sync on next startup or token refresh.
+  /// Registers the device FCM token with the backend. Retries when the device
+  /// session is not ready yet (common right after login).
+  static Future<bool> syncCurrentToken({int maxAttempts = 4}) async {
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        final token = await _messaging
+            .getToken()
+            .timeout(const Duration(seconds: 8));
+        if (token == null || token.trim().isEmpty) return false;
+        await _syncTokenWithBackend(token);
+        if (kDebugMode) {
+          debugPrint('[Push] FCM token synced (attempt ${attempt + 1})');
+        }
+        return true;
+      } catch (err) {
+        if (kDebugMode) {
+          debugPrint(
+            '[Push] sync attempt ${attempt + 1}/$maxAttempts failed: $err',
+          );
+        }
+        if (attempt < maxAttempts - 1) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 350 * (attempt + 1)),
+          );
+        }
+      }
     }
+    return false;
+  }
+
+  static Future<void> clearTokenOnLogout() async {
+    final accessToken = AuthStorage.accessToken;
+    if (accessToken == null || accessToken.isEmpty) return;
+    try {
+      await ApiService.patch(
+        '/users/push-token',
+        body: {'token': null},
+        extraHeaders: {'Authorization': 'Bearer $accessToken'},
+      );
+    } catch (_) {}
   }
 
   static Future<void> _syncTokenWithBackend(String token) async {
     final accessToken = AuthStorage.accessToken;
-    if (accessToken == null || accessToken.isEmpty) return;
+    if (accessToken == null || accessToken.isEmpty) {
+      throw StateError('Missing access token');
+    }
+    final deviceId = AuthStorage.deviceId;
+    if (deviceId == null || deviceId.isEmpty) {
+      throw StateError('Missing device id');
+    }
+    await ApiService.patch(
+      '/users/push-token',
+      body: {'token': token},
+      extraHeaders: {'Authorization': 'Bearer $accessToken'},
+    );
+  }
 
-    try {
-      await ApiService.patch(
-        '/users/push-token',
-        body: {'token': token},
-        extraHeaders: {'Authorization': 'Bearer $accessToken'},
+  static bool _shouldDedupe(String id) {
+    final now = DateTime.now();
+    _recentIds.removeWhere(
+      (key, ts) => now.difference(ts) > _dedupeWindow,
+    );
+    if (_recentIds.containsKey(id)) return true;
+    _recentIds[id] = now;
+    return false;
+  }
+
+  static Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    final data = Map<String, dynamic>.from(message.data);
+
+    if (MessagesPushHandler.isMessagesPush(data)) {
+      await MessagesPushHandler.handleForegroundMessage(
+        message: message,
+        local: _local,
+        shouldDedupe: _shouldDedupe,
       );
-    } catch (_) {
-      // Ignore sync failures and retry later on token refresh or next startup.
+      return;
+    }
+
+    if (SocialPushHandler.isSocialPush(data)) {
+      await SocialPushHandler.handleForegroundMessage(
+        message: message,
+        local: _local,
+        shouldDedupe: _shouldDedupe,
+      );
     }
   }
 
@@ -192,157 +224,7 @@ class PushNotificationService {
     });
   }
 
-  static void _navigateFromTapData(
-    NavigatorState navigator,
-    Map<String, dynamic> data,
-  ) {
-    final type = (data['type'] as String?)?.trim() ?? '';
-    if (_isDmCallIncomingType(type)) {
-      unawaited(_routeDmCallIncoming(data));
-      return;
-    }
-    final actorId =
-        ((data['actorId'] ?? data['userId']) as String?)?.trim() ?? '';
-    final postId =
-        ((data['postId'] ?? data['targetPostId']) as String?)?.trim() ?? '';
-    final commentId = (data['commentId'] as String?)?.trim() ?? '';
-    final postKind =
-        ((data['postKind'] ?? data['post_kind']) as String?)
-            ?.trim()
-            .toLowerCase() ??
-        'post';
-
-    if (type == 'follow' && actorId.isNotEmpty) {
-      navigator.push(
-        MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: actorId)),
-      );
-      return;
-    }
-
-    if (postId.isNotEmpty) {
-      if (postKind == 'reel') {
-        navigator.push(
-          MaterialPageRoute<void>(
-            builder: (_) => ReelsScreen(
-              scope: 'all',
-              initialReelId: postId,
-              pinInitialReelToTop: true,
-            ),
-          ),
-        );
-        return;
-      }
-
-      navigator.push(
-        MaterialPageRoute<void>(
-          builder: (_) => PostDetailScreen(
-            postId: postId,
-            priorityCommentId: commentId.isNotEmpty ? commentId : null,
-          ),
-        ),
-      );
-      return;
-    }
-
-    _openNotifications();
-  }
-
-  static bool _isDmMessagePushType(String type) {
-    final t = type.toLowerCase();
-    return t == 'dm_message' ||
-        t == 'direct_message' ||
-        t == 'new_dm_message' ||
-        (t.startsWith('dm_') && !_isDmCallIncomingType(t));
-  }
-
-  static bool _isDmCallIncomingType(String type) {
-    final t = type.toLowerCase();
-    return t == 'dm_call_incoming' ||
-        t == 'dm_call' ||
-        t == 'incoming_dm_call';
-  }
-
-  static Future<void> _routeDmCallIncoming(Map<String, dynamic> data) async {
-    final token = AuthStorage.accessToken;
-    if (token == null || token.isEmpty) {
-      await PendingDmCallStorage.save(Map<String, dynamic>.from(data));
-      return;
-    }
-    final callerId = _readDmCallerId(data);
-    if (callerId.isEmpty) {
-      _openNotifications();
-      return;
-    }
-    final video = _readDmCallVideoFlag(data);
-    final name =
-        (data['callerName'] ??
-                data['callerDisplayName'] ??
-                data['displayName'] ??
-                '')
-            .toString()
-            .trim();
-    final username =
-        (data['callerUsername'] ?? data['username'] ?? '').toString().trim();
-    final avatar =
-        (data['callerAvatar'] ?? data['avatarUrl'] ?? data['avatar'] ?? '')
-            .toString()
-            .trim();
-    await DirectMessagesRealtimeService.connect();
-    final callId = (data['callId'] ?? '').toString().trim();
-    DmCallManager.instance.presentIncomingHintFromPush(
-      callerUserId: callerId,
-      displayName: name.isNotEmpty ? name : null,
-      username: username.isNotEmpty ? username : null,
-      avatarUrl: avatar.isNotEmpty ? avatar : null,
-      video: video,
-      callId: callId.isNotEmpty ? callId : null,
-    );
-  }
-
-  static String _readDmPeerIdFromPushData(Map<String, dynamic> data) {
-    for (final key in <String>[
-      'peerUserId',
-      'senderUserId',
-      'senderId',
-      'fromUserId',
-      'actorId',
-      'userId',
-    ]) {
-      final v = data[key];
-      if (v == null) continue;
-      final s = v.toString().trim();
-      if (s.isNotEmpty) return s;
-    }
-    return '';
-  }
-
-  static String _readDmCallerId(Map<String, dynamic> data) {
-    for (final key in <String>[
-      'callerUserId',
-      'callerId',
-      'fromUserId',
-      'peerId',
-      'userId',
-    ]) {
-      final v = data[key];
-      if (v == null) continue;
-      final s = v.toString().trim();
-      if (s.isNotEmpty) return s;
-    }
-    return '';
-  }
-
-  static bool _readDmCallVideoFlag(Map<String, dynamic> data) {
-    final v = data['video'] ?? data['isVideo'] ?? data['callType'];
-    if (v == null) return true;
-    final s = v.toString().toLowerCase().trim();
-    if (s == 'audio' || s == 'voice' || s == 'false' || s == '0') {
-      return false;
-    }
-    return true;
-  }
-
-  static void _openNotifications() {
+  static void _openSocialNotifications() {
     final navigator = _navigatorKey?.currentState;
     if (navigator == null) {
       _pendingTapData = const <String, dynamic>{};
@@ -351,10 +233,7 @@ class PushNotificationService {
       });
       return;
     }
-
-    navigator.push(
-      MaterialPageRoute<void>(builder: (_) => const NotificationScreen()),
-    );
+    SocialPushHandler.navigateFromTap(navigator, const {});
   }
 
   static void _drainPendingTap() {
@@ -368,11 +247,11 @@ class PushNotificationService {
     if (pending == null) return;
     _pendingTapData = null;
 
-    if (pending.isEmpty) {
-      _openNotifications();
+    if (MessagesPushHandler.isMessagesPush(pending)) {
+      MessagesPushHandler.navigateFromTap(navigator, pending);
       return;
     }
 
-    _navigateFromTapData(navigator, pending);
+    SocialPushHandler.navigateFromTap(navigator, pending);
   }
 }

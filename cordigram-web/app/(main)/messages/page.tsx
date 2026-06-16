@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useLayoutEffect, useRef, memo, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -13,6 +14,7 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
 import {
   DM_CALL_ANSWER_EVENT,
+  setActiveDmCallIdForHeartbeat,
   type DmCallAnswerDetail,
 } from "@/lib/dm-call-session-sync";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
@@ -21,7 +23,6 @@ import {
   type DirectMessage,
 } from "@/hooks/use-direct-messages";
 import {
-  isCallAnswerEvent,
   isCallRejectedEvent,
   isIceCandidateEvent,
   isIncomingRingEvent,
@@ -30,9 +31,16 @@ import {
   getCallTabId,
   tryAcquireOutboundCallLock,
   ownsOutboundCallLock,
+  hasForeignOutboundCallLock,
   releaseOutboundCallLock,
   subscribeOutboundCallLock,
 } from "@/lib/call-tab-coordination";
+import {
+  addActiveDmCallPeer,
+  getActiveDmCallPeerIds,
+  isInActiveDmCall,
+  removeActiveDmCallPeer,
+} from "@/lib/dm-call-active-peers";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
@@ -70,6 +78,10 @@ import {
   fetchUserSettings,
   fetchBoostStatus,
   fetchApiHealth,
+  patchDmConversationPreferences,
+  blockUser,
+  unblockUser,
+  unfollowUser,
   type BoostStatusResponse,
   fetchMessagingProfileByUserId,
   fetchMessagingProfileMe,
@@ -111,6 +123,7 @@ import EventCreatedDetailPopup from "@/components/ServerEvents/EventCreatedDetai
 import InviteToServerPopup from "@/components/InviteToServerPopup/InviteToServerPopup";
 import MessagesInbox from "@/components/MessagesInbox/MessagesInbox";
 import ServerContextMenu from "@/components/ServerContextMenu/ServerContextMenu";
+import ServerProfileDropdown from "@/components/ServerProfileDropdown/ServerProfileDropdown";
 import ChannelContextMenu from "@/components/ChannelContextMenu/ChannelContextMenu";
 import CategoryContextMenu from "@/components/CategoryContextMenu/CategoryContextMenu";
 import * as sidebarPrefs from "@/lib/sidebar-prefs";
@@ -136,6 +149,14 @@ import ServerStickerSection from "@/components/ServerStickerSection/ServerSticke
 import MessageSearchPanel from "@/components/MessageSearchPanel/MessageSearchPanel";
 import MentionDropdown from "@/components/MentionDropdown/MentionDropdown";
 import { fetchInboxForYou } from "@/lib/inbox-api";
+import {
+  isMessagesDesktopNotificationsEnabled,
+  requestDesktopNotificationPermission,
+  showInboxForYouDesktopNotification,
+  showMentionDesktopNotification,
+  type MessagesDesktopNotificationCopy,
+} from "@/lib/messages-desktop-notifications";
+import MessagesDesktopNotificationHost from "@/components/MessagesDesktopNotification/MessagesDesktopNotificationHost";
 import { normalizeServerBanner } from "@/lib/server-banner";
 import type { VoiceChannelCallProps } from "@/components/VoiceChannelCall";
 import ChannelUserProfileRoot, {
@@ -159,9 +180,17 @@ import { buildServerEmojiRenderMapFromPickerGroups } from "@/lib/server-emoji-re
 import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
 import ChatMediaViewer, { type ChatMediaItem } from "@/components/ChatMediaViewer";
 import { ConversationDetailsPanel, type DetailsPanelMessage, type DetailsPanelPinnedItem } from "@/components/ConversationDetailsPanel/ConversationDetailsPanel";
+import DmConversationContextMenu from "@/components/DmConversationContextMenu/DmConversationContextMenu";
+import {
+  parseDmConversationPreferences,
+  isDmConversationMuted,
+  DM_CATEGORY_COLORS,
+  type DmConversationPreferences,
+  type DmConversationCategory,
+  emptyDmConversationPreferences,
+} from "@/lib/dm-conversation-prefs";
 
-// Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
-const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
+// Dynamic import VoiceChannelCall to avoid SSR issues with LiveKit
 const VoiceChannelCall = dynamic<VoiceChannelCallProps>(
   () => import("@/components/VoiceChannelCall"),
   { ssr: false },
@@ -285,6 +314,7 @@ interface UIMessage {
   isPinned?: boolean;
   replyTo?: string;
   stickerReplyWelcomeEnabled?: boolean;
+  welcomeWaveDismissedByMe?: boolean;
   contentModerationResult?: "none" | "blurred" | "rejected";
   replyToMessage?: {
     id: string;
@@ -1578,6 +1608,8 @@ export default function MessagesPage() {
   const [serverSettingsPermissions, setServerSettingsPermissions] =
     useState<serversApi.CurrentUserServerPermissions | null>(null);
   const [showServerSettingsPanel, setShowServerSettingsPanel] = useState(false);
+  const [showServerProfileDropdown, setShowServerProfileDropdown] = useState(false);
+  const serverProfileDropdownRef = useRef<HTMLDivElement>(null);
   const [serverSettingsTarget, setServerSettingsTarget] = useState<{
     serverId: string;
     serverName: string;
@@ -1592,6 +1624,8 @@ export default function MessagesPage() {
   const [notificationRoleNames, setNotificationRoleNames] = useState<string[]>([]);
   const [currentServerPermissions, setCurrentServerPermissions] =
     useState<serversApi.CurrentUserServerPermissions | null>(null);
+  const [currentServerPermissionsForId, setCurrentServerPermissionsForId] =
+    useState<string | null>(null);
   const [sidebarPrefsTick, setSidebarPrefsTick] = useState(0);
   const bumpSidebarPrefs = useCallback(() => setSidebarPrefsTick((t) => t + 1), []);
   const [wavingIds, setWavingIds] = useState<Set<string>>(new Set());
@@ -1720,6 +1754,87 @@ export default function MessagesPage() {
   const [showMessagesUserSettings, setShowMessagesUserSettings] =
     useState(false);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [dmConversationPrefs, setDmConversationPrefs] = useState<
+    Record<string, DmConversationPreferences>
+  >({});
+  const [dmBlockedByMe, setDmBlockedByMe] = useState<Set<string>>(new Set());
+  const [dmBlockedByPeer, setDmBlockedByPeer] = useState<Set<string>>(new Set());
+  const dmBlockedByMeRef = useRef<Set<string>>(new Set());
+  const dmBlockedByPeerRef = useRef<Set<string>>(new Set());
+  const dmBlockFetchGenRef = useRef(0);
+  dmBlockedByMeRef.current = dmBlockedByMe;
+  dmBlockedByPeerRef.current = dmBlockedByPeer;
+
+  const persistDmBlockState = useCallback(
+    (byMe: Set<string>, byPeer: Set<string>) => {
+      if (!currentUserId) return;
+      try {
+        sessionStorage.setItem(
+          `cordigram:dm-blocks:${currentUserId}`,
+          JSON.stringify({ byMe: [...byMe], byPeer: [...byPeer] }),
+        );
+      } catch {
+        /* ignore */
+      }
+    },
+    [currentUserId],
+  );
+
+  const applyDmBlockSets = useCallback(
+    (byMe: Set<string>, byPeer: Set<string>) => {
+      dmBlockedByMeRef.current = byMe;
+      dmBlockedByPeerRef.current = byPeer;
+      setDmBlockedByMe(byMe);
+      setDmBlockedByPeer(byPeer);
+      persistDmBlockState(byMe, byPeer);
+    },
+    [persistDmBlockState],
+  );
+
+  const applyDmBlockSetsFromApi = useCallback(
+    (byMe: Set<string>, byPeer: Set<string>, gen: number) => {
+      if (gen !== dmBlockFetchGenRef.current) return;
+      applyDmBlockSets(byMe, byPeer);
+    },
+    [applyDmBlockSets],
+  );
+
+  const applyDmBlockSetsLive = useCallback(
+    (byMe: Set<string>, byPeer: Set<string>) => {
+      dmBlockFetchGenRef.current += 1;
+      applyDmBlockSets(byMe, byPeer);
+    },
+    [applyDmBlockSets],
+  );
+
+  const refreshDmBlockState = useCallback(async () => {
+    if (!token) return;
+    const gen = ++dmBlockFetchGenRef.current;
+    try {
+      const list = await getConversationList({ token });
+      if (gen !== dmBlockFetchGenRef.current) return;
+      const byMe = new Set<string>();
+      const byPeer = new Set<string>();
+      list.forEach((c) => {
+        const peerId = String(c.userId ?? "");
+        if (!peerId) return;
+        if (c.isBlockedByMe) byMe.add(peerId);
+        if (c.isBlockedByPeer) byPeer.add(peerId);
+      });
+      applyDmBlockSetsFromApi(byMe, byPeer, gen);
+    } catch {
+      /* ignore */
+    }
+  }, [token, applyDmBlockSetsFromApi]);
+  const [dmContextMenu, setDmContextMenu] = useState<{
+    x: number;
+    y: number;
+    friend: {
+      _id: string;
+      displayName?: string;
+      username?: string;
+    };
+  } | null>(null);
   const [chatUserSettings, setChatUserSettings] =
     useState<UserSettingsResponse | null>(null);
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(
@@ -2010,11 +2125,21 @@ export default function MessagesPage() {
     setNoticePopupMessage(message);
   }, []);
 
-  // Call states
-  const [isInCall, setIsInCall] = useState(false);
-  const [callToken, setCallToken] = useState<string>("");
-  const [callServerUrl, setCallServerUrl] = useState<string>("");
-  const [isAudioOnly, setIsAudioOnly] = useState(false);
+  // Call states — each active call lives in its own /call tab (per peer)
+  const [activeCallTabPeers, setActiveCallTabPeers] = useState<string[]>([]);
+  const errorDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const showTransientError = useCallback((message: string, ms = 5000) => {
+    if (errorDismissTimerRef.current) {
+      clearTimeout(errorDismissTimerRef.current);
+    }
+    setError(message);
+    errorDismissTimerRef.current = setTimeout(() => {
+      setError((prev) => (prev === message ? null : prev));
+      errorDismissTimerRef.current = null;
+    }, ms);
+  }, []);
   const [incomingCall, setIncomingCall] = useState<{
     from: string;
     type: "audio" | "video";
@@ -2024,7 +2149,9 @@ export default function MessagesPage() {
       displayName: string;
       avatar?: string;
     };
-    status?: "incoming" | "cancelled"; // ✅ Added status for when caller cancels
+    status?: "incoming" | "cancelled" | "accepted";
+    roomName?: string;
+    callId?: string;
   } | null>(null);
   type OutgoingCallEntry = {
     to: string;
@@ -2036,6 +2163,7 @@ export default function MessagesPage() {
     type: "audio" | "video";
     status: "calling" | "rejected" | "no-answer" | "answered";
     roomName?: string;
+    callId?: string;
   };
 
   const [outgoingCallsByPeer, setOutgoingCallsByPeer] = useState<
@@ -2044,15 +2172,50 @@ export default function MessagesPage() {
 
   /** Refs for call socket effect — avoid wrong incoming UI / stale deps (glare, self) */
   const outgoingCallsByPeerRef = useRef(outgoingCallsByPeer);
-  // Tracks peers whose call tab we've already opened for the current answer, so
-  // the two answer paths (custom window event + callEvent effect) don't open
-  // the same /call tab twice.
+  const callIdsByPeerRef = useRef<Record<string, string>>({});
   const openedCallTabPeersRef = useRef<Set<string>>(new Set());
+  const openingCallTabForPeerRef = useRef<Set<string>>(new Set());
   const callTabIdRef = useRef<string>("");
   if (!callTabIdRef.current && typeof window !== "undefined") {
     callTabIdRef.current = getCallTabId();
   }
   const currentUserIdRef = useRef(currentUserId);
+  const dismissOutgoingCallPopup = useCallback((peerId: string) => {
+    setOutgoingCallsByPeer((prev) => {
+      if (!prev[peerId]) return prev;
+      const next = { ...prev };
+      delete next[peerId];
+      outgoingCallsByPeerRef.current = next;
+      return next;
+    });
+  }, []);
+  const isCallTabActiveForPeer = useCallback((peerId: string) => {
+    return (
+      openedCallTabPeersRef.current.has(peerId) ||
+      getActiveDmCallPeerIds().includes(peerId)
+    );
+  }, []);
+  const markCallTabOpen = useCallback((peerId: string, callId?: string) => {
+    openedCallTabPeersRef.current.add(peerId);
+    addActiveDmCallPeer(peerId);
+    setActiveCallTabPeers((prev) =>
+      prev.includes(peerId) ? prev : [...prev, peerId],
+    );
+    const resolvedCallId = callId || callIdsByPeerRef.current[peerId];
+    if (resolvedCallId) {
+      setActiveDmCallIdForHeartbeat(resolvedCallId);
+    }
+    dismissOutgoingCallPopup(peerId);
+  }, [dismissOutgoingCallPopup]);
+  const markCallTabClosed = useCallback((peerId: string) => {
+    openedCallTabPeersRef.current.delete(peerId);
+    removeActiveDmCallPeer(peerId);
+    delete callIdsByPeerRef.current[peerId];
+    setActiveCallTabPeers((prev) => prev.filter((id) => id !== peerId));
+    if (openedCallTabPeersRef.current.size === 0) {
+      setActiveDmCallIdForHeartbeat(null);
+    }
+  }, []);
   useEffect(() => {
     outgoingCallsByPeerRef.current = outgoingCallsByPeer;
   }, [outgoingCallsByPeer]);
@@ -2146,6 +2309,7 @@ export default function MessagesPage() {
     callSessionsSync,
     messageDeleted,
     dmUnreadCountEvent,
+    dmBlockUpdatedEvent,
     initiateCall,
     answerCall,
     rejectCall,
@@ -2237,11 +2401,13 @@ export default function MessagesPage() {
     newMessageChannel,
     reactionUpdateChannel,
     channelNotification,
+    inboxForYouItem,
     serverDeleted,
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,
     clearChannelNotification,
+    clearInboxForYouItem,
     clearServerDeleted,
     channelMessageDeleted,
   } = useChannelMessages({ token });
@@ -2267,8 +2433,110 @@ export default function MessagesPage() {
     if (!channelNotification) return;
     setHasInboxNotification(true);
     scheduleInboxDotRefresh();
+
+    const desktopEnabled = isMessagesDesktopNotificationsEnabled(chatUserSettings);
+    if (
+      desktopEnabled &&
+      channelNotification.isMention === true &&
+      channelNotification.messageId &&
+      channelNotification.serverId &&
+      channelNotification.channelId
+    ) {
+      const viewingSameChannel =
+        typeof document !== "undefined" &&
+        document.hasFocus() &&
+        selectedServerRef.current === channelNotification.serverId &&
+        selectedChannelRef.current === channelNotification.channelId;
+
+      if (!viewingSameChannel) {
+        showMentionDesktopNotification({
+          messageId: channelNotification.messageId,
+          senderName: channelNotification.senderName || "Ai đó",
+          channelName: channelNotification.channelName || "general",
+          serverName: channelNotification.serverName || "Máy chủ",
+          excerpt: channelNotification.excerpt || "",
+          senderAvatarUrl: channelNotification.senderAvatarUrl,
+          enabled: desktopEnabled,
+          onNavigate: () => {
+            router.push(
+              `/messages?server=${channelNotification.serverId}&channel=${channelNotification.channelId}`,
+            );
+          },
+        });
+      }
+    }
+
     clearChannelNotification();
-  }, [channelNotification, clearChannelNotification, scheduleInboxDotRefresh]);
+  }, [
+    channelNotification,
+    clearChannelNotification,
+    scheduleInboxDotRefresh,
+    chatUserSettings,
+    router,
+  ]);
+
+  const inboxDesktopCopy = useMemo<MessagesDesktopNotificationCopy>(
+    () => ({
+      eventTitleLine: (topic, serverName) =>
+        t("settings.notifications.desktopEventTitleLine")
+          .replace("{topic}", topic)
+          .replace("{server}", serverName),
+      eventBody: (topic, startAt) => {
+        if (!startAt) return topic;
+        try {
+          const when = new Date(startAt).toLocaleString(
+            localeTagForLanguage(language),
+            { dateStyle: "medium", timeStyle: "short" },
+          );
+          return t("settings.notifications.desktopEventBody").replace(
+            "{when}",
+            when,
+          );
+        } catch {
+          return topic;
+        }
+      },
+      roleTitleLine: (serverName) =>
+        t("settings.notifications.desktopRoleTitleLine").replace(
+          "{server}",
+          serverName,
+        ),
+      roleBody: (title, content) => {
+        const excerpt = content.trim().slice(0, 240);
+        return excerpt ? `${title}\n${excerpt}` : title;
+      },
+      mentionTitleLine: (senderName, channelName, serverName) =>
+        `${senderName} (#${channelName}, ${serverName})`,
+    }),
+    [t, language],
+  );
+
+  // Realtime: server event / role notification → inbox dot + OS desktop notification (messages only).
+  useEffect(() => {
+    if (!inboxForYouItem) return;
+    setHasInboxNotification(true);
+    scheduleInboxDotRefresh();
+    showInboxForYouDesktopNotification({
+      item: inboxForYouItem,
+      copy: inboxDesktopCopy,
+      enabled: isMessagesDesktopNotificationsEnabled(chatUserSettings),
+      onNavigate: (item) => {
+        if (item.type === "event") {
+          router.push(`/messages?server=${item.serverId}&event=${item._id}`);
+        } else if (item.type === "server_notification") {
+          router.push(`/messages?server=${item.serverId}`);
+        }
+      },
+    });
+    clearInboxForYouItem();
+  }, [
+    inboxForYouItem,
+    inboxDesktopCopy,
+    chatUserSettings,
+    scheduleInboxDotRefresh,
+    clearInboxForYouItem,
+    router,
+  ]);
 
   // Realtime: server removed — drop from sidebar, clear open server/channel/voice, inbox + toast.
   useEffect(() => {
@@ -2527,6 +2795,7 @@ export default function MessagesPage() {
       voiceUrl: msg.voiceUrl ?? undefined,
       voiceDuration: msg.voiceDuration ?? undefined,
       stickerReplyWelcomeEnabled: msg.stickerReplyWelcomeEnabled,
+      welcomeWaveDismissedByMe: (msg as any).welcomeWaveDismissedByMe === true,
       contentModerationResult: msg.contentModerationResult ?? "none",
       reactions: normalizeReactions(msg.reactions),
       replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
@@ -2582,8 +2851,13 @@ export default function MessagesPage() {
       callTabIdRef.current = tabId;
       const peerId = selectedDirectMessageFriend._id;
 
+      if (openedCallTabPeersRef.current.has(peerId)) {
+        showTransientError("Bạn đã có cuộc gọi đang diễn ra với người này.");
+        return;
+      }
+
       if (!tryAcquireOutboundCallLock(tabId, peerId)) {
-        setError(
+        showTransientError(
           "Bạn đang gọi người này từ tab hoặc cửa sổ trình duyệt khác. Hãy dùng tab đó hoặc kết thúc cuộc gọi trước.",
         );
         return;
@@ -2596,82 +2870,251 @@ export default function MessagesPage() {
 
         setIncomingCall(null);
 
+        const entry: OutgoingCallEntry = {
+          to: peerId,
+          toUser: {
+            displayName:
+              selectedDirectMessageFriend.displayName ||
+              selectedDirectMessageFriend.username,
+            username: selectedDirectMessageFriend.username,
+            avatarUrl: selectedDirectMessageFriend.avatarUrl,
+          },
+          type: isVideo ? "video" : "audio",
+          status: "calling",
+          roomName,
+        };
+        outgoingCallsByPeerRef.current = {
+          ...outgoingCallsByPeerRef.current,
+          [peerId]: entry,
+        };
         setOutgoingCallsByPeer((prev) => ({
           ...prev,
-          [peerId]: {
-            to: peerId,
-            toUser: {
-              displayName:
-                selectedDirectMessageFriend.displayName ||
-                selectedDirectMessageFriend.username,
-              username: selectedDirectMessageFriend.username,
-              avatarUrl: selectedDirectMessageFriend.avatarUrl,
-            },
-            type: isVideo ? "video" : "audio",
-            status: "calling",
-            roomName,
-          },
+          [peerId]: entry,
         }));
 
-        initiateCall(peerId, isVideo ? "video" : "audio");
+        const emitted = initiateCall(peerId, isVideo ? "video" : "audio");
+        if (!emitted) {
+          showTransientError("Mất kết nối. Không thể bắt đầu cuộc gọi.");
+          setOutgoingCallsByPeer((prev) => {
+            const next = { ...prev };
+            delete next[peerId];
+            outgoingCallsByPeerRef.current = next;
+            return next;
+          });
+          releaseOutboundCallLock(tabId, peerId);
+        }
       } catch (error) {
         releaseOutboundCallLock(tabId, peerId);
         console.error("❌ [CALL] Failed to start call:", error);
-        setError("Không thể bắt đầu cuộc gọi");
+        showTransientError("Không thể bắt đầu cuộc gọi");
       }
     },
-    [selectedDirectMessageFriend, token, currentUserProfile, initiateCall],
+    [selectedDirectMessageFriend, token, currentUserProfile, initiateCall, showTransientError],
   );
 
-  const handleEndCall = useCallback(() => {
-    setIsInCall(false);
-    setCallToken("");
-    setCallServerUrl("");
-    setIsAudioOnly(false);
-  }, []);
+  const buildCallUrl = useCallback(
+    (peerId: string, roomName: string, callType: "audio" | "video", callId?: string) => {
+      const participantName =
+        currentUserProfile?.username ||
+        currentUserProfile?.displayName ||
+        "Người dùng";
+      const callAuthToken = getTabAccessToken() || token;
+      const qpToken = callAuthToken
+        ? `&accessToken=${encodeURIComponent(callAuthToken)}`
+        : "";
+      const qpCallId =
+        callId && callId.trim()
+          ? `&callId=${encodeURIComponent(callId)}`
+          : "";
+      return (
+        `/call?roomName=${encodeURIComponent(roomName)}` +
+        `&participantName=${encodeURIComponent(participantName)}` +
+        `&audioOnly=${callType === "audio"}` +
+        `&peerId=${encodeURIComponent(peerId)}` +
+        qpToken +
+        qpCallId
+      );
+    },
+    [currentUserProfile, token],
+  );
 
-  // ✅ Accept incoming call - notify caller and open tabs for both
+  const openCallTabForPeer = useCallback(
+    (peerId: string, roomNameOverride?: string): boolean => {
+      if (!currentUserProfile || !token) return false;
+
+      const outgoing = outgoingCallsByPeerRef.current[peerId];
+      const roomName = roomNameOverride || outgoing?.roomName;
+      if (!roomName) {
+        console.warn("[CALL] Missing roomName for outgoing call");
+        return false;
+      }
+
+      if (openedCallTabPeersRef.current.has(peerId)) {
+        dismissOutgoingCallPopup(peerId);
+        return true;
+      }
+
+      const tabId = callTabIdRef.current || getCallTabId();
+      const callType = outgoing?.type ?? "audio";
+      const callId = outgoing?.callId || callIdsByPeerRef.current[peerId];
+      if (!ownsOutboundCallLock(tabId, peerId)) {
+        tryAcquireOutboundCallLock(tabId, peerId);
+      }
+
+      try {
+        const callUrl = buildCallUrl(peerId, roomName, callType, callId);
+        const callWindowName = `cordigram-dm-call-${peerId}`;
+        const win = window.open(callUrl, callWindowName, "noopener,noreferrer");
+        if (!win) {
+          return isCallTabActiveForPeer(peerId);
+        }
+        markCallTabOpen(peerId, callId);
+        dismissOutgoingCallPopup(peerId);
+        return true;
+      } catch (error) {
+        console.error("❌ [CALLER] Failed to open call window:", error);
+        return false;
+      }
+    },
+    [
+      currentUserProfile,
+      token,
+      buildCallUrl,
+      markCallTabOpen,
+      dismissOutgoingCallPopup,
+      isCallTabActiveForPeer,
+    ],
+  );
+
+  const scheduleDismissOutgoingPopup = useCallback(
+    (peerId: string) => {
+      dismissOutgoingCallPopup(peerId);
+      if (typeof window === "undefined") return;
+      window.setTimeout(() => {
+        if (isCallTabActiveForPeer(peerId)) {
+          dismissOutgoingCallPopup(peerId);
+        }
+      }, 400);
+    },
+    [dismissOutgoingCallPopup, isCallTabActiveForPeer],
+  );
+
+  const handlePeerAnsweredCall = useCallback(
+    (peerId: string, roomFromAnswer?: string, callId?: string) => {
+      if (isCallTabActiveForPeer(peerId)) {
+        scheduleDismissOutgoingPopup(peerId);
+        return;
+      }
+      if (openingCallTabForPeerRef.current.has(peerId)) {
+        return;
+      }
+
+      const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
+      if (!hasOutgoing && !roomFromAnswer) return;
+
+      if (callId) {
+        callIdsByPeerRef.current[peerId] = callId;
+      }
+      if (hasOutgoing && roomFromAnswer) {
+        const existing = outgoingCallsByPeerRef.current[peerId];
+        if (existing) {
+          const patched = {
+            ...existing,
+            roomName: roomFromAnswer,
+            callId:
+              callId ||
+              existing.callId ||
+              callIdsByPeerRef.current[peerId],
+          };
+          const next = { ...outgoingCallsByPeerRef.current, [peerId]: patched };
+          outgoingCallsByPeerRef.current = next;
+        }
+      }
+
+      openingCallTabForPeerRef.current.add(peerId);
+      try {
+        openCallTabForPeer(peerId, roomFromAnswer);
+      } finally {
+        openingCallTabForPeerRef.current.delete(peerId);
+        scheduleDismissOutgoingPopup(peerId);
+      }
+    },
+    [
+      openCallTabForPeer,
+      isCallTabActiveForPeer,
+      scheduleDismissOutgoingPopup,
+    ],
+  );
+
+  // ✅ Accept incoming call — notify caller and open dedicated /call tab
   const handleAcceptCall = useCallback(async () => {
     if (!incomingCall || !token || !currentUserProfile) {
       console.error("Cannot accept call: missing data");
       return;
     }
 
+    if (openedCallTabPeersRef.current.has(incomingCall.from)) {
+      rejectCall(incomingCall.from);
+      setIncomingCall(null);
+      return;
+    }
+
+    const peerId = incomingCall.from;
+    const alreadyAccepted = incomingCall.status === "accepted";
+
     try {
+      let roomName = incomingCall.roomName;
+      if (!alreadyAccepted) {
+        const resolved = await getDMRoomName(peerId, token);
+        roomName = resolved.roomName;
+        answerCall(peerId, { roomName });
+        if (incomingCall.callId) {
+          callIdsByPeerRef.current[peerId] = incomingCall.callId;
+        }
+        setIncomingCall((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: "accepted",
+                roomName,
+              }
+            : prev,
+        );
+      }
 
-      // Get room name
-      const { roomName } = await getDMRoomName(incomingCall.from, token);
+      if (!roomName) {
+        showTransientError("Không thể chấp nhận cuộc gọi");
+        return;
+      }
 
-      // Notify caller that call was answered (this will open tab on caller's side)
-      answerCall(incomingCall.from, { roomName });
-
-      // Open call in new tab for receiver (this user). We forward the current
-      // access token + peerId so the tab:
-      //   - never falls through `getStoredAccessToken()` into a stale/missing
-      //     token (fixes the 403 users hit when accepting calls, especially
-      //     calls initiated from mobile).
-      //   - knows who to signal via BroadcastChannel when the user hits
-      //     "end call", so the other side gets a proper `call-end` instead
-      //     of having to wait for LiveKit's disconnect event.
-      const participantName =
-        currentUserProfile.username || currentUserProfile.displayName || "Người dùng";
-      const isAudioOnly = incomingCall.type === "audio";
-      const callUrl =
-        `/call?roomName=${encodeURIComponent(roomName)}` +
-        `&participantName=${encodeURIComponent(participantName)}` +
-        `&audioOnly=${isAudioOnly}` +
-        `&peerId=${encodeURIComponent(incomingCall.from)}` +
-        `&accessToken=${encodeURIComponent(token)}`;
-
-      window.open(callUrl, "_blank", "noopener,noreferrer");
-
-      // Close popup
+      const callUrl = buildCallUrl(
+        peerId,
+        roomName,
+        incomingCall.type,
+        incomingCall.callId,
+      );
+      const callWindowName = `cordigram-dm-call-${peerId}`;
+      const win = window.open(callUrl, callWindowName, "noopener,noreferrer");
+      if (!win && !isCallTabActiveForPeer(peerId)) {
+        window.open(callUrl, callWindowName, "noopener,noreferrer");
+      }
+      markCallTabOpen(peerId, incomingCall.callId);
       setIncomingCall(null);
     } catch (error) {
       console.error("❌ [ACCEPT] Failed to accept call:", error);
-      setError("Không thể chấp nhận cuộc gọi");
+      showTransientError("Không thể chấp nhận cuộc gọi");
     }
-  }, [incomingCall, token, currentUserProfile, answerCall]);
+  }, [
+    incomingCall,
+    token,
+    currentUserProfile,
+    answerCall,
+    buildCallUrl,
+    showTransientError,
+    markCallTabOpen,
+    rejectCall,
+    isCallTabActiveForPeer,
+  ]);
 
   // ✅ Reject incoming call — clear UI + ringtone first, then notify caller
   const handleRejectCall = useCallback(() => {
@@ -2688,117 +3131,25 @@ export default function MessagesPage() {
       const outgoing = outgoingCallsByPeerRef.current[peerId];
       if (!outgoing) return;
 
-      endCall(peerId);
+      if (
+        !endCall(peerId, {
+          status: outgoing.status === "calling" ? "cancelled" : undefined,
+        })
+      ) {
+        showTransientError("Mất kết nối. Không thể kết thúc cuộc gọi.");
+      }
       releaseOutboundCallLock(callTabIdRef.current, peerId);
-      openedCallTabPeersRef.current.delete(peerId);
+      markCallTabClosed(peerId);
       setOutgoingCallsByPeer((prev) => {
         const next = { ...prev };
         delete next[peerId];
         return next;
       });
     },
-    [endCall],
+    [endCall, markCallTabClosed, showTransientError],
   );
 
-  const buildCallUrl = useCallback(
-    (peerId: string, roomName: string, callType: "audio" | "video") => {
-      const participantName =
-        currentUserProfile?.username ||
-        currentUserProfile?.displayName ||
-        "Người dùng";
-      const isAudioOnly = callType === "audio";
-      const callAuthToken = getTabAccessToken() || token;
-      const qpToken = callAuthToken
-        ? `&accessToken=${encodeURIComponent(callAuthToken)}`
-        : "";
-      return (
-        `/call?roomName=${encodeURIComponent(roomName)}` +
-        `&participantName=${encodeURIComponent(participantName)}` +
-        `&audioOnly=${isAudioOnly}` +
-        `&peerId=${encodeURIComponent(peerId)}` +
-        qpToken
-      );
-    },
-    [currentUserProfile, token],
-  );
-
-  const openCallTabForPeer = useCallback(
-    async (peerId: string, roomNameOverride?: string) => {
-      if (!currentUserProfile) return;
-      // Already opened for this answer — don't spawn a duplicate /call tab.
-      if (openedCallTabPeersRef.current.has(peerId)) return;
-
-      const outgoing = outgoingCallsByPeerRef.current[peerId];
-      const tabId = callTabIdRef.current || getCallTabId();
-      const roomName = roomNameOverride || outgoing?.roomName;
-      if (!roomName) {
-        console.warn("[CALL] Missing roomName for outgoing call");
-        return;
-      }
-      const callType = outgoing?.type ?? "audio";
-      if (!ownsOutboundCallLock(tabId, peerId)) {
-        tryAcquireOutboundCallLock(tabId, peerId);
-      }
-
-      try {
-        const callUrl = buildCallUrl(peerId, roomName, callType);
-
-        // The answer arrives via a socket event (no user gesture), so most
-        // browsers block window.open. Try opening a new tab first; if blocked,
-        // navigate the CURRENT tab instead (the user is on /messages anyway).
-        const win = window.open(callUrl, "_blank", "noopener,noreferrer");
-        if (!win) {
-          console.warn(
-            "[CALL] Popup blocked — navigating current tab to call for",
-            peerId,
-          );
-          releaseOutboundCallLock(tabId, peerId);
-          window.location.href = callUrl;
-          return;
-        }
-
-        openedCallTabPeersRef.current.add(peerId);
-        releaseOutboundCallLock(tabId, peerId);
-        setOutgoingCallsByPeer((prev) => {
-          const next = { ...prev };
-          delete next[peerId];
-          return next;
-        });
-        window.setTimeout(() => {
-          openedCallTabPeersRef.current.delete(peerId);
-        }, 15000);
-      } catch (error) {
-        console.error("❌ [CALLER] Failed to open call window:", error);
-      }
-    },
-    [currentUserProfile, buildCallUrl],
-  );
-
-  // Manual join (real user gesture) used when the browser blocked the
-  // automatic window.open after the callee accepted.
-  const handleJoinCall = useCallback(
-    (peerId: string) => {
-      const outgoing = outgoingCallsByPeerRef.current[peerId];
-      const roomName = outgoing?.roomName;
-      if (!roomName) return;
-      const callType = outgoing?.type ?? "audio";
-      const tabId = callTabIdRef.current || getCallTabId();
-      const callUrl = buildCallUrl(peerId, roomName, callType);
-      window.open(callUrl, "_blank", "noopener,noreferrer");
-      openedCallTabPeersRef.current.add(peerId);
-      releaseOutboundCallLock(tabId, peerId);
-      setOutgoingCallsByPeer((prev) => {
-        const next = { ...prev };
-        delete next[peerId];
-        return next;
-      });
-      window.setTimeout(() => {
-        openedCallTabPeersRef.current.delete(peerId);
-      }, 15000);
-    },
-    [buildCallUrl],
-  );
-
+  // ✅ Handle incoming call & call events
   useEffect(() => {
     const tabId = callTabIdRef.current || getCallTabId();
     callTabIdRef.current = tabId;
@@ -2825,10 +3176,16 @@ export default function MessagesPage() {
         return next;
       });
     }
-    setError(
-      "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
+    showTransientError(
+      callBusy.code === "peer_busy"
+        ? "Người dùng này đang bận cuộc gọi khác."
+        : callBusy.code === "blocked"
+          ? "Không thể gọi người dùng này."
+          : callBusy.code === "already_in_call"
+            ? "Bạn đã có cuộc gọi đang diễn ra với người này."
+            : "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
     );
-  }, [callBusy]);
+  }, [callBusy, showTransientError]);
 
   // ✅ Handle incoming call & call events
   useEffect(() => {
@@ -2853,6 +3210,11 @@ export default function MessagesPage() {
         return;
       }
 
+      if (openedCallTabPeersRef.current.has(ev.from)) {
+        rejectCall(ev.from);
+        return;
+      }
+
       setOutgoingCallsByPeer((prev) => {
         if (!prev[ev.from]) return prev;
         const next = { ...prev };
@@ -2870,44 +3232,17 @@ export default function MessagesPage() {
           type: ev.type || "audio",
           callerInfo: ev.callerInfo!,
           status: "incoming" as const,
+          callId:
+            typeof ev.callId === "string" ? ev.callId : undefined,
         };
       });
       return;
     }
 
-    // Call answered - open tab for caller.
-    //
-    // The `from === outgoingCall.to` guard is load-bearing: without it, a
-    // stale `answer` callEvent from a previous session (e.g. user logged
-    // out and back in, or called a different person earlier) would
-    // re-fire here the moment the user sets up a NEW outgoingCall and
-    // auto-open a call tab, skipping the accept/reject step entirely.
-    if (isCallAnswerEvent(callEvent) && callEvent.sdpOffer) {
-      const peerId = String(callEvent.from);
-      const roomFromAnswer =
-        typeof callEvent.sdpOffer === "object" &&
-        callEvent.sdpOffer != null &&
-        typeof (callEvent.sdpOffer as { roomName?: string }).roomName === "string"
-          ? String((callEvent.sdpOffer as { roomName: string }).roomName)
-          : undefined;
-      const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
-      if (hasOutgoing || roomFromAnswer) {
-        if (roomFromAnswer && hasOutgoing) {
-          setOutgoingCallsByPeer((prev) => {
-            const cur = prev[peerId];
-            if (!cur) return prev;
-            return {
-              ...prev,
-              [peerId]: { ...cur, roomName: roomFromAnswer },
-            };
-          });
-        }
-        void openCallTabForPeer(peerId, roomFromAnswer);
-      }
-      return;
-    }
+    // Call answered is handled via DM_CALL_ANSWER_EVENT (see effect below) to
+    // avoid duplicate window.open attempts that trigger false popup-block toasts.
     // Do NOT list incomingCall in deps — setIncomingCall updates it and would retrigger this effect forever.
-  }, [callEvent, openCallTabForPeer]);
+  }, [callEvent, rejectCall]);
 
   // Open caller tab immediately on call-answer (bypasses React state batching / short TTL).
   useEffect(() => {
@@ -2921,20 +3256,11 @@ export default function MessagesPage() {
         typeof detail.sdpOffer.roomName === "string"
           ? detail.sdpOffer.roomName
           : undefined;
-      const hasOutgoing = Boolean(outgoingCallsByPeerRef.current[peerId]);
-      if (!hasOutgoing && !roomFromAnswer) return;
-      if (roomFromAnswer && hasOutgoing) {
-        setOutgoingCallsByPeer((prev) => {
-          const cur = prev[peerId];
-          if (!cur) return prev;
-          return { ...prev, [peerId]: { ...cur, roomName: roomFromAnswer } };
-        });
-      }
-      void openCallTabForPeer(peerId, roomFromAnswer);
+      handlePeerAnsweredCall(peerId, roomFromAnswer, detail.callId);
     };
     window.addEventListener(DM_CALL_ANSWER_EVENT, onAnswer);
     return () => window.removeEventListener(DM_CALL_ANSWER_EVENT, onAnswer);
-  }, [openCallTabForPeer]);
+  }, [handlePeerAnsweredCall]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
@@ -2963,31 +3289,66 @@ export default function MessagesPage() {
     }
 
     const endedPeer = String(callEnded.from);
-    if (outgoingCallsByPeerRef.current[endedPeer]) {
-      releaseOutboundCallLock(callTabIdRef.current, endedPeer);
-    }
-    setOutgoingCallsByPeer((prev) => {
-      if (!prev[endedPeer]) return prev;
-      const next = { ...prev };
-      delete next[endedPeer];
-      return next;
-    });
+    releaseOutboundCallLock(callTabIdRef.current, endedPeer);
+    markCallTabClosed(endedPeer);
 
-    const timer = setTimeout(() => {
-      setIncomingCall((prev) => {
-        if (
-          prev &&
-          prev.from === callEnded.from &&
-          prev.status === "cancelled"
-        ) {
-          return null;
-        }
-        return prev;
+    const outgoing = outgoingCallsByPeerRef.current[endedPeer];
+    const endedReason = callEnded.reason;
+    const isNoAnswer =
+      outgoing?.status === "calling" &&
+      (endedReason === "timeout" ||
+        endedReason === "missed" ||
+        endedReason === "no-answer");
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    if (isNoAnswer && outgoing) {
+      const next = {
+        ...outgoingCallsByPeerRef.current,
+        [endedPeer]: { ...outgoing, status: "no-answer" as const },
+      };
+      outgoingCallsByPeerRef.current = next;
+      setOutgoingCallsByPeer(next);
+      timers.push(
+        setTimeout(() => {
+          setOutgoingCallsByPeer((prev) => {
+            if (prev[endedPeer]?.status !== "no-answer") return prev;
+            const cleared = { ...prev };
+            delete cleared[endedPeer];
+            outgoingCallsByPeerRef.current = cleared;
+            return cleared;
+          });
+        }, 3000),
+      );
+    } else {
+      setOutgoingCallsByPeer((prev) => {
+        if (!prev[endedPeer]) return prev;
+        const next = { ...prev };
+        delete next[endedPeer];
+        outgoingCallsByPeerRef.current = next;
+        return next;
       });
-    }, 3000);
+    }
 
-    return () => clearTimeout(timer);
-  }, [callEnded]); // ✅ Only depend on callEnded, not incomingCall
+    timers.push(
+      setTimeout(() => {
+        setIncomingCall((prev) => {
+          if (
+            prev &&
+            prev.from === callEnded.from &&
+            prev.status === "cancelled"
+          ) {
+            return null;
+          }
+          return prev;
+        });
+      }, 3000),
+    );
+
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, [callEnded, markCallTabClosed]); // ✅ Only depend on callEnded, not incomingCall
 
   // Đóng popup incoming trên tab/thiết bị khác khi đã accept/reject ở nơi khác.
   useEffect(() => {
@@ -3011,8 +3372,9 @@ export default function MessagesPage() {
   // Đồng bộ session sau reconnect — xóa ring ảo nếu server không còn ringing.
   useEffect(() => {
     if (!callSessionsSync?.sessions) return;
+    const sessions = callSessionsSync.sessions;
     const ringingPeers = new Set(
-      callSessionsSync.sessions
+      sessions
         .filter((s) => s.state === "ringing" && s.role === "callee")
         .map((s) => s.peerId),
     );
@@ -3021,7 +3383,68 @@ export default function MessagesPage() {
       if (ringingPeers.has(prev.from)) return prev;
       return null;
     });
-  }, [callSessionsSync]);
+
+    const activeCallerPeers = new Set(
+      sessions
+        .filter(
+          (s) =>
+            s.role === "caller" &&
+            (s.state === "ringing" ||
+              s.state === "connected" ||
+              s.state === "connecting"),
+        )
+        .map((s) => s.peerId),
+    );
+
+    for (const session of sessions) {
+      if (session.role !== "caller" || !session.callId) continue;
+      callIdsByPeerRef.current[session.peerId] = session.callId;
+      const out = outgoingCallsByPeerRef.current[session.peerId];
+      if (out && !out.callId) {
+        const next = {
+          ...outgoingCallsByPeerRef.current,
+          [session.peerId]: { ...out, callId: session.callId },
+        };
+        outgoingCallsByPeerRef.current = next;
+        setOutgoingCallsByPeer(next);
+      }
+    }
+
+    for (const session of sessions) {
+      if (session.role !== "caller") continue;
+      if (session.state !== "connected" && session.state !== "connecting") {
+        continue;
+      }
+      const peerId = session.peerId;
+      dismissOutgoingCallPopup(peerId);
+      if (isCallTabActiveForPeer(peerId)) {
+        continue;
+      }
+      const out = outgoingCallsByPeerRef.current[peerId];
+      if (!out) continue;
+      if (out.status === "calling") {
+        handlePeerAnsweredCall(peerId, session.roomId, session.callId);
+      }
+    }
+
+    setOutgoingCallsByPeer((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [peerId, out] of Object.entries(prev)) {
+        if (out.status !== "calling") continue;
+        if (!activeCallerPeers.has(peerId)) {
+          delete next[peerId];
+          delete callIdsByPeerRef.current[peerId];
+          changed = true;
+        }
+      }
+      if (changed) {
+        outgoingCallsByPeerRef.current = next;
+        return next;
+      }
+      return prev;
+    });
+  }, [callSessionsSync, handlePeerAnsweredCall, dismissOutgoingCallPopup, isCallTabActiveForPeer]);
 
   // ✅ Listen for the call tab telling us the user ended the call.
   //
@@ -3038,12 +3461,27 @@ export default function MessagesPage() {
     const channel = new BroadcastChannel("cordigram-call");
     const onMessage = (event: MessageEvent) => {
       const data = event.data as
-        | { type: string; peerId?: string }
+        | {
+            type: string;
+            peerId?: string;
+            callId?: string;
+            status?: "completed" | "cancelled";
+            durationSec?: number;
+          }
         | null;
       if (!data || typeof data !== "object") return;
+      if (data.type === "call-active" && data.peerId) {
+        markCallTabOpen(data.peerId, data.callId);
+        scheduleDismissOutgoingPopup(data.peerId);
+        return;
+      }
       if (data.type === "self-ended" && data.peerId) {
-        endCall(data.peerId);
+        endCall(data.peerId, {
+          status: data.status,
+          durationSec: data.durationSec,
+        });
         releaseOutboundCallLock(callTabIdRef.current, data.peerId);
+        markCallTabClosed(data.peerId);
         setIncomingCall(null);
         setOutgoingCallsByPeer((prev) => {
           if (!prev[data.peerId!]) return prev;
@@ -3051,6 +3489,10 @@ export default function MessagesPage() {
           delete next[data.peerId!];
           return next;
         });
+        return;
+      }
+      if (data.type === "peer-ended" && data.peerId) {
+        markCallTabClosed(data.peerId);
       }
     };
     channel.addEventListener("message", onMessage);
@@ -3058,7 +3500,7 @@ export default function MessagesPage() {
       channel.removeEventListener("message", onMessage);
       channel.close();
     };
-  }, [endCall]);
+  }, [endCall, markCallTabClosed, markCallTabOpen, scheduleDismissOutgoingPopup]);
 
   // ✅ Listen for call-rejected event
   useEffect(() => {
@@ -3416,6 +3858,123 @@ export default function MessagesPage() {
       return next;
     });
   }, []);
+
+  const handleDmMutePreference = useCallback(
+    async (
+      peerId: string,
+      patch: Pick<DmConversationPreferences, "mutedUntil" | "mutedForever">,
+    ) => {
+      if (!token || !peerId) return;
+      try {
+        const next = await patchDmConversationPreferences({
+          token,
+          peerUserId: peerId,
+          mutedUntil: patch.mutedUntil,
+          mutedForever: patch.mutedForever,
+        });
+        const parsed = parseDmConversationPreferences(next);
+        setDmConversationPrefs((prev) => ({ ...prev, [peerId]: parsed }));
+        if (isDmConversationMuted(parsed)) {
+          setDmUnreadCounts((prev) => ({ ...prev, [peerId]: 0 }));
+        }
+      } catch (e) {
+        console.error("Failed to update DM mute preference", e);
+      }
+    },
+    [token],
+  );
+
+  const handleDmCategoryPreference = useCallback(
+    async (peerId: string, category: DmConversationCategory | null) => {
+      if (!token || !peerId) return;
+      try {
+        const next = await patchDmConversationPreferences({
+          token,
+          peerUserId: peerId,
+          category,
+        });
+        setDmConversationPrefs((prev) => ({
+          ...prev,
+          [peerId]: parseDmConversationPreferences(next),
+        }));
+      } catch (e) {
+        console.error("Failed to update DM category", e);
+      }
+    },
+    [token],
+  );
+
+  const handleDmUnfollowPeer = useCallback(
+    async (peerId: string) => {
+      if (!token || !peerId) return;
+      try {
+        await unfollowUser({ token, userId: peerId });
+        setFollowingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(peerId);
+          return next;
+        });
+      } catch (e) {
+        console.error("Failed to unfollow DM peer", e);
+      }
+    },
+    [token],
+  );
+
+  const handleDmBlockPeer = useCallback(
+    async (peerId: string) => {
+      if (!token || !peerId) return;
+      try {
+        await blockUser({ token, userId: peerId });
+        applyDmBlockSetsLive(
+          new Set(dmBlockedByMeRef.current).add(peerId),
+          dmBlockedByPeerRef.current,
+        );
+      } catch (e) {
+        console.error("Failed to block DM peer", e);
+      }
+    },
+    [token, applyDmBlockSetsLive],
+  );
+
+  const handleDmUnblockPeer = useCallback(
+    async (peerId: string) => {
+      if (!token || !peerId) return;
+      try {
+        await unblockUser({ token, userId: peerId });
+        const next = new Set(dmBlockedByMeRef.current);
+        next.delete(peerId);
+        applyDmBlockSetsLive(next, dmBlockedByPeerRef.current);
+      } catch (e) {
+        console.error("Failed to unblock DM peer", e);
+      }
+    },
+    [token, applyDmBlockSetsLive],
+  );
+  const activeDmPeerId = selectedDirectMessageFriend?._id ?? "";
+  const dmBlockedByMeActive = Boolean(
+    activeDmPeerId && dmBlockedByMe.has(activeDmPeerId),
+  );
+  const dmBlockedByPeerActive = Boolean(
+    activeDmPeerId && dmBlockedByPeer.has(activeDmPeerId),
+  );
+  const shouldBlockDmChatInput = dmBlockedByMeActive || dmBlockedByPeerActive;
+
+  const openDmContextMenu = useCallback(
+    (
+      e: React.MouseEvent,
+      friend: { _id: string; displayName?: string; username?: string },
+    ) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDmContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        friend,
+      });
+    },
+    [],
+  );
 
   const friendsForDmSidebar = useMemo(() => {
     // Apply realtime presence overrides when available
@@ -4222,21 +4781,37 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!token || selectedServer) return;
     let cancelled = false;
+    const gen = ++dmBlockFetchGenRef.current;
     getConversationList({ token })
       .then((list) => {
         if (cancelled) return;
         const counts: Record<string, number> = {};
         const activity: Record<string, number> = {};
+        const prefs: Record<string, DmConversationPreferences> = {};
+        const blocked = new Set<string>();
+        const blockedByPeer = new Set<string>();
         list.forEach((c) => {
           const peerId = String(c.userId ?? "");
           if (!peerId) return;
           const apiCount = Math.max(0, Number(c.unreadCount) || 0);
-          counts[peerId] = dmReadPeersRef.current.has(peerId) ? 0 : apiCount;
+          const pref = parseDmConversationPreferences(c.preferences);
+          prefs[peerId] = pref;
+          if (c.isBlockedByMe) blocked.add(peerId);
+          if (c.isBlockedByPeer) blockedByPeer.add(peerId);
+          if (c.isFollowing) {
+            setFollowingIds((prev) => new Set(prev).add(peerId));
+          }
+          counts[peerId] =
+            dmReadPeersRef.current.has(peerId) || isDmConversationMuted(pref)
+              ? 0
+              : apiCount;
           if (c.lastMessageTime) {
             const t = new Date(c.lastMessageTime).getTime();
             if (!Number.isNaN(t)) activity[peerId] = t;
           }
         });
+        setDmConversationPrefs((prev) => ({ ...prev, ...prefs }));
+        applyDmBlockSetsFromApi(blocked, blockedByPeer, gen);
         const activeDmId = selectedDmFriendRef.current?._id;
         if (activeDmId) counts[String(activeDmId)] = 0;
         setDmUnreadCounts(counts);
@@ -4265,7 +4840,43 @@ export default function MessagesPage() {
         if (!cancelled) setDmUnreadCounts({});
       });
     return () => { cancelled = true; };
-  }, [token, selectedServer]);
+  }, [token, selectedServer, applyDmBlockSetsFromApi]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    try {
+      const raw = sessionStorage.getItem(`cordigram:dm-blocks:${currentUserId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          byMe?: string[];
+          byPeer?: string[];
+        };
+        applyDmBlockSets(
+          new Set(Array.isArray(parsed.byMe) ? parsed.byMe : []),
+          new Set(Array.isArray(parsed.byPeer) ? parsed.byPeer : []),
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+    void refreshDmBlockState();
+  }, [currentUserId, applyDmBlockSets, refreshDmBlockState]);
+
+  useEffect(() => {
+    if (!token || selectedServer) return;
+    const syncBlocks = () => {
+      void refreshDmBlockState();
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") syncBlocks();
+    };
+    window.addEventListener("focus", syncBlocks);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", syncBlocks);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [token, selectedServer, refreshDmBlockState]);
 
   // Đồng bộ badge từng hội thoại theo backend (socket dm-unread-count).
   useEffect(() => {
@@ -4287,6 +4898,25 @@ export default function MessagesPage() {
     }
     setDmUnreadCounts((prev) => ({ ...prev, [peerId]: normalized }));
   }, [dmUnreadCountEvent]);
+
+  useEffect(() => {
+    if (!dmBlockUpdatedEvent) return;
+    if (dmBlockUpdatedEvent.direction === "outgoing") {
+      const peerId = dmBlockUpdatedEvent.peerId;
+      if (!peerId) return;
+      const next = new Set(dmBlockedByMeRef.current);
+      if (dmBlockUpdatedEvent.blocked) next.add(peerId);
+      else next.delete(peerId);
+      applyDmBlockSetsLive(next, dmBlockedByPeerRef.current);
+      return;
+    }
+    const blockerId = dmBlockUpdatedEvent.blockerId;
+    if (!blockerId) return;
+    const nextPeer = new Set(dmBlockedByPeerRef.current);
+    if (dmBlockUpdatedEvent.blocked) nextPeer.add(blockerId);
+    else nextPeer.delete(blockerId);
+    applyDmBlockSetsLive(dmBlockedByMeRef.current, nextPeer);
+  }, [dmBlockUpdatedEvent, applyDmBlockSetsLive]);
 
   // Mở server từ link /messages?server=xxx (sau khi join từ event link)
   useEffect(() => {
@@ -4904,6 +5534,7 @@ export default function MessagesPage() {
         voiceUrl: (msg as any).voiceUrl ?? undefined,
         voiceDuration: (msg as any).voiceDuration ?? undefined,
         stickerReplyWelcomeEnabled: (msg as any).stickerReplyWelcomeEnabled,
+        welcomeWaveDismissedByMe: (msg as any).welcomeWaveDismissedByMe === true,
         contentModerationResult: (msg as any).contentModerationResult ?? "none",
         reactions: normalizeReactions(msg.reactions),
         replyTo:
@@ -5078,7 +5709,13 @@ export default function MessagesPage() {
       if (token) await markDmConversationRead({ token, userId: peerId });
     } catch (_err) {}
     prepareScrollToLatest();
-    await loadDirectMessages(friend._id);
+    await refreshDmBlockState();
+    const peerBlocked =
+      dmBlockedByPeerRef.current.has(peerId) ||
+      dmBlockedByMeRef.current.has(peerId);
+    if (!peerBlocked) {
+      await loadDirectMessages(friend._id);
+    }
     scheduleScrollToBottom();
   };
 
@@ -5658,6 +6295,7 @@ export default function MessagesPage() {
   ]);
 
   const handleSendMessage = async () => {
+    if (shouldBlockDmChatInput) return;
     if (shouldBlockServerChatInput) {
       void openVerificationRulesModal();
       return;
@@ -7103,7 +7741,15 @@ export default function MessagesPage() {
           replyToMessage,
           reactions: [],
         };
-        setMessages((prev) => appendServerMessage(prev, uiMsg));
+        setMessages((prev) => {
+          const withWave = appendServerMessage(prev, uiMsg);
+          if (isNewMember) return withWave;
+          return withWave.map((m) =>
+            m.id === welcomeMessageId
+              ? { ...m, welcomeWaveDismissedByMe: true }
+              : m,
+          );
+        });
       } catch (e) {
         console.error("Wave sticker failed", e);
       } finally {
@@ -7305,7 +7951,9 @@ export default function MessagesPage() {
 
       if (messageType === "welcome") {
         const isWaving = wavingIds.has(message.id);
-        const showWaveButton = message.stickerReplyWelcomeEnabled !== false;
+        const showWaveButton =
+          message.stickerReplyWelcomeEnabled !== false &&
+          !message.welcomeWaveDismissedByMe;
         const displayName =
           message.senderDisplayName || message.senderName || t("chat.welcome.unknownUser");
         return (
@@ -7671,16 +8319,6 @@ export default function MessagesPage() {
         return (
           <div>
             {textBefore && <div style={{ marginBottom: 4 }}>{textBefore}</div>}
-            <a
-              href={fullUrl}
-              style={{
-                color: "var(--color-chat-accent)",
-                fontSize: 14,
-                wordBreak: "break-all",
-              }}
-            >
-              {fullUrl}
-            </a>
             <ServerInviteCard serverId={sid} inviteUrl={fullUrl} />
             {textAfter && <div style={{ marginTop: 4 }}>{textAfter}</div>}
           </div>
@@ -8175,30 +8813,44 @@ export default function MessagesPage() {
     if (!selectedServer || !token) {
       prevSelectedServerForMyPermsRef.current = null;
       setCurrentServerPermissions(null);
+      setCurrentServerPermissionsForId(null);
       return;
     }
     if (isAdminView && adminViewServerId && selectedServer === adminViewServerId) {
       prevSelectedServerForMyPermsRef.current = selectedServer;
       setCurrentServerPermissions(null);
+      setCurrentServerPermissionsForId(null);
       return;
     }
     if (prevSelectedServerForMyPermsRef.current !== selectedServer) {
       prevSelectedServerForMyPermsRef.current = selectedServer;
       setCurrentServerPermissions(null);
+      setCurrentServerPermissionsForId(null);
     }
     let cancelled = false;
     serversApi
       .getCurrentUserPermissions(selectedServer)
       .then((p) => {
-        if (!cancelled) setCurrentServerPermissions(p);
+        if (!cancelled) {
+          setCurrentServerPermissions(p);
+          setCurrentServerPermissionsForId(selectedServer);
+        }
       })
       .catch(() => {
-        if (!cancelled) setCurrentServerPermissions(null);
+        if (!cancelled) {
+          setCurrentServerPermissions(null);
+          setCurrentServerPermissionsForId(null);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [selectedServer, token, isAdminView, adminViewServerId]);
+
+  const serverPermissionsReady =
+    Boolean(selectedServer) &&
+    currentServerPermissionsForId === selectedServer &&
+    currentServerPermissions != null;
 
   useEffect(() => {
     if (!currentUserId || !selectedServer) return;
@@ -8236,12 +8888,21 @@ export default function MessagesPage() {
     [servers, selectedServer],
   );
 
-  /** Chủ server hoặc (quản lý máy chủ và quản lý kênh) — chỉnh sửa/xóa kênh & danh mục */
+  const selectedDmPeerId = selectedDirectMessageFriend?._id;
+  const isSamePeerCallBlocked = useMemo(() => {
+    if (!selectedDmPeerId) return false;
+    const tabId = callTabIdRef.current || getCallTabId();
+    if (outgoingCallsByPeer[selectedDmPeerId]) return true;
+    if (activeCallTabPeers.includes(selectedDmPeerId)) return true;
+    return hasForeignOutboundCallLock(tabId, selectedDmPeerId);
+  }, [selectedDmPeerId, outgoingCallsByPeer, activeCallTabPeers]);
+
+  /** Chủ server hoặc quản lý kênh — chỉnh sửa/xóa kênh & danh mục */
   const canManageChannelsStructure = useMemo(() => {
     if (!currentUserId || !selectedServerEntity) return false;
     const p = currentServerPermissions;
     if (p?.isOwner) return true;
-    return !!(p?.canManageServer && p?.canManageChannels);
+    return Boolean(p?.canManageChannels);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
   const canAccessPrivateChannel = useMemo(() => {
@@ -8252,9 +8913,20 @@ export default function MessagesPage() {
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
   const canManageJoinApplications = useMemo(() => {
-    if (!currentUserId || !selectedServerEntity) return false;
+    if (!serverPermissionsReady || !currentUserId || !selectedServerEntity) return false;
     if (currentServerPermissions?.isOwner) return true;
     return Boolean(currentServerPermissions?.canManageServer);
+  }, [
+    serverPermissionsReady,
+    currentUserId,
+    selectedServerEntity,
+    currentServerPermissions,
+  ]);
+
+  const canManageEventsOnServer = useMemo(() => {
+    if (!currentUserId || !selectedServerEntity) return false;
+    if (currentServerPermissions?.isOwner) return true;
+    return Boolean(currentServerPermissions?.canManageEvents);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
   const ownedServersForPicker = useMemo(() => {
@@ -8301,6 +8973,28 @@ export default function MessagesPage() {
   useEffect(() => {
     setShowJoinApplicationsView(false);
   }, [selectedServer]);
+
+  useEffect(() => {
+    setShowServerProfileDropdown(false);
+  }, [selectedServer]);
+
+  useEffect(() => {
+    if (!showServerProfileDropdown) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (serverProfileDropdownRef.current?.contains(target)) return;
+      setShowServerProfileDropdown(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowServerProfileDropdown(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showServerProfileDropdown]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -8425,6 +9119,37 @@ export default function MessagesPage() {
       "cordigram-server-membership-updated",
       onMembership as EventListener,
     );
+
+    const onInteractionSettings = (ev: Event) => {
+      const d = (ev as CustomEvent<any>).detail;
+      if (!d?.serverId) return;
+      if (String(d.serverId) !== String(selectedServerRef.current)) return;
+      const stickerEnabled = d.stickerReplyWelcomeEnabled !== false;
+      setServerInteractionSettings((prev) =>
+        prev
+          ? {
+              ...prev,
+              stickerReplyWelcomeEnabled: stickerEnabled,
+              systemChannelId:
+                d.systemChannelId != null
+                  ? String(d.systemChannelId)
+                  : prev.systemChannelId,
+            }
+          : prev,
+      );
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.messageType === "welcome"
+            ? { ...m, stickerReplyWelcomeEnabled: stickerEnabled }
+            : m,
+        ),
+      );
+    };
+    window.addEventListener(
+      "cordigram-interaction-settings-updated",
+      onInteractionSettings as EventListener,
+    );
+
     return () => {
       window.removeEventListener(
         "cordigram-server-updated",
@@ -8433,6 +9158,10 @@ export default function MessagesPage() {
       window.removeEventListener(
         "cordigram-server-membership-updated",
         onMembership as EventListener,
+      );
+      window.removeEventListener(
+        "cordigram-interaction-settings-updated",
+        onInteractionSettings as EventListener,
       );
     };
   }, [currentUserId]);
@@ -8624,16 +9353,6 @@ export default function MessagesPage() {
           </div>
         </div>
       ) : null}
-      {/* Call Room Overlay - DEPRECATED: Calls now open in new tab */}
-      {/* {isInCall && callToken && callServerUrl && (
-        <CallRoom
-          token={callToken}
-          serverUrl={callServerUrl}
-          onDisconnect={handleEndCall}
-          participantName={selfMessagingIdentity.chatUsername || selfMessagingIdentity.displayName || 'Người dùng'}
-          isAudioOnly={isAudioOnly}
-        />
-      )} */}
 
       {/* Left Sidebar - Logo & Create Group */}
       <div className={styles.leftSidebar}>
@@ -8873,10 +9592,6 @@ export default function MessagesPage() {
                     title={t("chat.messagesPage.searchButtonAria")}
                     aria-label={t("chat.messagesPage.searchButtonAria")}
                   >
-                    <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
                     {t("chat.messagesPage.searchButtonLabel")}
                   </button>
                 </div>
@@ -8925,6 +9640,13 @@ export default function MessagesPage() {
                           friend.username?.charAt(0)?.toUpperCase() ||
                           "U";
                         const hue = Math.floor(Math.random() * 360);
+                        const dmPref =
+                          dmConversationPrefs[friend._id] ??
+                          emptyDmConversationPreferences();
+                        const category = dmPref.category;
+                        const categoryColor = category
+                          ? DM_CATEGORY_COLORS[category]
+                          : null;
                         return (
                           <div
                             key={friend._id}
@@ -8932,6 +9654,7 @@ export default function MessagesPage() {
                             onClick={() =>
                               handleSelectDirectMessageFriend(friend)
                             }
+                            onContextMenu={(e) => openDmContextMenu(e, friend)}
                             style={{ cursor: "pointer" }}
                           >
                             <div
@@ -8958,17 +9681,42 @@ export default function MessagesPage() {
                                 {friend.displayName || friend.username}
                               </p>
                               <p className={styles.friendStatus}>
-                                {formatDmPresenceLabel({
-                                  entry: (presenceByUserId as Record<string, unknown>)?.[
-                                    friend._id
-                                  ] as any,
-                                  t,
-                                  language,
-                                  fallbackLastActiveAt: friend.lastActiveAt,
-                                })}
+                                {categoryColor ? (
+                                  <span
+                                    className={styles.dmCategoryMark}
+                                    style={{ color: categoryColor }}
+                                    title={t(
+                                      `chat.dmConversation.categories.${category}`,
+                                    )}
+                                    aria-label={t(
+                                      `chat.dmConversation.categories.${category}`,
+                                    )}
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                      aria-hidden
+                                    >
+                                      <path d="M21.41 11.59l-8.59 8.59a2 2 0 0 1-2.83 0l-7.17-7.17a2 2 0 0 1 0-2.83L11.17 2.59a2 2 0 0 1 2.83 0l7.41 7.41a2 2 0 0 1 0 2.83zM5.5 7A1.5 1.5 0 1 0 5.5 4 1.5 1.5 0 0 0 5.5 7z" />
+                                    </svg>
+                                  </span>
+                                ) : null}
+                                <span className={styles.friendStatusText}>
+                                  {formatDmPresenceLabel({
+                                    entry: (presenceByUserId as Record<string, unknown>)?.[
+                                      friend._id
+                                    ] as any,
+                                    t,
+                                    language,
+                                    fallbackLastActiveAt: friend.lastActiveAt,
+                                  })}
+                                </span>
                               </p>
                             </div>
-                            {(dmUnreadCounts[String(friend._id)] ?? 0) > 0 && (
+                            {(dmUnreadCounts[String(friend._id)] ?? 0) > 0 &&
+                              !isDmConversationMuted(
+                                dmConversationPrefs[friend._id],
+                              ) && (
                               <span className={styles.friendUnreadWrap}>
                                 <span className={styles.dmUnreadDot} aria-hidden />
                                 <span className={styles.dmUnreadBadge}>
@@ -9118,40 +9866,72 @@ export default function MessagesPage() {
               // Server Selected - Header (tên máy chủ + mời) + Sự kiện + Kênh Chat & Kênh đàm thoại
               <>
                 <div className={styles.conversationsScrollArea}>
-                {/* Server header: tên máy chủ + mời tham gia */}
-                <div className={styles.serverHeader}>
-                  <button
-                    type="button"
-                    className={styles.serverNameBtn}
-                    title={currentServer?.name}
-                  >
-                    <span className={styles.serverNameText}>
-                      {currentServer?.name || "Máy chủ"}
-                    </span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.inviteServerBtn}
-                    title={t("chat.sidebar.inviteServer")}
-                    onClick={() => {
-                      if (currentServer)
+                {/* Server header: tên máy chủ + hồ sơ máy chủ + mời tham gia */}
+                <div ref={serverProfileDropdownRef} className={styles.serverHeaderBlock}>
+                  <div className={styles.serverHeader}>
+                    <button
+                      type="button"
+                      className={`${styles.serverNameBtn} ${showServerProfileDropdown ? styles.serverNameBtnOpen : ""}`}
+                      title={currentServer?.name}
+                      aria-expanded={showServerProfileDropdown}
+                      aria-haspopup="dialog"
+                      onClick={() => setShowServerProfileDropdown((open) => !open)}
+                    >
+                      <span className={styles.serverNameText}>
+                        {currentServer?.name || t("chat.sidebar.serverFallback")}
+                      </span>
+                      <svg
+                        className={`${styles.serverNameChevron} ${showServerProfileDropdown ? styles.serverNameChevronOpen : ""}`}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        aria-hidden
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.inviteServerBtn}
+                      title={t("chat.sidebar.inviteServer")}
+                      onClick={() => {
+                        if (currentServer)
+                          setInviteToServerTarget({
+                            serverId: currentServer._id,
+                            serverName: currentServer.name || t("chat.sidebar.serverFallback"),
+                          });
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                    </button>
+                  </div>
+                  {showServerProfileDropdown && currentServer && (
+                    <ServerProfileDropdown
+                      server={currentServer}
+                      canManageProfile={canManageJoinApplications}
+                      canCreateInvite={currentServerPermissions?.canCreateInvite ?? true}
+                      onEditProfile={() => {
+                        setShowServerProfileDropdown(false);
+                        void openServerSettingsFromMediaPicker(currentServer._id, "profile");
+                      }}
+                      onInvite={() => {
+                        setShowServerProfileDropdown(false);
                         setInviteToServerTarget({
                           serverId: currentServer._id,
                           serverName: currentServer.name || t("chat.sidebar.serverFallback"),
                         });
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </button>
+                      }}
+                    />
+                  )}
                 </div>
                 {/* Sự kiện đang diễn ra - hiển thị bên trên Sự kiện khi đến đúng thời gian */}
                 {activeServerEvents.length > 0 && (
@@ -10765,7 +11545,7 @@ export default function MessagesPage() {
                   </>
                 ) : null}
               </div>
-            ) : showJoinApplicationsView && currentServer && !selectedDirectMessageFriend ? (
+            ) : showJoinApplicationsView && currentServer && !selectedDirectMessageFriend && serverPermissionsReady ? (
               <div style={{ flex: 1, display: "flex", minHeight: 0, minWidth: 0 }}>
                 <ServerJoinApplicationsPanel
                   serverId={currentServer._id}
@@ -10906,9 +11686,23 @@ export default function MessagesPage() {
                       <>
                         <button
                           type="button"
+                          title={t("chat.dmConversation.moreActions")}
+                          aria-label={t("chat.dmConversation.moreActions")}
+                          onClick={(e) =>
+                            openDmContextMenu(e, selectedDirectMessageFriend)
+                          }
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="5" cy="12" r="2" />
+                            <circle cx="12" cy="12" r="2" />
+                            <circle cx="19" cy="12" r="2" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
                           title={t("chat.composer.voiceCall")}
                           onClick={() => handleStartCall(false)}
-                          disabled={isInCall}
+                          disabled={isSamePeerCallBlocked}
                         >
                           <svg
                             width="20"
@@ -10925,7 +11719,7 @@ export default function MessagesPage() {
                           type="button"
                           title={t("chat.composer.videoCall")}
                           onClick={() => handleStartCall(true)}
-                          disabled={isInCall}
+                          disabled={isSamePeerCallBlocked}
                         >
                           <svg
                             width="20"
@@ -11158,7 +11952,40 @@ export default function MessagesPage() {
                       </div>
                     )}
                   {selectedDirectMessageFriend ? (
-                    loadingDirectMessages ? (
+                    shouldBlockDmChatInput ? (
+                      <div className={styles.dmBlockedPanel}>
+                        <div className={styles.dmBlockedCard}>
+                          <p className={styles.dmBlockedText}>
+                            {dmBlockedByPeerActive
+                              ? t("chat.dmConversation.blockedByPeer", {
+                                  name:
+                                    selectedDirectMessageFriend.displayName ||
+                                    selectedDirectMessageFriend.username ||
+                                    t("chat.sidebar.userFallback"),
+                                })
+                              : t("chat.dmConversation.blockedByYou", {
+                                  name:
+                                    selectedDirectMessageFriend.displayName ||
+                                    selectedDirectMessageFriend.username ||
+                                    t("chat.sidebar.userFallback"),
+                                })}
+                          </p>
+                          {dmBlockedByMeActive && (
+                            <button
+                              type="button"
+                              className={styles.dmBlockedUnblockBtn}
+                              onClick={() =>
+                                void handleDmUnblockPeer(
+                                  selectedDirectMessageFriend._id,
+                                )
+                              }
+                            >
+                              {t("chat.dmConversation.unblock")}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : loadingDirectMessages ? (
                       <div
                         style={{
                           display: "flex",
@@ -11274,16 +12101,10 @@ export default function MessagesPage() {
                             maxWidth: 560,
                             textAlign: "left",
                           }}>
-                            {t("chat.welcome.channelBegin")}{" "}
-                            <strong style={{ color: "var(--color-text)" }}>
-                              #
-                              {translateChannelName(
-                                allChannels.find((c) => c._id === selectedChannel)?.name ??
-                                  "chung",
-                                language,
-                              )}
-                            </strong>
-                            {t("chat.welcome.startTalking")}
+                            {t("chat.welcome.channelIntro").replace(
+                              "{serverName}",
+                              currentServer.name,
+                            )}
                           </p>
                           {/* Welcome messages: nằm dưới phần chào mừng, không bị trôi theo chat */}
                           <div style={{
@@ -11566,8 +12387,13 @@ export default function MessagesPage() {
                 <div
                   className={styles.inputArea}
                   style={{
-                    opacity: shouldBlockServerChatInput ? 0.6 : 1,
-                    pointerEvents: shouldBlockServerChatInput ? "none" : undefined,
+                    opacity:
+                      shouldBlockServerChatInput || shouldBlockDmChatInput ? 0.6 : 1,
+                    pointerEvents:
+                      shouldBlockServerChatInput || shouldBlockDmChatInput
+                        ? "none"
+                        : undefined,
+                    display: shouldBlockDmChatInput ? "none" : undefined,
                   }}
                 >
                   {/* Plus Menu Button */}
@@ -12749,6 +13575,7 @@ export default function MessagesPage() {
         onClose={() => setShowEventsPopup(false)}
         serverId={selectedServer}
         onOpenCreateWizard={openCreateEventWizard}
+        canManageEvents={canManageEventsOnServer}
       />
 
       {inviteToServerTarget && (
@@ -12967,6 +13794,36 @@ export default function MessagesPage() {
         />
       )}
 
+      {dmContextMenu && (
+        <DmConversationContextMenu
+          x={dmContextMenu.x}
+          y={dmContextMenu.y}
+          peerName={
+            dmContextMenu.friend.displayName ||
+            dmContextMenu.friend.username ||
+            ""
+          }
+          preferences={
+            dmConversationPrefs[dmContextMenu.friend._id] ??
+            emptyDmConversationPreferences()
+          }
+          isFollowing={followingIds.has(dmContextMenu.friend._id)}
+          isBlockedByMe={dmBlockedByMe.has(dmContextMenu.friend._id)}
+          onClose={() => setDmContextMenu(null)}
+          onMute={(patch) =>
+            void handleDmMutePreference(dmContextMenu.friend._id, patch)
+          }
+          onCategory={(category) =>
+            void handleDmCategoryPreference(dmContextMenu.friend._id, category)
+          }
+          onUnfollow={() =>
+            void handleDmUnfollowPeer(dmContextMenu.friend._id)
+          }
+          onBlock={() => void handleDmBlockPeer(dmContextMenu.friend._id)}
+          onUnblock={() => void handleDmUnblockPeer(dmContextMenu.friend._id)}
+        />
+      )}
+
       {channelContextMenu && selectedServer && currentUserId && (() => {
         const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
         const chId = channelContextMenu.channel._id;
@@ -12995,8 +13852,8 @@ export default function MessagesPage() {
             }}
             onCopyChannelLink={() => {
               const url = `${origin}/invite/server/${selectedServer}/${chId}`;
-              void navigator.clipboard?.writeText(url).catch(() => {
-                window.prompt("Sao chép liên kết:", url);
+              void navigator.clipboard?.writeText(url).catch(async () => {
+                await appPrompt("Sao chép liên kết:", url);
               });
             }}
             onMarkAsRead={() => serversApi.markChannelAsRead(chId)}
@@ -13108,10 +13965,10 @@ export default function MessagesPage() {
               setRenamingCategoryId(categoryContextMenu.category._id);
               setRenamingCategoryName(categoryContextMenu.category.name);
             }}
-            onDeleteCategory={() => {
+            onDeleteCategory={async () => {
               if (catId === UNCATEGORIZED_CATEGORY_ID) {
                 if (
-                  confirm(
+                  await appConfirm(
                     'Bạn có chắc muốn xóa danh mục "Kênh khác"? Tất cả kênh bên trong (trừ kênh mặc định) sẽ bị xóa.',
                   )
                 ) {
@@ -13119,7 +13976,7 @@ export default function MessagesPage() {
                 }
                 return;
               }
-              if (confirm(`Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`)) {
+              if (await appConfirm(`Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`)) {
                 handleDeleteCategory(catId);
               }
             }}
@@ -13255,6 +14112,19 @@ export default function MessagesPage() {
                   Boolean(serverSettingsPermissions?.canManageServer)
                 }
                 textChannels={allChannels.filter((c) => c.type !== "voice")}
+                onSettingsChange={(next) => {
+                  if (serverSettingsTarget.serverId === selectedServer) {
+                    setServerInteractionSettings(next);
+                    const stickerEnabled = next.stickerReplyWelcomeEnabled !== false;
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.messageType === "welcome"
+                          ? { ...m, stickerReplyWelcomeEnabled: stickerEnabled }
+                          : m,
+                      ),
+                    );
+                  }
+                }}
               />
             );
           }
@@ -13402,7 +14272,7 @@ export default function MessagesPage() {
         }}
       />
 
-      {selectedServer && (
+      {selectedServer && canManageEventsOnServer && (
         <CreateEventWizard
           isOpen={showCreateEventWizard}
           onClose={() => setShowCreateEventWizard(false)}
@@ -13821,7 +14691,9 @@ export default function MessagesPage() {
         />
       )}
 
-      {Object.entries(outgoingCallsByPeer).map(([peerId, outgoingCall]) => (
+      {Object.entries(outgoingCallsByPeer)
+        .filter(([peerId]) => !activeCallTabPeers.includes(peerId))
+        .map(([peerId, outgoingCall]) => (
         <OutgoingCallPopup
           key={peerId}
           receiverName={
@@ -13834,7 +14706,6 @@ export default function MessagesPage() {
           }
           callType={outgoingCall.type}
           onCancel={() => handleCancelCall(peerId)}
-          onJoin={() => handleJoinCall(peerId)}
           status={outgoingCall.status}
         />
       ))}
@@ -14008,6 +14879,8 @@ export default function MessagesPage() {
           </div>
         </div>
       )}
+
+      <MessagesDesktopNotificationHost />
 
       {/* Toast Notification */}
       {toastMessage && (

@@ -24,6 +24,8 @@ class ChannelMessagesRealtimeService {
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _channelNotificationController =
       StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _inboxForYouController =
+      StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _serverRealtimeController =
       StreamController<Map<String, dynamic>>.broadcast();
 
@@ -33,6 +35,8 @@ class ChannelMessagesRealtimeService {
   /// Per-user pushes from the gateway (mentions, inbox-related) without joining a channel room.
   static Stream<Map<String, dynamic>> get channelNotifications =>
       _channelNotificationController.stream;
+  static Stream<Map<String, dynamic>> get inboxForYouItems =>
+      _inboxForYouController.stream;
   static Stream<Map<String, dynamic>> get serverRealtime =>
       _serverRealtimeController.stream;
 
@@ -86,6 +90,11 @@ class ChannelMessagesRealtimeService {
       _channelNotificationController.add(Map<String, dynamic>.from(payload));
     });
 
+    socket.on('inbox-for-you-item', (payload) {
+      if (payload is! Map) return;
+      _inboxForYouController.add(Map<String, dynamic>.from(payload));
+    });
+
     socket.on('server-updated', (payload) {
       if (payload is! Map) return;
       final mapped = Map<String, dynamic>.from(payload);
@@ -104,6 +113,13 @@ class ChannelMessagesRealtimeService {
       if (payload is! Map) return;
       final mapped = Map<String, dynamic>.from(payload);
       mapped['event'] = 'join-application-updated';
+      _serverRealtimeController.add(mapped);
+    });
+
+    socket.on('interaction-settings-updated', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'interaction-settings-updated';
       _serverRealtimeController.add(mapped);
     });
 
@@ -145,8 +161,11 @@ class ChannelMessagesRealtimeService {
       socket.off('reaction-updated');
       socket.off('message-deleted');
       socket.off('channel-notification');
+      socket.off('inbox-for-you-item');
       socket.off('server-updated');
       socket.off('server-membership-updated');
+      socket.off('join-application-updated');
+      socket.off('interaction-settings-updated');
       socket.off('connect');
       socket.disconnect();
       socket.dispose();

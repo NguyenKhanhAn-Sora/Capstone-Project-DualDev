@@ -18,13 +18,16 @@ import 'models/server_models.dart';
 import 'services/direct_messages_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/voice_channel_session_controller.dart';
+import 'widgets/display_name_styled_text.dart';
 import 'widgets/message_folder_dropdown.dart';
 import 'widgets/messages_inbox_sheet.dart';
 import 'widgets/message_thread_tile.dart';
+import 'widgets/dm_conversation_actions_sheet.dart';
 import 'messages_settings_screen.dart';
 import '../../core/services/accent_color_controller.dart';
 import '../../core/services/appearance_preset_controller.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/services/pending_messages_push_navigation.dart';
 import 'utils/messages_navigator.dart';
 import 'widgets/messages_boost_store_screen.dart';
 import 'widgets/messages_chrome_builder.dart';
@@ -64,6 +67,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       if (mounted && widget.initialThread != null) {
         _openThread(widget.initialThread!);
       }
+      await _consumePendingPushNavigation();
     });
     _serverRealtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
       _onServerRealtimeEvent,
@@ -102,6 +106,31 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       if (!mounted) return;
       _serverListController.loadServers();
     });
+  }
+
+  Future<void> _consumePendingPushNavigation() async {
+    final pending = PendingMessagesPushNavigation.take();
+    if (pending == null) return;
+    final serverId = (pending['serverId'] ?? '').toString().trim();
+    if (serverId.isEmpty) return;
+
+    await _serverListController.loadServers();
+    if (!mounted) return;
+
+    ServerSummary? target;
+    for (final s in _serverListController.servers) {
+      if (s.id == serverId) {
+        target = s;
+        break;
+      }
+    }
+    if (target == null) return;
+
+    final channelId = (pending['channelId'] ?? '').toString().trim();
+    await _openServer(
+      target,
+      initialTextChannelId: channelId.isEmpty ? null : channelId,
+    );
   }
 
   List<ServerSummary> get _filteredServers {
@@ -1042,6 +1071,13 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                             thread: thread,
                             showActivityLabel: !_isServerMode,
                             onTap: () => _openThread(thread),
+                            onLongPress: _isServerMode
+                                ? null
+                                : () => DmConversationActionsSheet.show(
+                                      context,
+                                      thread: thread,
+                                      controller: _messagesController,
+                                    ),
                           );
                         },
                       ),
@@ -1057,73 +1093,90 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 10,
-                  backgroundColor: chrome.surfaceMuted,
-                  backgroundImage:
-                      (_messagesController.myAvatarUrl ?? '').isNotEmpty
-                      ? NetworkImage(_messagesController.myAvatarUrl!)
-                      : null,
-                  child: (_messagesController.myAvatarUrl ?? '').isNotEmpty
-                      ? null
-                      : Text(
-                          ((_messagesController.myDisplayName ??
-                                      _messagesController.myUsername ??
-                                      'U')
-                                  .trim()
-                                  .isNotEmpty
-                              ? (_messagesController.myDisplayName ??
-                                        _messagesController.myUsername ??
-                                        'U')
-                                    .trim()
-                                    .substring(0, 1)
-                                    .toUpperCase()
-                              : 'U'),
-                          style: TextStyle(
-                            color: onSurface,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 10,
+                      backgroundColor: chrome.surfaceMuted,
+                      backgroundImage:
+                          (_messagesController.myAvatarUrl ?? '').isNotEmpty
+                          ? NetworkImage(_messagesController.myAvatarUrl!)
+                          : null,
+                      child: (_messagesController.myAvatarUrl ?? '').isNotEmpty
+                          ? null
+                          : Text(
+                              ((_messagesController.myDisplayName ??
+                                          _messagesController.myUsername ??
+                                          'U')
+                                      .trim()
+                                      .isNotEmpty
+                                  ? (_messagesController.myDisplayName ??
+                                            _messagesController.myUsername ??
+                                            'U')
+                                        .trim()
+                                        .substring(0, 1)
+                                        .toUpperCase()
+                                  : 'U'),
+                              style: TextStyle(
+                                color: onSurface,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                    ),
+                    if (_messagesController.myOnline)
+                      Positioned(
+                        right: -1,
+                        bottom: -1,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF31C56F),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: chrome.panelSidebar, width: 1.5),
                           ),
                         ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 6),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      (_messagesController.myUsername ?? '').isNotEmpty
-                          ? _messagesController.myUsername!
-                          : _t('chat.messagesPage.userFallback'),
-                      style: TextStyle(
-                        color: onSurface,
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DisplayNameStyledText(
+                        text: () {
+                          final dn =
+                              (_messagesController.myDisplayName ?? '').trim();
+                          final un =
+                              (_messagesController.myUsername ?? '').trim();
+                          if (dn.isNotEmpty) return dn;
+                          if (un.isNotEmpty) return un;
+                          return _t('chat.messagesPage.userFallback');
+                        }(),
+                        style: _messagesController.myDisplayNameStyle,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        height: 1.1,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        fallbackColor: onSurface,
                       ),
-                    ),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.circle,
-                          size: 7,
-                          color: _messagesController.myOnline
-                              ? const Color(0xFF31C56F)
-                              : muted,
-                        ),
-                        const SizedBox(width: 4),
+                      if ((_messagesController.myUsername ?? '').trim().isNotEmpty)
                         Text(
-                          (_messagesController.myDisplayName ?? '').isNotEmpty
-                              ? _messagesController.myDisplayName!
-                              : _t('chat.messagesPage.userFallback'),
+                          _messagesController.myUsername!.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: muted,
                             fontSize: 9,
+                            height: 1.2,
                           ),
                         ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const Spacer(),
                 IconButton(

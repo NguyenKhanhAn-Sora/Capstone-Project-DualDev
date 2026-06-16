@@ -440,6 +440,11 @@
         "noDescription": "No description yet."
       }
     },
+    "serverProfileDropdown": {
+      "title": "Server profile",
+      "editProfile": "Edit server profile",
+      "invitePeople": "Invite people"
+    },
     "popups": {
       "closeAria": "Close",
       "loading": "Loading...",
@@ -1621,8 +1626,7 @@
     "welcome": {
       "title": "Welcome to",
       "serverOf": "{name}'s Server",
-      "channelBegin": "This is the beginning of the",
-      "startTalking": " channel. Start chatting!",
+      "channelIntro": "Welcome to {serverName}. Start your conversation.",
       "greeting": "Nice to meet you, {name}!",
       "unknownUser": "Someone",
       "waving": "Sending...",
@@ -1631,6 +1635,31 @@
     "dmList": {
       "sent": "Sent",
       "seen": "Seen"
+    },
+    "dmConversation": {
+      "menuLabel": "Conversation options for {name}",
+      "categorize": "Categorize",
+      "clearCategory": "Remove category",
+      "muteNotifications": "Mute notifications",
+      "unmuteNotifications": "Unmute notifications",
+      "mute1h": "For 1 hour",
+      "mute4h": "For 4 hours",
+      "muteUntil8am": "Until 8:00 AM",
+      "muteForever": "Until I turn it back on",
+      "unfollow": "Unfollow",
+      "block": "Block",
+      "unblock": "Unblock",
+      "blockedByYou": "You blocked {name}",
+      "blockedByPeer": "You were blocked by {name}",
+      "moreActions": "Options",
+      "categories": {
+        "customer": "Customer",
+        "family": "Family",
+        "work": "Work",
+        "friends": "Friends",
+        "reply_later": "Reply later",
+        "colleague": "Colleague"
+      }
     },
     "mention": {
       "tooltip": "Mention (@mention)"
@@ -1887,7 +1916,17 @@
       "masterHint": "On: normal notifications. Off: disable all notifications (social + DM/server).",
       "enabledToast": "Notifications enabled.",
       "disabledToast": "Notifications disabled.",
-      "soundLabel": "Notification sounds (messages & new notifications)"
+      "soundLabel": "Notification sounds (messages & new notifications)",
+      "desktopLabel": "Desktop notifications (Messages)",
+      "desktopHint": "Show OS notifications for new server events and role announcements.",
+      "desktopEnabledToast": "Desktop notifications enabled.",
+      "desktopDeniedToast": "Your browser blocked desktop notifications. Enable them in browser settings.",
+      "desktopDisabledToast": "Desktop notifications disabled.",
+      "desktopEventTitle": "New event: {topic}",
+      "desktopEventTitleLine": "New event · {server}",
+      "desktopEventBody": "Starts {when}",
+      "desktopRoleBody": "Announcement from {server}",
+      "desktopRoleTitleLine": "Announcement · {server}"
     },
     "profile": {
       "title": "Profile",

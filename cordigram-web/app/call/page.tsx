@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStoredAccessToken, setStoredAccessToken } from "@/lib/auth";
 import { getLiveKitToken } from "@/lib/livekit-api";
+import { addActiveDmCallPeer, removeActiveDmCallPeer } from "@/lib/dm-call-active-peers";
+import { setActiveDmCallIdForHeartbeat } from "@/lib/dm-call-session-sync";
 import styles from "./call.module.css";
 
 const CallRoom = dynamic(() => import("@/components/CallRoom"), {
@@ -23,9 +25,40 @@ export default function CallPage() {
   const lkTokenFromQuery = searchParams.get("lkToken");
   const lkUrlFromQuery = searchParams.get("lkUrl");
   const peerId = searchParams.get("peerId") || "";
+  const callIdFromQuery = searchParams.get("callId") || "";
   const publicLivekitUrl = (process.env.NEXT_PUBLIC_LIVEKIT_URL || "").trim();
 
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const remoteJoinedAtRef = useRef<number | null>(null);
+
+  const buildSelfEndedMessage = useCallback(() => {
+    if (!peerId) return null;
+    if (remoteJoinedAtRef.current != null) {
+      const durationSec = Math.max(
+        1,
+        Math.floor((Date.now() - remoteJoinedAtRef.current) / 1000),
+      );
+      return {
+        type: "self-ended" as const,
+        peerId,
+        status: "completed" as const,
+        durationSec,
+      };
+    }
+    return {
+      type: "self-ended" as const,
+      peerId,
+      status: "cancelled" as const,
+    };
+  }, [peerId]);
+
+  const postSelfEnded = useCallback(() => {
+    const payload = buildSelfEndedMessage();
+    if (!payload || !channelRef.current) return;
+    try {
+      channelRef.current.postMessage(payload);
+    } catch (_) {}
+  }, [buildSelfEndedMessage]);
 
   const [callToken, setCallToken] = useState<string>("");
   const [callServerUrl, setCallServerUrl] = useState<string>("");
@@ -127,6 +160,16 @@ export default function CallPage() {
     }
     const channel = new BroadcastChannel("cordigram-call");
     channelRef.current = channel;
+    if (peerId) {
+      addActiveDmCallPeer(peerId);
+      try {
+        channel.postMessage({
+          type: "call-active",
+          peerId,
+          callId: callIdFromQuery || undefined,
+        });
+      } catch (_) {}
+    }
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; peerId?: string } | null;
       if (!data) return;
@@ -134,6 +177,9 @@ export default function CallPage() {
         data.type === "peer-ended" &&
         (!peerId || !data.peerId || data.peerId === peerId)
       ) {
+        if (data.peerId) {
+          removeActiveDmCallPeer(data.peerId);
+        }
         setEnded(true);
         setTimeout(() => {
           try {
@@ -148,7 +194,36 @@ export default function CallPage() {
       channel.close();
       channelRef.current = null;
     };
-  }, [embedded, peerId]);
+  }, [embedded, peerId, callIdFromQuery]);
+
+  useEffect(() => {
+    if (embedded || !callIdFromQuery) return;
+    setActiveDmCallIdForHeartbeat(callIdFromQuery);
+    return () => {
+      setActiveDmCallIdForHeartbeat(null);
+    };
+  }, [embedded, callIdFromQuery]);
+
+  useEffect(() => {
+    if (embedded || !peerId || typeof window === "undefined") return;
+
+    const cleanupActivePeer = () => {
+      removeActiveDmCallPeer(peerId);
+      setActiveDmCallIdForHeartbeat(null);
+      postSelfEnded();
+    };
+
+    window.addEventListener("pagehide", cleanupActivePeer);
+    return () => {
+      window.removeEventListener("pagehide", cleanupActivePeer);
+    };
+  }, [embedded, peerId, postSelfEnded]);
+
+  const handleRemoteJoined = useCallback(() => {
+    if (remoteJoinedAtRef.current == null) {
+      remoteJoinedAtRef.current = Date.now();
+    }
+  }, []);
 
   const handleDisconnect = useCallback(() => {
     if (embedded) {
@@ -158,17 +233,17 @@ export default function CallPage() {
     // Signal the opener tab so it can emit `call-end` via its socket — this
     // is what makes the peer (especially the mobile app) tear down their
     // side immediately instead of waiting for LiveKit's fallback timeout.
-    if (peerId && channelRef.current) {
-      try {
-        channelRef.current.postMessage({ type: "self-ended", peerId });
-      } catch (_) {}
+    postSelfEnded();
+    if (peerId) {
+      removeActiveDmCallPeer(peerId);
+      setActiveDmCallIdForHeartbeat(null);
     }
     window.close();
 
     setTimeout(() => {
       router.push("/messages");
     }, 100);
-  }, [embedded, router, peerId]);
+  }, [embedded, router, peerId, postSelfEnded]);
 
   if (loading) {
     return (
@@ -210,6 +285,7 @@ export default function CallPage() {
         token={callToken}
         serverUrl={callServerUrl}
         onDisconnect={handleDisconnect}
+        onRemoteJoined={handleRemoteJoined}
         participantName={participantName || "User"}
         isAudioOnly={isAudioOnly}
       />

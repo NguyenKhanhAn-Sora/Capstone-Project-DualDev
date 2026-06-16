@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useRef, useEffect } from "react";
 import styles from "./ServerCustomization.module.css";
 import { uploadMedia } from "@/lib/api";
@@ -47,18 +48,18 @@ export default function ServerCustomization({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert(t("chat.createServer.customize.errors.imageOnly"));
+      appAlert(t("chat.createServer.customize.errors.imageOnly"));
       return;
     }
 
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      alert(t("chat.createServer.customize.errors.maxSize5mb"));
+      appAlert(t("chat.createServer.customize.errors.maxSize5mb"));
       return;
     }
 
     if (!token) {
-      alert(t("chat.createServer.customize.errors.loginRequired"));
+      appAlert(t("chat.createServer.customize.errors.loginRequired"));
       return;
     }
 
@@ -72,7 +73,7 @@ export default function ServerCustomization({
       setAvatarUrl(result.url);
     } catch (error) {
       console.error("Failed to upload image:", error);
-      alert(t("chat.createServer.customize.errors.uploadFailed"));
+      appAlert(t("chat.createServer.customize.errors.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -80,7 +81,7 @@ export default function ServerCustomization({
 
   const handleSubmit = () => {
     if (!serverName.trim()) {
-      alert(t("chat.createServer.errors.nameRequired"));
+      appAlert(t("chat.createServer.errors.nameRequired"));
       return;
     }
     onCreateServer(serverName, avatarUrl || undefined);

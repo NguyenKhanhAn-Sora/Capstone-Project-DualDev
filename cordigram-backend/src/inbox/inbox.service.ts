@@ -177,8 +177,8 @@ export class InboxService {
     for (const server of servers) {
       const serverId = server._id.toString();
       const [active, upcoming] = await Promise.all([
-        this.eventsService.getActiveByServer(serverId),
-        this.eventsService.getUpcomingByServer(serverId),
+        this.eventsService.getActiveByServer(serverId, userId),
+        this.eventsService.getUpcomingByServer(serverId, userId),
       ]);
       const events: ServerEvent[] = [...active, ...upcoming];
       for (const ev of events) {

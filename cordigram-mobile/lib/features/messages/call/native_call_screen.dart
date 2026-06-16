@@ -21,6 +21,7 @@ class NativeCallScreen extends StatefulWidget {
   const NativeCallScreen({
     super.key,
     required this.session,
+    required this.peerUserId,
     required this.title,
     required this.onHangup,
     this.peerAvatarUrl,
@@ -28,6 +29,7 @@ class NativeCallScreen extends StatefulWidget {
   });
 
   final CallSession session;
+  final String peerUserId;
   final String title;
   final String? peerAvatarUrl;
 
@@ -48,10 +50,8 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   // `ParticipantDisconnected` events. This is specifically to survive the
   // brief disconnect ↔ reconnect cycle that web peers go through in React 18
   // StrictMode / slow networks when joining a LiveKit room.
-  static const Duration _initialGrace = Duration(seconds: 5);
-  // Once at least one remote has joined, any transient disconnect must
-  // persist for this long before we actually treat the call as ended.
-  static const Duration _remoteLeaveGrace = Duration(seconds: 3);
+  static const Duration _initialGrace = Duration(seconds: 8);
+  static const Duration _remoteLeaveGrace = Duration(seconds: 4);
 
   Room? _room;
   EventsListener<RoomEvent>? _roomListener;
@@ -69,6 +69,8 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   bool _isMinimizeNavigating = false;
   DateTime? _connectedAt;
   Timer? _remoteLeavePending;
+  Timer? _roomDisconnectPending;
+  bool _remoteEverJoined = false;
 
   List<Participant> _participants = const [];
   VoidCallback? _mgrListener;
@@ -92,7 +94,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   /// would linger after the other side ended the call.
   void _onManagerChanged() {
     if (!mounted || _hangupCalled) return;
-    if (DmCallManager.instance.active == null) {
+    if (!DmCallManager.instance.isActiveCallForPeer(widget.peerUserId)) {
       _teardownAndPop();
     }
   }
@@ -115,10 +117,13 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       );
 
       final listener = room.createListener()
-        ..on<RoomDisconnectedEvent>((_) => _handleRemoteLeft())
+        ..on<RoomDisconnectedEvent>((_) => _scheduleRoomDisconnectHangup())
         ..on<ParticipantConnectedEvent>((_) {
+          _remoteEverJoined = true;
           _remoteLeavePending?.cancel();
           _remoteLeavePending = null;
+          _roomDisconnectPending?.cancel();
+          _roomDisconnectPending = null;
           _refreshParticipants();
           unawaited(_applySpeakerState(_speakerOn));
         })
@@ -240,7 +245,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
 
     VideoTrack? localPip;
     if (remote != null && local != null) {
-      localPip = _ParticipantTile.pickLocalCameraVideo(local!, camOn: _camEnabled);
+      localPip = _ParticipantTile.pickLocalCameraVideo(local, camOn: _camEnabled);
     }
 
     mgr.setMinimizedPipVideoTracks(
@@ -436,6 +441,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   }
 
   void _scheduleRemoteLeaveIfPersistent(Room room) {
+    if (!_remoteEverJoined) return;
     final connectedAt = _connectedAt;
     if (connectedAt != null &&
         DateTime.now().difference(connectedAt) < _initialGrace) {
@@ -447,6 +453,19 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       if (room.remoteParticipants.isEmpty) {
         _handleRemoteLeft();
       }
+    });
+  }
+
+  void _scheduleRoomDisconnectHangup() {
+    _roomDisconnectPending?.cancel();
+    final connectedAt = _connectedAt ?? DateTime.now();
+    final elapsed = DateTime.now().difference(connectedAt);
+    final delay = elapsed >= _initialGrace
+        ? _remoteLeaveGrace
+        : _initialGrace - elapsed + _remoteLeaveGrace;
+    _roomDisconnectPending = Timer(delay, () {
+      if (!mounted || _hangupCalled) return;
+      _handleRemoteLeft();
     });
   }
 
@@ -472,6 +491,8 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     }
     _remoteLeavePending?.cancel();
     _remoteLeavePending = null;
+    _roomDisconnectPending?.cancel();
+    _roomDisconnectPending = null;
     try {
       await _roomListener?.dispose();
     } catch (_) {}
@@ -498,6 +519,8 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     }
     _remoteLeavePending?.cancel();
     _remoteLeavePending = null;
+    _roomDisconnectPending?.cancel();
+    _roomDisconnectPending = null;
     try {
       await _roomListener?.dispose();
     } catch (_) {}
@@ -539,8 +562,11 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     }
     _remoteLeavePending?.cancel();
     _remoteLeavePending = null;
+    _roomDisconnectPending?.cancel();
+    _roomDisconnectPending = null;
     if (!_hangupCalled) {
       _hangupCalled = true;
+      unawaited(widget.onHangup());
       unawaited(_roomListener?.dispose());
       unawaited(_room?.disconnect());
     }
@@ -751,7 +777,7 @@ class _RemoteCallPlaceholder extends StatelessWidget {
             radius: 56,
             backgroundColor: const Color(0xFF1B2A4A),
             backgroundImage:
-                (url != null && url.isNotEmpty) ? NetworkImage(url!) : null,
+                (url != null && url.isNotEmpty) ? NetworkImage(url) : null,
             onBackgroundImageError: (_, __) {},
             child: (url == null || url.isEmpty)
                 ? Text(
@@ -865,7 +891,7 @@ class _VideoCallBody extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: _CompactSelfPip(
-                local: local as LocalParticipant,
+                local: local,
                 nameHint: localDisplayName,
                 micOn: localMicOn,
                 camOn: localCamOn,
@@ -915,11 +941,11 @@ class _CompactSelfPip extends StatelessWidget {
       );
     }
 
-    final fromRoom = local.name?.trim();
-    final identity = local.identity?.trim();
-    final name = (fromRoom != null && fromRoom.isNotEmpty)
+    final fromRoom = local.name.trim();
+    final identity = local.identity.trim();
+    final name = fromRoom.isNotEmpty
         ? fromRoom
-        : (identity != null && identity.isNotEmpty)
+        : identity.isNotEmpty
             ? identity
             : (nameHint?.trim().isNotEmpty == true ? nameHint!.trim() : 'Bạn');
     final initial =

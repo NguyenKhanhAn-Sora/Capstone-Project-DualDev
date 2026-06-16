@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'models/display_name_style.dart';
 import 'models/dm_message.dart';
 import 'models/message_reaction.dart';
 import 'models/message_thread.dart';
@@ -30,15 +31,18 @@ class MessagesController extends ChangeNotifier {
   final Map<String, DateTime?> _conversationMutedUntil = {};
   final Set<String> _conversationMutedForever = {};
   final Set<String> _blockedUsers = {};
+  final Set<String> _blockedByPeerUsers = {};
 
   StreamSubscription<DmMessage>? _newMessageSub;
   StreamSubscription<DmUnreadCountEvent>? _unreadSub;
+  StreamSubscription<DmBlockUpdatedEvent>? _blockUpdatedSub;
   StreamSubscription<PresenceState>? _presenceSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
   StreamSubscription<Map<String, dynamic>>? _messagesReadSub;
   StreamSubscription<DmProfileStyleUpdatedEvent>? _profileStyleSub;
   StreamSubscription<Map<String, dynamic>>? _channelInboxSub;
+  StreamSubscription<Map<String, dynamic>>? _inboxForYouSub;
   Timer? _inboxPollTimer;
 
   final Set<String> _followingUserIds = {};
@@ -55,6 +59,7 @@ class MessagesController extends ChangeNotifier {
   String? _myDisplayName;
   String? _myUsername;
   String? _myAvatarUrl;
+  DisplayNameStyle _myDisplayNameStyle = const DisplayNameStyle();
   bool _myOnline = true;
   String _languageCode = 'vi';
 
@@ -93,6 +98,7 @@ class MessagesController extends ChangeNotifier {
   String? get myDisplayName => _myDisplayName;
   String? get myUsername => _myUsername;
   String? get myAvatarUrl => _myAvatarUrl;
+  DisplayNameStyle get myDisplayNameStyle => _myDisplayNameStyle;
   bool get myOnline => _myOnline;
   String get languageCode => _languageCode;
 
@@ -105,13 +111,25 @@ class MessagesController extends ChangeNotifier {
     await DirectMessagesRealtimeService.connect();
     await ChannelMessagesRealtimeService.connect();
     _channelInboxSub = ChannelMessagesRealtimeService.channelNotifications.listen(
-      (_) => refreshInboxCount(),
+      (payload) {
+        MessageNotificationSound.play();
+        refreshInboxCount();
+      },
+    );
+    _inboxForYouSub = ChannelMessagesRealtimeService.inboxForYouItems.listen(
+      (_) {
+        MessageNotificationSound.play();
+        refreshInboxCount();
+      },
     );
     _newMessageSub = DirectMessagesRealtimeService.newMessages.listen(
       _onNewMessage,
     );
     _unreadSub = DirectMessagesRealtimeService.unreadCounts.listen(
       _onUnreadCount,
+    );
+    _blockUpdatedSub = DirectMessagesRealtimeService.blockUpdated.listen(
+      _onBlockUpdatedEvent,
     );
     _presenceSub = DirectMessagesRealtimeService.presences.listen(_onPresence);
     _reactionSub = DirectMessagesRealtimeService.reactions.listen(_onReactionEvent);
@@ -174,6 +192,8 @@ class MessagesController extends ChangeNotifier {
           isOnline: t.isOnline,
           lastSeenAt: t.lastSeenAt,
         ),
+        category: t.category,
+        isFollowing: t.isFollowing,
       );
     }
   }
@@ -213,6 +233,7 @@ class MessagesController extends ChangeNotifier {
       _myUsername =
           (data['chatUsername'] ?? data['username'] ?? '').toString().trim();
       _myAvatarUrl = (data['avatarUrl'] ?? data['avatar'])?.toString();
+      _myDisplayNameStyle = DisplayNameStyle.fromProfile(data);
       notifyListeners();
     } catch (_) {}
   }
@@ -221,12 +242,14 @@ class MessagesController extends ChangeNotifier {
     LanguageController.instance.removeListener(_onLanguageChanged);
     await _newMessageSub?.cancel();
     await _unreadSub?.cancel();
+    await _blockUpdatedSub?.cancel();
     await _presenceSub?.cancel();
     await _reactionSub?.cancel();
     await _deletedSub?.cancel();
     await _messagesReadSub?.cancel();
     await _profileStyleSub?.cancel();
     await _channelInboxSub?.cancel();
+    await _inboxForYouSub?.cancel();
     _inboxPollTimer?.cancel();
     // Do not disconnect the shared DM socket here. [DmCallManager] needs it
     // app-wide for incoming calls while the user is on Home / social tabs.
@@ -269,6 +292,14 @@ class MessagesController extends ChangeNotifier {
         ..addAll(following.map((c) => c.userId));
       for (final c in conversations) {
         final peerId = c.userId;
+        if (c.isBlockedByMe) {
+          _blockedUsers.add(peerId);
+        }
+        if (c.isBlockedByPeer) {
+          _blockedByPeerUsers.add(peerId);
+        } else {
+          _blockedByPeerUsers.remove(peerId);
+        }
         if (c.lastMessageAt != null) {
           final ms = c.lastMessageAt!.millisecondsSinceEpoch;
           final prev = _peerLastActivityMs[peerId] ?? 0;
@@ -295,6 +326,9 @@ class MessagesController extends ChangeNotifier {
                 isOnline: c.isOnline,
                 lastSeenAt: c.lastActiveAt,
               ),
+              category: c.category,
+              isFollowing:
+                  c.isFollowing || _followingUserIds.contains(c.userId),
             ),
           ),
         );
@@ -358,6 +392,8 @@ class MessagesController extends ChangeNotifier {
           isPinned: t.isPinned,
           lastSeenAt: t.lastSeenAt,
           presenceLabel: t.presenceLabel,
+          category: t.category,
+          isFollowing: t.isFollowing,
         );
       }
       notifyListeners();
@@ -382,6 +418,8 @@ class MessagesController extends ChangeNotifier {
         isPinned: _threads[idx].isPinned,
         lastSeenAt: _threads[idx].lastSeenAt,
         presenceLabel: _threads[idx].presenceLabel,
+        category: _threads[idx].category,
+        isFollowing: _threads[idx].isFollowing,
       );
       _recalcTotalUnread();
       notifyListeners();
@@ -640,6 +678,25 @@ class MessagesController extends ChangeNotifier {
   }
 
   void _onProfileStyleUpdated(DmProfileStyleUpdatedEvent event) {
+    final myId = _myUserId ?? DirectMessagesService.currentUserId;
+    if (myId != null && event.userId == myId) {
+      if (event.displayName != null) {
+        _myDisplayName = event.displayName!.trim();
+      }
+      if (event.username != null) {
+        _myUsername = event.username!.trim();
+      }
+      if (event.avatarUrl != null) {
+        _myAvatarUrl = event.avatarUrl;
+      }
+      _myDisplayNameStyle = _myDisplayNameStyle.copyWith(
+        fontId: event.displayNameFontId,
+        effectId: event.displayNameEffectId,
+        primaryHex: event.displayNamePrimaryHex,
+        accentHex: event.displayNameAccentHex,
+      );
+    }
+
     final idx = _threads.indexWhere((t) => t.id == event.userId);
     if (idx != -1) {
       final t = _threads[idx];
@@ -655,6 +712,8 @@ class MessagesController extends ChangeNotifier {
         isPinned: t.isPinned,
         lastSeenAt: t.lastSeenAt,
         presenceLabel: t.presenceLabel,
+        category: t.category,
+        isFollowing: t.isFollowing,
       );
     }
     for (final entry in _messagesByUser.entries) {
@@ -778,6 +837,8 @@ class MessagesController extends ChangeNotifier {
       isPinned: t.isPinned,
       lastSeenAt: t.lastSeenAt,
       presenceLabel: t.presenceLabel,
+      category: t.category,
+      isFollowing: t.isFollowing,
     );
   }
 
@@ -826,12 +887,53 @@ class MessagesController extends ChangeNotifier {
 
   bool isUserBlocked(String userId) => _blockedUsers.contains(userId);
 
+  bool isUserBlockedByPeer(String userId) => _blockedByPeerUsers.contains(userId);
+
+  void _onBlockUpdatedEvent(DmBlockUpdatedEvent event) {
+    if (event.direction == 'outgoing') {
+      final peerId = event.peerId;
+      if (peerId == null || peerId.isEmpty) return;
+      if (event.blocked) {
+        _blockedUsers.add(peerId);
+      } else {
+        _blockedUsers.remove(peerId);
+      }
+    } else {
+      final blockerId = event.blockerId;
+      if (blockerId == null || blockerId.isEmpty) return;
+      if (event.blocked) {
+        _blockedByPeerUsers.add(blockerId);
+      } else {
+        _blockedByPeerUsers.remove(blockerId);
+      }
+    }
+    notifyListeners();
+  }
+
   Future<void> refreshBlockedUsers() async {
     try {
       final blocked = await DirectMessagesService.getBlockedUserIds();
       _blockedUsers
         ..clear()
         ..addAll(blocked);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> refreshDmBlockStateFromApi() async {
+    try {
+      final conversations = await DirectMessagesService.getConversations();
+      final blocked = await DirectMessagesService.getBlockedUserIds();
+      _blockedUsers
+        ..clear()
+        ..addAll(blocked);
+      _blockedByPeerUsers
+        ..clear()
+        ..addAll(
+          conversations
+              .where((c) => c.isBlockedByPeer)
+              .map((c) => c.userId),
+        );
       notifyListeners();
     } catch (_) {}
   }
@@ -845,6 +947,57 @@ class MessagesController extends ChangeNotifier {
   Future<void> unblockUser(String userId) async {
     await DirectMessagesService.unblockUser(userId);
     _blockedUsers.remove(userId);
+    notifyListeners();
+  }
+
+  Future<void> unfollowUser(String userId) async {
+    await DirectMessagesService.unfollowUser(userId);
+    _followingUserIds.remove(userId);
+    final idx = _threads.indexWhere((e) => e.id == userId);
+    if (idx != -1) {
+      final t = _threads[idx];
+      _threads[idx] = MessageThread(
+        id: t.id,
+        name: t.name,
+        lastMessage: t.lastMessage,
+        lastActiveLabel: t.lastActiveLabel,
+        unreadCount: t.unreadCount,
+        avatarUrl: t.avatarUrl,
+        isOnline: t.isOnline,
+        isPinned: t.isPinned,
+        lastSeenAt: t.lastSeenAt,
+        presenceLabel: t.presenceLabel,
+        category: t.category,
+        isFollowing: false,
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> setConversationCategory(String userId, String? category) async {
+    await DirectMessagesService.patchConversationPreferences(
+      userId,
+      category: category,
+      clearCategory: category == null,
+    );
+    final idx = _threads.indexWhere((e) => e.id == userId);
+    if (idx != -1) {
+      final t = _threads[idx];
+      _threads[idx] = MessageThread(
+        id: t.id,
+        name: t.name,
+        lastMessage: t.lastMessage,
+        lastActiveLabel: t.lastActiveLabel,
+        unreadCount: t.unreadCount,
+        avatarUrl: t.avatarUrl,
+        isOnline: t.isOnline,
+        isPinned: t.isPinned,
+        lastSeenAt: t.lastSeenAt,
+        presenceLabel: t.presenceLabel,
+        category: category,
+        isFollowing: t.isFollowing,
+      );
+    }
     notifyListeners();
   }
 
@@ -931,6 +1084,8 @@ class MessagesController extends ChangeNotifier {
       isPinned: current.isPinned,
       lastSeenAt: lastSeen,
       presenceLabel: nextLabel,
+      category: current.category,
+      isFollowing: current.isFollowing,
     );
     notifyListeners();
   }
@@ -973,6 +1128,8 @@ class MessagesController extends ChangeNotifier {
           isPinned: t.isPinned,
           lastSeenAt: t.lastSeenAt,
           presenceLabel: t.presenceLabel,
+          category: t.category,
+          isFollowing: t.isFollowing,
         );
       }
     }
@@ -1020,6 +1177,8 @@ class MessagesController extends ChangeNotifier {
       isPinned: current.isPinned,
       lastSeenAt: current.lastSeenAt,
       presenceLabel: current.presenceLabel,
+      category: current.category,
+      isFollowing: current.isFollowing,
     );
     _sortThreads();
   }

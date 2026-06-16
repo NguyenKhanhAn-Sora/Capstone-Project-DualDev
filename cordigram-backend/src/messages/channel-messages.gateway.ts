@@ -130,13 +130,51 @@ export class ChannelMessagesGateway
     });
   }
 
+  /**
+   * Realtime push for inbox «Dành cho bạn» items (events, role notifications).
+   * Delivered on the messages socket only — not the social notifications namespace.
+   */
+  emitInboxForYouItem(
+    recipientUserIds: string[],
+    payload: Record<string, unknown>,
+    excludeUserId?: string,
+  ): void {
+    const seen = new Set<string>();
+    const exclude = excludeUserId ? String(excludeUserId).trim() : '';
+    for (const raw of recipientUserIds) {
+      const uid = String(raw ?? '').trim();
+      if (!uid || seen.has(uid)) continue;
+      if (exclude && uid === exclude) continue;
+      seen.add(uid);
+      this.emitToUser(uid, 'inbox-for-you-item', payload);
+    }
+  }
+
+  /** Interaction settings changed (e.g. sticker welcome replies toggled). */
+  emitInteractionSettingsUpdated(
+    recipientUserIds: string[],
+    payload: {
+      serverId: string;
+      systemChannelId: string | null;
+      stickerReplyWelcomeEnabled: boolean;
+    },
+  ): void {
+    const seen = new Set<string>();
+    for (const raw of recipientUserIds) {
+      const uid = String(raw ?? '').trim();
+      if (!uid || seen.has(uid)) continue;
+      seen.add(uid);
+      this.emitToUser(uid, 'interaction-settings-updated', payload);
+    }
+  }
+
   /** Join applications: notify connected owner/members/applicant without page reload. */
   emitJoinApplicationUpdated(
     recipientUserIds: string[],
     payload: {
       serverId: string;
       userId: string;
-      status: 'accepted' | 'rejected' | 'withdrawn';
+      status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
     },
   ): void {
     const seen = new Set<string>();

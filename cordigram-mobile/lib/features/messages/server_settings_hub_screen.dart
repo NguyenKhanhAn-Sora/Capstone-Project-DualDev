@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/services/language_controller.dart';
-import '../../core/theme/app_theme_context.dart';
 import 'widgets/messages_chrome_builder.dart';
 import 'models/server_models.dart';
 import 'models/server_permissions.dart';
@@ -12,7 +11,6 @@ import 'server_roles_screen.dart';
 import 'server_settings/server_access_screen.dart';
 import 'server_settings/server_automod_screen.dart';
 import 'server_settings/server_bans_screen.dart';
-import 'server_settings/server_audit_log_screen.dart';
 import 'server_settings/server_community_screen.dart';
 import 'server_settings/server_emoji_screen.dart';
 import 'server_settings/server_interaction_screen.dart';
@@ -378,13 +376,6 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
               ),
             ),
           ),
-          if (canManageSettings) ...[
-            const SizedBox(height: 8),
-            _tile(
-              'Nhật ký chỉnh sửa',
-              () => _push(ServerAuditLogScreen(serverId: _server.id)),
-            ),
-          ],
           Divider(height: 28, color: Theme.of(context).dividerColor),
           _sectionTitle('CỘNG ĐỒNG'),
           _tile(

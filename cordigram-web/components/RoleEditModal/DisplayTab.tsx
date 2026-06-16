@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useCallback } from "react";
 import styles from "./DisplayTab.module.css";
 import type { Role } from "@/lib/servers-api";
@@ -45,7 +46,7 @@ export default function DisplayTab({
       });
       onUpdate(updated);
     } catch (err) {
-      alert(err instanceof Error ? err.message : t("chat.roleDisplay.saveFailed"));
+      appAlert(err instanceof Error ? err.message : t("chat.roleDisplay.saveFailed"));
     } finally {
       setSaving(false);
     }

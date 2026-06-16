@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, {
   useCallback,
   useEffect,
@@ -618,7 +619,7 @@ export default function ChannelUserProfileRoot({
 
   const handleBlock = useCallback(async () => {
     if (!friend) return;
-    if (!window.confirm(t("chat.channelUserProfile.toastBlockConfirm"))) return;
+    if (!await appConfirm(t("chat.channelUserProfile.toastBlockConfirm"))) return;
     try {
       await blockUser({ token, userId: friend._id });
       toast(t("chat.channelUserProfile.toastBlocked"));

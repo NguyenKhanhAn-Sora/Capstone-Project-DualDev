@@ -327,6 +327,9 @@ export class UsersService {
   async updateCurrentDevicePushToken(params: {
     userId: string;
     deviceId?: string;
+    userAgent?: string;
+    deviceInfo?: string;
+    ip?: string;
     token?: string | null;
   }): Promise<{ ok: true }> {
     const user = await this.userModel
@@ -346,10 +349,26 @@ export class UsersService {
     const token = params.token?.trim() ?? '';
     const nextToken = token.length ? token : null;
 
-    const current = user.loginDevices ?? [];
-    const idx = current.findIndex((d) => d.deviceIdHash === deviceIdHash);
+    let current = user.loginDevices ?? [];
+    let idx = current.findIndex((d) => d.deviceIdHash === deviceIdHash);
     if (idx < 0) {
-      throw new NotFoundException('Device session not found');
+      await this.recordLoginDevice({
+        userId: params.userId,
+        deviceId,
+        userAgent: params.userAgent,
+        deviceInfo: params.deviceInfo,
+        ip: params.ip,
+        loginMethod: 'mobile',
+      });
+      const refreshed = await this.userModel
+        .findById(params.userId)
+        .select('loginDevices')
+        .exec();
+      current = refreshed?.loginDevices ?? [];
+      idx = current.findIndex((d) => d.deviceIdHash === deviceIdHash);
+      if (idx < 0) {
+        throw new NotFoundException('Device session not found');
+      }
     }
 
     const next = [...current];
@@ -1785,6 +1804,7 @@ export class UsersService {
     sharePresence: boolean;
     accountBoost: boolean;
     chatSoundEnabled: boolean;
+    chatDesktopNotificationsEnabled: boolean;
   }> {
     const user = await this.userModel
       .findById(userId)
@@ -1819,6 +1839,8 @@ export class UsersService {
       sharePresence: (s?.sharePresence as boolean | undefined) !== false,
       accountBoost: (s?.accountBoost as boolean | undefined) === true,
       chatSoundEnabled: (s?.chatSoundEnabled as boolean | undefined) !== false,
+      chatDesktopNotificationsEnabled:
+        (s?.chatDesktopNotificationsEnabled as boolean | undefined) !== false,
     };
   }
 
@@ -2451,6 +2473,7 @@ export class UsersService {
     sharePresence?: boolean;
     accountBoost?: boolean;
     chatSoundEnabled?: boolean;
+    chatDesktopNotificationsEnabled?: boolean;
   }): Promise<{
     theme: 'light' | 'dark';
     language: 'vi' | 'en' | 'ja' | 'zh';
@@ -2463,6 +2486,7 @@ export class UsersService {
     sharePresence: boolean;
     accountBoost: boolean;
     chatSoundEnabled: boolean;
+    chatDesktopNotificationsEnabled: boolean;
   }> {
     const update: Record<string, unknown> = {};
     if (params.theme) {
@@ -2499,6 +2523,10 @@ export class UsersService {
     }
     if (params.chatSoundEnabled !== undefined) {
       update['settings.chatSoundEnabled'] = params.chatSoundEnabled;
+    }
+    if (params.chatDesktopNotificationsEnabled !== undefined) {
+      update['settings.chatDesktopNotificationsEnabled'] =
+        params.chatDesktopNotificationsEnabled;
     }
 
     if (!Object.keys(update).length) {

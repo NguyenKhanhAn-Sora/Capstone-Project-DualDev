@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useEffect, useMemo, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./ServerAccessSection.module.css";
@@ -358,7 +359,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
 
   const handleDeleteRule = async (ruleId: string) => {
     if (!canEdit) return;
-    if (!window.confirm(t("chat.serverAccess.ruleDeleteConfirm"))) return;
+    if (!await appConfirm(t("chat.serverAccess.ruleDeleteConfirm"))) return;
     setSaving(true);
     setError(null);
     try {

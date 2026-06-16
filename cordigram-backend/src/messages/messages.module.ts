@@ -21,12 +21,14 @@ import { User, UserSchema } from '../users/user.schema';
 import { MediaModerationService } from '../posts/media-moderation.service';
 import { BoostModule } from '../boost/boost.module';
 import { LinkPreviewService } from '../comment/link-preview.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     forwardRef(() => UsersModule),
     forwardRef(() => RolesModule),
     forwardRef(() => BoostModule),
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Message.name, schema: MessageSchema },
       { name: ChannelReadState.name, schema: ChannelReadStateSchema },

@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Post,
   Patch,
@@ -10,6 +11,7 @@ import {
   Req,
   UseGuards,
   UnauthorizedException,
+  forwardRef,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -40,6 +42,7 @@ import { ActivityType } from '../activity/activity.schema';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
 import { UpdatePushTokenDto } from './dto/update-push-token.dto';
 import { type SupportedLanguage } from './language.constants';
+import { DirectMessagesGateway } from '../direct-messages/direct-messages.gateway';
 
 @Controller('users')
 @UseGuards(OptionalJwtAuthGuard)
@@ -50,6 +53,8 @@ export class UsersController {
     private readonly ignoredService: IgnoredService,
     private readonly mentionMuteService: MentionMuteService,
     private readonly authService: AuthService,
+    @Inject(forwardRef(() => DirectMessagesGateway))
+    private readonly directMessagesGateway: DirectMessagesGateway,
   ) {}
 
   @Post('mention-mutes')
@@ -333,6 +338,7 @@ export class UsersController {
       sharePresence: dto.sharePresence,
       accountBoost: dto.accountBoost,
       chatSoundEnabled: dto.chatSoundEnabled,
+      chatDesktopNotificationsEnabled: dto.chatDesktopNotificationsEnabled,
       appearanceBackground: dto.appearanceBackground,
     });
   }
@@ -368,6 +374,9 @@ export class UsersController {
     return this.usersService.updateCurrentDevicePushToken({
       userId,
       deviceId: req.headers['x-device-id'] as string | undefined,
+      userAgent: req.headers['user-agent'] as string | undefined,
+      deviceInfo: req.headers['x-device-info'] as string | undefined,
+      ip: (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim(),
       token: dto.token ?? null,
     });
   }
@@ -607,7 +616,17 @@ export class UsersController {
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
     }
-    return this.blocksService.block(userId, targetUserId);
+    const result = await this.blocksService.block(userId, targetUserId);
+    try {
+      this.directMessagesGateway.emitDmBlockUpdated({
+        blockerId: userId,
+        blockedId: targetUserId,
+        blocked: true,
+      });
+    } catch {
+      // ignore socket emit errors
+    }
+    return result;
   }
 
   @Delete(':id/block')
@@ -619,7 +638,17 @@ export class UsersController {
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
     }
-    return this.blocksService.unblock(userId, targetUserId);
+    const result = await this.blocksService.unblock(userId, targetUserId);
+    try {
+      this.directMessagesGateway.emitDmBlockUpdated({
+        blockerId: userId,
+        blockedId: targetUserId,
+        blocked: false,
+      });
+    } catch {
+      // ignore socket emit errors
+    }
+    return result;
   }
 
   @Post(':id/ignore')

@@ -1,8 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+
+import '../../../core/config/app_config.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
+import 'messages_media_service.dart';
 import '../models/dm_conversation.dart';
 import '../models/dm_message.dart';
 import 'dm_mute_prefs_store.dart';
@@ -117,6 +122,74 @@ class DirectMessagesService {
         mutedUntilIso: mutedUntilIso,
         mutedForever: forever,
       ),
+    );
+    unawaited(
+      patchConversationPreferences(
+        peerUserId,
+        mutedUntil: duration == null && !forever ? null : mutedUntilIso,
+        mutedForever: forever ? true : (duration == null ? false : null),
+        clearMute: duration == null && !forever,
+      ),
+    );
+  }
+
+  static Future<Map<String, dynamic>> patchConversationPreferences(
+    String peerUserId, {
+    String? mutedUntil,
+    bool? mutedForever,
+    String? category,
+    bool clearCategory = false,
+    bool clearMute = false,
+  }) async {
+    final body = <String, dynamic>{};
+    if (clearMute) {
+      body['mutedUntil'] = null;
+      body['mutedForever'] = false;
+    } else {
+      if (mutedUntil != null) body['mutedUntil'] = mutedUntil;
+      if (mutedForever != null) body['mutedForever'] = mutedForever;
+    }
+    if (clearCategory) {
+      body['category'] = null;
+    } else if (category != null) {
+      body['category'] = category;
+    }
+    return ApiService.patch(
+      '/direct-messages/conversations/$peerUserId/preferences',
+      body: body,
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static void applyConversationPreferencesFromApi(
+    String peerUserId,
+    Map<String, dynamic>? prefs,
+  ) {
+    if (peerUserId.trim().isEmpty || prefs == null) return;
+    final forever = prefs['mutedForever'] == true;
+    final untilRaw = prefs['mutedUntil']?.toString();
+    if (forever) {
+      _dmMutedForever.add(peerUserId);
+      _dmMutedUntil.remove(peerUserId);
+      return;
+    }
+    _dmMutedForever.remove(peerUserId);
+    if (untilRaw == null || untilRaw.isEmpty) {
+      _dmMutedUntil.remove(peerUserId);
+      return;
+    }
+    final until = DateTime.tryParse(untilRaw);
+    if (until != null && until.isAfter(DateTime.now())) {
+      _dmMutedUntil[peerUserId] = until;
+    } else {
+      _dmMutedUntil.remove(peerUserId);
+    }
+  }
+
+  static Future<void> unfollowUser(String targetUserId) async {
+    await ApiService.delete(
+      '/users/$targetUserId/follow',
+      extraHeaders: _authHeaders,
     );
   }
 
@@ -327,6 +400,50 @@ class DirectMessagesService {
     );
   }
 
+  static const _messagesUploadHeader = {
+    'x-cordigram-upload-context': 'messages',
+  };
+
+  static Future<Map<String, dynamic>> uploadMessagingProfileAvatar(
+    String filePath, {
+    String? contentType,
+  }) async {
+    final ct = MessagesMediaService.resolveUploadContentType(
+      filePath: filePath,
+      hintedContentType: contentType,
+    );
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/messaging-profiles/avatar/upload');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll({..._authHeaders, ..._messagesUploadHeader})
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'original',
+          filePath,
+          contentType: MediaType.parse(ct),
+        ),
+      )
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'cropped',
+          filePath,
+          contentType: MediaType.parse(ct),
+        ),
+      );
+    final streamed = await request.send().timeout(const Duration(seconds: 120));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Avatar upload failed (${response.statusCode})');
+  }
+
+  static Future<Map<String, dynamic>> resetMessagingProfileAvatar() async {
+    return ApiService.delete(
+      '/messaging-profiles/avatar',
+      extraHeaders: _authHeaders,
+    );
+  }
+
   static Future<List<DmConversation>> searchConversations(String query) async {
     final encoded = Uri.encodeQueryComponent(query);
     final res = await ApiService.get(
@@ -448,6 +565,26 @@ class DirectMessagesService {
         avatarUrl: conv.avatarUrl ?? existing.avatarUrl,
         isOnline: conv.isOnline || existing.isOnline,
         lastActiveAt: conv.lastActiveAt ?? existing.lastActiveAt,
+        lastMessageType: conv.lastMessageType ?? existing.lastMessageType,
+        lastCallType: conv.lastCallType ?? existing.lastCallType,
+        lastCallStatus: conv.lastCallStatus ?? existing.lastCallStatus,
+        lastCallDurationSec:
+            conv.lastCallDurationSec ?? existing.lastCallDurationSec,
+        lastCallInitiatorId:
+            conv.lastCallInitiatorId ?? existing.lastCallInitiatorId,
+        mutedUntil: conv.mutedUntil ?? existing.mutedUntil,
+        mutedForever: conv.mutedForever || existing.mutedForever,
+        category: conv.category ?? existing.category,
+        isFollowing: conv.isFollowing || existing.isFollowing,
+        isBlockedByMe: conv.isBlockedByMe || existing.isBlockedByMe,
+        isBlockedByPeer: conv.isBlockedByPeer || existing.isBlockedByPeer,
+      );
+      applyConversationPreferencesFromApi(
+        conv.userId,
+        {
+          'mutedUntil': conv.mutedUntil?.toIso8601String(),
+          'mutedForever': conv.mutedForever,
+        },
       );
     }
 

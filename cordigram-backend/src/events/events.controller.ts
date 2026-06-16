@@ -26,10 +26,13 @@ export class EventsController {
   }
 
   @Get()
-  async list(@Param('serverId') serverId: string) {
+  async list(
+    @Param('serverId') serverId: string,
+    @Request() req: any,
+  ) {
     const [active, upcoming] = await Promise.all([
-      this.eventsService.getActiveByServer(serverId),
-      this.eventsService.getUpcomingByServer(serverId),
+      this.eventsService.getActiveByServer(serverId, req.user.userId),
+      this.eventsService.getUpcomingByServer(serverId, req.user.userId),
     ]);
     return { active, upcoming };
   }
@@ -38,7 +41,12 @@ export class EventsController {
   async getOne(
     @Param('serverId') serverId: string,
     @Param('eventId') eventId: string,
+    @Request() req: any,
   ) {
+    await this.eventsService.assertServerMemberForUser(
+      serverId,
+      req.user.userId,
+    );
     return this.eventsService.getById(eventId);
   }
 

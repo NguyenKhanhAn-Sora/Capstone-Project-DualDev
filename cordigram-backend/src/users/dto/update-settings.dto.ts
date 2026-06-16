@@ -40,6 +40,10 @@ export class UpdateSettingsDto {
   chatSoundEnabled?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  chatDesktopNotificationsEnabled?: boolean;
+
+  @IsOptional()
   @IsString()
   @Matches(/^#[0-9A-Fa-f]{6}$/)
   appearanceBackground?: string;

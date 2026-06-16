@@ -440,6 +440,11 @@
         "noDescription": "暂无描述。"
       }
     },
+    "serverProfileDropdown": {
+      "title": "服务器资料",
+      "editProfile": "编辑服务器资料",
+      "invitePeople": "邀请成员"
+    },
     "popups": {
       "closeAria": "关闭",
       "loading": "加载中...",
@@ -1621,8 +1626,7 @@
     "welcome": {
       "title": "欢迎来到",
       "serverOf": "{name}的服务器",
-      "channelBegin": "这是",
-      "startTalking": "频道的开始。开始聊天吧！",
+      "channelIntro": "欢迎来到{serverName}。开始你的对话吧。",
       "greeting": "很高兴认识你，{name}！",
       "unknownUser": "某人",
       "waving": "发送中...",
@@ -1631,6 +1635,31 @@
     "dmList": {
       "sent": "已发送",
       "seen": "已读"
+    },
+    "dmConversation": {
+      "menuLabel": "与 {name} 的对话选项",
+      "categorize": "分类",
+      "clearCategory": "清除分类",
+      "muteNotifications": "关闭通知",
+      "unmuteNotifications": "开启通知",
+      "mute1h": "1 小时",
+      "mute4h": "4 小时",
+      "muteUntil8am": "直到 8:00 AM",
+      "muteForever": "直到我手动开启",
+      "unfollow": "取消关注",
+      "block": "屏蔽",
+      "unblock": "取消屏蔽",
+      "blockedByYou": "您已屏蔽 {name}",
+      "blockedByPeer": "您已被 {name} 屏蔽",
+      "moreActions": "选项",
+      "categories": {
+        "customer": "客户",
+        "family": "家人",
+        "work": "工作",
+        "friends": "朋友",
+        "reply_later": "稍后回复",
+        "colleague": "同事"
+      }
     },
     "mention": {
       "tooltip": "提及 (@mention)"
@@ -1887,7 +1916,17 @@
       "masterHint": "开启：正常通知。关闭：关闭所有通知（社交 + 私信/服务器）。",
       "enabledToast": "已开启通知。",
       "disabledToast": "已关闭通知。",
-      "soundLabel": "通知声音（消息与新通知）"
+      "soundLabel": "通知声音（消息与新通知）",
+      "desktopLabel": "桌面通知（Messages）",
+      "desktopHint": "在有新服务器活动或角色通知时显示系统通知。",
+      "desktopEnabledToast": "已开启桌面通知。",
+      "desktopDeniedToast": "浏览器已阻止桌面通知，请在浏览器设置中允许。",
+      "desktopDisabledToast": "已关闭桌面通知。",
+      "desktopEventTitle": "新活动：{topic}",
+      "desktopEventTitleLine": "新活动 · {server}",
+      "desktopEventBody": "开始时间 {when}",
+      "desktopRoleBody": "来自 {server} 的通知",
+      "desktopRoleTitleLine": "通知 · {server}"
     },
     "profile": {
       "title": "个人资料",

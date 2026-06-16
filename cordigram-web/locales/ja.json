@@ -440,6 +440,11 @@
         "noDescription": "説明はまだありません。"
       }
     },
+    "serverProfileDropdown": {
+      "title": "サーバープロフィール",
+      "editProfile": "サーバープロフィールを編集",
+      "invitePeople": "メンバーを招待"
+    },
     "popups": {
       "closeAria": "閉じる",
       "loading": "読み込み中...",
@@ -1621,8 +1626,7 @@
     "welcome": {
       "title": "ようこそ",
       "serverOf": "{name}のサーバーへ",
-      "channelBegin": "これが",
-      "startTalking": "チャンネルの最初です。チャットを始めましょう！",
+      "channelIntro": "{serverName}へようこそ。会話を始めましょう。",
       "greeting": "はじめまして、{name}！",
       "unknownUser": "誰か",
       "waving": "送信中...",
@@ -1631,6 +1635,31 @@
     "dmList": {
       "sent": "送信済み",
       "seen": "既読"
+    },
+    "dmConversation": {
+      "menuLabel": "{name} との会話オプション",
+      "categorize": "分類",
+      "clearCategory": "分類を解除",
+      "muteNotifications": "通知をミュート",
+      "unmuteNotifications": "通知をオンにする",
+      "mute1h": "1時間",
+      "mute4h": "4時間",
+      "muteUntil8am": "8:00 AMまで",
+      "muteForever": "手動でオンにするまで",
+      "unfollow": "フォロー解除",
+      "block": "ブロック",
+      "unblock": "ブロック解除",
+      "blockedByYou": "{name} をブロックしました",
+      "blockedByPeer": "{name} からブロックされました",
+      "moreActions": "オプション",
+      "categories": {
+        "customer": "顧客",
+        "family": "家族",
+        "work": "仕事",
+        "friends": "友達",
+        "reply_later": "後で返信",
+        "colleague": "同僚"
+      }
     },
     "mention": {
       "tooltip": "メンション (@mention)"
@@ -1887,7 +1916,17 @@
       "masterHint": "オン: 通常の通知。オフ: すべての通知を無効化（ソーシャル + DM/サーバー）。",
       "enabledToast": "通知をオンにしました。",
       "disabledToast": "通知をオフにしました。",
-      "soundLabel": "通知サウンド（メッセージ・新着通知）"
+      "soundLabel": "通知サウンド（メッセージ・新着通知）",
+      "desktopLabel": "デスクトップ通知（Messages）",
+      "desktopHint": "サーバーの新規イベントやロール通知をOS通知で表示します。",
+      "desktopEnabledToast": "デスクトップ通知を有効にしました。",
+      "desktopDeniedToast": "ブラウザがデスクトップ通知をブロックしました。ブラウザ設定で許可してください。",
+      "desktopDisabledToast": "デスクトップ通知を無効にしました。",
+      "desktopEventTitle": "新しいイベント: {topic}",
+      "desktopEventTitleLine": "新しいイベント · {server}",
+      "desktopEventBody": "開始 {when}",
+      "desktopRoleBody": "{server} からのお知らせ",
+      "desktopRoleTitleLine": "お知らせ · {server}"
     },
     "profile": {
       "title": "プロフィール",

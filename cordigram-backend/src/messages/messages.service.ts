@@ -156,6 +156,14 @@ export class MessagesService {
     };
   }
 
+  private viewerHasWavedWelcome(msg: any, viewerId?: string): boolean {
+    if (!viewerId) return false;
+    const wavedBy = Array.isArray(msg?.welcomeWavedBy) ? msg.welcomeWavedBy : [];
+    return wavedBy.some(
+      (id: any) => String(id?._id ?? id ?? '').trim() === String(viewerId),
+    );
+  }
+
   private async handleMentionSpamViolation(
     server: any,
     userId: string,
@@ -918,7 +926,7 @@ export class MessagesService {
 
     const server = await this.serverModel
       .findById(channel.serverId)
-      .select('ownerId members safetySettings isAgeRestricted')
+      .select('ownerId members safetySettings isAgeRestricted interactionSettings')
       .lean()
       .exec();
     if (!server) throw new NotFoundException('Server not found');
@@ -954,6 +962,39 @@ export class MessagesService {
       server as any,
     );
     this.assertChatGateOrThrow(gate);
+
+    const stickerReplyEnabled =
+      (server as any)?.interactionSettings?.stickerReplyWelcomeEnabled ?? true;
+    if (!stickerReplyEnabled) {
+      throw new ForbiddenException(
+        'Tính năng vẫy tay chào đã được tắt trên máy chủ này',
+      );
+    }
+
+    if (replyTo) {
+      const welcomeMsg = await this.messageModel
+        .findOne({
+          _id: new Types.ObjectId(replyTo),
+          channelId: new Types.ObjectId(channelId),
+          messageType: 'welcome',
+          isDeleted: { $ne: true },
+        })
+        .select('_id welcomeWavedBy')
+        .exec();
+      if (!welcomeMsg) {
+        throw new BadRequestException('Không tìm thấy tin nhắn chào mừng');
+      }
+      const userOid = new Types.ObjectId(userId);
+      const alreadyWaved = (welcomeMsg.welcomeWavedBy ?? []).some(
+        (id) => id.toString() === userId,
+      );
+      if (!alreadyWaved) {
+        await this.messageModel.updateOne(
+          { _id: welcomeMsg._id },
+          { $addToSet: { welcomeWavedBy: userOid } },
+        );
+      }
+    }
 
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
@@ -1070,6 +1111,7 @@ export class MessagesService {
   ): Promise<{
     serverId: string;
     serverName: string;
+    serverAvatarUrl: string | null;
     channelName: string;
     defaultNotificationLevel: 'all' | 'mentions';
     memberUserIds: string[];
@@ -1080,7 +1122,7 @@ export class MessagesService {
 
     const server = await this.serverModel
       .findById(channel.serverId)
-      .select('name members interactionSettings')
+      .select('name avatarUrl members interactionSettings')
       .lean()
       .exec();
     if (!server) return null;
@@ -1098,6 +1140,7 @@ export class MessagesService {
     return {
       serverId: (server as any)._id.toString(),
       serverName: (server as any).name,
+      serverAvatarUrl: (server as any).avatarUrl ?? null,
       channelName: channel.name,
       defaultNotificationLevel: level,
       memberUserIds,
@@ -1449,6 +1492,11 @@ export class MessagesService {
         for (const m of enriched) {
           if (m.messageType === 'welcome') {
             m.stickerReplyWelcomeEnabled = stickerReply;
+            m.welcomeWaveDismissedByMe = this.viewerHasWavedWelcome(
+              m,
+              viewerId,
+            );
+            delete m.welcomeWavedBy;
           }
         }
       }
@@ -1928,6 +1976,7 @@ export class MessagesService {
   }
 
   async searchMessages(params: {
+    viewerId: string;
     serverId?: string;
     channelId?: string;
     q?: string;
@@ -1947,6 +1996,7 @@ export class MessagesService {
     parsed?: ParsedMessageSearch;
   }> {
     const {
+      viewerId,
       serverId,
       channelId: channelIdParam,
       q,
@@ -1959,6 +2009,10 @@ export class MessagesService {
       fuzzy = false,
       parseQuery = true,
     } = params;
+
+    if (!viewerId) {
+      throw new ForbiddenException('Unauthorized');
+    }
 
     const parsed: ParsedMessageSearch =
       parseQuery && q
@@ -1983,17 +2037,42 @@ export class MessagesService {
     }
 
     if (resolvedChannelId) {
+      const canView = await this.userCanJoinChannelRoom(
+        resolvedChannelId,
+        viewerId,
+      );
+      if (!canView) {
+        throw new ForbiddenException('Bạn không được phép tìm kiếm trong kênh này');
+      }
       match.channelId = new Types.ObjectId(resolvedChannelId);
     } else if (serverId) {
+      const isMember = await this.serverModel.exists({
+        _id: new Types.ObjectId(serverId),
+        'members.userId': new Types.ObjectId(viewerId),
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      });
+      if (!isMember) {
+        throw new ForbiddenException('Bạn không thuộc máy chủ này');
+      }
       const channels = await this.channelModel
         .find({ serverId: new Types.ObjectId(serverId) })
         .select('_id')
         .lean()
         .exec();
-      const channelIds = channels.map((c) => c._id);
-      if (channelIds.length === 0)
+      const accessibleChannelIds: Types.ObjectId[] = [];
+      for (const channel of channels) {
+        const channelIdStr = channel._id.toString();
+        if (await this.userCanJoinChannelRoom(channelIdStr, viewerId)) {
+          accessibleChannelIds.push(channel._id);
+        }
+      }
+      if (accessibleChannelIds.length === 0)
         return { results: [], totalCount: 0, parsed };
-      match.channelId = { $in: channelIds };
+      match.channelId = { $in: accessibleChannelIds };
+    } else {
+      throw new ForbiddenException(
+        'Cần serverId hoặc channelId để tìm kiếm tin nhắn kênh',
+      );
     }
 
     let resolvedSenderId = senderIdParam;

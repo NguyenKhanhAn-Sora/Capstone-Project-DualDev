@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useRef } from "react";
 import styles from "./RoleEditModal.module.css";
 import type { Role } from "@/lib/servers-api";
@@ -93,7 +94,7 @@ export default function RoleEditModal({
     const roleToDelete = contextMenu.role;
     setContextMenu(null);
     
-    if (!window.confirm(t("chat.roleEditor.confirmDeleteRole", { name: roleToDelete.name }))) {
+    if (!await appConfirm(t("chat.roleEditor.confirmDeleteRole", { name: roleToDelete.name }))) {
       return;
     }
     try {
@@ -107,7 +108,7 @@ export default function RoleEditModal({
         }
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : t("chat.roleEditor.errorDeleteRole"));
+      appAlert(err instanceof Error ? err.message : t("chat.roleEditor.errorDeleteRole"));
     }
   };
 
@@ -126,7 +127,7 @@ export default function RoleEditModal({
       setSelectedRoleId(newRole._id);
       onCreate(newRole);
     } catch (err) {
-      alert(err instanceof Error ? err.message : t("chat.roleEditor.errorCreateRole"));
+      appAlert(err instanceof Error ? err.message : t("chat.roleEditor.errorCreateRole"));
     }
   };
 
@@ -139,7 +140,7 @@ export default function RoleEditModal({
 
   const handleRoleDelete = async () => {
     if (!isOwner || selectedRole.isDefault) return;
-    if (!window.confirm(t("chat.roleEditor.confirmDeleteRole", { name: selectedRole.name }))) {
+    if (!await appConfirm(t("chat.roleEditor.confirmDeleteRole", { name: selectedRole.name }))) {
       return;
     }
     try {
@@ -151,7 +152,7 @@ export default function RoleEditModal({
         setSelectedRoleId(remaining[0]._id);
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : t("chat.roleEditor.errorDeleteRole"));
+      appAlert(err instanceof Error ? err.message : t("chat.roleEditor.errorDeleteRole"));
     }
   };
 

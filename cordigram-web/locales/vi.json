@@ -441,6 +441,11 @@
         "noDescription": "Chưa có mô tả."
       }
     },
+    "serverProfileDropdown": {
+      "title": "Hồ sơ máy chủ",
+      "editProfile": "Chỉnh sửa hồ sơ máy chủ",
+      "invitePeople": "Mời thành viên"
+    },
     "popups": {
       "closeAria": "Đóng",
       "loading": "Đang tải...",
@@ -1622,8 +1627,7 @@
     "welcome": {
       "title": "Chào mừng đến với",
       "serverOf": "Máy chủ của {name}",
-      "channelBegin": "Đây là khởi đầu của kênh",
-      "startTalking": ". Hãy bắt đầu cuộc trò chuyện!",
+      "channelIntro": "Chào mừng bạn đến {serverName}. Hãy bắt đầu cuộc trò chuyện của bạn.",
       "greeting": "Rất vui được gặp bạn, {name}!",
       "unknownUser": "Ai đó",
       "waving": "Đang gửi...",
@@ -1632,6 +1636,31 @@
     "dmList": {
       "sent": "Đã gửi",
       "seen": "Đã xem"
+    },
+    "dmConversation": {
+      "menuLabel": "Tùy chọn hội thoại với {name}",
+      "categorize": "Phân loại",
+      "clearCategory": "Bỏ phân loại",
+      "muteNotifications": "Tắt thông báo",
+      "unmuteNotifications": "Bật lại thông báo",
+      "mute1h": "Trong 1 giờ",
+      "mute4h": "Trong 4 giờ",
+      "muteUntil8am": "Cho đến 8:00 AM",
+      "muteForever": "Cho đến khi được mở lại",
+      "unfollow": "Bỏ theo dõi",
+      "block": "Chặn",
+      "unblock": "Bỏ chặn",
+      "blockedByYou": "Bạn đã chặn {name}",
+      "blockedByPeer": "Bạn đã bị {name} chặn",
+      "moreActions": "Tùy chọn",
+      "categories": {
+        "customer": "Khách hàng",
+        "family": "Gia đình",
+        "work": "Công việc",
+        "friends": "Bạn bè",
+        "reply_later": "Trả lời sau",
+        "colleague": "Đồng nghiệp"
+      }
     },
     "applyPending": {
       "title": "Đơn đăng ký tham gia {server} của bạn đang được xem xét!",
@@ -1885,7 +1914,17 @@
       "masterHint": "Bật: thông báo bình thường. Tắt: tắt mọi thông báo (social + DM/server qua cài đặt tài khoản).",
       "enabledToast": "Đã bật thông báo.",
       "disabledToast": "Đã tắt thông báo.",
-      "soundLabel": "Âm thanh thông báo (tin & thông báo mới)"
+      "soundLabel": "Âm thanh thông báo (tin & thông báo mới)",
+      "desktopLabel": "Thông báo desktop (Messages)",
+      "desktopHint": "Hiện thông báo hệ điều hành khi có sự kiện mới hoặc thông báo vai trò trong máy chủ.",
+      "desktopEnabledToast": "Đã bật thông báo desktop.",
+      "desktopDeniedToast": "Trình duyệt đã chặn thông báo desktop. Hãy bật lại trong cài đặt trình duyệt.",
+      "desktopDisabledToast": "Đã tắt thông báo desktop.",
+      "desktopEventTitle": "Sự kiện mới: {topic}",
+      "desktopEventTitleLine": "Sự kiện mới · {server}",
+      "desktopEventBody": "Bắt đầu {when}",
+      "desktopRoleBody": "Thông báo từ {server}",
+      "desktopRoleTitleLine": "Thông báo · {server}"
     },
     "profile": {
       "title": "Hồ sơ",

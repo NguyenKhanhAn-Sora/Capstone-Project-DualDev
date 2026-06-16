@@ -1,5 +1,5 @@
 "use client";
-
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import { useLanguage } from "@/component/language-provider";
@@ -99,12 +99,14 @@ interface ServerInteractionsSectionProps {
   serverId: string;
   canManageSettings: boolean;
   textChannels: serversApi.Channel[];
+  onSettingsChange?: (settings: serversApi.ServerInteractionSettings) => void;
 }
 
 export default function ServerInteractionsSection({
   serverId,
   canManageSettings,
   textChannels,
+  onSettingsChange,
 }: ServerInteractionsSectionProps) {
   const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
@@ -160,6 +162,7 @@ export default function ServerInteractionsSection({
     try {
       const next = await serversApi.updateInteractionSettings(serverId, patch);
       setSettings(next);
+      onSettingsChange?.(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("chat.serverInteractions.saveError"));
     } finally {
@@ -188,7 +191,7 @@ export default function ServerInteractionsSection({
       });
       setNotifTitle("");
       setNotifContent("");
-      window.alert(t("chat.serverInteractions.sentAlert").replace("{n}", String(res.recipients)));
+      appAlert(t("chat.serverInteractions.sentAlert").replace("{n}", String(res.recipients)));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("chat.serverInteractions.sendError"));
     } finally {

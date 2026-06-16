@@ -25,12 +25,20 @@ class DmProfileStyleUpdatedEvent {
     this.displayName,
     this.username,
     this.avatarUrl,
+    this.displayNameFontId,
+    this.displayNameEffectId,
+    this.displayNamePrimaryHex,
+    this.displayNameAccentHex,
   });
 
   final String userId;
   final String? displayName;
   final String? username;
   final String? avatarUrl;
+  final String? displayNameFontId;
+  final String? displayNameEffectId;
+  final String? displayNamePrimaryHex;
+  final String? displayNameAccentHex;
 }
 
 class DmUnreadCountEvent {
@@ -43,6 +51,20 @@ class DmUnreadCountEvent {
   final int totalUnread;
   final String? fromUserId;
   final int? conversationUnread;
+}
+
+class DmBlockUpdatedEvent {
+  const DmBlockUpdatedEvent({
+    required this.blocked,
+    this.blockerId,
+    this.peerId,
+    this.direction,
+  });
+
+  final bool blocked;
+  final String? blockerId;
+  final String? peerId;
+  final String? direction;
 }
 
 class DmCallEvent {
@@ -85,6 +107,35 @@ class DmCallIncomingDismissEvent {
   final String reason;
 }
 
+class DmCallSessionSyncItem {
+  const DmCallSessionSyncItem({
+    required this.callId,
+    required this.peerId,
+    required this.role,
+    required this.state,
+    required this.type,
+    this.roomId,
+  });
+
+  final String callId;
+  final String peerId;
+  final String role; // caller | callee
+  final String state;
+  final String type; // audio | video
+  final String? roomId;
+
+  factory DmCallSessionSyncItem.fromJson(Map<String, dynamic> json) {
+    return DmCallSessionSyncItem(
+      callId: (json['callId'] ?? '').toString(),
+      peerId: (json['peerId'] ?? '').toString(),
+      role: (json['role'] ?? '').toString(),
+      state: (json['state'] ?? '').toString(),
+      type: (json['type'] ?? 'audio').toString(),
+      roomId: json['roomId']?.toString(),
+    );
+  }
+}
+
 class DirectMessagesRealtimeService {
   DirectMessagesRealtimeService._();
 
@@ -95,6 +146,8 @@ class DirectMessagesRealtimeService {
       StreamController<DmMessage>.broadcast();
   static final StreamController<DmUnreadCountEvent> _unreadController =
       StreamController<DmUnreadCountEvent>.broadcast();
+  static final StreamController<DmBlockUpdatedEvent> _blockUpdatedController =
+      StreamController<DmBlockUpdatedEvent>.broadcast();
   static final StreamController<PresenceState> _presenceController =
       StreamController<PresenceState>.broadcast();
   static final StreamController<Map<String, dynamic>> _reactionController =
@@ -108,6 +161,9 @@ class DirectMessagesRealtimeService {
   static final StreamController<DmCallIncomingDismissEvent>
       _callIncomingDismissController =
       StreamController<DmCallIncomingDismissEvent>.broadcast();
+  static final StreamController<List<DmCallSessionSyncItem>>
+      _callSessionsSyncController =
+      StreamController<List<DmCallSessionSyncItem>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messagesReadController =
@@ -119,10 +175,13 @@ class DirectMessagesRealtimeService {
       StreamController<DmProfileStyleUpdatedEvent>.broadcast();
 
   static Timer? _presencePingTimer;
+  static final Set<String> _presencePeerIds = <String>{};
 
   static Stream<DmMessage> get newMessages => _newMessageController.stream;
   static Stream<DmUnreadCountEvent> get unreadCounts =>
       _unreadController.stream;
+  static Stream<DmBlockUpdatedEvent> get blockUpdated =>
+      _blockUpdatedController.stream;
   static Stream<PresenceState> get presences => _presenceController.stream;
   static Stream<Map<String, dynamic>> get reactions =>
       _reactionController.stream;
@@ -131,6 +190,8 @@ class DirectMessagesRealtimeService {
   static Stream<DmCallBusyEvent> get callBusy => _callBusyController.stream;
   static Stream<DmCallIncomingDismissEvent> get callIncomingDismiss =>
       _callIncomingDismissController.stream;
+  static Stream<List<DmCallSessionSyncItem>> get callSessionsSync =>
+      _callSessionsSyncController.stream;
   static Stream<Map<String, dynamic>> get messageDeleted =>
       _messageDeletedController.stream;
   static Stream<Map<String, dynamic>> get messagesRead =>
@@ -138,6 +199,11 @@ class DirectMessagesRealtimeService {
   static Stream<DmUserTypingEvent> get userTyping => _typingController.stream;
   static Stream<DmProfileStyleUpdatedEvent> get profileStyleUpdated =>
       _profileStyleController.stream;
+
+  /// Local-only emit (e.g. after saving style in profile editor).
+  static void emitLocalProfileStyleUpdated(DmProfileStyleUpdatedEvent event) {
+    _profileStyleController.add(event);
+  }
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -184,6 +250,18 @@ class DirectMessagesRealtimeService {
           totalUnread: total is num ? total.toInt() : 0,
           fromUserId: payload['fromUserId']?.toString(),
           conversationUnread: unread is num ? unread.toInt() : null,
+        ),
+      );
+    });
+
+    socket.on('dm-block-updated', (payload) {
+      if (payload is! Map) return;
+      _blockUpdatedController.add(
+        DmBlockUpdatedEvent(
+          blocked: payload['blocked'] == true,
+          blockerId: payload['blockerId']?.toString(),
+          peerId: payload['peerId']?.toString(),
+          direction: payload['direction']?.toString(),
         ),
       );
     });
@@ -286,6 +364,19 @@ class DirectMessagesRealtimeService {
         ),
       );
     });
+    socket.on('call-sessions-sync', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      final raw = data['sessions'];
+      if (raw is! List) return;
+      final sessions = raw
+          .whereType<Map>()
+          .map((item) => DmCallSessionSyncItem.fromJson(
+                Map<String, dynamic>.from(item),
+              ))
+          .toList(growable: false);
+      _callSessionsSyncController.add(sessions);
+    });
     socket.on('message-deleted', (payload) {
       if (payload is! Map) return;
       _messageDeletedController.add(Map<String, dynamic>.from(payload));
@@ -318,11 +409,18 @@ class DirectMessagesRealtimeService {
           displayName: payload['displayName']?.toString(),
           username: payload['username']?.toString(),
           avatarUrl: (payload['avatarUrl'] ?? payload['avatar'])?.toString(),
+          displayNameFontId: payload['displayNameFontId']?.toString(),
+          displayNameEffectId: payload['displayNameEffectId']?.toString(),
+          displayNamePrimaryHex: payload['displayNamePrimaryHex']?.toString(),
+          displayNameAccentHex: payload['displayNameAccentHex']?.toString(),
         ),
       );
     });
 
-    socket.on('connect', (_) => _startPresenceHeartbeat());
+    socket.on('connect', (_) {
+      _startPresenceHeartbeat();
+      _resubscribePresence();
+    });
     socket.on('disconnect', (_) => _stopPresenceHeartbeat());
 
     socket.connect();
@@ -364,8 +462,17 @@ class DirectMessagesRealtimeService {
     _reactionController.add(Map<String, dynamic>.from(payload));
   }
 
+  static void _resubscribePresence() {
+    if (_presencePeerIds.isEmpty || _socket == null) return;
+    _socket!.emit('presence-subscribe', {
+      'userIds': _presencePeerIds.toList(),
+    });
+  }
+
   static void subscribePresence(List<String> userIds) {
-    if (userIds.isEmpty || _socket == null) return;
+    if (userIds.isEmpty) return;
+    _presencePeerIds.addAll(userIds.where((id) => id.isNotEmpty));
+    if (_socket == null) return;
     _socket!.emit('presence-subscribe', {'userIds': userIds});
   }
 
@@ -424,8 +531,19 @@ class DirectMessagesRealtimeService {
     _socket?.emit('call-reject', {'callerId': callerId});
   }
 
-  static void endCall(String peerId) {
-    _socket?.emit('call-end', {'peerId': peerId});
+  static void endCall(
+    String peerId, {
+    String? status,
+    int? durationSec,
+  }) {
+    final payload = <String, dynamic>{'peerId': peerId};
+    if (status != null && status.isNotEmpty) {
+      payload['status'] = status;
+    }
+    if (durationSec != null) {
+      payload['durationSec'] = durationSec;
+    }
+    _socket?.emit('call-end', payload);
   }
 
   static void sendCallSignal(String event, Map<String, dynamic> payload) {
@@ -439,6 +557,7 @@ class DirectMessagesRealtimeService {
       socket.off('new-message');
       socket.off('message-sent');
       socket.off('dm-unread-count');
+      socket.off('dm-block-updated');
       socket.off('presence-updated');
       socket.off('presence-snapshot');
       socket.off('reaction-added');
@@ -450,8 +569,13 @@ class DirectMessagesRealtimeService {
       socket.off('ice-candidate');
       socket.off('call-ended');
       socket.off('call-incoming-dismiss');
+      socket.off('call-sessions-sync');
       socket.off('message-deleted');
       socket.off('messages-read');
+      socket.off('user-typing');
+      socket.off('user-profile-style-updated');
+      socket.off('connect');
+      socket.off('disconnect');
       socket.disconnect();
       socket.dispose();
     }

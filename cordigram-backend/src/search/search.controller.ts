@@ -96,6 +96,7 @@ export class SearchController {
     }
 
     return this.messagesService.searchMessages({
+      viewerId: user.userId,
       q,
       serverId,
       channelId,

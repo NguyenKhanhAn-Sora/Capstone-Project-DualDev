@@ -14,6 +14,12 @@ class DmConversation {
     this.lastCallStatus,
     this.lastCallDurationSec,
     this.lastCallInitiatorId,
+    this.mutedUntil,
+    this.mutedForever = false,
+    this.category,
+    this.isFollowing = false,
+    this.isBlockedByMe = false,
+    this.isBlockedByPeer = false,
   });
 
   final String userId;
@@ -30,6 +36,18 @@ class DmConversation {
   final String? lastCallStatus;
   final int? lastCallDurationSec;
   final String? lastCallInitiatorId;
+  final DateTime? mutedUntil;
+  final bool mutedForever;
+  final String? category;
+  final bool isFollowing;
+  final bool isBlockedByMe;
+  final bool isBlockedByPeer;
+
+  bool get isMuted {
+    if (mutedForever) return true;
+    if (mutedUntil == null) return false;
+    return mutedUntil!.isAfter(DateTime.now());
+  }
 
   String get title => displayName.isNotEmpty ? displayName : username;
 
@@ -66,6 +84,27 @@ class DmConversation {
       lastActiveAt: DateTime.tryParse(
             (json['lastActiveAt'] ?? peerMap['lastActiveAt'])?.toString() ?? '',
           )?.toLocal(),
+      mutedUntil: () {
+        final prefs = json['preferences'];
+        if (prefs is! Map) return null;
+        final iso = prefs['mutedUntil']?.toString();
+        if (iso == null || iso.isEmpty) return null;
+        return DateTime.tryParse(iso)?.toLocal();
+      }(),
+      mutedForever: () {
+        final prefs = json['preferences'];
+        if (prefs is! Map) return false;
+        return prefs['mutedForever'] == true;
+      }(),
+      category: () {
+        final prefs = json['preferences'];
+        if (prefs is! Map) return null;
+        final raw = prefs['category']?.toString();
+        return raw != null && raw.isNotEmpty ? raw : null;
+      }(),
+      isFollowing: json['isFollowing'] == true,
+      isBlockedByMe: json['isBlockedByMe'] == true,
+      isBlockedByPeer: json['isBlockedByPeer'] == true,
     );
   }
 }

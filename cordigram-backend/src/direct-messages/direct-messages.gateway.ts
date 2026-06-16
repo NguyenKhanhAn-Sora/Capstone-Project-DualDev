@@ -16,6 +16,7 @@ import { Model } from 'mongoose';
 import { Profile } from '../profiles/profile.schema';
 import { User } from '../users/user.schema';
 import { FcmPushService } from '../notifications/fcm-push.service';
+import { BlocksService } from '../users/blocks.service';
 import { DmCallSessionService } from '../dm-call/dm-call-session.service';
 import {
   DmCallClientPlatform,
@@ -52,7 +53,7 @@ export class DirectMessagesGateway
   private emitCallBusy(
     socket: Socket,
     payload: {
-      code: 'already_in_call' | 'peer_busy' | 'user_busy';
+      code: 'already_in_call' | 'peer_busy' | 'user_busy' | 'blocked';
       receiverId?: string;
       peerId?: string;
     },
@@ -90,6 +91,11 @@ export class DirectMessagesGateway
       from: session.calleeId,
       callId: session.callId,
       reason: 'timeout',
+    });
+    this.maybeDismissCallPush({
+      receiverUserId: session.calleeId,
+      callId: session.callId,
+      callerUserId: session.initiatorId,
     });
     await this.finalizeFromSession(session, session.initiatorId, 'missed');
   }
@@ -217,6 +223,53 @@ export class DirectMessagesGateway
     } catch (_err) {
       // ignore
     }
+  }
+
+  private isUserConnected(userId: string): boolean {
+    const sockets = this.connectedUsers.get(userId);
+    return Boolean(sockets && sockets.size > 0);
+  }
+
+  private async maybePushDmMessage(params: {
+    receiverId: string;
+    senderId: string;
+    message: any;
+  }): Promise<void> {
+    try {
+      const muted = await this.directMessagesService.isDmConversationMuted(
+        params.receiverId,
+        params.senderId,
+      );
+      if (muted) return;
+    } catch {
+      // best-effort — still attempt push if preference lookup fails
+    }
+
+    const sender = params.message?.senderId ?? {};
+    const senderName =
+      (sender.displayName as string | undefined)?.trim() ||
+      (sender.username as string | undefined)?.trim() ||
+      'New message';
+    const content = String(params.message?.content ?? '').trim();
+    const messageId = params.message?._id?.toString?.() ?? '';
+
+    void this.fcmPushService.pushDmMessage({
+      receiverUserId: params.receiverId,
+      senderUserId: params.senderId,
+      messageId,
+      senderName,
+      senderUsername: (sender.username as string | undefined)?.trim(),
+      senderAvatarUrl: (sender.avatarUrl as string | null | undefined) ?? null,
+      excerpt: content || 'Sent you a message',
+    });
+  }
+
+  private maybeDismissCallPush(params: {
+    receiverUserId: string;
+    callId?: string;
+    callerUserId?: string;
+  }): void {
+    void this.fcmPushService.pushDmCallDismiss(params);
   }
 
   private getSocketIdsByUserId(userId: string): string[] {
@@ -472,6 +525,11 @@ export class DirectMessagesGateway
         });
       }
     }
+    this.maybePushDmMessage({
+      receiverId: payload.receiverId,
+      senderId: payload.senderId,
+      message: payload.message,
+    });
     // Also push unread count update (if receiver is online)
     this.emitDmUnreadCount(payload.receiverId, payload.senderId);
   }
@@ -483,6 +541,7 @@ export class DirectMessagesGateway
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(User.name) private userModel: Model<User>,
     private readonly fcmPushService: FcmPushService,
+    private readonly blocksService: BlocksService,
     private readonly dmCallSessions: DmCallSessionService,
   ) {}
 
@@ -494,11 +553,29 @@ export class DirectMessagesGateway
         return;
       }
 
-      const payload = this.jwtService.verify(token, {
-        secret: process.env.JWT_SECRET || 'your_secret_key',
-      });
+      const secret = process.env.JWT_SECRET;
+      if (!secret) {
+        console.error('JWT_SECRET is not configured');
+        socket.disconnect();
+        return;
+      }
+
+      const payload = this.jwtService.verify(token, { secret }) as {
+        userId?: string;
+        sub?: string;
+        type?: string;
+      };
+
+      if (payload.type !== 'access') {
+        socket.disconnect();
+        return;
+      }
 
       const userId = payload.userId || payload.sub;
+      if (!userId) {
+        socket.disconnect();
+        return;
+      }
       socket.data.userId = userId;
       const set = this.connectedUsers.get(userId) ?? new Set<string>();
       set.add(socket.id);
@@ -680,8 +757,13 @@ export class DirectMessagesGateway
         }
         // Push unread count update to receiver (badge)
         await this.emitDmUnreadCount(data.receiverId, senderId);
-      } else {
       }
+
+      this.maybePushDmMessage({
+        receiverId: data.receiverId,
+        senderId,
+        message: populatedMessage,
+      });
 
       // Confirm to sender
       socket.emit('message-sent', {
@@ -880,6 +962,16 @@ export class DirectMessagesGateway
         return;
       }
 
+      if (
+        await this.blocksService.isBlockedEither(senderId, data.receiverId)
+      ) {
+        this.emitCallBusy(socket, {
+          code: 'blocked',
+          receiverId: data.receiverId,
+        });
+        return;
+      }
+
       const outcome = await this.dmCallSessions.tryInitiate({
         initiatorId: senderId,
         calleeId: data.receiverId,
@@ -962,11 +1054,15 @@ export class DirectMessagesGateway
       roomId,
     });
 
+    if (!session) {
+      return;
+    }
+
     const answerPayload = {
       from: userId,
       sdpOffer: data.sdpOffer,
-      callId: session?.callId,
-      type: session?.type,
+      callId: session.callId,
+      type: session.type,
     };
 
     this.emitToAllUserSockets(data.callerId, 'call-answer', answerPayload);
@@ -981,6 +1077,12 @@ export class DirectMessagesGateway
       },
       socket.id,
     );
+
+    this.maybeDismissCallPush({
+      receiverUserId: userId,
+      callId: session?.callId,
+      callerUserId: data.callerId,
+    });
 
     if (session) {
       this.emitToAllUserSockets(data.callerId, 'call-sessions-sync', {
@@ -998,6 +1100,10 @@ export class DirectMessagesGateway
     @MessageBody() data: { callerId: string },
   ) {
     const userId = socket.data.userId;
+    if (!userId || !data?.callerId) return;
+
+    const session = await this.dmCallSessions.getByPair(userId, data.callerId);
+    if (!session || session.calleeId !== userId) return;
 
     this.emitToAllUserSockets(data.callerId, 'call-rejected', {
       from: userId,
@@ -1008,18 +1114,25 @@ export class DirectMessagesGateway
       'call-incoming-dismiss',
       {
         peerId: data.callerId,
+        callId: session.callId,
         reason: 'rejected_elsewhere',
       },
       socket.id,
     );
 
-    const session = await this.dmCallSessions.markEnded({
+    this.maybeDismissCallPush({
+      receiverUserId: userId,
+      callId: session.callId,
+      callerUserId: data.callerId,
+    });
+
+    const ended = await this.dmCallSessions.markEnded({
       userId,
       peerId: data.callerId,
       explicitStatus: 'declined',
     });
-    if (session) {
-      await this.finalizeFromSession(session, userId, 'declined');
+    if (ended) {
+      await this.finalizeFromSession(ended, userId, 'declined');
     }
   }
 
@@ -1030,20 +1143,24 @@ export class DirectMessagesGateway
   ) {
     const userId = socket.data.userId;
     if (!data?.callId) return;
-    const ok = await this.dmCallSessions.heartbeat(data.callId, userId);
-    if (!ok) {
-      socket.emit('call-ended', { from: null, reason: 'session_gone' });
-    }
+    await this.dmCallSessions.heartbeat(data.callId, userId);
   }
 
   @SubscribeMessage('ice-candidate')
-  handleIceCandidate(
+  async handleIceCandidate(
     @ConnectedSocket() socket: Socket,
     @MessageBody() data: { peerId: string; candidate: any },
   ) {
     const userId = socket.data.userId;
-    const peerSocket = this.connectedUsers.get(data.peerId);
+    if (!userId || !data?.peerId) return;
 
+    const hasSession = await this.dmCallSessions.hasActiveSessionBetween(
+      userId,
+      data.peerId,
+    );
+    if (!hasSession) return;
+
+    const peerSocket = this.connectedUsers.get(data.peerId);
     if (peerSocket && peerSocket.size) {
       for (const sid of peerSocket) {
         this.server.to(sid).emit('ice-candidate', {
@@ -1117,5 +1234,21 @@ export class DirectMessagesGateway
     for (const socketId of sockets) {
       this.server.to(socketId).emit(event, payload);
     }
+  }
+
+  emitDmBlockUpdated(payload: {
+    blockerId: string;
+    blockedId: string;
+    blocked: boolean;
+  }): void {
+    this.emitToAllUserSockets(payload.blockedId, 'dm-block-updated', {
+      blockerId: payload.blockerId,
+      blocked: payload.blocked,
+    });
+    this.emitToAllUserSockets(payload.blockerId, 'dm-block-updated', {
+      peerId: payload.blockedId,
+      blocked: payload.blocked,
+      direction: 'outgoing',
+    });
   }
 }

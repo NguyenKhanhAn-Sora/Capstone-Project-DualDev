@@ -807,6 +807,58 @@ export default function MessagesUserSettingsModal({
                       }
                     />
                   </div>
+                  <div className={styles.row}>
+                    <div>
+                      <div className={styles.rowLabel}>
+                        {t("settings.notifications.desktopLabel")}
+                      </div>
+                      <div className={styles.hint} style={{ margin: 0 }}>
+                        {t("settings.notifications.desktopHint")}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`${styles.toggle} ${
+                        userSettings?.chatDesktopNotificationsEnabled !== false
+                          ? styles.toggleOn
+                          : styles.toggleOff
+                      }`}
+                      onClick={() => {
+                        void (async () => {
+                          const nextEnabled =
+                            userSettings?.chatDesktopNotificationsEnabled === false;
+                          if (nextEnabled) {
+                            const { requestDesktopNotificationPermission } =
+                              await import("@/lib/messages-desktop-notifications");
+                            const perm = await requestDesktopNotificationPermission();
+                            if (perm !== "granted") {
+                              onToast?.(t("settings.notifications.desktopDeniedToast"));
+                              return;
+                            }
+                          }
+                          try {
+                            const next = await updateUserSettings({
+                              token,
+                              chatDesktopNotificationsEnabled: nextEnabled,
+                            });
+                            setUserSettings(next);
+                            dispatchChatSettingsRefresh();
+                            onToast?.(
+                              nextEnabled
+                                ? t("settings.notifications.desktopEnabledToast")
+                                : t("settings.notifications.desktopDisabledToast"),
+                            );
+                          } catch (e) {
+                            onToast?.(
+                              e instanceof Error
+                                ? e.message
+                                : t("settings.errorUpdate"),
+                            );
+                          }
+                        })();
+                      }}
+                    />
+                  </div>
                 </div>
               </>
             ) : null}

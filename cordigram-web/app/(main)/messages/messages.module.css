@@ -597,7 +597,7 @@
 
 .searchButton {
   width: 100%;
-  padding: 9px 14px 9px 36px;
+  padding: 9px 14px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-chat-input);
@@ -607,7 +607,7 @@
   transition: all 0.22s ease;
   font-family: var(--font-roboto);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   position: relative;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -620,29 +620,17 @@
   box-shadow: 0 0 0 3px var(--accent-soft), 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
-.searchIcon {
-  position: absolute;
-  left: 26px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-text-muted);
-  pointer-events: none;
+/* Server header (tên máy chủ + hồ sơ + mời) */
+.serverHeaderBlock {
   flex-shrink: 0;
-  transition: color 0.18s ease;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.searchButton:hover .searchIcon {
-  color: var(--color-text);
-}
-
-/* Server header (tên máy chủ + mời) */
 .serverHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
+  padding: 12px 16px 8px;
 }
 
 .serverNameBtn {
@@ -665,6 +653,19 @@
 
 .serverNameBtn:hover {
   background: var(--color-surface-hover, rgba(255, 255, 255, 0.06));
+}
+
+.serverNameBtnOpen {
+  background: var(--color-surface-hover, rgba(255, 255, 255, 0.06));
+}
+
+.serverNameChevron {
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.serverNameChevronOpen {
+  transform: rotate(180deg);
 }
 
 .serverNameText {
@@ -2832,6 +2833,79 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.friendStatusText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.dmCategoryMark {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dmCategoryMark svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.friendItem.active .friendStatus {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.friendItem.active .dmCategoryMark {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
+}
+
+.dmBlockedPanel {
+  flex: 1;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dmBlockedCard {
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 12px;
+  padding: 28px 24px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.dmBlockedText {
+  margin: 0;
+  color: var(--color-panel-text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.dmBlockedUnblockBtn {
+  margin-top: 20px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--color-panel-accent);
+  color: #fff;
   line-height: 1.3;
   transition: color 0.15s ease;
 }
@@ -4964,9 +5038,10 @@
 /* ── Search button: glass card style ── */
 :global([data-messages-theme="galaxy"]) .searchButton {
   border-radius: 10px;
-  padding: 10px 14px 10px 38px;
+  padding: 10px 14px;
   font-size: 13px;
   letter-spacing: 0.01em;
+  text-align: center;
 }
 
 :global([data-messages-theme="galaxy"]) .searchButton:hover {

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { isIP } from 'net';
 
 export interface LinkPreviewData {
   url: string;
@@ -29,6 +30,10 @@ export class LinkPreviewService {
     };
 
     try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:') return empty;
+      if (this.isBlockedHost(parsed.hostname)) return empty;
+
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
       const res = await fetch(url, {
@@ -151,5 +156,35 @@ export class LinkPreviewService {
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
       .replace(/&nbsp;/g, ' ');
+  }
+
+  private isBlockedHost(hostname: string): boolean {
+    const host = hostname.toLowerCase();
+
+    if (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local')
+    ) {
+      return true;
+    }
+
+    if (isIP(host) === 4) {
+      const [a, b] = host.split('.').map((part) => Number(part));
+      if (a === 10) return true;
+      if (a === 127) return true;
+      if (a === 169 && b === 254) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+      if (a === 0) return true;
+    }
+
+    if (isIP(host) === 6) {
+      if (host === '::1') return true;
+      if (host.startsWith('fc') || host.startsWith('fd')) return true;
+      if (host.startsWith('fe80:')) return true;
+    }
+
+    return false;
   }
 }

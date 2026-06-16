@@ -141,12 +141,13 @@ class _MessagesInboxSheetState extends State<MessagesInboxSheet> {
         _mentions = const [];
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _loadingForYou = false;
-        _loadingUnread = false;
-        _loadingMentions = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingForYou = false;
+          _loadingUnread = false;
+          _loadingMentions = false;
+        });
+      }
     }
   }
 

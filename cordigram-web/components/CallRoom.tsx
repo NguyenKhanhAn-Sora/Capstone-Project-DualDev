@@ -14,7 +14,7 @@ import type { TrackReference } from "@livekit/components-react";
 import { Track, RoomEvent, RemoteAudioTrack } from "livekit-client";
 import styles from "./CallRoom.module.css";
 
-/** In a 1:1 call, when the remote participant leaves, end this session too */
+/** In a 1:1 call, end only after the remote has joined and stays gone past grace windows. */
 function EndCallWhenRemoteDisconnects({
   onRemoteLeft,
 }: {
@@ -22,9 +22,15 @@ function EndCallWhenRemoteDisconnects({
 }) {
   const room = useRoomContext();
   const finishedRef = useRef(false);
+  const remoteEverJoinedRef = useRef(false);
+  const connectedAtRef = useRef<number | null>(null);
+  const pendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!room) return;
+
+    const INITIAL_GRACE_MS = 8000;
+    const LEAVE_GRACE_MS = 4000;
 
     const finish = () => {
       if (finishedRef.current) return;
@@ -32,15 +38,93 @@ function EndCallWhenRemoteDisconnects({
       onRemoteLeft();
     };
 
-    const onParticipantDisconnected = () => {
-      finish();
+    const clearPending = () => {
+      if (pendingRef.current) {
+        clearTimeout(pendingRef.current);
+        pendingRef.current = null;
+      }
     };
 
+    const scheduleLeaveCheck = () => {
+      if (!remoteEverJoinedRef.current) return;
+      if (room.remoteParticipants.size > 0) return;
+
+      clearPending();
+      const connectedAt = connectedAtRef.current ?? Date.now();
+      const elapsed = Date.now() - connectedAt;
+      const delay =
+        Math.max(0, INITIAL_GRACE_MS - elapsed) + LEAVE_GRACE_MS;
+
+      pendingRef.current = setTimeout(() => {
+        if (room.remoteParticipants.size === 0) {
+          finish();
+        }
+      }, delay);
+    };
+
+    const onConnected = () => {
+      connectedAtRef.current = Date.now();
+    };
+
+    const onParticipantConnected = () => {
+      remoteEverJoinedRef.current = true;
+      clearPending();
+    };
+
+    const onParticipantDisconnected = () => {
+      if (room.remoteParticipants.size === 0) {
+        scheduleLeaveCheck();
+      }
+    };
+
+    room.on(RoomEvent.Connected, onConnected);
+    room.on(RoomEvent.ParticipantConnected, onParticipantConnected);
     room.on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
+
+    if (room.remoteParticipants.size > 0) {
+      remoteEverJoinedRef.current = true;
+    }
+
     return () => {
+      clearPending();
+      room.off(RoomEvent.Connected, onConnected);
       room.off(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
+      room.off(RoomEvent.ParticipantConnected, onParticipantConnected);
     };
   }, [room, onRemoteLeft]);
+
+  return null;
+}
+
+/** Notifies parent when the remote peer joins — used for accurate call duration. */
+function CallSessionTelemetry({
+  onRemoteJoined,
+}: {
+  onRemoteJoined?: () => void;
+}) {
+  const room = useRoomContext();
+  const notifiedRef = useRef(false);
+
+  useEffect(() => {
+    if (!room || !onRemoteJoined) return;
+
+    const maybeNotify = () => {
+      if (notifiedRef.current || room.remoteParticipants.size === 0) return;
+      notifiedRef.current = true;
+      onRemoteJoined();
+    };
+
+    const onParticipantConnected = () => {
+      maybeNotify();
+    };
+
+    room.on(RoomEvent.ParticipantConnected, onParticipantConnected);
+    maybeNotify();
+
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, onParticipantConnected);
+    };
+  }, [room, onRemoteJoined]);
 
   return null;
 }
@@ -51,6 +135,7 @@ interface CallRoomProps {
   onDisconnect: () => void;
   participantName: string;
   isAudioOnly?: boolean;
+  onRemoteJoined?: () => void;
 }
 
 export default function CallRoom({
@@ -59,6 +144,7 @@ export default function CallRoom({
   onDisconnect,
   participantName,
   isAudioOnly = false,
+  onRemoteJoined,
 }: CallRoomProps) {
   return (
     <div className={styles.callRoomContainer}>
@@ -69,11 +155,13 @@ export default function CallRoom({
         video={!isAudioOnly}
         audio={true}
         onDisconnected={() => {
-          onDisconnect();
+          // LiveKit may emit a transient disconnect during join/reconnect.
+          // EndCallWhenRemoteDisconnects owns the 1:1 hangup decision.
         }}
         className={styles.liveKitRoom}
       >
         <EndCallWhenRemoteDisconnects onRemoteLeft={onDisconnect} />
+        <CallSessionTelemetry onRemoteJoined={onRemoteJoined} />
         <UnifiedCallView
           participantName={participantName}
           onDisconnect={onDisconnect}

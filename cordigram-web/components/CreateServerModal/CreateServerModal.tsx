@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState } from "react";
 import styles from "./CreateServerModal.module.css";
 import ServerTemplateSelector from "./ServerTemplateSelector";
@@ -58,7 +59,7 @@ export default function CreateServerModal({
 
   const handleCreateServer = async (name: string, avatarUrl?: string) => {
     if (!name.trim()) {
-      alert(t("chat.createServer.errors.nameRequired"));
+      appAlert(t("chat.createServer.errors.nameRequired"));
       return;
     }
 
@@ -80,7 +81,7 @@ export default function CreateServerModal({
       handleClose();
     } catch (error) {
       console.error("Failed to create server:", error);
-      alert(t("chat.createServer.errors.createFailed"));
+      appAlert(t("chat.createServer.errors.createFailed"));
     } finally {
       setIsCreating(false);
     }

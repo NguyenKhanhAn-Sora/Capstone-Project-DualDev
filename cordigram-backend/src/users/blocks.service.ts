@@ -139,6 +139,45 @@ export class BlocksService {
       .filter((item) => Boolean(item.blockedId));
   }
 
+  async listBlockedUserIds(
+    blockerId: string | Types.ObjectId,
+    candidateIds?: Types.ObjectId[],
+  ): Promise<string[]> {
+    const blocker = this.asObjectId(blockerId, 'blockerId');
+    const filter: Record<string, unknown> = { blockerId: blocker };
+    if (candidateIds?.length) {
+      filter.blockedId = { $in: candidateIds };
+    }
+    const rows = await this.blockModel
+      .find(filter)
+      .select('blockedId')
+      .lean()
+      .exec();
+    return rows
+      .map((doc) => doc.blockedId?.toString?.() ?? '')
+      .filter(Boolean);
+  }
+
+  /** Users in `candidateIds` who have blocked `blockedId`. */
+  async listBlockedByUserIds(
+    blockedId: string | Types.ObjectId,
+    candidateIds?: Types.ObjectId[],
+  ): Promise<string[]> {
+    const blocked = this.asObjectId(blockedId, 'blockedId');
+    const filter: Record<string, unknown> = { blockedId: blocked };
+    if (candidateIds?.length) {
+      filter.blockerId = { $in: candidateIds };
+    }
+    const rows = await this.blockModel
+      .find(filter)
+      .select('blockerId')
+      .lean()
+      .exec();
+    return rows
+      .map((doc) => doc.blockerId?.toString?.() ?? '')
+      .filter(Boolean);
+  }
+
   async assertNotBlocked(viewerId: Types.ObjectId, ownerId: Types.ObjectId) {
     const blocked = await this.isBlockedEither(viewerId, ownerId);
     if (blocked) {

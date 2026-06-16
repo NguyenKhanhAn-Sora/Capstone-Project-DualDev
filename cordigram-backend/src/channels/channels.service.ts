@@ -87,7 +87,11 @@ export class ChannelsService {
     return savedChannel;
   }
 
-  async getChannelsByServerId(serverId: string): Promise<Channel[]> {
+  async getChannelsByServerId(
+    serverId: string,
+    userId: string,
+  ): Promise<Channel[]> {
+    await this.assertServerMember(serverId, userId);
     return this.channelModel
       .find({ serverId: new Types.ObjectId(serverId) })
       .sort({ position: 1 })
@@ -95,7 +99,8 @@ export class ChannelsService {
       .exec();
   }
 
-  async getChannelById(channelId: string): Promise<Channel> {
+  async getChannelById(channelId: string, userId: string): Promise<Channel> {
+    await this.assertCanAccessChannel(channelId, userId);
     const channel = await this.channelModel
       .findById(channelId)
       .populate('createdBy', 'email')
@@ -198,7 +203,9 @@ export class ChannelsService {
   async getChannelsByType(
     serverId: string,
     type: ChannelType,
+    userId: string,
   ): Promise<Channel[]> {
+    await this.assertServerMember(serverId, userId);
     return this.channelModel
       .find({
         serverId: new Types.ObjectId(serverId),
@@ -225,13 +232,62 @@ export class ChannelsService {
     }
   }
 
+  private async assertServerMember(
+    serverId: string,
+    userId: string,
+  ): Promise<void> {
+    const exists = await this.serverModel.exists({
+      _id: new Types.ObjectId(serverId),
+      'members.userId': new Types.ObjectId(userId),
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+    });
+    if (!exists) {
+      throw new ForbiddenException('Bạn không thuộc máy chủ này');
+    }
+  }
+
+  async assertCanAccessChannel(
+    channelId: string,
+    userId: string,
+  ): Promise<void> {
+    const channel = await this.channelModel
+      .findById(channelId)
+      .select('serverId isPrivate')
+      .lean()
+      .exec();
+    if (!channel) {
+      throw new NotFoundException(`Channel with id ${channelId} not found`);
+    }
+    await this.assertServerMember(channel.serverId.toString(), userId);
+    if (channel.isPrivate) {
+      const serverId = channel.serverId.toString();
+      const manageServer = await this.rolesService.hasPermission(
+        serverId,
+        userId,
+        'manageServer',
+      );
+      const manageChannels = await this.rolesService.hasPermission(
+        serverId,
+        userId,
+        'manageChannels',
+      );
+      if (!manageServer && !manageChannels) {
+        throw new ForbiddenException(
+          'Vai trò của bạn không được phép vào kênh riêng tư này',
+        );
+      }
+    }
+  }
+
   // ── Category CRUD ──
 
   async createCategory(
     serverId: string,
     name: string,
     type: 'text' | 'voice' | 'mixed' = 'mixed',
+    userId: string,
   ): Promise<ChannelCategory> {
+    await this.assertCanManageChannels(serverId, userId);
     const serverOid = new Types.ObjectId(serverId);
     const maxPos = await this.categoryModel
       .findOne({ serverId: serverOid })
@@ -249,7 +305,8 @@ export class ChannelsService {
     return cat.save();
   }
 
-  async getCategories(serverId: string): Promise<any[]> {
+  async getCategories(serverId: string, userId: string): Promise<any[]> {
+    await this.assertServerMember(serverId, userId);
     const serverOid = new Types.ObjectId(serverId);
     let cats = await this.categoryModel
       .find({ serverId: serverOid })
@@ -335,7 +392,11 @@ export class ChannelsService {
   async updateCategory(
     categoryId: string,
     name: string,
+    userId: string,
   ): Promise<ChannelCategory> {
+    const existing = await this.categoryModel.findById(categoryId);
+    if (!existing) throw new NotFoundException('Category not found');
+    await this.assertCanManageChannels(existing.serverId.toString(), userId);
     const cat = await this.categoryModel.findByIdAndUpdate(
       categoryId,
       { name },
@@ -345,9 +406,10 @@ export class ChannelsService {
     return cat;
   }
 
-  async deleteCategory(categoryId: string): Promise<void> {
+  async deleteCategory(categoryId: string, userId: string): Promise<void> {
     const cat = await this.categoryModel.findById(categoryId);
     if (!cat) throw new NotFoundException('Category not found');
+    await this.assertCanManageChannels(cat.serverId.toString(), userId);
 
     await this.channelModel.updateMany(
       { categoryId: new Types.ObjectId(categoryId) },

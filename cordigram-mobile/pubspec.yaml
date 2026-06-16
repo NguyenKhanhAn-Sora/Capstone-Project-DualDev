@@ -104,6 +104,9 @@ flutter:
     - assets/images/sticker_toolbar.svg
     - assets/locales/
     - assets/env/.env
+    - assets/Sounds/universfield-new-notification-040-493469.mp3
+    - assets/Sounds/incoming-call.mp3
+    - assets/Sounds/outgoing-call.mp3
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useCallback } from "react";
 import styles from "./RolesSection.module.css";
 import * as serversApi from "@/lib/servers-api";
@@ -46,7 +47,7 @@ export default function RolesSection({ serverId, isOwner }: RolesSectionProps) {
       setSelectedRole(newRole);
       setIsEditModalOpen(true);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Không tạo được vai trò");
+      appAlert(err instanceof Error ? err.message : "Không tạo được vai trò");
     }
   };
 

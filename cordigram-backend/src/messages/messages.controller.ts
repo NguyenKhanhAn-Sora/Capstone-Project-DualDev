@@ -15,6 +15,7 @@ import { ChannelMessagesGateway } from './channel-messages.gateway';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MentionMuteService } from '../users/mention-mute.service';
+import { FcmPushService } from '../notifications/fcm-push.service';
 
 @Controller('channels/:channelId/messages')
 @UseGuards(JwtAuthGuard)
@@ -23,6 +24,7 @@ export class MessagesController {
     private readonly messagesService: MessagesService,
     private readonly channelMessagesGateway: ChannelMessagesGateway,
     private readonly mentionMuteService: MentionMuteService,
+    private readonly fcmPushService: FcmPushService,
   ) {}
 
   @Post('wave-sticker')
@@ -83,6 +85,7 @@ export class MessagesController {
 
       const senderName =
         message.senderId?.displayName ?? message.senderId?.username ?? 'Ai đó';
+      const senderAvatarUrl = message.senderId?.avatarUrl ?? null;
 
       const mentionSet = new Set(ctx.mentionedUserIds);
 
@@ -99,10 +102,12 @@ export class MessagesController {
         type: 'channel_message' as const,
         serverId: ctx.serverId,
         serverName: ctx.serverName,
+        serverAvatarUrl: ctx.serverAvatarUrl,
         channelId,
         channelName: ctx.channelName,
         messageId: message._id?.toString?.() ?? '',
         senderName,
+        senderAvatarUrl,
         excerpt: (message.content ?? '').slice(0, 200),
         isMention: mentionSet.has(userId),
         createdAt: message.createdAt ?? new Date().toISOString(),
@@ -110,14 +115,40 @@ export class MessagesController {
 
       if (ctx.defaultNotificationLevel === 'all') {
         for (const uid of ctx.memberUserIds) {
-          if (mutedRecipients.has(uid) && mentionSet.has(uid)) {
-            continue;
-          }
+          if (uid === senderId) continue;
+          if (mutedRecipients.has(uid)) continue;
           this.channelMessagesGateway.emitToUser(
             uid,
             'channel-notification',
             payload(uid),
           );
+          if (mentionSet.has(uid)) {
+            void this.fcmPushService.pushChannelMention({
+              userId: uid,
+              serverId: ctx.serverId,
+              serverName: ctx.serverName,
+              serverAvatarUrl: ctx.serverAvatarUrl,
+              channelId,
+              channelName: ctx.channelName,
+              messageId: message._id?.toString?.() ?? '',
+              senderName,
+              senderAvatarUrl,
+              excerpt: (message.content ?? '').slice(0, 200),
+            });
+          } else {
+            void this.fcmPushService.pushChannelMessage({
+              userId: uid,
+              serverId: ctx.serverId,
+              serverName: ctx.serverName,
+              serverAvatarUrl: ctx.serverAvatarUrl,
+              channelId,
+              channelName: ctx.channelName,
+              messageId: message._id?.toString?.() ?? '',
+              senderName,
+              senderAvatarUrl,
+              excerpt: (message.content ?? '').slice(0, 200),
+            });
+          }
         }
       } else {
         for (const uid of ctx.mentionedUserIds) {
@@ -128,6 +159,18 @@ export class MessagesController {
               'channel-notification',
               payload(uid),
             );
+            void this.fcmPushService.pushChannelMention({
+              userId: uid,
+              serverId: ctx.serverId,
+              serverName: ctx.serverName,
+              serverAvatarUrl: ctx.serverAvatarUrl,
+              channelId,
+              channelName: ctx.channelName,
+              messageId: message._id?.toString?.() ?? '',
+              senderName,
+              senderAvatarUrl,
+              excerpt: (message.content ?? '').slice(0, 200),
+            });
           }
         }
       }

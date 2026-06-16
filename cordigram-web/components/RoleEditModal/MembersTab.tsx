@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useCallback } from "react";
 import styles from "./MembersTab.module.css";
 import type { Role, ServerMemberRow } from "@/lib/servers-api";
@@ -77,7 +78,7 @@ export default function MembersTab({
       setShowAddModal(false);
       setAddSearchQuery("");
     } catch (err) {
-      alert(err instanceof Error ? err.message : t("chat.roleMembers.errorAdd"));
+      appAlert(err instanceof Error ? err.message : t("chat.roleMembers.errorAdd"));
     } finally {
       setSaving(false);
     }
@@ -85,7 +86,7 @@ export default function MembersTab({
 
   const handleRemoveMember = async (memberId: string) => {
     if (!isOwner || role.isDefault) return;
-    if (!window.confirm(t("chat.roleMembers.confirmRemove"))) {
+    if (!await appConfirm(t("chat.roleMembers.confirmRemove"))) {
       return;
     }
     setSaving(true);
@@ -93,7 +94,7 @@ export default function MembersTab({
       const updated = await serversApi.removeMemberFromRole(serverId, role._id, memberId);
       onUpdate(updated);
     } catch (err) {
-      alert(err instanceof Error ? err.message : t("chat.roleMembers.errorRemove"));
+      appAlert(err instanceof Error ? err.message : t("chat.roleMembers.errorRemove"));
     } finally {
       setSaving(false);
     }

@@ -12,6 +12,7 @@ import {
   DM_CALL_INCOMING_EVENT,
   type DmCallIncomingDetail,
 } from "@/lib/dm-call-session-sync";
+import { isInActiveDmCall } from "@/lib/dm-call-active-peers";
 import { getDMRoomName } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 
@@ -122,6 +123,10 @@ export default function GlobalDmIncomingCalls() {
       ) {
         return;
       }
+      if (isInActiveDmCall()) {
+        rejectCall(ev.from);
+        return;
+      }
       setIncomingCall({
         from: ev.from,
         type: ev.type || "audio",
@@ -130,7 +135,7 @@ export default function GlobalDmIncomingCalls() {
       });
       return;
     }
-  }, [callEvent]);
+  }, [callEvent, rejectCall]);
 
   useEffect(() => {
     const onIncoming = (e: Event) => {
@@ -142,6 +147,10 @@ export default function GlobalDmIncomingCalls() {
       ) {
         return;
       }
+      if (isInActiveDmCall()) {
+        rejectCall(detail.from);
+        return;
+      }
       setIncomingCall({
         from: detail.from,
         type: detail.type || "audio",
@@ -151,7 +160,7 @@ export default function GlobalDmIncomingCalls() {
     };
     window.addEventListener(DM_CALL_INCOMING_EVENT, onIncoming);
     return () => window.removeEventListener(DM_CALL_INCOMING_EVENT, onIncoming);
-  }, []);
+  }, [rejectCall]);
 
   useEffect(() => {
     if (!callIncomingDismiss?.peerId) return;

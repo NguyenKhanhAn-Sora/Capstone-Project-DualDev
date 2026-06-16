@@ -3658,8 +3658,7 @@
     "welcome": {
       "title": "ようこそ",
       "serverOf": "{name}のサーバーへ",
-      "channelBegin": "これが",
-      "startTalking": "チャンネルの最初です。チャットを始めましょう！",
+      "channelIntro": "{serverName}へようこそ。会話を始めましょう。",
       "greeting": "はじめまして、{name}！",
       "unknownUser": "誰か",
       "waving": "送信中...",
@@ -3838,13 +3837,30 @@
     "dmConversation": {
       "muteUntilForever": "手動でオンにするまで通知をミュート",
       "unmuteNotifications": "通知をオンにする",
+      "muteNotifications": "通知をミュート",
+      "mute1h": "1時間",
+      "mute4h": "4時間",
+      "muteUntil8am": "8:00 AMまで",
+      "categorize": "分類",
+      "clearCategory": "分類を解除",
+      "unfollow": "フォロー解除",
       "block": "ブロック",
       "unblock": "ブロック解除",
+      "blockedByYou": "{name} をブロックしました",
+      "blockedByPeer": "{name} からブロックされました",
       "muteDialogTitle": "メッセージ通知をミュート",
       "muteDialogActiveTitle": "通知はオフです",
       "turnOnNotifications": "通知を再開",
       "blockUpdateError": "ブロック状態を更新できませんでした",
-      "now": "たった今"
+      "now": "たった今",
+      "categories": {
+        "customer": "顧客",
+        "family": "家族",
+        "work": "仕事",
+        "friends": "友達",
+        "reply_later": "後で返信",
+        "colleague": "同僚"
+      }
     }
   },
   "player": {

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useRef, useEffect } from "react";
 import styles from "./VoiceRecorder.module.css";
 
@@ -85,7 +86,7 @@ export default function VoiceRecorder({
       }, 100);
     } catch (error) {
       console.error("Failed to access microphone:", error);
-      alert("Unable to access the microphone. Please allow microphone access.");
+      appAlert("Unable to access the microphone. Please allow microphone access.");
       onCancel();
     }
   };

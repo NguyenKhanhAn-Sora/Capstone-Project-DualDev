@@ -10,6 +10,7 @@ interface EventsPopupProps {
   onClose: () => void;
   serverId: string | null;
   onOpenCreateWizard: () => void;
+  canManageEvents?: boolean;
 }
 
 export default function EventsPopup({
@@ -17,6 +18,7 @@ export default function EventsPopup({
   onClose,
   serverId,
   onOpenCreateWizard,
+  canManageEvents = false,
 }: EventsPopupProps) {
   const { t, language } = useLanguage();
   const [activeEvents, setActiveEvents] = useState<serversApi.ServerEvent[]>([]);
@@ -44,14 +46,6 @@ export default function EventsPopup({
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          className={styles.closeBtn}
-          onClick={onClose}
-          aria-label={t("chat.popups.closeAria")}
-        >
-          ×
-        </button>
         <div className={styles.header}>
           <div className={styles.titleRow}>
             <span className={styles.calendarIcon}>
@@ -64,16 +58,28 @@ export default function EventsPopup({
             </span>
             <h2 className={styles.title}>{t("chat.popups.events.title")}</h2>
           </div>
-          <button
-            type="button"
-            className={styles.createBtn}
-            onClick={() => {
-              onClose();
-              onOpenCreateWizard();
-            }}
-          >
-            {t("chat.popups.events.create")}
-          </button>
+          <div className={styles.headerActions}>
+            {canManageEvents ? (
+              <button
+                type="button"
+                className={styles.createBtn}
+                onClick={() => {
+                  onClose();
+                  onOpenCreateWizard();
+                }}
+              >
+                {t("chat.popups.events.create")}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={styles.closeBtn}
+              onClick={onClose}
+              aria-label={t("chat.popups.closeAria")}
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {loading ? (

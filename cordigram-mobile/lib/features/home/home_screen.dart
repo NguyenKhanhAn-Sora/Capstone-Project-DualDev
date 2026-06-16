@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/theme_controller.dart';
 import '../../core/services/user_notifier.dart';
@@ -55,7 +56,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   // ── Feed state ────────────────────────────────────────────────────────────
   final List<FeedPostState> _states = [];
   final ScrollController _scrollController = ScrollController();
@@ -121,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 5, vsync: this);
     _topNavAnimController = AnimationController(
       vsync: this,
@@ -146,8 +149,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _startNotificationRealtime();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_consumePendingDmCallFromPush());
+      unawaited(PushNotificationService.syncCurrentToken());
       unawaited(AppUpdateService.checkForUpdate(context));
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(PushNotificationService.syncCurrentToken());
+    }
   }
 
   Future<void> _consumePendingDmCallFromPush() async {
@@ -237,6 +248,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     PostUploadController.instance.removeListener(_onUploadStateChanged);
     LanguageController.instance.removeListener(_onLanguageChanged);
     UserNotifier.avatarUrl.removeListener(_onAvatarChanged);
@@ -1422,6 +1434,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             : null,
       );
     } catch (_) {}
+    await PushNotificationService.clearTokenOnLogout();
     await AuthStorage.clear();
     // Tear down in-flight call state (active / ringing / outgoing) and
     // reset the call socket so the NEXT account that logs in on this

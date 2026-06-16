@@ -1,4 +1,4 @@
-import 'package:flutter/services.dart';
+import '../../../core/services/cordigram_notification_sounds.dart';
 
 class MessageNotificationSound {
   MessageNotificationSound._();
@@ -12,6 +12,6 @@ class MessageNotificationSound {
       return;
     }
     _lastPlayAt = now;
-    SystemSound.play(SystemSoundType.alert);
+    CordigramNotificationSounds.playMessage();
   }
 }

@@ -1857,6 +1857,7 @@ export type UserSettingsResponse = {
   showCordigramMemberSince?: boolean;
   sharePresence?: boolean;
   chatSoundEnabled?: boolean;
+  chatDesktopNotificationsEnabled?: boolean;
 };
 
 export type NotificationCategoryKey =
@@ -2139,6 +2140,7 @@ export async function updateUserSettings(opts: {
   showCordigramMemberSince?: boolean;
   sharePresence?: boolean;
   chatSoundEnabled?: boolean;
+  chatDesktopNotificationsEnabled?: boolean;
 }): Promise<UserSettingsResponse> {
   const {
     token,
@@ -2152,6 +2154,7 @@ export async function updateUserSettings(opts: {
     showCordigramMemberSince,
     sharePresence,
     chatSoundEnabled,
+    chatDesktopNotificationsEnabled,
   } = opts;
   return apiFetch<UserSettingsResponse>({
     path: "/users/settings",
@@ -2170,6 +2173,7 @@ export async function updateUserSettings(opts: {
       showCordigramMemberSince,
       sharePresence,
       chatSoundEnabled,
+      chatDesktopNotificationsEnabled,
     }),
   });
 }
@@ -3655,7 +3659,46 @@ export type ConversationListItem = {
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount: number;
+  preferences?: {
+    mutedUntil?: string | null;
+    mutedForever?: boolean;
+    category?: string | null;
+  };
+  isFollowing?: boolean;
+  isBlockedByMe?: boolean;
+  isBlockedByPeer?: boolean;
 };
+
+export async function patchDmConversationPreferences(opts: {
+  token?: string;
+  peerUserId: string;
+  mutedUntil?: string | null;
+  mutedForever?: boolean;
+  category?: string | null;
+}): Promise<{
+  mutedUntil: string | null;
+  mutedForever: boolean;
+  category: string | null;
+}> {
+  const token =
+    opts.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+  return apiFetch({
+    path: `/direct-messages/conversations/${opts.peerUserId}/preferences`,
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ...(opts.mutedUntil !== undefined ? { mutedUntil: opts.mutedUntil } : {}),
+      ...(opts.mutedForever !== undefined
+        ? { mutedForever: opts.mutedForever }
+        : {}),
+      ...(opts.category !== undefined ? { category: opts.category } : {}),
+    }),
+  });
+}
 
 export async function getConversationList(opts?: {
   token?: string;
@@ -3678,6 +3721,10 @@ export async function getConversationList(opts?: {
     lastMessage: c.lastMessage,
     lastMessageTime: c.lastMessageTime,
     unreadCount: typeof c.unreadCount === "number" ? c.unreadCount : 0,
+    preferences: c.preferences ?? undefined,
+    isFollowing: c.isFollowing === true,
+    isBlockedByMe: c.isBlockedByMe === true,
+    isBlockedByPeer: c.isBlockedByPeer === true,
   }));
 }
 

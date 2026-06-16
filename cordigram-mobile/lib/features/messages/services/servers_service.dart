@@ -1,3 +1,9 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+
+import '../../../core/config/app_config.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
 import '../models/server_models.dart';
@@ -1142,6 +1148,96 @@ class ServersService {
         .whereType<Map>()
         .map((e) => ServerRole.fromJson(Map<String, dynamic>.from(e)))
         .toList();
+  }
+
+  static Future<Map<String, dynamic>> getMyServerProfile(String serverId) async {
+    try {
+      return await ApiService.get(
+        '/servers/$serverId/me/profile',
+        extraHeaders: _authHeaders,
+      );
+    } catch (_) {
+      return {
+        'nickname': null,
+        'avatarUrl': null,
+        'coverUrl': null,
+      };
+    }
+  }
+
+  static Future<void> updateMyServerProfile(
+    String serverId,
+    Map<String, dynamic> payload,
+  ) async {
+    await ApiService.patch(
+      '/servers/$serverId/me/profile',
+      extraHeaders: _authHeaders,
+      body: payload,
+    );
+  }
+
+  static Future<void> updateMyServerNickname(
+    String serverId,
+    String nickname,
+  ) async {
+    await ApiService.patch(
+      '/servers/$serverId/me/nickname',
+      extraHeaders: _authHeaders,
+      body: {'nickname': nickname},
+    );
+  }
+
+  static Future<Map<String, dynamic>> uploadMyServerAvatar(
+    String serverId,
+    String filePath, {
+    String? contentType,
+  }) async {
+    final ct = _resolveImageContentType(filePath, contentType);
+    final uri = Uri.parse(
+      '${AppConfig.apiBaseUrl}/servers/$serverId/me/avatar/upload',
+    );
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll({
+        ..._authHeaders,
+        'x-cordigram-upload-context': 'messages',
+      })
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'original',
+          filePath,
+          contentType: MediaType.parse(ct),
+        ),
+      )
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'cropped',
+          filePath,
+          contentType: MediaType.parse(ct),
+        ),
+      );
+    final streamed = await request.send().timeout(const Duration(seconds: 120));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Server avatar upload failed (${response.statusCode})');
+  }
+
+  static Future<void> resetMyServerAvatar(String serverId) async {
+    await ApiService.delete(
+      '/servers/$serverId/me/avatar',
+      extraHeaders: _authHeaders,
+    );
+  }
+
+  static String _resolveImageContentType(String filePath, String? hinted) {
+    final h = (hinted ?? '').trim().toLowerCase();
+    if (h.startsWith('image/')) return h;
+    final lower = filePath.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
   }
 
   static Future<List<dynamic>> _getListResponse(

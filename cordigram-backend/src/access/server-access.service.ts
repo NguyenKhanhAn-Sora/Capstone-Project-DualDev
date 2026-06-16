@@ -86,7 +86,7 @@ export class ServerAccessService {
     server: unknown,
     serverId: string,
     applicantUserId: string,
-    status: 'accepted' | 'rejected' | 'withdrawn',
+    status: 'pending' | 'accepted' | 'rejected' | 'withdrawn',
   ): void {
     try {
       const ids = new Set<string>();
@@ -291,17 +291,12 @@ export class ServerAccessService {
     serverId: string,
     requesterUserId: string,
   ): Promise<void> {
-    const server = await this.serversService.getServerById(serverId);
-    const isOwner = String(server.ownerId) === String(requesterUserId);
-    // IMPORTANT: use the same permission calculation as the UI permissions endpoint.
-    // `hasPermission()` and `calculateMemberPermissions()` must remain consistent, but
-    // historically they could diverge; join-applications should follow calculated perms.
-    const perms = await this.rolesService.calculateMemberPermissions(
+    const canReview = await this.rolesService.hasPermission(
       serverId,
       requesterUserId,
+      'manageServer',
     );
-    const canManageServer = Boolean((perms as any)?.manageServer);
-    if (!isOwner && !canManageServer) {
+    if (!canReview) {
       throw new ForbiddenException(
         'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới xem được đơn đăng ký',
       );
@@ -426,43 +421,56 @@ export class ServerAccessService {
     const memberIds = members
       .map((m) => String(m.userId?._id ?? m.userId))
       .filter(Boolean);
-    const oidList = memberIds.map((id) => new Types.ObjectId(id));
 
     const memberIdsNoOwner = memberIds.filter(
       (id) => id && !sameMongoUserId(id, ownerIdStr),
     );
-    const oidListNoOwner = memberIdsNoOwner.map((id) => new Types.ObjectId(id));
 
-    // Chỉ đếm pending trong số user vẫn còn trong server.members (tránh ghost sau khi rời mà chưa xóa UserServer).
-    // Chủ server không có "đơn đăng ký" — không đếm vào pending.
+    // Đếm mọi đơn pending (kể cả user chưa sync vào server.members).
     const pendingCount =
-      oidListNoOwner.length === 0
-        ? 0
+      ownerIdStr && Types.ObjectId.isValid(ownerIdStr)
+        ? await this.userServerModel.countDocuments({
+            serverId: new Types.ObjectId(serverId),
+            status: 'pending',
+            userId: { $ne: new Types.ObjectId(ownerIdStr) },
+          })
         : await this.userServerModel.countDocuments({
             serverId: new Types.ObjectId(serverId),
             status: 'pending',
-            userId: { $in: oidListNoOwner },
           });
 
-    const [profiles, users, userServers] = await Promise.all([
-      oidListNoOwner.length
+    const userServers = await this.userServerModel
+      .find({ serverId: new Types.ObjectId(serverId) })
+      .lean()
+      .exec();
+
+    const applicationUserIds = (userServers as any[])
+      .filter((us) => us.status === 'pending' || us.status === 'rejected')
+      .map((us) => stringMongoUserId(us.userId))
+      .filter((uid) => uid && !(ownerIdStr && sameMongoUserId(uid, ownerIdStr)));
+
+    const profileUserIds = [
+      ...new Set([...memberIdsNoOwner, ...applicationUserIds]),
+    ];
+    const profileOidList = profileUserIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const [profiles, users] = await Promise.all([
+      profileOidList.length
         ? this.profileModel
-            .find({ userId: { $in: oidListNoOwner } })
+            .find({ userId: { $in: profileOidList } })
             .select('userId displayName username avatarUrl')
             .lean()
             .exec()
         : [],
-      oidListNoOwner.length
+      profileOidList.length
         ? this.userModel
-            .find({ _id: { $in: oidListNoOwner } })
+            .find({ _id: { $in: profileOidList } })
             .select('_id username createdAt')
             .lean()
             .exec()
         : [],
-      this.userServerModel
-        .find({ serverId: new Types.ObjectId(serverId) })
-        .lean()
-        .exec(),
     ]);
 
     const profileByUser = new Map(
@@ -533,6 +541,33 @@ export class ServerAccessService {
         return hasJoinApplicationRecord(us);
       });
 
+    // Bổ sung đơn pending/rejected còn UserServer nhưng thiếu trong server.members (vd. re-apply sau khi rời).
+    if (status === 'pending' || status === 'rejected') {
+      const seen = new Set(filtered.map((r) => r.userId));
+      for (const us of userServers as any[]) {
+        const uid = stringMongoUserId(us.userId);
+        if (!uid || (ownerIdStr && sameMongoUserId(uid, ownerIdStr))) continue;
+        if (us.status !== status || seen.has(uid)) continue;
+        const prof = profileByUser.get(uid);
+        const urow = userById.get(uid);
+        const registeredAt = us.applicationSubmittedAt
+          ? new Date(us.applicationSubmittedAt)
+          : us.createdAt
+            ? new Date(us.createdAt)
+            : new Date();
+        filtered.push({
+          userId: uid,
+          displayName: String(prof?.displayName || urow?.username || 'User'),
+          username: String(prof?.username || urow?.username || ''),
+          avatarUrl: prof?.avatarUrl ? String(prof.avatarUrl) : undefined,
+          status: status as UserServerStatus,
+          registeredAt: registeredAt.toISOString(),
+          acceptedRules: Boolean(us.acceptedRules),
+        });
+        seen.add(uid);
+      }
+    }
+
     filtered.sort(
       (a, b) =>
         new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime(),
@@ -568,16 +603,11 @@ export class ServerAccessService {
   }> {
     await this.assertCanReviewJoinApplications(serverId, requesterUserId);
     const server = await this.serversService.getServerById(serverId);
-    if (
-      String((server as any).ownerId?._id ?? (server as any).ownerId) ===
-      String(applicantUserId)
-    ) {
+    const ownerIdStr = stringMongoUserId((server as any).ownerId);
+    if (ownerIdStr && sameMongoUserId(ownerIdStr, applicantUserId)) {
       throw new BadRequestException(
         'Chủ máy chủ không có đơn đăng ký tham gia',
       );
-    }
-    if (!this.serversService.isMember(server as any, applicantUserId)) {
-      throw new NotFoundException('Người dùng không thuộc máy chủ');
     }
 
     const [prof, urow, us] = await Promise.all([
@@ -599,6 +629,10 @@ export class ServerAccessService {
         .lean()
         .exec(),
     ]);
+
+    if (!us) {
+      throw new NotFoundException('Không tìm thấy đơn đăng ký');
+    }
 
     const formQs = Array.isArray(
       (server as any)?.joinApplicationForm?.questions,
@@ -1414,6 +1448,21 @@ export class ServerAccessService {
       .lean()
       .exec();
 
+    if (
+      !statusOverride &&
+      accessMode === 'apply' &&
+      (updated as any)?.status === 'pending'
+    ) {
+      await this.ensureApplicantInServerMembers(serverId, userId);
+      const serverAfter = await this.serversService.getServerById(serverId);
+      this.notifyJoinApplicationUpdated(
+        serverAfter,
+        serverId,
+        userId,
+        'pending',
+      );
+    }
+
     return updated as any;
   }
 
@@ -1656,5 +1705,17 @@ export class ServerAccessService {
       userId,
       role === 'owner' ? 'member' : 'member',
     );
+  }
+
+  /** Pending/rejected applicants must appear in server.members for admin review lists. */
+  private async ensureApplicantInServerMembers(
+    serverId: string,
+    userId: string,
+  ): Promise<void> {
+    const server = await this.serversService.getServerById(serverId);
+    if (this.serversService.isMember(server as any, userId)) return;
+    await this.serversService.addMemberToServer(serverId, userId, 'member', null, {
+      skipWelcome: true,
+    });
   }
 }

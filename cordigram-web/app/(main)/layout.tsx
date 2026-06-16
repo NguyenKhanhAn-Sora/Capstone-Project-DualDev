@@ -7,6 +7,7 @@ import GlobalDmIncomingCalls from "@/components/GlobalDmIncomingCalls";
 import { PostUploadProvider } from "@/context/post-upload-context";
 import { GuestAuthProvider } from "@/context/guest-auth-context";
 import { NavigationGuardProvider } from "@/context/navigation-guard-context";
+import { AppDialogProvider } from "@/context/app-dialog-provider";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/component/theme-provider";
 import GalaxyBackground from "@/component/galaxy-background";
@@ -27,6 +28,7 @@ export default function MainLayout({
 
   return (
     <NavigationGuardProvider>
+    <AppDialogProvider>
     <PostUploadProvider>
       <GuestAuthProvider>
         {isGalaxy && <GalaxyBackground />}
@@ -50,6 +52,7 @@ export default function MainLayout({
         )}
       </GuestAuthProvider>
     </PostUploadProvider>
+    </AppDialogProvider>
     </NavigationGuardProvider>
   );
 }

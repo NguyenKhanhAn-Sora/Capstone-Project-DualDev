@@ -85,12 +85,6 @@ class _ChannelContextBodyState extends State<_ChannelContextBody> {
   Future<void> _load() async {
     if (_uid.isEmpty) return;
     final muted = await ServerSidebarPrefsStore.isChannelMuted(_uid, _sid, _cid);
-    final eff = await ServerSidebarPrefsStore.effectiveNotifyLevel(
-      _uid,
-      _sid,
-      _cid,
-      widget.categoryId,
-    );
     final prefs = await ServerSidebarPrefsStore.getServerPrefs(_uid, _sid);
     final ch = prefs['channels'];
     String mode = 'inherit_category';

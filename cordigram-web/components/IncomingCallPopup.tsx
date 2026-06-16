@@ -12,7 +12,7 @@ interface IncomingCallPopupProps {
   callType: "audio" | "video";
   onAccept: () => void;
   onReject: () => void;
-  status?: "incoming" | "cancelled"; // ✅ Status for when caller cancels
+  status?: "incoming" | "cancelled" | "accepted";
   /**
    * When true, the backdrop is a light translucent blur (page behind stays
    * visible) instead of the near-solid black used inside the messages app.
@@ -33,6 +33,7 @@ export default function IncomingCallPopup({
   const { t } = useLanguage();
   const uiTone = useMessagesUiTone();
   const isCancelled = status === "cancelled";
+  const isAccepted = status === "accepted";
 
   // ✅ Play incoming call ringtone (only when status is 'incoming')
   useCallSound("incoming", status === "incoming");
@@ -75,6 +76,17 @@ export default function IncomingCallPopup({
           <p className={styles.statusCancelled}>
             {t("chat.popups.incomingCall.canceled")}
           </p>
+        ) : isAccepted ? (
+          <>
+            <span className={styles.kindPill}>
+              {callType === "video"
+                ? t("chat.popups.incomingCall.videoCall")
+                : t("chat.popups.incomingCall.voiceCall")}
+            </span>
+            <p className={styles.statusLive}>
+              Đã chấp nhận — nhấn Tham gia để mở cuộc gọi
+            </p>
+          </>
         ) : (
           <>
             <span className={styles.kindPill}>
@@ -132,7 +144,7 @@ export default function IncomingCallPopup({
                 >
                   <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
                 </svg>
-                <span>{t("chat.popups.incomingCall.accept")}</span>
+                <span>{isAccepted ? "Tham gia" : t("chat.popups.incomingCall.accept")}</span>
               </button>
             </>
           )}

@@ -21,6 +21,7 @@ class ChannelMessage {
     this.replyTo,
     this.senderAvatarUrl,
     this.stickerReplyWelcomeEnabled = true,
+    this.welcomeWaveDismissedByMe = false,
     this.linkPreviews = const [],
   });
 
@@ -45,8 +46,59 @@ class ChannelMessage {
   /// Server interaction setting; only used when [type] is `welcome`.
   final bool stickerReplyWelcomeEnabled;
 
+  /// True when the current viewer already waved at this welcome message.
+  final bool welcomeWaveDismissedByMe;
+
   /// Pre-fetched link previews (fetched server-side on message send).
   final List<DmLinkPreview> linkPreviews;
+
+  ChannelMessage copyWith({
+    String? id,
+    String? channelId,
+    String? senderId,
+    String? senderName,
+    String? content,
+    DateTime? createdAt,
+    String? type,
+    String? voiceUrl,
+    int? voiceDurationSec,
+    String? giphyId,
+    String? customStickerUrl,
+    List<String>? attachments,
+    List<MessageReaction>? reactions,
+    bool? isPinned,
+    DateTime? pinnedAt,
+    ChannelReplyMessage? replyTo,
+    String? senderAvatarUrl,
+    bool? stickerReplyWelcomeEnabled,
+    bool? welcomeWaveDismissedByMe,
+    List<DmLinkPreview>? linkPreviews,
+  }) {
+    return ChannelMessage(
+      id: id ?? this.id,
+      channelId: channelId ?? this.channelId,
+      senderId: senderId ?? this.senderId,
+      senderName: senderName ?? this.senderName,
+      content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+      type: type ?? this.type,
+      voiceUrl: voiceUrl ?? this.voiceUrl,
+      voiceDurationSec: voiceDurationSec ?? this.voiceDurationSec,
+      giphyId: giphyId ?? this.giphyId,
+      customStickerUrl: customStickerUrl ?? this.customStickerUrl,
+      attachments: attachments ?? this.attachments,
+      reactions: reactions ?? this.reactions,
+      isPinned: isPinned ?? this.isPinned,
+      pinnedAt: pinnedAt ?? this.pinnedAt,
+      replyTo: replyTo ?? this.replyTo,
+      senderAvatarUrl: senderAvatarUrl ?? this.senderAvatarUrl,
+      stickerReplyWelcomeEnabled:
+          stickerReplyWelcomeEnabled ?? this.stickerReplyWelcomeEnabled,
+      welcomeWaveDismissedByMe:
+          welcomeWaveDismissedByMe ?? this.welcomeWaveDismissedByMe,
+      linkPreviews: linkPreviews ?? this.linkPreviews,
+    );
+  }
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
     final senderRaw = json['sender'] ?? json['senderId'];
@@ -108,6 +160,7 @@ class ChannelMessage {
             )
           : null,
       stickerReplyWelcomeEnabled: json['stickerReplyWelcomeEnabled'] != false,
+      welcomeWaveDismissedByMe: json['welcomeWaveDismissedByMe'] == true,
       linkPreviews: () {
         final raw = json['linkPreviews'];
         if (raw is! List) return const <DmLinkPreview>[];

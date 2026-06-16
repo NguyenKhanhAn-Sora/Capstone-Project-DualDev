@@ -3669,8 +3669,7 @@
     "welcome": {
       "title": "Welcome to",
       "serverOf": "{name}'s Server",
-      "channelBegin": "This is the beginning of the",
-      "startTalking": " channel. Start chatting!",
+      "channelIntro": "Welcome to {serverName}. Start your conversation.",
       "greeting": "Nice to meet you, {name}!",
       "unknownUser": "Someone",
       "waving": "Sending...",
@@ -3851,6 +3850,8 @@
       "unmuteNotifications": "Turn notifications back on",
       "block": "Block",
       "unblock": "Unblock",
+      "blockedByYou": "You blocked {name}",
+      "blockedByPeer": "You were blocked by {name}",
       "muteDialogTitle": "Mute message notifications",
       "muteDialogActiveTitle": "Notifications are off",
       "turnOnNotifications": "Turn notifications back on",

@@ -27,7 +27,7 @@ class CurrentUserServerPermissions {
   final bool mentionEveryone;
 
   bool get canManageChannelsStructure =>
-      isOwner || (canManageServer && canManageChannels);
+      isOwner || canManageChannels;
 
   bool get canAccessPrivateChannel =>
       isOwner || canManageServer || canManageChannels;
@@ -52,7 +52,7 @@ class CurrentUserServerPermissions {
       canManageChannels: b('canManageChannels'),
       canManageEvents: b('canManageEvents'),
       canManageExpressions: b('canManageExpressions'),
-      canCreateInvite: b('canCreateInvite', def: true),
+      canCreateInvite: b('canCreateInvite', def: false),
       mentionEveryone: b('mentionEveryone'),
     );
   }

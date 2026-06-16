@@ -10,6 +10,8 @@ class MessageThread {
     this.isPinned = false,
     this.lastSeenAt,
     this.presenceLabel = '',
+    this.category,
+    this.isFollowing = false,
   });
 
   final String id;
@@ -22,4 +24,6 @@ class MessageThread {
   final bool isPinned;
   final DateTime? lastSeenAt;
   final String presenceLabel;
+  final String? category;
+  final bool isFollowing;
 }

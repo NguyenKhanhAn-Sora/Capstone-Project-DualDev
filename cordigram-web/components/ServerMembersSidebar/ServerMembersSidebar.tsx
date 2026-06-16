@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./ServerMembersSidebar.module.css";
@@ -307,7 +308,7 @@ export default function ServerMembersSidebar({
       await fetchMembers();
       closeModerationModal();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Không thực hiện được hành động");
+      appAlert(err instanceof Error ? err.message : "Không thực hiện được hành động");
     } finally {
       setModerationLoading(false);
     }

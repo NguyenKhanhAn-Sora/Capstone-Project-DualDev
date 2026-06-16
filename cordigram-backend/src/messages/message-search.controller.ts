@@ -4,6 +4,7 @@ import {
   Query,
   UseGuards,
   BadRequestException,
+  Request,
 } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -15,6 +16,7 @@ export class MessageSearchController {
 
   @Get('search')
   async searchMessages(
+    @Request() req: any,
     @Query('q') q?: string,
     @Query('serverId') serverId?: string,
     @Query('channelId') channelId?: string,
@@ -34,6 +36,7 @@ export class MessageSearchController {
     }
 
     return this.messagesService.searchMessages({
+      viewerId: req.user.userId,
       q,
       serverId,
       channelId,

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CategoryNotifyMode, ChannelNotifyMode, NotifyLevel } from "@/lib/sidebar-prefs";
 import { notifyLabelChannel } from "@/lib/sidebar-prefs";
@@ -138,14 +139,13 @@ export default function ChannelContextMenu({
       return;
     }
     if (
-      typeof window !== "undefined" &&
-      window.confirm("Bạn chưa tham gia máy chủ này. Tham gia ngay để vào kênh?")
+      await appConfirm("Bạn chưa tham gia máy chủ này. Tham gia ngay để vào kênh?")
     ) {
       try {
         await onJoinServerThenOpenChannel?.();
         await onInviteToChannel();
       } catch (e) {
-        alert((e as Error)?.message || "Không thể tham gia máy chủ");
+        appAlert((e as Error)?.message || "Không thể tham gia máy chủ");
       }
     }
     onClose();
@@ -154,13 +154,12 @@ export default function ChannelContextMenu({
   const handleCopyLink = async () => {
     if (!isMemberOfServer) {
       if (
-        typeof window !== "undefined" &&
-        window.confirm("Bạn chưa tham gia máy chủ. Tham gia trước khi dùng link đầy đủ?")
+        await appConfirm("Bạn chưa tham gia máy chủ. Tham gia trước khi dùng link đầy đủ?")
       ) {
         try {
           await onJoinServerThenOpenChannel?.();
         } catch (e) {
-          alert((e as Error)?.message || "Không thể tham gia");
+          appAlert((e as Error)?.message || "Không thể tham gia");
         }
       }
     }

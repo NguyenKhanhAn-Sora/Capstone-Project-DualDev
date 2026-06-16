@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 
 const IcoCrown = () => (
@@ -221,7 +222,7 @@ export default function ServerMembersSection({
       await fetchMembers();
       closeModerationModal();
     } catch (err) {
-      alert(err instanceof Error ? err.message : t("chat.serverMembers.moderateFail"));
+      appAlert(err instanceof Error ? err.message : t("chat.serverMembers.moderateFail"));
     } finally {
       setModerationLoading(false);
     }
@@ -420,11 +421,11 @@ export default function ServerMembersSection({
                   try {
                     const count = pruneCount ?? (await serversApi.getPruneCount({ serverId, days: filterDays, role: filterRole }));
                     if (count <= 0) { setPruneCount(0); return; }
-                    const ok = window.confirm(t("chat.serverMembers.filterConfirm").replace("{n}", String(count)).replace("{days}", String(filterDays)));
+                    const ok = await appConfirm(t("chat.serverMembers.filterConfirm").replace("{n}", String(count)).replace("{days}", String(filterDays)));
                     if (!ok) return;
                     const removed = await serversApi.pruneMembers({ serverId, days: filterDays, role: filterRole });
                     await fetchMembers(); setFilterModalOpen(false); setPruneCount(null);
-                    alert(t("chat.serverMembers.filterDone").replace("{n}", String(removed)));
+                    appAlert(t("chat.serverMembers.filterDone").replace("{n}", String(removed)));
                   } catch (err) {
                     setPruneError(err instanceof Error ? err.message : t("chat.serverMembers.filterError"));
                   } finally { setPruneLoading(false); }
@@ -536,7 +537,7 @@ export default function ServerMembersSection({
                     await serversApi.transferServerOwnership(serverId, transferConfirmMember.userId);
                     setTransferConfirmMember(null); onOwnershipTransferred?.();
                   } catch (err) {
-                    alert(err instanceof Error ? err.message : t("chat.serverMembers.transferFail"));
+                    appAlert(err instanceof Error ? err.message : t("chat.serverMembers.transferFail"));
                   } finally { setTransferring(false); }
                 }}>
                 {transferring ? t("chat.serverMembers.transferApplying") : t("chat.serverMembers.transferBtn")}

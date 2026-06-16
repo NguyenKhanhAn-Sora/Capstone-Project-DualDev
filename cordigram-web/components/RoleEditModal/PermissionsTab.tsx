@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import styles from "./PermissionsTab.module.css";
 import type { Role, RolePermissions } from "@/lib/servers-api";
@@ -92,7 +93,7 @@ export default function PermissionsTab({
       });
       onUpdate(updated);
     } catch (err) {
-      alert(err instanceof Error ? err.message : t("chat.rolePermissions.saveFailed"));
+      appAlert(err instanceof Error ? err.message : t("chat.rolePermissions.saveFailed"));
     } finally {
       setSaving(false);
     }

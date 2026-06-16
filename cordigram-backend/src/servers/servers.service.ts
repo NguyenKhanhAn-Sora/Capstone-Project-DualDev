@@ -27,6 +27,7 @@ import { RolePermissions } from '../roles/role.schema';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AddServerEmojiDto } from './dto/add-server-emoji.dto';
 import { BoostService } from '../boost/boost.service';
+import { FcmPushService } from '../notifications/fcm-push.service';
 
 /** Tổng số emoji tùy chỉnh (tĩnh + GIF) tối đa mỗi máy chủ. */
 const MAX_CUSTOM_EMOJIS_PER_SERVER = 30;
@@ -62,6 +63,7 @@ export class ServersService {
     private readonly auditLogService: AuditLogService,
     @Inject(forwardRef(() => BoostService))
     private readonly boostService: BoostService,
+    private readonly fcmPushService: FcmPushService,
   ) {}
 
   private stickerMaxFromBoost(boost: {
@@ -81,6 +83,66 @@ export class ServersService {
       );
     }
     return STICKER_FREE_SLOTS;
+  }
+
+  /** Chỉ tính máy chủ chưa bị soft-delete. */
+  private readonly serverNotDeletedFilter = {
+    $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+  };
+
+  private ownerStickerBoostAssignmentQuery(
+    ownerId: Types.ObjectId | string,
+    excludeServerId?: Types.ObjectId | string,
+  ): Record<string, unknown> {
+    const oid =
+      ownerId instanceof Types.ObjectId
+        ? ownerId
+        : new Types.ObjectId(String(ownerId));
+    const query: Record<string, unknown> = {
+      ownerId: oid,
+      stickerBoostTier: { $in: ['basic', 'boost'] },
+      ...this.serverNotDeletedFilter,
+    };
+    if (excludeServerId) {
+      query._id = {
+        $ne:
+          excludeServerId instanceof Types.ObjectId
+            ? excludeServerId
+            : new Types.ObjectId(String(excludeServerId)),
+      };
+    }
+    return query;
+  }
+
+  /** Gỡ gán Boost sticker trên máy chủ đã xóa (sửa dữ liệu cũ + tránh chiếm slot 2/2). */
+  private async clearStickerBoostOnDeletedOwnerServers(
+    ownerId: string,
+  ): Promise<void> {
+    await this.serverModel
+      .updateMany(
+        {
+          ownerId: new Types.ObjectId(ownerId),
+          stickerBoostTier: { $in: ['basic', 'boost'] },
+          deletedAt: { $exists: true, $ne: null },
+        },
+        { $set: { stickerBoostTier: null } },
+      )
+      .exec();
+  }
+
+  private async countOwnerStickerBoostAssignments(
+    ownerId: string,
+    excludeServerId?: string,
+  ): Promise<number> {
+    await this.clearStickerBoostOnDeletedOwnerServers(ownerId);
+    return this.serverModel
+      .countDocuments(
+        this.ownerStickerBoostAssignmentQuery(
+          ownerId,
+          excludeServerId ? new Types.ObjectId(excludeServerId) : undefined,
+        ),
+      )
+      .exec();
   }
 
   private async canManageServerExpressions(
@@ -633,10 +695,14 @@ export class ServersService {
     const server = await this.serverModel.findById(serverId);
     if (!server) throw new NotFoundException('Server not found');
 
-    const member = server.members.find((m) => m.userId.toString() === userId);
-    if (!member || member.role === 'member') {
+    const canManage = await this.rolesService.hasPermission(
+      serverId,
+      userId,
+      'manageChannels',
+    );
+    if (!canManage) {
       throw new ForbiddenException(
-        'Only owner or moderator can create categories',
+        'Chỉ thành viên có quyền Quản Lý Kênh mới được tạo danh mục',
       );
     }
 
@@ -1199,6 +1265,7 @@ export class ServersService {
     // Soft delete so admin can restore later (keeps owner + members + data).
     (server as any).deletedAt = new Date();
     (server as any).deletedByUserId = new Types.ObjectId(userId);
+    (server as any).stickerBoostTier = null;
     await server.save();
   }
 
@@ -1207,6 +1274,7 @@ export class ServersService {
     memberId: string,
     role: 'moderator' | 'member' = 'member',
     nickname?: string | null,
+    opts?: { skipWelcome?: boolean },
   ): Promise<Server> {
     const server = await this.serverModel.findById(serverId);
 
@@ -1242,9 +1310,11 @@ export class ServersService {
       recipients: this.memberUserIdsForRealtime(saved),
     });
 
-    this.sendWelcomeMessage(serverId, memberId).catch((err) => {
-      console.error('[sendWelcomeMessage] Failed:', err?.message || err);
-    });
+    if (!opts?.skipWelcome) {
+      this.sendWelcomeMessage(serverId, memberId).catch((err) => {
+        console.error('[sendWelcomeMessage] Failed:', err?.message || err);
+      });
+    }
 
     return saved;
   }
@@ -2478,6 +2548,16 @@ export class ServersService {
 
     (server as any).interactionSettings = next;
     await server.save();
+
+    const recipients = this.memberUserIdsForRealtime(server);
+    const systemChannelId =
+      next.systemChannelId != null ? String(next.systemChannelId) : null;
+    this.channelMessagesGateway.emitInteractionSettingsUpdated(recipients, {
+      serverId: String(serverId),
+      systemChannelId,
+      stickerReplyWelcomeEnabled: next.stickerReplyWelcomeEnabled ?? true,
+    });
+
     return this.getInteractionSettings(serverId, userId);
   }
 
@@ -2539,6 +2619,42 @@ export class ServersService {
       targetRoleName,
       recipientUserIds: uniqueRecipientIds,
     });
+
+    try {
+      this.channelMessagesGateway.emitInboxForYouItem(
+        uniqueRecipientIds.map((id) => id.toString()),
+        {
+          type: 'server_notification',
+          _id: notification._id.toString(),
+          serverId,
+          serverName: server.name?.trim?.() ?? '',
+          serverAvatarUrl: (server as any).avatarUrl ?? null,
+          title,
+          content,
+          targetRoleName,
+          createdAt:
+            (notification as any).createdAt?.toISOString?.() ??
+            new Date().toISOString(),
+          seen: false,
+        },
+        actorId,
+      );
+      void this.fcmPushService.pushInboxForYouItemToUsers(
+        uniqueRecipientIds.map((id) => id.toString()),
+        {
+          type: 'server_notification',
+          _id: notification._id.toString(),
+          serverId,
+          serverName: server.name?.trim?.() ?? '',
+          serverAvatarUrl: (server as any).avatarUrl ?? null,
+          title,
+          content,
+        },
+        actorId,
+      );
+    } catch (_) {
+      // non-critical
+    }
 
     return {
       success: true,
@@ -2621,26 +2737,13 @@ export class ServersService {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
 
-    // Kiểm tra có phải member không
-    const isMember = server.members.some((m) => m.userId.toString() === userId);
-    if (!isMember) {
-      throw new ForbiddenException('Bạn không phải thành viên của server này');
-    }
+    await this.ensureOwnerMemberRow(server);
 
     const isOwner = server.ownerId.toString() === userId;
-
-    // Kiểm tra user có vai trò nào ngoài @everyone không
-    const memberRoles = await this.rolesService.getMemberRoles(
-      serverId,
-      userId,
-    );
-    const hasCustomRole = memberRoles.some((r) => !r.isDefault);
-
-    // Owner có tất cả quyền
     if (isOwner) {
       return {
         isOwner: true,
-        hasCustomRole: true, // Owner luôn có quyền
+        hasCustomRole: true,
         canKick: true,
         canBan: true,
         canTimeout: true,
@@ -2652,6 +2755,19 @@ export class ServersService {
         mentionEveryone: true,
       };
     }
+
+    // Kiểm tra có phải member không
+    const isMember = server.members.some((m) => m.userId.toString() === userId);
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+
+    // Kiểm tra user có vai trò nào ngoài @everyone không
+    const memberRoles = await this.rolesService.getMemberRoles(
+      serverId,
+      userId,
+    );
+    const hasCustomRole = memberRoles.some((r) => !r.isDefault);
 
     // Lấy permissions từ roles
     const permissions = await this.rolesService.calculateMemberPermissions(
@@ -4180,6 +4296,9 @@ export class ServersService {
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
+    if ((server as any).deletedAt) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
     if ((server as any).ownerId?.toString() !== userId) {
       throw new ForbiddenException(
         'Chỉ chủ máy chủ mới có thể gán gói Boost mở rộng ô sticker cho máy chủ này.',
@@ -4187,6 +4306,7 @@ export class ServersService {
     }
 
     const ownerBoost = await this.boostService.getBoostStatus(userId, 'messages');
+    await this.clearStickerBoostOnDeletedOwnerServers(userId);
     const normalizedTier: 'basic' | 'boost' | null =
       tier === 'basic' || tier === 'boost' ? tier : null;
 
@@ -4207,11 +4327,10 @@ export class ServersService {
     const current = (server as any).stickerBoostTier ?? null;
     const hadAssignment = current === 'basic' || current === 'boost';
     if (normalizedTier && !hadAssignment) {
-      const other = await this.serverModel.countDocuments({
-        ownerId: new Types.ObjectId(userId),
-        _id: { $ne: server._id },
-        stickerBoostTier: { $in: ['basic', 'boost'] },
-      });
+      const other = await this.countOwnerStickerBoostAssignments(
+        userId,
+        serverId,
+      );
       if (other >= OWNER_STICKER_BOOST_MAX_SERVERS) {
         throw new BadRequestException(
           `Bạn chỉ có thể áp dụng mở rộng ô sticker cho tối đa ${OWNER_STICKER_BOOST_MAX_SERVERS} máy chủ. Hãy gỡ gán trên một máy chủ khác trước.`,
@@ -4223,12 +4342,8 @@ export class ServersService {
     await server.save();
 
     const meta = await this.getStickerSlotMetaForServer(server as any);
-    const assignedStickerBoostServerCount = await this.serverModel
-      .countDocuments({
-        ownerId: new Types.ObjectId(userId),
-        stickerBoostTier: { $in: ['basic', 'boost'] },
-      })
-      .exec();
+    const assignedStickerBoostServerCount =
+      await this.countOwnerStickerBoostAssignments(userId);
 
     return {
       stickerBoostTier: normalizedTier,
@@ -4471,7 +4586,10 @@ export class ServersService {
   }> {
     const userObjectId = new Types.ObjectId(userId);
     const servers = await this.serverModel
-      .find({ 'members.userId': userObjectId })
+      .find({
+        'members.userId': userObjectId,
+        ...this.serverNotDeletedFilter,
+      })
       .select('_id name avatarUrl customStickers ownerId stickerBoostTier')
       .lean()
       .exec();
@@ -4617,6 +4735,9 @@ export class ServersService {
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
+    if ((server as any).deletedAt) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
 
     const canManage = await this.canManageServerExpressions(serverId, userId);
     if (!canManage) {
@@ -4672,12 +4793,8 @@ export class ServersService {
     const rawTier = (server as any).stickerBoostTier;
     const stickerBoostTierOnServer: 'basic' | 'boost' | null =
       rawTier === 'basic' || rawTier === 'boost' ? rawTier : null;
-    const ownerStickerBoostSlotsUsed = await this.serverModel
-      .countDocuments({
-        ownerId: new Types.ObjectId(ownerIdStr),
-        stickerBoostTier: { $in: ['basic', 'boost'] },
-      })
-      .exec();
+    const ownerStickerBoostSlotsUsed =
+      await this.countOwnerStickerBoostAssignments(ownerIdStr);
     const slotMeta = await this.getStickerSlotMetaForServer(server as any);
 
     return {

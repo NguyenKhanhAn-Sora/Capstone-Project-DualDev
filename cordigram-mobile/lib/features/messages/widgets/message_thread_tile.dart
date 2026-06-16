@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/services/language_controller.dart';
 import '../models/message_thread.dart';
+import '../utils/dm_conversation_categories.dart';
 import '../utils/messages_i18n.dart';
 
 class MessageThreadTile extends StatelessWidget {
@@ -9,11 +10,13 @@ class MessageThreadTile extends StatelessWidget {
     super.key,
     required this.thread,
     required this.onTap,
+    this.onLongPress,
     this.showActivityLabel = true,
   });
 
   final MessageThread thread;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final bool showActivityLabel;
 
   String get _unreadLabel {
@@ -42,6 +45,7 @@ class MessageThreadTile extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       onTap: onTap,
+      onLongPress: onLongPress,
       leading: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -111,29 +115,40 @@ class MessageThreadTile extends StatelessWidget {
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 1),
-        child: hasPreview
-            ? Text(
-                preview,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: thread.unreadCount > 0
-                      ? scheme.onSurface
-                      : scheme.onSurfaceVariant,
-                  fontSize: 12,
-                  fontWeight:
-                      thread.unreadCount > 0 ? FontWeight.w600 : FontWeight.w400,
-                ),
-              )
-            : Text(
-                presenceText,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: 12,
-                ),
-              ),
+        child: Row(
+          children: [
+            if (thread.category != null) ...[
+              dmCategoryMark(thread.category, size: 13),
+              const SizedBox(width: 5),
+            ],
+            Expanded(
+              child: hasPreview
+                  ? Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: thread.unreadCount > 0
+                            ? scheme.onSurface
+                            : scheme.onSurfaceVariant,
+                        fontSize: 12,
+                        fontWeight: thread.unreadCount > 0
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    )
+                  : Text(
+                      presenceText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

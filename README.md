@@ -296,6 +296,8 @@ git clone https://github.com/NguyenKhanhAn-Sora/Capstone-Project-DualDev
 cd Capstone-Project-DualDev
 ```
 
+### Get Env of Proejct here: ====> https://docs.google.com/document/d/1LYrCk8NeGd-VWWJZitXpiTrc5yWL4rdgyNYuf2jgTlI/edit?usp=sharing
+
 ### 2. Backend setup
 ```bash
 cd cordigram-backend
