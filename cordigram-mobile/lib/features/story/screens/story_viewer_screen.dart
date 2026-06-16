@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/audio_cache_service.dart';
 import '../../../core/services/auth_storage.dart';
 import '../../../core/services/language_controller.dart';
 import '../models/story_models.dart';
@@ -49,14 +50,17 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   final Map<String, bool> _followMap = {};
   final Set<String> _loadingFollow = {};
 
-  // Local visibility override (so UI updates immediately after PATCH)
+  // Local overrides so UI updates immediately without waiting for server round-trip
   String? _localVisibility;
+  String? _localReaction; // null = no reaction yet / cleared
 
   @override
   void initState() {
     super.initState();
     _groupIdx = widget.initialGroupIndex;
     _initStory();
+    // Clean up stale cached files from previous sessions (fire-and-forget).
+    AudioCacheService.instance.evictOld();
   }
 
   StoryFeedGroup get _group => widget.groups[_groupIdx];
@@ -70,11 +74,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _disposeVideo();
     _disposeProgress();
     _videoReady = false;
+    _paused = false;
     _showViewers = false;
     _waitingForAudio = false;
     // Cancel any stale audio load from a previous story.
     _audioLoadForStoryId = null;
     _localVisibility = _story.visibility;
+    _localReaction = _story.myReaction;
     StoryService.markViewed(_story.id);
 
     if (_story.type == 'media' &&
@@ -87,61 +93,150 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     } else {
       _startProgress();
     }
+
+    // Kick off background prefetch for upcoming stories (fire-and-forget).
+    _prefetchUpcoming();
   }
 
-  /// Buffers audio first, then starts story progress and audio simultaneously.
+  /// Prefetches music for the next few stories so they play instantly.
+  void _prefetchUpcoming() {
+    const lookahead = 3;
+    var fetched = 0;
+    for (var gi = _groupIdx; gi < widget.groups.length && fetched < lookahead; gi++) {
+      final group = widget.groups[gi];
+      final startSi = (gi == _groupIdx) ? _storyIdx + 1 : 0;
+      for (var si = startSi; si < group.stories.length && fetched < lookahead; si++) {
+        final url = group.stories[si].music?.audioUrl ?? '';
+        if (url.isNotEmpty) {
+          AudioCacheService.instance.prefetch(url);
+          fetched++;
+        }
+      }
+    }
+  }
+
+  /// Plays story music, preferring a locally cached file for instant start.
+  /// Falls back to URL streaming if the file is not yet cached.
   Future<void> _initMusicPlayerWithSync(StoryMusic music) async {
     _stopAudio();
     final storyId = _story.id;
     _audioLoadForStoryId = storyId;
 
+    bool stale() => !mounted || _audioLoadForStoryId != storyId;
+
     setState(() => _waitingForAudio = true);
 
+    // ── 1. Resolve audio source ──────────────────────────────────────────────
+    // Hit in-memory / disk cache first — zero latency when prefetched.
+    String? localPath = await AudioCacheService.instance.getCached(music.audioUrl);
+
+    if (localPath == null && !stale()) {
+      // Not cached yet. Try to download within 3 s; if it completes in time
+      // we play from file (instant playback start). If it times out we fall
+      // through to URL streaming as before.
+      try {
+        localPath = await AudioCacheService.instance
+            .fetchAndCache(music.audioUrl)
+            .timeout(const Duration(seconds: 3));
+      } catch (_) {
+        localPath = null;
+      }
+    }
+
+    if (stale()) {
+      if (mounted) setState(() => _waitingForAudio = false);
+      return;
+    }
+
+    // ── 2. Play ──────────────────────────────────────────────────────────────
     final player = AudioPlayer();
-    _audioPlayer = player;
+    StreamSubscription<PlayerState>? sub;
+    bool audioFailed = false;
 
     try {
       await player.setReleaseMode(ReleaseMode.loop);
 
-      // Wait until the player reports it is actually playing (buffered + started).
+      if (stale()) {
+        player.dispose();
+        if (mounted) setState(() => _waitingForAudio = false);
+        return;
+      }
+
+      _audioPlayer = player;
+
       final completer = Completer<void>();
-      StreamSubscription<PlayerState>? sub;
       sub = player.onPlayerStateChanged.listen((state) {
-        if (state == PlayerState.playing && !completer.isCompleted) {
+        if (!completer.isCompleted &&
+            (state == PlayerState.playing ||
+                state == PlayerState.stopped ||
+                state == PlayerState.completed)) {
           completer.complete();
-          sub?.cancel();
         }
       });
 
-      // Kick off playback (this begins buffering from the network).
-      await player.play(
-        UrlSource(music.audioUrl),
-        position: Duration(seconds: music.startTime),
-      );
+      // Fire-and-forget play — do NOT await. If we await player.play() and
+      // the network is slow, it can block indefinitely before the 6 s timeout
+      // on completer.future even has a chance to fire, which prevents
+      // _startProgress() from ever being called and freezes the story.
+      // Instead, play() runs in the background; the completer resolves as soon
+      // as PlayerState.playing fires (or after the 6 s safety timeout).
+      void onPlayError(_) {
+        if (!completer.isCompleted) completer.complete();
+      }
 
-      // Wait until actually playing, up to 6 s; after timeout proceed anyway.
+      if (localPath != null) {
+        player.play(DeviceFileSource(localPath)).catchError(onPlayError);
+      } else {
+        player
+            .play(
+              UrlSource(music.audioUrl),
+              position: music.startTime > 0
+                  ? Duration(seconds: music.startTime)
+                  : null,
+            )
+            .catchError(onPlayError);
+      }
+
       await completer.future.timeout(
         const Duration(seconds: 6),
         onTimeout: () {},
       );
-      sub.cancel();
     } catch (_) {
-      // Audio failed — continue without it.
-      _audioPlayer = null;
-      player.dispose();
+      audioFailed = true;
+    } finally {
+      sub?.cancel();
     }
 
-    // Check we haven't navigated to a different story while waiting.
-    if (!mounted || _audioLoadForStoryId != storyId) return;
+    if (audioFailed) {
+      if (_audioPlayer == player) _audioPlayer = null;
+      player.stop().catchError((_) {}).then((_) => player.dispose().catchError((_) {}));
+      if (mounted) {
+        setState(() => _waitingForAudio = false);
+        _startProgress();
+      }
+      return;
+    }
 
-    setState(() => _waitingForAudio = false);
-    _startProgress();
+    if (stale()) {
+      if (_audioPlayer == player) _audioPlayer = null;
+      player.stop().catchError((_) {}).then((_) => player.dispose().catchError((_) {}));
+      if (mounted) setState(() => _waitingForAudio = false);
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _waitingForAudio = false);
+      _startProgress();
+    }
   }
 
   void _stopAudio() {
-    _audioPlayer?.stop();
-    _audioPlayer?.dispose();
+    final p = _audioPlayer;
     _audioPlayer = null;
+    if (p != null) {
+      // Chain stop → dispose so the native player is halted before teardown.
+      p.stop().catchError((_) {}).then((_) => p.dispose().catchError((_) {}));
+    }
   }
 
   void _startProgress() {
@@ -289,13 +384,20 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ── Reactions ─────────────────────────────────────────────────────────────
 
   Future<void> _react(String emoji) async {
+    final prev = _localReaction;
+    final removing = _localReaction == emoji;
+    // Optimistic update
+    setState(() => _localReaction = removing ? null : emoji);
     try {
-      if (_story.myReaction == emoji) {
+      if (removing) {
         await StoryService.removeReaction(_story.id);
       } else {
         await StoryService.reactToStory(_story.id, emoji);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Roll back on failure
+      if (mounted) setState(() => _localReaction = prev);
+    }
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
@@ -363,18 +465,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /// Computes the 9:16 preview box within [screenW]×[screenH].
-  /// Returns (offsetX, offsetY, boxW, boxH).
-  static (double, double, double, double) _previewBox(double screenW, double screenH) {
-    double pw = screenW;
-    double ph = pw * 16 / 9;
-    if (ph > screenH) {
-      ph = screenH;
-      pw = ph * 9 / 16;
-    }
-    return ((screenW - pw) / 2, (screenH - ph) / 2, pw, ph);
-  }
-
   static Color _hexColor(String hex) {
     try {
       final s = hex.replaceFirst('#', '');
@@ -404,19 +494,17 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
             if (!_showViewers)
               Positioned.fill(child: _buildTapAreas()),
             // Music sticker — positioned using saved stickerX/Y/Width
-            // (same 9:16 coordinate system as the creator).
+            // (full screen coordinate system, same as creator canvas).
             if (_story.music != null && !_showViewers)
               Positioned.fill(
                 child: LayoutBuilder(builder: (ctx, cs) {
-                  final (ox, oy, pw, ph) =
-                      _previewBox(cs.maxWidth, cs.maxHeight);
                   final m = _story.music!;
                   return Stack(
                     children: [
                       Positioned(
-                        left: ox + (m.stickerX / 100) * pw,
-                        top: oy + (m.stickerY / 100) * ph,
-                        width: (m.stickerWidth / 100) * pw,
+                        left: (m.stickerX / 100) * cs.maxWidth,
+                        top: (m.stickerY / 100) * cs.maxHeight,
+                        width: (m.stickerWidth / 100) * cs.maxWidth,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: FittedBox(
@@ -523,13 +611,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       );
     }
     if (story.mediaUrl != null) {
-      // Render image + text overlays using the same 9:16 coordinate system
-      // as the creator so positions match.
       return LayoutBuilder(builder: (ctx, cs) {
-        final (ox, oy, pw, ph) = _previewBox(cs.maxWidth, cs.maxHeight);
+        final sw = cs.maxWidth;
+        final sh = cs.maxHeight;
         return Stack(
           fit: StackFit.expand,
           children: [
+            // Image fills full screen (same as creator canvas)
             Image.network(
               story.mediaUrl!,
               fit: BoxFit.cover,
@@ -538,12 +626,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               errorBuilder: (_, __, ___) =>
                   Container(color: const Color(0xFF0F1829)),
             ),
-            // Text overlays
+            // Text overlays — coordinates as % of full screen
             ...story.textOverlays.map((ov) {
-              final fontPx = ((ov.fontSize / 100) * ph).clamp(8.0, 120.0);
+              final fontPx = ((ov.fontSize / 100) * sh).clamp(8.0, 120.0);
               return Positioned(
-                left: ox + (ov.x / 100) * pw,
-                top: oy + (ov.y / 100) * ph,
+                left: (ov.x / 100) * sw,
+                top: (ov.y / 100) * sh,
                 child: FractionalTranslation(
                   translation: const Offset(-0.5, -0.5),
                   child: Text(
@@ -676,14 +764,31 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                   ],
                 ),
               ),
+              // Play / pause toggle — visible for all stories
               IconButton(
-                onPressed: _showOptionsMenu,
-                icon: const Icon(Icons.more_horiz_rounded,
-                    color: Colors.white, size: 22),
+                onPressed: _paused ? _resume : _pause,
+                icon: Icon(
+                  _paused
+                      ? Icons.play_arrow_rounded
+                      : Icons.pause_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
               const SizedBox(width: 4),
+              // 3-dot menu only for own stories
+              if (_isOwn) ...[
+                IconButton(
+                  onPressed: _showOptionsMenu,
+                  icon: const Icon(Icons.more_horiz_rounded,
+                      color: Colors.white, size: 22),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 4),
+              ],
               IconButton(
                 onPressed: _close,
                 icon: const Icon(Icons.close_rounded,
@@ -797,10 +902,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
             ),
             const SizedBox(width: 10),
           ],
-          _ReactionButton(
-            currentReaction: _story.myReaction,
-            onReact: _react,
-          ),
+          if (!_isOwn)
+            _ReactionButton(
+              currentReaction: _localReaction,
+              onReact: _react,
+            ),
         ],
       ),
     );
@@ -1122,7 +1228,7 @@ class _ReactionButton extends StatelessWidget {
   final String? currentReaction;
   final void Function(String emoji) onReact;
 
-  static const _emojis = ['❤️', '😂', '😮', '😢', '😡', '🔥', '👏', '💯'];
+  static const _emojis = ['❤️', '😮', '😂', '😢', '😡', '👍'];
 
   @override
   Widget build(BuildContext context) {

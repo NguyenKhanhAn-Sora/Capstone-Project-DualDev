@@ -117,6 +117,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
   void dispose() {
     _tabCtrl.dispose();
     _textCtrl.dispose();
+    _textFocus.dispose();
     _videoCtrl?.dispose();
     super.dispose();
   }
@@ -179,7 +180,12 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
     _mediaDurationMs = null;
     _trimStartMs = null;
     _trimEndMs = null;
-    setState(() => _step = 'editor');
+    setState(() {
+      _step = 'editor';
+      _textInputActive = false;
+      _musicStickerSelected = false;
+      _textSelectedId = null;
+    });
 
     if (type == 'video') {
       final ctrl = VideoPlayerController.file(file);
@@ -209,6 +215,68 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
     });
   }
 
+  // ── Tab switching with confirm ────────────────────────────────────────────
+
+  Future<void> _switchTab(int target) async {
+    if (_tabCtrl.index == target) return;
+
+    final hasContent = _mediaFile != null ||
+        _textCtrl.text.isNotEmpty ||
+        _selectedMusic != null ||
+        _textLayers.isNotEmpty;
+
+    if (hasContent) {
+      final t = LanguageController.instance.t;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF1A2435),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(t('story.discardTitle'),
+              style: const TextStyle(color: Colors.white)),
+          content: Text(t('story.discardBody'),
+              style: const TextStyle(color: Color(0xFF7A8BB0))),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t('story.discardCancel'),
+                  style: const TextStyle(color: Color(0xFF4AA3E4))),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(t('story.discardConfirm'),
+                  style: const TextStyle(color: Colors.redAccent)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+
+      // Reset all story content before switching
+      _videoCtrl?.dispose();
+      _videoCtrl = null;
+      _textCtrl.clear();
+      setState(() {
+        _mediaFile = null;
+        _mediaType = null;
+        _mediaDurationMs = null;
+        _trimStartMs = null;
+        _trimEndMs = null;
+        _trimStart = 0;
+        _trimEnd = 1;
+        _selectedMusic = null;
+        _textLayers = [];
+        _textSelectedId = null;
+        _textInputActive = false;
+        _musicStickerSelected = false;
+        _bgStyle = kStoryBgOptions[1];
+        _videoReady = false;
+      });
+    }
+
+    _tabCtrl.animateTo(target);
+  }
+
   // ── Music ─────────────────────────────────────────────────────────────────
 
   void _showMusicPicker() {
@@ -232,6 +300,9 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
   // ── Submit ────────────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
+    // Capture before any await to satisfy BuildContext-across-async-gap lint.
+    final double canvasH = MediaQuery.of(context).size.height;
+
     setState(() {
       _error = null;
       _uploading = true;
@@ -275,8 +346,6 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         final dur = (uploadResult['mediaDurationMs'] as num?)?.toInt() ??
             _mediaDurationMs;
 
-        // Canvas height used to normalise fontSize to % (matches web logic)
-        const double canvasH = 896;
         final overlaysPayload = type == 'image'
             ? _textLayers
                 .where((l) => l.text.trim().isNotEmpty)
@@ -379,7 +448,9 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+    SystemChrome.setSystemUIOverlayStyle(
+      _step == 'editor' ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+    );
     final t = LanguageController.instance.t;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B1120) : const Color(0xFFF5F7FB);
@@ -395,19 +466,21 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         }
       },
       child: Scaffold(
-        backgroundColor: bg,
+        backgroundColor: _step == 'editor' ? Colors.black : bg,
         resizeToAvoidBottomInset: false,
-        body: SafeArea(
-          child: _step == 'success'
-              ? StorySuccessScreen(
-                  onGoHome: () =>
-                      Navigator.of(context, rootNavigator: true).pop(true),
-                  onPostAnother: _resetForNewStory,
-                )
-              : _step == 'select'
-                  ? _buildSelectScreen(t, isDark)
-                  : _buildEditorScreen(t, isDark),
-        ),
+        body: _step == 'editor'
+            // Editor fills full screen — padding handled internally via
+            // MediaQuery.of(context).padding.top / .bottom
+            ? _buildEditorScreen(t, isDark)
+            : SafeArea(
+                child: _step == 'success'
+                    ? StorySuccessScreen(
+                        onGoHome: () =>
+                            Navigator.of(context, rootNavigator: true).pop(true),
+                        onPostAnother: _resetForNewStory,
+                      )
+                    : _buildSelectScreen(t, isDark),
+              ),
       ),
     );
   }
@@ -598,37 +671,122 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
 
   // ── Editor screen ─────────────────────────────────────────────────────────
 
+  static const double _kBottomBarH = 64.0;
+
   Widget _buildEditorScreen(
       String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
-    return Column(
+    final topPad = MediaQuery.of(context).padding.top;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        // Top bar
-        _buildEditorTopBar(t, isDark),
-        // Story preview
-        Expanded(child: _buildPreview(t, isDark)),
-        // Options panel
-        _buildOptionsPanel(t, isDark),
+        // Full-screen canvas (image/text fills entire screen)
+        Positioned.fill(
+          child: _isText ? _buildTextPreview(t) : _buildMediaPreview(t, isDark),
+        ),
+        // Top gradient + back + tab switcher (hidden during text editing)
+        if (!_textInputActive)
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: _buildFloatingTopBar(t, topPad),
+          ),
+        // Right floating toolbar (hidden during text/music edit)
+        if (!_textInputActive && !_musicStickerSelected && _textSelectedId == null)
+          Positioned(
+            top: topPad + 60,
+            right: 12,
+            child: _buildRightToolbar(t, isDark),
+          ),
+        // Music trim panel (when sticker is selected)
+        if (_musicStickerSelected && _selectedMusic != null)
+          Positioned(
+            bottom: _kBottomBarH + bottomPad + 8,
+            left: 12, right: 12,
+            child: MusicTrimPanel(
+              music: _selectedMusic!,
+              isDark: isDark,
+              onUpdate: (m) => setState(() => _selectedMusic = m),
+              onDone: () => setState(() => _musicStickerSelected = false),
+            ),
+          ),
+        // Text layer controls (when a text layer is selected, not in input mode)
+        if (_textSelectedId != null && !_textInputActive)
+          Positioned(
+            bottom: _kBottomBarH + bottomPad + 8,
+            left: 12, right: 12,
+            child: Builder(builder: (_) {
+              final idx = _textLayers.indexWhere((l) => l.id == _textSelectedId);
+              if (idx < 0) return const SizedBox.shrink();
+              final layer = _textLayers[idx];
+              return TextLayerControls(
+                layer: layer,
+                isDark: isDark,
+                onUpdate: (updated) => setState(() {
+                  final copy = List<StoryTextLayer>.from(_textLayers);
+                  copy[idx] = updated;
+                  _textLayers = copy;
+                }),
+                onDelete: () => setState(() {
+                  _textLayers = _textLayers.where((l) => l.id != _textSelectedId).toList();
+                  _textSelectedId = null;
+                }),
+              );
+            }),
+          ),
+        // Upload progress overlay
+        if (_uploading)
+          Positioned(
+            bottom: _kBottomBarH + bottomPad,
+            left: 0, right: 0,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(_error!,
+                          style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
+                    ),
+                  LinearProgressIndicator(
+                    value: _uploadProgress / 100,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation(Color(0xFF4AA3E4)),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_uploadProgress.toInt()}%',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        // Bottom bar: visibility + post button
+        Positioned(
+          bottom: 0, left: 0, right: 0,
+          child: _buildBottomPostBar(t, isDark, bottomPad),
+        ),
       ],
     );
   }
 
-  Widget _buildEditorTopBar(
-      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
+  Widget _buildFloatingTopBar(
+      String Function(String, [Map<String, dynamic>?]) t, double topPad) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: isDark
-                ? const Color(0xFF1E2D48)
-                : const Color(0xFFE3EAF5),
-            width: 0.5,
-          ),
+      padding: EdgeInsets.only(top: topPad, left: 12, right: 12, bottom: 10),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xBB000000), Colors.transparent],
         ),
       ),
       child: Row(
         children: [
-          // Back button
+          // Back/close
           GestureDetector(
             onTap: () async {
               if (await _confirmDiscard()) {
@@ -639,59 +797,177 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
               width: 36, height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isDark
-                    ? const Color(0xFF1E2D48)
-                    : const Color(0xFFE3EAF5),
+                color: Colors.black.withValues(alpha: 0.45),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
               ),
-              child: Icon(Icons.arrow_back_rounded,
-                  color: isDark
-                      ? const Color(0xFFE8ECF8)
-                      : const Color(0xFF0F1629),
-                  size: 18),
+              child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
             ),
           ),
-          const SizedBox(width: 12),
-          // Tabs
+          // Tab switcher pill — custom buttons to intercept tap before switching
           Expanded(
-            child: Container(
-              height: 36,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: isDark
-                    ? const Color(0xFF1E2D48)
-                    : const Color(0xFFE3EAF5),
-              ),
-              child: TabBar(
-                controller: _tabCtrl,
-                indicator: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
-                  ),
+            child: Center(
+              child: Container(
+                height: 34,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(17),
+                  color: Colors.black.withValues(alpha: 0.45),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                 ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                labelColor: Colors.white,
-                unselectedLabelColor: const Color(0xFF7A8BB0),
-                labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 13),
-                tabs: [
-                  Tab(text: t('story.tabMedia')),
-                  Tab(text: t('story.tabText')),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [0, 1].map((i) {
+                    final active = _tabCtrl.index == i;
+                    final label = i == 0 ? t('story.tabMedia') : t('story.tabText');
+                    return GestureDetector(
+                      onTap: () => _switchTab(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(17),
+                          color: active
+                              ? Colors.white.withValues(alpha: 0.2)
+                              : Colors.transparent,
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            color: active ? Colors.white : Colors.white54,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 36), // balance the back button
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRightToolbar(
+      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Add text (image stories only)
+        if (!_isText && _mediaType == 'image') ...[
+          _ToolbarIconBtn(
+            icon: Icons.text_fields_rounded,
+            label: 'Chữ',
+            onTap: () => setState(() => _textAddTrigger++),
+          ),
+          const SizedBox(height: 18),
+        ],
+        // Music (not for video)
+        if (_mediaType != 'video') ...[
+          _ToolbarIconBtn(
+            icon: Icons.music_note_rounded,
+            label: 'Nhạc',
+            onTap: _showMusicPicker,
+            active: _selectedMusic != null,
+          ),
+          const SizedBox(height: 18),
+        ],
+        // Background color (text stories)
+        if (_isText) ...[
+          _ToolbarIconBtn(
+            icon: Icons.palette_outlined,
+            label: 'Màu nền',
+            onTap: () => _showBgPicker(isDark),
+          ),
+          const SizedBox(height: 18),
+        ],
+        // Change media
+        if (!_isText && _mediaFile != null) ...[
+          _ToolbarIconBtn(
+            icon: Icons.swap_horiz_rounded,
+            label: 'Đổi',
+            onTap: () => _showMediaPicker(isDark),
+          ),
+          const SizedBox(height: 18),
+        ],
+        // Trim video
+        if (_mediaType == 'video' && _mediaDurationMs != null) ...[
+          _ToolbarIconBtn(
+            icon: Icons.content_cut_rounded,
+            label: 'Cắt',
+            onTap: () => setState(() => _mediaStep = 'trim'),
+            active: _mediaStep == 'trim',
+          ),
+          const SizedBox(height: 18),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBottomPostBar(
+      String Function(String, [Map<String, dynamic>?]) t, bool isDark, double bottomPad) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.75)],
+        ),
+      ),
+      padding: EdgeInsets.fromLTRB(16, 20, 16, 12 + bottomPad),
+      child: Row(
+        children: [
+          // Visibility chip
+          GestureDetector(
+            onTap: () => _showVisibilityPicker(t, isDark),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: Colors.white.withValues(alpha: 0.1),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(_vis.icon, color: Colors.white70, size: 13),
+                  const SizedBox(width: 5),
+                  Text(
+                    _vis.label(t),
+                    style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 3),
+                  const Icon(Icons.expand_more_rounded,
+                      color: Colors.white54, size: 13),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          // Share button
+          if (_error != null && !_uploading) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ] else
+            const Spacer(),
+          // Post button
           GestureDetector(
             onTap: _uploading ? null : _submit,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 gradient: _uploading
                     ? null
                     : const LinearGradient(
@@ -701,7 +977,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
               ),
               child: _uploading
                   ? const SizedBox(
-                      width: 16, height: 16,
+                      width: 18, height: 18,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     )
@@ -710,7 +986,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                     ),
             ),
@@ -720,37 +996,70 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
     );
   }
 
-  // ── Preview area ──────────────────────────────────────────────────────────
-
-  Widget _buildPreview(
-      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
-    return Container(
-      color: Colors.black,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final maxW = constraints.maxWidth;
-          final maxH = constraints.maxHeight;
-          double pw = maxW;
-          double ph = pw * 16 / 9;
-          if (ph > maxH) {
-            ph = maxH;
-            pw = ph * 9 / 16;
-          }
-          return Center(
-            child: SizedBox(
-              width: pw,
-              height: ph,
-              child: ClipRect(
-                child: _isText
-                    ? _buildTextPreview(t)
-                    : _buildMediaPreview(t, isDark),
-              ),
+  void _showBgPicker(bool isDark) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A2435),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Màu nền',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16),
             ),
-          );
-        },
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: kStoryBgOptions.map((bg) {
+                final active = _bgStyle == bg;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _bgStyle = bg);
+                    Navigator.pop(ctx);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: parseBackgroundGradient(bg),
+                      border: active
+                          ? Border.all(color: const Color(0xFF4AA3E4), width: 3)
+                          : Border.all(
+                              color: Colors.white.withValues(alpha: 0.2)),
+                      boxShadow: active
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF4AA3E4)
+                                    .withValues(alpha: 0.45),
+                                blurRadius: 10,
+                              )
+                            ]
+                          : null,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  // ── Preview area (direct content, no outer box) ───────────────────────────
 
   Widget _buildTextPreview(
       String Function(String, [Map<String, dynamic>?]) t) {
@@ -817,41 +1126,6 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
       return _buildMediaPicker(t, isDark);
     }
 
-    // Floating overlay button (semi-transparent pill)
-    Widget floatingBtn({
-      required IconData icon,
-      required String label,
-      required VoidCallback onTap,
-    }) {
-      return GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: Colors.black.withValues(alpha: 0.55),
-            border:
-                Border.all(color: Colors.white.withValues(alpha: 0.25)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white, size: 15),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -888,33 +1162,6 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
               _selectedMusic = null;
               _musicStickerSelected = false;
             }),
-          ),
-
-        // Top-right: change media (hidden during text input)
-        if (!_textInputActive)
-          Positioned(
-            top: 12,
-            right: 12,
-            child: floatingBtn(
-              icon: Icons.swap_horiz_rounded,
-              label: _mediaType == 'image'
-                  ? t('story.btnChangePhoto')
-                  : t('story.btnChangeVideo'),
-              onTap: () => _showMediaPicker(isDark),
-            ),
-          ),
-
-        // Top-left: add text (image only, hidden during text input)
-        if (_mediaType == 'image' && !_textInputActive)
-          Positioned(
-            top: 12,
-            left: 12,
-            child: floatingBtn(
-              icon: Icons.text_fields_rounded,
-              label: 'Thêm chữ',
-              onTap: () =>
-                  setState(() => _textAddTrigger = _textAddTrigger + 1),
-            ),
           ),
       ],
     );
@@ -1006,328 +1253,6 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
             ),
           ),
       ],
-    );
-  }
-
-  // ── Options panel ─────────────────────────────────────────────────────────
-
-  Widget _buildOptionsPanel(
-      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
-    final borderColor =
-        isDark ? const Color(0xFF1E2D48) : const Color(0xFFE3EAF5);
-    final bg =
-        isDark ? const Color(0xFF0F1829) : Colors.white;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        border: Border(top: BorderSide(color: borderColor, width: 0.5)),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── Music trim panel when sticker is selected ────────────
-          if (_musicStickerSelected && _selectedMusic != null)
-            MusicTrimPanel(
-              music: _selectedMusic!,
-              isDark: isDark,
-              onUpdate: (m) => setState(() => _selectedMusic = m),
-              onDone: () => setState(() => _musicStickerSelected = false),
-            )
-          // ── Text layer controls when layer is selected ────────────
-          else if (!_isText && _mediaType == 'image' &&
-              _textSelectedId != null)
-            Builder(builder: (_) {
-              final idx =
-                  _textLayers.indexWhere((l) => l.id == _textSelectedId);
-              if (idx < 0) return const SizedBox.shrink();
-              final layer = _textLayers[idx];
-              return TextLayerControls(
-                layer: layer,
-                isDark: isDark,
-                onUpdate: (updated) => setState(() {
-                  final copy = List<StoryTextLayer>.from(_textLayers);
-                  copy[idx] = updated;
-                  _textLayers = copy;
-                }),
-                onDelete: () {
-                  setState(() {
-                    _textLayers = _textLayers
-                        .where((l) => l.id != _textSelectedId)
-                        .toList();
-                    _textSelectedId = null;
-                  });
-                },
-              );
-            })
-          // ── Normal options ────────────────────────────────────────
-          else ...[
-            if (_isText) _buildBgStrip(isDark),
-            if (_mediaType != 'video') _buildMusicRow(t, isDark),
-            if (!_isText && _mediaFile != null && _mediaType == 'video')
-              _buildActionRow(t, isDark),
-            _buildVisibilityButton(t, isDark),
-          ],
-
-          // Error
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(_error!,
-                  style: const TextStyle(
-                      color: Colors.redAccent, fontSize: 13)),
-            ),
-
-          // Upload progress
-          if (_uploading) ...[
-            const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: _uploadProgress / 100,
-              backgroundColor: borderColor,
-              valueColor: const AlwaysStoppedAnimation(Color(0xFF4AA3E4)),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              t('story.labelUploading'),
-              style: const TextStyle(
-                  color: Color(0xFF7A8BB0), fontSize: 12),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMusicRow(
-      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
-    final hasMusic = _selectedMusic != null;
-    return GestureDetector(
-      onTap: _showMusicPicker,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          color: hasMusic
-              ? const Color(0xFF4AA3E4).withValues(alpha: 0.08)
-              : (isDark
-                  ? const Color(0xFF1A2435)
-                  : const Color(0xFFF0F4FA)),
-          border: hasMusic
-              ? Border.all(
-                  color: const Color(0xFF4AA3E4).withValues(alpha: 0.4))
-              : Border.all(
-                  color: isDark
-                      ? const Color(0xFF1E2D48)
-                      : const Color(0xFFE3EAF5)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 30, height: 30,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: hasMusic
-                    ? const LinearGradient(
-                        colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)])
-                    : null,
-                color: hasMusic
-                    ? null
-                    : (isDark
-                        ? const Color(0xFF253347)
-                        : const Color(0xFFE3EAF5)),
-              ),
-              child: Icon(
-                hasMusic
-                    ? Icons.music_note_rounded
-                    : Icons.music_note_outlined,
-                color: hasMusic ? Colors.white : const Color(0xFF7A8BB0),
-                size: 16,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: hasMusic
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _selectedMusic!.title,
-                          style: const TextStyle(
-                            color: Color(0xFF4AA3E4),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          _selectedMusic!.artist,
-                          style: const TextStyle(
-                              color: Color(0xFF7A8BB0), fontSize: 11),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    )
-                  : Text(
-                      t('story.btnAddMusic'),
-                      style: const TextStyle(
-                        color: Color(0xFF7A8BB0),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
-                      ),
-                    ),
-            ),
-            Icon(
-              hasMusic
-                  ? Icons.swap_horiz_rounded
-                  : Icons.add_rounded,
-              color: hasMusic
-                  ? const Color(0xFF4AA3E4)
-                  : const Color(0xFF7A8BB0),
-              size: 18,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBgStrip(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          LanguageController.instance.t('story.labelBackground'),
-          style: TextStyle(
-            color: isDark
-                ? const Color(0xFF7A8BB0)
-                : const Color(0xFF5B6378),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 38,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: kStoryBgOptions.length,
-            itemBuilder: (_, i) {
-              final bg = kStoryBgOptions[i];
-              final active = _bgStyle == bg;
-              return GestureDetector(
-                onTap: () => setState(() => _bgStyle = bg),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: 38, height: 38,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: parseBackgroundGradient(bg),
-                    border: active
-                        ? Border.all(
-                            color: const Color(0xFF4AA3E4), width: 2.5)
-                        : null,
-                    boxShadow: active
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFF4AA3E4)
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 8,
-                            )
-                          ]
-                        : null,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-      ],
-    );
-  }
-
-  Widget _buildActionRow(
-      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
-    // Change-media is now a floating overlay on the preview; only trim stays here
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          _ActionChip(
-            icon: Icons.content_cut_rounded,
-            label: t('story.editVideo'),
-            onTap: () => setState(() => _mediaStep = 'trim'),
-            isDark: isDark,
-            active: _mediaStep == 'trim',
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Single-row button that opens the visibility picker overlay
-  Widget _buildVisibilityButton(
-      String Function(String, [Map<String, dynamic>?]) t, bool isDark) {
-    return GestureDetector(
-      onTap: () => _showVisibilityPicker(t, isDark),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          color: isDark ? const Color(0xFF1A2435) : const Color(0xFFF0F4FA),
-          border: Border.all(
-            color: isDark ? const Color(0xFF1E2D48) : const Color(0xFFE3EAF5),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
-                ),
-              ),
-              child: Icon(_vis.icon, color: Colors.white, size: 15),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    t('story.labelVisibility'),
-                    style: const TextStyle(
-                      color: Color(0xFF7A8BB0),
-                      fontSize: 11,
-                    ),
-                  ),
-                  Text(
-                    _vis.label(t),
-                    style: TextStyle(
-                      color: isDark ? Colors.white : const Color(0xFF0F1629),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.expand_more_rounded,
-                color: Color(0xFF7A8BB0), size: 18),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1613,67 +1538,6 @@ class _MediaPickBtn extends StatelessWidget {
   }
 }
 
-// ── Action chip ───────────────────────────────────────────────────────────────
-
-class _ActionChip extends StatelessWidget {
-  const _ActionChip({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    required this.isDark,
-    this.active = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool isDark;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: active
-              ? const LinearGradient(
-                  colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
-                )
-              : null,
-          color: active
-              ? null
-              : (isDark
-                  ? const Color(0xFF1E2D48)
-                  : const Color(0xFFE3EAF5)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon,
-                size: 15,
-                color: active ? Colors.white : const Color(0xFF7A8BB0)),
-            const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: active
-                      ? Colors.white
-                      : (isDark
-                          ? const Color(0xFFE8ECF8)
-                          : const Color(0xFF0F1629)),
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── Video trim bar ────────────────────────────────────────────────────────────
 
 class _VideoTrimBar extends StatefulWidget {
@@ -1801,6 +1665,60 @@ class _VideoTrimBarState extends State<_VideoTrimBar> {
                       fontSize: 12,
                       fontWeight: FontWeight.w600)),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Floating toolbar icon button ──────────────────────────────────────────────
+
+class _ToolbarIconBtn extends StatelessWidget {
+  const _ToolbarIconBtn({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: active
+                  ? const Color(0xFF4AA3E4).withValues(alpha: 0.9)
+                  : Colors.black.withValues(alpha: 0.5),
+              border: Border.all(
+                color: active
+                    ? const Color(0xFF4AA3E4)
+                    : Colors.white.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Icon(icon, color: Colors.white, size: 21),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
+            ),
           ),
         ],
       ),
