@@ -292,17 +292,23 @@
 .reactionChip {
   flex-shrink: 0;
   font-size: 26px;
-  background: none;
-  border: none;
-  padding: 4px 6px;
+  background: rgba(30, 42, 64, 0.75);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 6px 10px;
   cursor: pointer;
-  transition: transform 0.15s cubic-bezier(0.34, 1.4, 0.64, 1);
+  transition: transform 0.15s cubic-bezier(0.34, 1.4, 0.64, 1),
+              background 0.12s ease,
+              border-color 0.12s ease;
   line-height: 1;
   filter: grayscale(0);
+  backdrop-filter: blur(6px);
 }
 
 .reactionChip:hover {
-  transform: scale(1.35) translateY(-4px);
+  transform: scale(1.2) translateY(-3px);
+  background: rgba(42, 60, 90, 0.85);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .reactionChip:active {
@@ -310,17 +316,19 @@
 }
 
 .reactionChipActive {
-  transform: scale(1.2);
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.5));
+  transform: scale(1.15);
+  background: rgba(74, 163, 228, 0.2);
+  border-color: #4AA3E4;
+  filter: drop-shadow(0 0 6px rgba(74, 163, 228, 0.4));
 }
 
 .reactionChipActive:hover {
-  transform: scale(1.35) translateY(-4px);
+  transform: scale(1.25) translateY(-3px);
 }
 
 .reactionChipDimmed {
-  opacity: 0.35;
-  filter: grayscale(0.4);
+  opacity: 0.4;
+  filter: grayscale(0.3);
 }
 
 .replyInput {
