@@ -3033,7 +3033,8 @@
       "searchPlaceholder": "Tìm theo tên hoặc username...",
       "invite": "Mời",
       "copiedToast": "Đã sao chép link mời vào máy chủ",
-      "errorLoad": "Không tải được danh sách bạn bè"
+      "errorLoad": "Không tải được danh sách bạn bè",
+      "noCreateInvitePermission": "Bạn không có quyền tạo lời mời"
     },
     "createEvent": {
       "title": "Tạo sự kiện",

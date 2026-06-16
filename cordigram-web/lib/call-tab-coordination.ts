@@ -55,10 +55,6 @@ export function tryAcquireOutboundCallLock(
   peerId: string,
 ): boolean {
   if (typeof window === "undefined") return true;
-  const existing = readLock(peerId);
-  if (existing && existing.tabId !== tabId) {
-    return false;
-  }
   try {
     window.localStorage.setItem(
       lockStorageKey(peerId),

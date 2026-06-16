@@ -303,7 +303,11 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
 
   Future<void> _openInviteSheet() async {
     if (!_permissions.canCreateInvite) return;
-    await InviteToServerSheet.show(context, _effectiveServer);
+    await InviteToServerSheet.show(
+      context,
+      _effectiveServer,
+      canCreateInvite: _permissions.canCreateInvite,
+    );
   }
 
   Future<void> _openJoinApplications() async {

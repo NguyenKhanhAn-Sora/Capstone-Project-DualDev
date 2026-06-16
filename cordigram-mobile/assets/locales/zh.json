@@ -3021,7 +3021,8 @@
       "searchPlaceholder": "按名称或用户名搜索...",
       "invite": "邀请",
       "copiedToast": "已复制服务器邀请链接",
-      "errorLoad": "无法加载好友列表"
+      "errorLoad": "无法加载好友列表",
+      "noCreateInvitePermission": "您没有创建邀请的权限"
     },
     "createEvent": {
       "title": "创建活动",

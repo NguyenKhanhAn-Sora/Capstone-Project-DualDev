@@ -26,6 +26,10 @@ export interface DmCallSessionRecord {
   answeredAt?: number;
   answeredBySocketId?: string;
   initiatorSocketId?: string;
+  /** Socket that currently owns LiveKit media for the initiator. */
+  initiatorMediaSocketId?: string;
+  /** Socket that currently owns LiveKit media for the callee. */
+  calleeMediaSocketId?: string;
   initiatorPlatform?: DmCallClientPlatform;
   createdAt: number;
   updatedAt: number;

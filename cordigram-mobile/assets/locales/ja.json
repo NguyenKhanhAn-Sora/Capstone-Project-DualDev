@@ -3021,7 +3021,8 @@
       "searchPlaceholder": "名前またはユーザー名で検索...",
       "invite": "招待",
       "copiedToast": "サーバー招待リンクをコピーしました",
-      "errorLoad": "友達リストを読み込めません"
+      "errorLoad": "友達リストを読み込めません",
+      "noCreateInvitePermission": "招待を作成する権限がありません"
     },
     "createEvent": {
       "title": "イベントを作成",

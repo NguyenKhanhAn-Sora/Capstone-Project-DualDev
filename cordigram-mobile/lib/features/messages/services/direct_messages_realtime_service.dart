@@ -136,6 +136,20 @@ class DmCallSessionSyncItem {
   }
 }
 
+class DmCallMediaTransferredEvent {
+  const DmCallMediaTransferredEvent({
+    required this.peerId,
+    this.callId,
+    this.roomId,
+    this.type,
+  });
+
+  final String peerId;
+  final String? callId;
+  final String? roomId;
+  final String? type;
+}
+
 class DirectMessagesRealtimeService {
   DirectMessagesRealtimeService._();
 
@@ -164,6 +178,9 @@ class DirectMessagesRealtimeService {
   static final StreamController<List<DmCallSessionSyncItem>>
       _callSessionsSyncController =
       StreamController<List<DmCallSessionSyncItem>>.broadcast();
+  static final StreamController<DmCallMediaTransferredEvent>
+      _callMediaTransferredController =
+      StreamController<DmCallMediaTransferredEvent>.broadcast();
   static final StreamController<Map<String, dynamic>> _messageDeletedController =
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _messagesReadController =
@@ -192,6 +209,8 @@ class DirectMessagesRealtimeService {
       _callIncomingDismissController.stream;
   static Stream<List<DmCallSessionSyncItem>> get callSessionsSync =>
       _callSessionsSyncController.stream;
+  static Stream<DmCallMediaTransferredEvent> get callMediaTransferred =>
+      _callMediaTransferredController.stream;
   static Stream<Map<String, dynamic>> get messageDeleted =>
       _messageDeletedController.stream;
   static Stream<Map<String, dynamic>> get messagesRead =>
@@ -377,6 +396,20 @@ class DirectMessagesRealtimeService {
           .toList(growable: false);
       _callSessionsSyncController.add(sessions);
     });
+    socket.on('call-media-transferred', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      final peerId = (data['peerId'] ?? '').toString();
+      if (peerId.isEmpty) return;
+      _callMediaTransferredController.add(
+        DmCallMediaTransferredEvent(
+          peerId: peerId,
+          callId: data['callId']?.toString(),
+          roomId: data['roomId']?.toString(),
+          type: data['type']?.toString(),
+        ),
+      );
+    });
     socket.on('message-deleted', (payload) {
       if (payload is! Map) return;
       _messageDeletedController.add(Map<String, dynamic>.from(payload));
@@ -523,6 +556,26 @@ class DirectMessagesRealtimeService {
     _socket?.emit('call-heartbeat', {'callId': callId});
   }
 
+  static Future<Map<String, dynamic>> claimCallMedia(String peerId) async {
+    final socket = _socket;
+    if (socket == null || socket.connected != true || peerId.isEmpty) {
+      return {'ok': false};
+    }
+    final completer = Completer<Map<String, dynamic>>();
+    socket.emitWithAck('call-media-claim', {'peerId': peerId}, ack: (data) {
+      if (data is Map) {
+        completer.complete(Map<String, dynamic>.from(data));
+      } else {
+        completer.complete({'ok': false});
+      }
+    });
+    try {
+      return await completer.future.timeout(const Duration(seconds: 8));
+    } catch (_) {
+      return {'ok': false};
+    }
+  }
+
   static void answerCall(String callerId, Map<String, dynamic> sdpOffer) {
     _socket?.emit('call-answer', {'callerId': callerId, 'sdpOffer': sdpOffer});
   }
@@ -570,6 +623,7 @@ class DirectMessagesRealtimeService {
       socket.off('call-ended');
       socket.off('call-incoming-dismiss');
       socket.off('call-sessions-sync');
+      socket.off('call-media-transferred');
       socket.off('message-deleted');
       socket.off('messages-read');
       socket.off('user-typing');

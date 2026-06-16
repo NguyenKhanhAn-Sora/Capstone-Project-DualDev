@@ -3032,7 +3032,8 @@
       "searchPlaceholder": "Search by name or username...",
       "invite": "Invite",
       "copiedToast": "Server invite link copied",
-      "errorLoad": "Could not load friends list"
+      "errorLoad": "Could not load friends list",
+      "noCreateInvitePermission": "You don't have permission to create invites"
     },
     "createEvent": {
       "title": "Create event",

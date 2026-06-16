@@ -372,7 +372,8 @@
         "notFound": "友だちが見つかりません。"
       },
       "errors": {
-        "cannotSendInvite": "招待を送信できませんでした"
+        "cannotSendInvite": "招待を送信できませんでした",
+        "noCreateInvitePermission": "招待を作成する権限がありません"
       }
     },
     "inviteServer": {

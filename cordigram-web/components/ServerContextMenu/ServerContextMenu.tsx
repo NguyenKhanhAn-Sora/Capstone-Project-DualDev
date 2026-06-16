@@ -190,7 +190,7 @@ export default function ServerContextMenu({
   const canManageServer = permissions?.canManageServer ?? isOwner;
   const canManageChannels = permissions?.canManageChannels ?? isOwner;
   const canManageEvents = permissions?.canManageEvents ?? isOwner;
-  const canCreateInvite = permissions?.canCreateInvite ?? true;
+  const canCreateInvite = permissions?.canCreateInvite ?? false;
   const hasAnyManagePermission = canManageServer || canManageChannels || canManageEvents;
 
   useEffect(() => {

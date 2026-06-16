@@ -373,7 +373,8 @@
         "notFound": "Không tìm thấy bạn bè nào."
       },
       "errors": {
-        "cannotSendInvite": "Không gửi được lời mời"
+        "cannotSendInvite": "Không gửi được lời mời",
+        "noCreateInvitePermission": "Bạn không có quyền tạo lời mời"
       }
     },
     "inviteServer": {

@@ -372,7 +372,8 @@
         "notFound": "No friends found."
       },
       "errors": {
-        "cannotSendInvite": "Couldn't send the invite"
+        "cannotSendInvite": "Couldn't send the invite",
+        "noCreateInvitePermission": "You don't have permission to create invites"
       }
     },
     "inviteServer": {

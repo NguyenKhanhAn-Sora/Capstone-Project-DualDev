@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import styles from "../InviteToVoiceChannelPopup/InviteToVoiceChannelPopup.module.css";
 import type { Friend } from "@/lib/servers-api";
 import { createServerInvite } from "@/lib/servers-api";
@@ -13,6 +13,7 @@ interface InviteToServerPopupProps {
   serverId: string;
   serverName: string;
   friends: Friend[];
+  canCreateInvite?: boolean;
   onInviteSent?: () => void;
 }
 
@@ -22,6 +23,7 @@ export default function InviteToServerPopup({
   serverId,
   serverName,
   friends,
+  canCreateInvite = false,
   onInviteSent,
 }: InviteToServerPopupProps) {
   const { t } = useLanguage();
@@ -29,8 +31,12 @@ export default function InviteToServerPopup({
   const [copied, setCopied] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** API từ chối quyền mời — ẩn link sao chép dù prop ban đầu có thể sai. */
+  const [inviteBlocked, setInviteBlocked] = useState(false);
   /** Id những người đã được mời thành công trong phiên này (để hiển thị "Đã mời"). */
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+
+  const canInvite = canCreateInvite && !inviteBlocked;
 
   const inviteLink =
     typeof window !== "undefined"
@@ -47,7 +53,60 @@ export default function InviteToServerPopup({
     );
   }, [friends, search]);
 
+  const noPermissionMessage = t("chat.invite.errors.noCreateInvitePermission");
+
+  useEffect(() => {
+    if (!isOpen) {
+      setError(null);
+      setInviteBlocked(false);
+      setCopied(false);
+      setInvitedIds(new Set());
+      setSearch("");
+      return;
+    }
+    setInviteBlocked(false);
+    if (!canCreateInvite) {
+      setError(noPermissionMessage);
+    } else {
+      setError(null);
+    }
+  }, [isOpen, canCreateInvite, noPermissionMessage]);
+
+  const isPermissionDeniedMessage = (msg: string): boolean =>
+    msg.includes("quyền tạo lời mời") ||
+    msg.includes("permission to create invite") ||
+    msg.includes("create invite") ||
+    msg.includes("招待を作成") ||
+    msg.includes("创建邀请");
+
+  const resolveInviteError = (e: unknown): string => {
+    let msg = e instanceof Error ? e.message : String(e ?? "");
+    const trimmed = msg.trim();
+    if (trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed) as { message?: string | string[] };
+        const raw = parsed.message;
+        msg =
+          typeof raw === "string"
+            ? raw
+            : Array.isArray(raw) && raw.length > 0
+              ? String(raw[0])
+              : trimmed;
+      } catch {
+        /* keep original */
+      }
+    }
+    if (isPermissionDeniedMessage(msg)) {
+      return noPermissionMessage;
+    }
+    return msg || t("chat.invite.errors.cannotSendInvite");
+  };
+
   const handleCopy = async () => {
+    if (!canInvite) {
+      setError(noPermissionMessage);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(inviteLink);
       setCopied(true);
@@ -58,6 +117,10 @@ export default function InviteToServerPopup({
   };
 
   const handleInviteFriend = async (friend: Friend) => {
+    if (!canInvite) {
+      setError(noPermissionMessage);
+      return;
+    }
     setError(null);
     setSendingId(friend._id);
     try {
@@ -70,9 +133,11 @@ export default function InviteToServerPopup({
       setInvitedIds((prev) => new Set(prev).add(friend._id));
       onInviteSent?.();
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : t("chat.invite.errors.cannotSendInvite"),
-      );
+      const friendly = resolveInviteError(e);
+      if (friendly === noPermissionMessage) {
+        setInviteBlocked(true);
+      }
+      setError(friendly);
       console.error("Failed to send server invite", e);
     } finally {
       setSendingId(null);
@@ -185,7 +250,7 @@ export default function InviteToServerPopup({
                   type="button"
                   className={styles.inviteFriendBtn}
                   onClick={() => handleInviteFriend(friend)}
-                  disabled={sendingId === friend._id || invitedIds.has(friend._id)}
+                  disabled={!canInvite || sendingId === friend._id || invitedIds.has(friend._id)}
                 >
                   {sendingId === friend._id
                     ? t("chat.common.sending")
@@ -198,31 +263,37 @@ export default function InviteToServerPopup({
           )}
         </div>
 
-        <div className={styles.dividerWrap}>
-          <p className={styles.dividerText}>
-            {t("chat.invite.orSendLink")}
-          </p>
-        </div>
-        <div className={styles.linkWrap}>
-          <input
-            type="text"
-            className={styles.linkInput}
-            readOnly
-            value={inviteLink}
-          />
-          <button
-            type="button"
-            className={`${styles.copyBtn} ${
-              copied ? styles.copied : ""
-            }`}
-            onClick={handleCopy}
-          >
-            {copied ? t("chat.common.copied") : t("chat.common.copy")}
-          </button>
-        </div>
-        <p className={styles.expireNote}>
-          {t("chat.inviteServer.expireNote")}
-        </p>
+        {canInvite && (
+          <div className={styles.dividerWrap}>
+            <p className={styles.dividerText}>
+              {t("chat.invite.orSendLink")}
+            </p>
+          </div>
+        )}
+        {canInvite && (
+          <>
+            <div className={styles.linkWrap}>
+              <input
+                type="text"
+                className={styles.linkInput}
+                readOnly
+                value={inviteLink}
+              />
+              <button
+                type="button"
+                className={`${styles.copyBtn} ${
+                  copied ? styles.copied : ""
+                }`}
+                onClick={handleCopy}
+              >
+                {copied ? t("chat.common.copied") : t("chat.common.copy")}
+              </button>
+            </div>
+            <p className={styles.expireNote}>
+              {t("chat.inviteServer.expireNote")}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

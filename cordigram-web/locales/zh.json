@@ -372,7 +372,8 @@
         "notFound": "未找到好友。"
       },
       "errors": {
-        "cannotSendInvite": "无法发送邀请"
+        "cannotSendInvite": "无法发送邀请",
+        "noCreateInvitePermission": "您没有创建邀请的权限"
       }
     },
     "inviteServer": {

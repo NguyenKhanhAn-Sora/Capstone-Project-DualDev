@@ -20,9 +20,11 @@ const ACTIVE_STATES: DmCallState[] = [
   'reconnecting',
 ];
 
-function isWebPlatform(platform?: DmCallClientPlatform): boolean {
-  return platform === 'web';
-}
+const MEDIA_ACTIVE_STATES: DmCallState[] = [
+  'connecting',
+  'connected',
+  'reconnecting',
+];
 
 @Injectable()
 export class DmCallSessionService implements OnModuleDestroy {
@@ -246,7 +248,6 @@ export class DmCallSessionService implements OnModuleDestroy {
   }): Promise<DmCallInitiateOutcome> {
     const { initiatorId, calleeId, type, initiatorSocketId, platform, onRingTimeout } =
       params;
-    const webCaller = isWebPlatform(platform);
 
     const existingPair = await this.getByPair(initiatorId, calleeId);
     if (existingPair && ACTIVE_STATES.includes(existingPair.state)) {
@@ -254,17 +255,12 @@ export class DmCallSessionService implements OnModuleDestroy {
         existingPair.state === 'ringing' &&
         existingPair.initiatorId === initiatorId
       ) {
-        const sameSocket =
-          existingPair.initiatorSocketId === initiatorSocketId;
-        if (sameSocket || !webCaller) {
-          existingPair.initiatorSocketId = initiatorSocketId;
-          existingPair.initiatorPlatform = platform;
-          existingPair.ringExpiresAt = Date.now() + DM_CALL_RING_TTL_SEC * 1000;
-          await this.saveSession(existingPair);
-          this.scheduleRingTimeout(existingPair, onRingTimeout);
-          return { ok: true, callId: existingPair.callId, session: existingPair };
-        }
-        return { ok: false, code: 'already_in_call', peerId: calleeId };
+        existingPair.initiatorSocketId = initiatorSocketId;
+        existingPair.initiatorPlatform = platform;
+        existingPair.ringExpiresAt = Date.now() + DM_CALL_RING_TTL_SEC * 1000;
+        await this.saveSession(existingPair);
+        this.scheduleRingTimeout(existingPair, onRingTimeout);
+        return { ok: true, callId: existingPair.callId, session: existingPair };
       }
       return { ok: false, code: 'already_in_call', peerId: calleeId };
     }
@@ -316,6 +312,7 @@ export class DmCallSessionService implements OnModuleDestroy {
     session.state = 'connected';
     session.answeredAt = Date.now();
     session.answeredBySocketId = params.answeringSocketId;
+    session.calleeMediaSocketId = params.answeringSocketId;
     if (params.roomId) session.roomId = params.roomId;
     await this.saveSession(session);
     const t = this.ringTimers.get(session.callId);
@@ -356,6 +353,32 @@ export class DmCallSessionService implements OnModuleDestroy {
       session.state = 'ended';
     }
     await this.deleteSession(session);
+    return session;
+  }
+
+  /**
+   * Move LiveKit media ownership to another socket/device without ending the call.
+   */
+  async claimMedia(params: {
+    userId: string;
+    peerId: string;
+    socketId: string;
+  }): Promise<DmCallSessionRecord | null> {
+    const session = await this.getByPair(params.userId, params.peerId);
+    if (!session || session.logged) return null;
+    if (!MEDIA_ACTIVE_STATES.includes(session.state)) return null;
+
+    if (session.initiatorId === params.userId) {
+      session.initiatorSocketId = params.socketId;
+      session.initiatorMediaSocketId = params.socketId;
+    } else if (session.calleeId === params.userId) {
+      session.answeredBySocketId = params.socketId;
+      session.calleeMediaSocketId = params.socketId;
+    } else {
+      return null;
+    }
+
+    await this.saveSession(session);
     return session;
   }
 

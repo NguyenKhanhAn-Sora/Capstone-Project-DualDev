@@ -1382,8 +1382,15 @@ export async function createServerInvite(
     body: JSON.stringify({ serverId, toUserId }),
   });
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || "Không gửi được lời mời");
+    const data = await response.json().catch(() => ({} as { message?: string | string[] }));
+    const raw = data?.message;
+    const message =
+      typeof raw === "string"
+        ? raw
+        : Array.isArray(raw) && raw.length > 0
+          ? String(raw[0])
+          : "Không gửi được lời mời";
+    throw new Error(message);
   }
   return response.json();
 }
