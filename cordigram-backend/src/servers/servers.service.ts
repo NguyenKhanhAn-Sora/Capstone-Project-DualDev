@@ -1510,7 +1510,7 @@ export class ServersService {
         _id: new Types.ObjectId(serverId),
         $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
       })
-      .select('members')
+      .select('members ownerId')
       .exec();
     if (!server) {
       throw new NotFoundException('Server not found');
@@ -1518,10 +1518,65 @@ export class ServersService {
     if (!this.isMember(server, userId)) {
       throw new ForbiddenException('Not a member of this server');
     }
+    const isOwner = server.ownerId.toString() === userId;
+    if (!isOwner) {
+      const canChange = await this.rolesService.hasPermission(
+        serverId,
+        userId,
+        'changeNickname',
+      );
+      if (!canChange) {
+        throw new ForbiddenException(
+          'Bạn không có quyền đổi biệt danh trong máy chủ này.',
+        );
+      }
+    }
     if (nickname.trim().length > 64) {
       throw new BadRequestException('nickname too long');
     }
     await this.setMemberNickname(serverId, userId, nickname);
+  }
+
+  /** Quản lý biệt danh thành viên khác (cần quyền manageNicknames). */
+  async updateMemberNickname(
+    serverId: string,
+    actorId: string,
+    targetMemberId: string,
+    nickname: string,
+  ): Promise<void> {
+    const server = await this.serverModel
+      .findOne({
+        _id: new Types.ObjectId(serverId),
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      })
+      .select('members ownerId')
+      .exec();
+    if (!server) {
+      throw new NotFoundException('Server not found');
+    }
+    if (!this.isMember(server, actorId)) {
+      throw new ForbiddenException('Not a member of this server');
+    }
+    if (!this.isMember(server, targetMemberId)) {
+      throw new NotFoundException('Target member not found');
+    }
+    const isOwner = server.ownerId.toString() === actorId;
+    if (!isOwner) {
+      const canManage = await this.rolesService.hasPermission(
+        serverId,
+        actorId,
+        'manageNicknames',
+      );
+      if (!canManage) {
+        throw new ForbiddenException(
+          'Bạn không có quyền quản lý biệt danh của thành viên khác.',
+        );
+      }
+    }
+    if (nickname.trim().length > 64) {
+      throw new BadRequestException('nickname too long');
+    }
+    await this.setMemberNickname(serverId, targetMemberId, nickname);
   }
 
   private async ensureUserServerAcceptedDoc(params: {
@@ -2721,7 +2776,7 @@ export class ServersService {
     userId: string,
   ): Promise<{
     isOwner: boolean;
-    hasCustomRole: boolean; // User có vai trò nào ngoài @everyone không
+    hasCustomRole: boolean;
     canKick: boolean;
     canBan: boolean;
     canTimeout: boolean;
@@ -2730,6 +2785,8 @@ export class ServersService {
     canManageEvents: boolean;
     canManageExpressions: boolean;
     canCreateInvite: boolean;
+    canChangeNickname: boolean;
+    canManageNicknames: boolean;
     mentionEveryone: boolean;
   }> {
     const server = await this.serverModel.findById(serverId).exec();
@@ -2752,24 +2809,23 @@ export class ServersService {
         canManageEvents: true,
         canManageExpressions: true,
         canCreateInvite: true,
+        canChangeNickname: true,
+        canManageNicknames: true,
         mentionEveryone: true,
       };
     }
 
-    // Kiểm tra có phải member không
     const isMember = server.members.some((m) => m.userId.toString() === userId);
     if (!isMember) {
       throw new ForbiddenException('Bạn không phải thành viên của server này');
     }
 
-    // Kiểm tra user có vai trò nào ngoài @everyone không
     const memberRoles = await this.rolesService.getMemberRoles(
       serverId,
       userId,
     );
     const hasCustomRole = memberRoles.some((r) => !r.isDefault);
 
-    // Lấy permissions từ roles
     const permissions = await this.rolesService.calculateMemberPermissions(
       serverId,
       userId,
@@ -2786,6 +2842,8 @@ export class ServersService {
       canManageEvents: permissions.manageEvents,
       canManageExpressions: Boolean(permissions.manageExpressions),
       canCreateInvite: permissions.createInvite,
+      canChangeNickname: permissions.changeNickname,
+      canManageNicknames: permissions.manageNicknames,
       mentionEveryone: Boolean(permissions.mentionEveryone),
     };
   }
@@ -3051,6 +3109,7 @@ export class ServersService {
       canKick: boolean;
       canBan: boolean;
       canTimeout: boolean;
+      canManageNicknames: boolean;
       isOwner: boolean;
     };
   }> {
@@ -3159,7 +3218,7 @@ export class ServersService {
 
     // Lấy quyền của user hiện tại
     const isOwner = server.ownerId.toString() === requesterUserId;
-    const [canKick, canBan, canTimeout] = await Promise.all([
+    const [canKick, canBan, canTimeout, canManageNicknames] = await Promise.all([
       this.rolesService.hasPermission(serverId, requesterUserId, 'kickMembers'),
       this.rolesService.hasPermission(serverId, requesterUserId, 'banMembers'),
       this.rolesService.hasPermission(
@@ -3167,6 +3226,7 @@ export class ServersService {
         requesterUserId,
         'timeoutMembers',
       ),
+      this.rolesService.hasPermission(serverId, requesterUserId, 'manageNicknames'),
     ]);
 
     return {
@@ -3175,6 +3235,7 @@ export class ServersService {
         canKick,
         canBan,
         canTimeout,
+        canManageNicknames,
         isOwner,
       },
     };

@@ -1,8 +1,9 @@
 .wrapper {
   border-radius: 8px;
-  border: 1px solid var(--border-subtle, #e3e5e8);
-  background: var(--background-secondary, #f2f3f5);
+  border: 1px solid var(--color-panel-border, #3f4147);
+  background: var(--color-panel-deep, #1e1f22);
   overflow: hidden;
+  color: var(--color-panel-text, #f2f3f5);
 }
 
 .headerRow {
@@ -13,8 +14,8 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted, #6a7480);
-  background: var(--background-tertiary, #e3e5e8);
+  color: var(--color-panel-text-muted, #949ba4);
+  background: var(--color-panel-sidebar, #2b2d31);
 }
 
 .body {
@@ -31,14 +32,15 @@
   width: 100%;
   text-align: left;
   cursor: pointer;
+  color: inherit;
 }
 
 .row:nth-child(odd) {
-  background: rgba(0, 0, 0, 0.01);
+  background: var(--color-panel-hover, rgba(255, 255, 255, 0.02));
 }
 
 .row:hover {
-  background: rgba(88, 101, 242, 0.06);
+  background: var(--color-panel-hover, rgba(88, 101, 242, 0.08));
 }
 
 .colUser,
@@ -60,7 +62,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #99aab5;
+  background: var(--color-panel-accent, #5865f2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,15 +79,17 @@
 
 .displayName {
   font-weight: 500;
+  color: var(--color-panel-text, #f2f3f5);
 }
 
 .username {
   font-size: 12px;
-  color: var(--text-muted, #6a7480);
+  color: var(--color-panel-text-muted, #949ba4);
 }
 
 .colDate {
   font-size: 12px;
+  color: var(--color-panel-text-faint, #72767d);
 }
 
 .roleBadge {
@@ -94,7 +98,7 @@
   justify-content: center;
   padding: 0 6px;
   border-radius: 999px;
-  border: 1px solid #99aab5;
+  border: 1px solid currentColor;
   font-size: 11px;
   font-weight: 500;
   margin-right: 4px;
@@ -104,6 +108,6 @@
 .empty {
   padding: 12px;
   font-size: 13px;
-  color: var(--text-muted, #6a7480);
+  color: var(--color-panel-text-muted, #949ba4);
 }
 

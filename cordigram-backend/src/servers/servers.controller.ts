@@ -806,6 +806,22 @@ export class ServersController {
     return { ok: true };
   }
 
+  @Patch(':id/members/:memberId/nickname')
+  async updateMemberNickname(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Body() body: { nickname?: string },
+    @Request() req: any,
+  ) {
+    await this.serversService.updateMemberNickname(
+      serverId,
+      req.user.userId,
+      memberId,
+      body?.nickname ?? '',
+    );
+    return { ok: true };
+  }
+
   /**
    * Hồ sơ trong máy chủ (per-server): avatar + banner/cover (và nickname lấy từ member row).
    */

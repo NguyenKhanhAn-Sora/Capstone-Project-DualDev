@@ -61,6 +61,10 @@ type Props = {
   onToast?: (message: string) => void;
   /** Máy chủ bạn tham gia (trừ máy chủ hiện tại) để mời người này. */
   inviteableServers: ServerInviteOption[];
+  /** Quyền quản lý biệt danh (manageNicknames) — hiện nút Đổi Biệt Danh thay vì Bỏ qua. */
+  canManageNicknames?: boolean;
+  /** Callback khi muốn đổi biệt danh cho user. */
+  onChangeNickname?: (userId: string, currentNickname: string | null) => void;
 };
 
 /** Trùng với `ConnectionStatus` của discord-card-react (dnd = chấm đỏ). */
@@ -247,6 +251,8 @@ export default function ChannelUserProfileRoot({
   onOpenDirectMessage,
   onToast,
   inviteableServers,
+  canManageNicknames = false,
+  onChangeNickname,
 }: Props) {
   const [view, setView] = useState<"mini" | "full">("mini");
   const [profile, setProfile] = useState<ProfileDetailResponse | null>(null);
@@ -702,30 +708,18 @@ export default function ChannelUserProfileRoot({
         <span>{t("chat.channelUserProfile.inviteToServer")}</span>
         <span className={styles.menuChevron}>›</span>
       </button>
-      <div className={styles.subMenuAnchor} ref={muteSubRef}>
+      {canManageNicknames && friend && (
         <button
           type="button"
-          className={`${styles.dropdownItem} ${styles.dropdownItemRow}`}
-          onClick={() => setMuteSubOpen((v) => !v)}
+          className={styles.dropdownItem}
+          onClick={() => {
+            onChangeNickname?.(friend._id, context?.nicknameInChannel ?? null);
+            opts.closeMore();
+          }}
         >
-          <span>{t("chat.channelUserProfile.ignore")}</span>
-          <span className={styles.menuChevron}>›</span>
+          {t("chat.channelUserProfile.changeNickname")}
         </button>
-        {muteSubOpen ? (
-          <div className={styles.subDropdown}>
-            {muteDurationOptions.map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                className={styles.subDropdownItem}
-                onClick={() => void handleMuteApply(opt.key)}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
+      )}
       <div className={styles.dropdownSep} />
       <button
         type="button"

@@ -1018,6 +1018,7 @@ export interface MembersWithRolesResponse {
     canKick: boolean;
     canBan: boolean;
     canTimeout: boolean;
+    canManageNicknames: boolean;
     isOwner: boolean;
   };
 }
@@ -1200,6 +1201,8 @@ export interface CurrentUserServerPermissions {
   canManageEvents: boolean;
   canManageExpressions: boolean;
   canCreateInvite: boolean;
+  canChangeNickname: boolean;
+  canManageNicknames: boolean;
   /** Được dùng đề cập (@) — không ảnh hưởng việc nhận tin khi người khác @ bạn. */
   mentionEveryone?: boolean;
 }
@@ -1229,7 +1232,7 @@ export async function getCurrentUserPermissions(
       const membersResponse = await getServerMembersWithRoles(serverId);
       return {
         isOwner: membersResponse.currentUserPermissions.isOwner,
-        hasCustomRole: membersResponse.currentUserPermissions.isOwner, // Fallback: chỉ owner có quyền
+        hasCustomRole: membersResponse.currentUserPermissions.isOwner,
         canKick: membersResponse.currentUserPermissions.canKick,
         canBan: membersResponse.currentUserPermissions.canBan,
         canTimeout: membersResponse.currentUserPermissions.canTimeout,
@@ -1238,6 +1241,8 @@ export async function getCurrentUserPermissions(
         canManageEvents: membersResponse.currentUserPermissions.isOwner,
         canManageExpressions: membersResponse.currentUserPermissions.isOwner,
         canCreateInvite: membersResponse.currentUserPermissions.isOwner,
+        canChangeNickname: membersResponse.currentUserPermissions.isOwner,
+        canManageNicknames: membersResponse.currentUserPermissions.isOwner,
         mentionEveryone: membersResponse.currentUserPermissions.isOwner,
       };
     } catch {
@@ -1252,6 +1257,8 @@ export async function getCurrentUserPermissions(
         canManageEvents: false,
         canManageExpressions: false,
         canCreateInvite: false,
+        canChangeNickname: false,
+        canManageNicknames: false,
         mentionEveryone: false,
       };
     }
@@ -1931,6 +1938,29 @@ export async function updateMyServerNickname(
 ): Promise<void> {
   const res = await fetch(
     `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/nickname`,
+    {
+      method: "PATCH",
+      headers: {
+        ...getHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ nickname }),
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu biệt danh");
+  }
+}
+
+/** Quản lý biệt danh thành viên khác (cần quyền manageNicknames). */
+export async function updateMemberNickname(
+  serverId: string,
+  memberId: string,
+  nickname: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(memberId)}/nickname`,
     {
       method: "PATCH",
       headers: {

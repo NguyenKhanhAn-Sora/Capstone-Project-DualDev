@@ -20,8 +20,8 @@ export interface MemberListRow {
 }
 
 export interface MemberListFilters {
-  /** Lọc theo vai trò hệ thống (owner/mod/member) */
-  serverRole: "all" | "owner" | "moderator" | "member";
+  /** Lọc theo vai trò hệ thống (owner/mod/member) hoặc roleId cụ thể */
+  serverRole: "all" | "owner" | "moderator" | "member" | string;
   /** Tài khoản mới: tuổi tài khoản < 7 ngày */
   newAccountOnly: boolean;
   /** Spam: > 50 tin trong 10 phút */
@@ -70,13 +70,18 @@ export function filterMembersBySearch<
   });
 }
 
-export function filterMembersByAdvanced<T extends MemberListRow>(
+export function filterMembersByAdvanced<T extends MemberListRow & { roles?: Array<{ _id: string }> }>(
   members: T[],
   filters: MemberListFilters,
 ): T[] {
   return members.filter((m) => {
-    if (filters.serverRole !== "all" && m.serverMemberRole !== filters.serverRole) {
-      return false;
+    if (filters.serverRole !== "all") {
+      const sysRoles = ["owner", "moderator", "member"];
+      if (sysRoles.includes(filters.serverRole)) {
+        if (m.serverMemberRole !== filters.serverRole) return false;
+      } else {
+        if (!m.roles?.some((r) => r._id === filters.serverRole)) return false;
+      }
     }
     if (filters.newAccountOnly && m.accountAgeDays >= 7) {
       return false;

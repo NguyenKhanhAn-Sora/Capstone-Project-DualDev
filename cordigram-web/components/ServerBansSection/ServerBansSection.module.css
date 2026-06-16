@@ -366,3 +366,44 @@
 .unrestrictBtn:hover {
   background: #2d8049;
 }
+
+.banStatus {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f23f43;
+  background: rgba(242, 63, 67, 0.12);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 8px;
+}
+
+.banDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: 12px;
+  text-align: right;
+}
+
+.banDate {
+  font-size: 11px;
+  color: var(--color-panel-text-faint, #72767d);
+}
+
+.restrictedStatus {
+  font-size: 11px;
+  font-weight: 600;
+  color: #faa61a;
+  background: rgba(250, 166, 26, 0.12);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.restrictedUsername {
+  font-size: 12px;
+  color: var(--color-panel-text-faint, #72767d);
+  font-weight: 400;
+  margin-left: 4px;
+}

@@ -9485,7 +9485,9 @@ export default function MessagesPage() {
                       canManageChannels: isOwner,
                       canManageEvents: isOwner,
                       canManageExpressions: isOwner,
-                      canCreateInvite: true,
+                      canCreateInvite: isOwner,
+                      canChangeNickname: isOwner,
+                      canManageNicknames: isOwner,
                       mentionEveryone: isOwner,
                     };
                   }
@@ -9918,7 +9920,7 @@ export default function MessagesPage() {
                     <ServerProfileDropdown
                       server={currentServer}
                       canManageProfile={canManageJoinApplications}
-                      canCreateInvite={currentServerPermissions?.canCreateInvite ?? true}
+                      canCreateInvite={currentServerPermissions?.canCreateInvite ?? Boolean(currentServerPermissions?.isOwner)}
                       onEditProfile={() => {
                         setShowServerProfileDropdown(false);
                         void openServerSettingsFromMediaPicker(currentServer._id, "profile");
@@ -13649,20 +13651,14 @@ export default function MessagesPage() {
           permissions={serverContextMenu.permissions ?? {
             isOwner: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
-            hasCustomRole: currentUserId !== "" &&
-              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
-            canKick: false,
-            canBan: false,
-            canTimeout: false,
             canManageServer: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canManageChannels: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canManageEvents: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
-            canManageExpressions: currentUserId !== "" &&
-              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
-            canCreateInvite: true,
+            canCreateInvite: currentServerPermissions?.canCreateInvite ?? (currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId),
           }}
           onClose={() => setServerContextMenu(null)}
           onMarkAsRead={() => setServerContextMenu(null)}
@@ -14065,6 +14061,7 @@ export default function MessagesPage() {
                     servers.find((s) => s._id === serverSettingsTarget?.serverId)?.ownerId === currentUserId
                   )
                 }
+                canManageServer={Boolean(currentServerPermissions?.canManageServer || currentServerPermissions?.isOwner)}
                 currentUserId={currentUserId ?? ""}
                 token={token}
                 onNavigateToDM={(userId, displayName, username, avatarUrl) => {
@@ -14716,6 +14713,22 @@ export default function MessagesPage() {
           context={channelProfileContext}
           token={token}
           inviteableServers={channelProfileInviteServers}
+          canManageNicknames={Boolean(currentServerPermissions?.canManageNicknames || currentServerPermissions?.isOwner)}
+          onChangeNickname={async (userId, currentNick) => {
+            const newNick = await appPrompt(
+              currentNick ? `Đổi biệt danh (hiện tại: ${currentNick})` : "Nhập biệt danh mới",
+              currentNick ?? "",
+            );
+            if (newNick === null || newNick === undefined) return;
+            try {
+              const sid = channelProfileContext?.serverId;
+              if (!sid) return;
+              await serversApi.updateMemberNickname(sid, userId, newNick);
+              setToastMessage("Đã đổi biệt danh thành công.");
+            } catch (err) {
+              setToastMessage(err instanceof Error ? err.message : "Không đổi được biệt danh");
+            }
+          }}
           onClose={() => setChannelProfileContext(null)}
           onOpenDirectMessage={handleOpenDmFromChannelProfile}
           onToast={(m) => setToastMessage(m)}

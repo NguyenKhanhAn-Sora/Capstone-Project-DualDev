@@ -10,6 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ServerInvite } from './server-invite.schema';
 import { ServersService } from '../servers/servers.service';
+import { RolesService } from '../roles/roles.service';
 
 @Injectable()
 export class ServerInvitesService {
@@ -17,9 +18,11 @@ export class ServerInvitesService {
     @InjectModel(ServerInvite.name) private inviteModel: Model<ServerInvite>,
     @Inject(forwardRef(() => ServersService))
     private readonly serversService: ServersService,
+    @Inject(forwardRef(() => RolesService))
+    private readonly rolesService: RolesService,
   ) {}
 
-  /** Tạo lời mời vào máy chủ (chỉ thành viên server mới mời được). */
+  /** Tạo lời mời vào máy chủ (chỉ thành viên có quyền createInvite). */
   async create(
     fromUserId: string,
     toUserId: string,
@@ -28,6 +31,21 @@ export class ServerInvitesService {
     const server = await this.serversService.getServerById(serverId);
     if (!this.serversService.isMember(server, fromUserId)) {
       throw new ForbiddenException('Chỉ thành viên máy chủ mới có thể mời.');
+    }
+
+    const isOwner =
+      (server as any).ownerId?.toString() === fromUserId;
+    if (!isOwner) {
+      const canInvite = await this.rolesService.hasPermission(
+        serverId,
+        fromUserId,
+        'createInvite',
+      );
+      if (!canInvite) {
+        throw new ForbiddenException(
+          'Bạn không có quyền tạo lời mời trong máy chủ này.',
+        );
+      }
     }
     if (this.serversService.isMember(server, toUserId)) {
       throw new BadRequestException('Người này đã là thành viên máy chủ.');
