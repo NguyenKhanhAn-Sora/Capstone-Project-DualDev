@@ -214,8 +214,9 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     if (!_isVideoCall || _room == null) {
       mgr.setMinimizedPipVideoTracks(
         remoteMain: null,
-        localPip: null,
+        pipTrack: null,
         remoteMainIsScreenShare: false,
+        pipIsSharingPlaceholder: false,
       );
       return;
     }
@@ -230,28 +231,52 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       }
     }
     final remote = remotes.isNotEmpty ? remotes.first : null;
-    final remoteHasScreen = _ParticipantTile.hasScreenShare(remote);
-    final mainParticipant = remoteHasScreen ? remote : (remote ?? local);
-    final mainPrefersScreen = remoteHasScreen;
 
-    final remoteMain = _ParticipantTile.pickRenderableVideo(
-      mainParticipant,
-      preferScreenShare: mainPrefersScreen,
-    );
-    final remoteMainIsScreen = _ParticipantTile.videoTrackIsScreenShare(
-      mainParticipant,
-      remoteMain,
-    );
+    final remoteScreen = _ParticipantTile.pickScreenVideo(remote);
+    final remoteCamera = _ParticipantTile.pickCameraVideo(remote);
+    final localScreen = local != null
+        ? _ParticipantTile.pickScreenVideo(local)
+        : null;
+    final localCamera = local != null
+        ? _ParticipantTile.pickLocalCameraVideo(local, camOn: _camEnabled)
+        : null;
 
-    VideoTrack? localPip;
-    if (remote != null && local != null) {
-      localPip = _ParticipantTile.pickLocalCameraVideo(local, camOn: _camEnabled);
+    VideoTrack? mainTrack;
+    var mainIsScreen = false;
+
+    if (remoteScreen != null) {
+      mainTrack = remoteScreen;
+      mainIsScreen = true;
+    } else if (localScreen != null && remoteCamera != null) {
+      mainTrack = remoteCamera;
+    } else if (remoteCamera != null) {
+      mainTrack = remoteCamera;
+    } else if (localCamera != null && localScreen == null) {
+      mainTrack = localCamera;
+    } else if (remote == null && localCamera != null) {
+      mainTrack = localCamera;
+    }
+
+    VideoTrack? pipTrack;
+    var pipSharingPlaceholder = false;
+
+    if (mainIsScreen && remoteCamera != null) {
+      pipTrack = remoteCamera;
+    } else if (localScreen != null) {
+      pipSharingPlaceholder = true;
+    } else if (mainTrack != null &&
+        remote != null &&
+        remoteCamera != null &&
+        mainTrack == remoteCamera &&
+        localCamera != null) {
+      pipTrack = localCamera;
     }
 
     mgr.setMinimizedPipVideoTracks(
-      remoteMain: remoteMain,
-      localPip: localPip,
-      remoteMainIsScreenShare: remoteMainIsScreen,
+      remoteMain: mainTrack,
+      pipTrack: pipTrack,
+      remoteMainIsScreenShare: mainIsScreen,
+      pipIsSharingPlaceholder: pipSharingPlaceholder,
     );
   }
 
@@ -303,7 +328,10 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     final next = !_camEnabled;
     try {
       await lp.setCameraEnabled(next);
-      if (mounted) setState(() => _camEnabled = next);
+      if (mounted) {
+        setState(() => _camEnabled = next);
+        _syncMinimizedPipIfNeeded();
+      }
     } catch (_) {}
   }
 
@@ -428,7 +456,12 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
           await FlutterBackground.disableBackgroundExecution();
         } catch (_) {}
       }
-      if (mounted) setState(() => _screenShareEnabled = next);
+      if (mounted) {
+        setState(() => _screenShareEnabled = next);
+        _syncMinimizedPipIfNeeded();
+      } else {
+        _screenShareEnabled = next;
+      }
     } catch (err) {
       _showSnack('Không chia sẻ màn hình được: $err');
     } finally {
@@ -1152,18 +1185,29 @@ class _ParticipantTile extends StatelessWidget {
     required bool preferScreenShare,
   }) {
     if (participant == null) return null;
-    VideoTrack? camera;
-    VideoTrack? screen;
+    final screen = pickScreenVideo(participant);
+    final camera = pickCameraVideo(participant);
+    return preferScreenShare ? (screen ?? camera) : (camera ?? screen);
+  }
+
+  static VideoTrack? pickScreenVideo(Participant? participant) {
+    if (participant == null) return null;
     for (final pub in participant.videoTrackPublications) {
       final track = pub.track;
       if (track is! VideoTrack || pub.muted) continue;
-      if (pub.source == TrackSource.screenShareVideo) {
-        screen = track;
-      } else if (pub.source == TrackSource.camera) {
-        camera = track;
-      }
+      if (pub.source == TrackSource.screenShareVideo) return track;
     }
-    return preferScreenShare ? (screen ?? camera) : (camera ?? screen);
+    return null;
+  }
+
+  static VideoTrack? pickCameraVideo(Participant? participant) {
+    if (participant == null) return null;
+    for (final pub in participant.videoTrackPublications) {
+      final track = pub.track;
+      if (track is! VideoTrack || pub.muted) continue;
+      if (pub.source == TrackSource.camera) return track;
+    }
+    return null;
   }
 
   static bool videoTrackIsScreenShare(Participant? participant, VideoTrack? track) {

@@ -68,8 +68,9 @@ class DmCallManager extends ChangeNotifier {
 
   /// Live tracks for the floating PiP while minimized (fed by [NativeCallScreen]).
   VideoTrack? _minimizedRemoteMainTrack;
-  VideoTrack? _minimizedLocalPipTrack;
+  VideoTrack? _minimizedPipTrack;
   bool _minimizedRemoteMainIsScreenShare = false;
+  bool _minimizedPipIsSharingPlaceholder = false;
   DateTime? _activeCallStartedAt;
 
   /// Cached display/username of the currently authenticated user. Fetched
@@ -114,25 +115,29 @@ class DmCallManager extends ChangeNotifier {
   String? get myDisplayName => _myName;
 
   VideoTrack? get minimizedRemoteMainTrack => _minimizedRemoteMainTrack;
-  VideoTrack? get minimizedLocalPipTrack => _minimizedLocalPipTrack;
+  VideoTrack? get minimizedPipTrack => _minimizedPipTrack;
   bool get minimizedRemoteMainIsScreenShare => _minimizedRemoteMainIsScreenShare;
+  bool get minimizedPipIsSharingPlaceholder => _minimizedPipIsSharingPlaceholder;
   DateTime? get activeCallStartedAt => _activeCallStartedAt;
 
   void setMinimizedPipVideoTracks({
     VideoTrack? remoteMain,
-    VideoTrack? localPip,
+    VideoTrack? pipTrack,
     bool remoteMainIsScreenShare = false,
+    bool pipIsSharingPlaceholder = false,
   }) {
     _minimizedRemoteMainTrack = remoteMain;
-    _minimizedLocalPipTrack = localPip;
+    _minimizedPipTrack = pipTrack;
     _minimizedRemoteMainIsScreenShare = remoteMainIsScreenShare;
+    _minimizedPipIsSharingPlaceholder = pipIsSharingPlaceholder;
     if (_isCallMinimized) notifyListeners();
   }
 
   void clearMinimizedPipVideoTracks() {
     _minimizedRemoteMainTrack = null;
-    _minimizedLocalPipTrack = null;
+    _minimizedPipTrack = null;
     _minimizedRemoteMainIsScreenShare = false;
+    _minimizedPipIsSharingPlaceholder = false;
   }
 
   /// Call once at app startup (after [AuthStorage.loadAll]) with the root
