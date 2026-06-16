@@ -53,11 +53,11 @@ export class CloudinaryService implements OnModuleInit {
   }): Promise<string> {
     const { audioUrl, startSec, durationSec } = params;
 
+    // Step 1: upload the original audio and generate a trimmed eager derivation.
     const res = await cloudinary.uploader.upload(audioUrl, {
       resource_type: 'video',
       folder: 'story-audio',
       unique_filename: true,
-      // Eagerly create the trimmed clip synchronously.
       eager: [
         {
           start_offset: startSec,
@@ -70,14 +70,32 @@ export class CloudinaryService implements OnModuleInit {
       timeout: 60000,
     } as UploadApiOptions);
 
+    // Step 2: re-upload the eager-derived URL as a standalone asset so it is
+    // independent of the original. Cloudinary derived resources are deleted
+    // together with their parent — storing only the eager URL and then
+    // deleting the original would make the stored URL a dead link.
     const eagerUrl: string = (res as any).eager?.[0]?.secure_url ?? res.secure_url;
 
-    // Delete the full-length original to conserve storage (fire-and-forget).
-    cloudinary.uploader
-      .destroy(res.public_id, { resource_type: 'video' })
-      .catch(() => {});
+    let standaloneUrl = eagerUrl;
+    try {
+      const clip = await cloudinary.uploader.upload(eagerUrl, {
+        resource_type: 'video',
+        folder: 'story-audio',
+        unique_filename: true,
+        timeout: 60000,
+      } as UploadApiOptions);
+      standaloneUrl = clip.secure_url;
 
-    return eagerUrl;
+      // Now it is safe to delete the original (and its derived resources).
+      cloudinary.uploader
+        .destroy(res.public_id, { resource_type: 'video' })
+        .catch(() => {});
+    } catch {
+      // Re-upload failed — keep the eager URL and do NOT delete the original,
+      // so the eager derived resource remains accessible.
+    }
+
+    return standaloneUrl;
   }
 
   async uploadBuffer(params: {
