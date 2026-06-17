@@ -666,11 +666,41 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     if (_chatBlocked) return;
     await MessagesMediaService.refreshBoostStatus();
     final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const [
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'webp',
+        'heic',
+        'heif',
+        'mp4',
+        'mov',
+        'm4v',
+        'webm',
+        'mp3',
+        'm4a',
+        'aac',
+        'wav',
+        'ogg',
+      ],
       allowMultiple: true,
       withReadStream: false,
     );
     if (picked == null || picked.files.isEmpty) return;
     for (final file in picked.files) {
+      final path = file.path;
+      if (path == null || path.isEmpty) continue;
+      if (!MessagesMediaService.isAllowedMessagingMediaPath(path)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(MessagesMediaService.formatMediaTypeNotAllowedError()),
+          ),
+        );
+        return;
+      }
       final len = file.size;
       if (len > MessagesMediaService.maxUploadBytes) {
         if (!mounted) return;
@@ -697,6 +727,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         final mime = MessagesMediaService.resolveUploadContentType(
           filePath: path,
         );
+        if (!MessagesMediaService.isAllowedMessagingMediaType(mime)) {
+          throw Exception(MessagesMediaService.formatMediaTypeNotAllowedError());
+        }
         final upload = await MessagesMediaService.uploadFile(
           filePath: path,
           contentType: mime,
@@ -707,20 +740,28 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         final isVideo =
             mime.startsWith('video/') || rt == 'video' || rt.contains('video');
         final isImage = mime.startsWith('image/') || rt == 'image';
+        final isAudio = mime.startsWith('audio/');
         final String content;
         if (isVideo) {
           content = '🎬 [Video]: $url';
+        } else if (isAudio) {
+          content = '🎵 [Audio]: $url';
         } else if (isImage) {
           content = '📷 [Image]: $url';
         } else {
-          final safeName = file.name.trim().isEmpty ? 'file' : file.name.trim();
-          content = '📎 [File]: $safeName\n$url';
+          throw Exception(MessagesMediaService.formatMediaTypeNotAllowedError());
         }
         await _sendChannelMessage(content: content, attachments: [url]);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            MessagesMediaService.mapUploadErrorMessage(e.toString()),
+          ),
+        ),
+      );
     } finally {
       final ctx = loaderCtx;
       if (ctx != null && ctx.mounted) {
@@ -746,9 +787,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                   Icons.upload_file_rounded,
                   color: Colors.white,
                 ),
-                title: const Text(
-                  'Upload file',
-                  style: TextStyle(color: Colors.white),
+                title: Text(
+                  LanguageController.instance.t('chat.composer.plusUploadFile'),
+                  style: const TextStyle(color: Colors.white),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);

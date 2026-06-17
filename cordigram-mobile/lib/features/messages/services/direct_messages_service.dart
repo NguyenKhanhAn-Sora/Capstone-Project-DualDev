@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/services/api_service.dart';
@@ -16,6 +17,31 @@ class DirectMessagesService {
   DirectMessagesService._();
   static final Map<String, DateTime?> _dmMutedUntil = {};
   static final Set<String> _dmMutedForever = {};
+  static const _chatPushPrefKey = 'cordigram_chat_push_notifications_v1';
+  static bool _chatPushNotificationsEnabled = true;
+
+  static bool get chatPushNotificationsEnabled => _chatPushNotificationsEnabled;
+
+  static void applyChatPushNotificationsEnabled(bool enabled) {
+    _chatPushNotificationsEnabled = enabled;
+    unawaited(persistChatPushNotificationsEnabled(enabled));
+  }
+
+  static Future<void> persistChatPushNotificationsEnabled(bool enabled) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_chatPushPrefKey, enabled);
+  }
+
+  static Future<bool> loadPersistedChatPushNotificationsEnabled() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(_chatPushPrefKey) ?? true;
+  }
+
+  static void applyUserSettings(Map<String, dynamic> settings) {
+    applyChatPushNotificationsEnabled(
+      settings['chatDesktopNotificationsEnabled'] != false,
+    );
+  }
 
   static void applyMutedState({
     required Map<String, DateTime?> mutedUntil,
@@ -30,6 +56,8 @@ class DirectMessagesService {
   }
 
   static Future<void> hydrateConversationMutes() async {
+    _chatPushNotificationsEnabled =
+        await loadPersistedChatPushNotificationsEnabled();
     final uid = currentUserId;
     if (uid == null || uid.isEmpty) return;
     final loaded = await DmMutePrefsStore.loadForUser(uid);

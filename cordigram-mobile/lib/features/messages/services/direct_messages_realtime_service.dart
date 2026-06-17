@@ -236,6 +236,7 @@ class DirectMessagesRealtimeService {
   }
 
   static void _applyRemoteUserSettings(Map<String, dynamic> settings) {
+    DirectMessagesService.applyUserSettings(settings);
     final lang = (settings['language'] ?? '').toString().toLowerCase();
     if (LanguageController.supported.contains(lang)) {
       unawaited(LanguageController.instance.applyRemoteLanguage(lang));
@@ -487,7 +488,8 @@ class DirectMessagesRealtimeService {
         if (v is num && v > 0) maxBytes = v.toInt();
       }
       MessagesMediaService.applyBoostEntitlement(
-        active: data['active'] == true,
+        active: data['active'] == true || data['unlocked'] == true,
+        unlocked: data['unlocked'] == true || data['active'] == true,
         maxUploadBytes: maxBytes,
       );
     });

@@ -47,7 +47,7 @@ import {
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
-import { DEFAULT_FREE_MAX_UPLOAD_BYTES, formatUploadLimitExceededMessage } from "@/lib/upload-limits";
+import { DEFAULT_FREE_MAX_UPLOAD_BYTES, formatUploadLimitExceededMessage, isAllowedMessagingMediaFile, mapMessagingUploadErrorMessage } from "@/lib/upload-limits";
 import { shouldPlayChannelMessageNotificationSound } from "@/lib/channel-notification-sound";
 import { playMessageNotificationSound } from "@/lib/message-notification-sound";
 import {
@@ -7140,7 +7140,7 @@ export default function MessagesPage() {
         const audioFile = new File([audioBlob], fileName, { type: mimeType });
 
         if (audioFile.size > maxUploadBytes) {
-          setError(formatUploadLimitExceededMessage(maxUploadBytes));
+          setError(formatUploadLimitExceededMessage(maxUploadBytes, (key) => t(key)));
           setIsUploadingVoice(false);
           return;
         }
@@ -7214,7 +7214,7 @@ export default function MessagesPage() {
       });
 
       if (audioFile.size > maxUploadBytes) {
-        setError(formatUploadLimitExceededMessage(maxUploadBytes));
+        setError(formatUploadLimitExceededMessage(maxUploadBytes, (key) => t(key)));
         setIsUploadingVoice(false);
         return;
       }
@@ -8613,9 +8613,15 @@ export default function MessagesPage() {
       setShowPlusMenu(false);
 
       try {
+        const invalidType = files.find((f) => !isAllowedMessagingMediaFile(f));
+        if (invalidType) {
+          setError(t("chat.composer.onlyImageVideoAudioAllowed"));
+          return;
+        }
+
         const tooLarge = files.find((f) => f.size > maxUploadBytes);
         if (tooLarge) {
-          setError(formatUploadLimitExceededMessage(maxUploadBytes));
+          setError(formatUploadLimitExceededMessage(maxUploadBytes, (key) => t(key)));
           return;
         }
 
@@ -8633,10 +8639,18 @@ export default function MessagesPage() {
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const isImage = file.type.startsWith("image/");
+          const isVideo = file.type.startsWith("video/");
+          const isAudio = file.type.startsWith("audio/");
           const tempId = `temp-upload-${Date.now()}-${i}`;
           const loadingMessage: UIMessage = {
             id: tempId,
-            text: isImage ? `📤 Uploading image...` : `📤 Uploading video...`,
+            text: isImage
+              ? `📤 Uploading image...`
+              : isVideo
+                ? `📤 Uploading video...`
+                : isAudio
+                  ? `📤 Uploading audio...`
+                  : `📤 Uploading...`,
             senderId: currentUserId,
             senderEmail: "",
             senderDisplayName: selfMessagingIdentity.displayName || undefined,
@@ -8685,20 +8699,16 @@ export default function MessagesPage() {
         // Group all images into a single combined message; videos stay separate.
         const imageResults: UploadMediaResponse[] = [];
         const videoResults: { media: UploadMediaResponse; loadingMsgId: string }[] = [];
-        const fileResults: { media: UploadMediaResponse; loadingMsgId: string; fileName: string }[] = [];
+        const audioResults: { media: UploadMediaResponse; loadingMsgId: string }[] = [];
         for (let i = 0; i < uploadResults.length; i++) {
           const media = uploadResults[i];
           const sourceFile = files[i];
           if (media.resourceType === "image") {
             imageResults.push(media);
+          } else if (sourceFile.type.startsWith("audio/")) {
+            audioResults.push({ media, loadingMsgId: loadingMessages[i].id });
           } else if (media.resourceType === "video" || sourceFile.type.startsWith("video/")) {
             videoResults.push({ media, loadingMsgId: loadingMessages[i].id });
-          } else {
-            fileResults.push({
-              media,
-              loadingMsgId: loadingMessages[i].id,
-              fileName: sourceFile.name || "file",
-            });
           }
         }
 
@@ -8802,11 +8812,11 @@ export default function MessagesPage() {
           }
         }
 
-        for (const { media, loadingMsgId, fileName } of fileResults) {
-          const fileMessage = `📎 [File]: ${fileName}\n${media.url}`;
+        for (const { media, loadingMsgId } of audioResults) {
+          const mediaMessage = `🎵 [Audio]: ${media.url}`;
           const finalMessage: UIMessage = {
             id: `temp-${Date.now()}-${loadingMsgId}`,
-            text: fileMessage,
+            text: mediaMessage,
             senderId: currentUserId,
             senderEmail: "",
             senderDisplayName: selfMessagingIdentity.displayName || undefined,
@@ -8830,19 +8840,24 @@ export default function MessagesPage() {
               );
               return newMap;
             });
-            emitSendMessage(selectedDirectMessageFriend._id, fileMessage, [
+            emitSendMessage(selectedDirectMessageFriend._id, mediaMessage, [
               media.url,
             ]);
           } else if (selectedChannel) {
             setMessages((prev) =>
               prev.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
             );
-            await serversApi.createMessage(selectedChannel, fileMessage);
+            await serversApi.createMessage(selectedChannel, mediaMessage);
           }
         }
       } catch (error: any) {
         console.error("❌ Failed to upload files:", error);
-        setError(error?.message || "Không tải lên được tệp");
+        setError(
+          mapMessagingUploadErrorMessage(error?.message || "", {
+            t: (key) => t(key),
+            maxUploadBytes,
+          }),
+        );
       }
     },
     [
@@ -8855,15 +8870,16 @@ export default function MessagesPage() {
       selectedChannel,
       token,
       emitSendMessage,
+      t,
     ],
   );
 
-  // Handle file upload
+  // Handle media upload (image / video / audio only)
   const handleFileUpload = () => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = "*/*";
+    input.accept = "image/*,video/*,audio/*";
     input.onchange = async (e: any) => {
       const files: File[] = Array.from(e.target.files || []);
       await handleMediaFilesSelected(files);
@@ -12862,7 +12878,8 @@ export default function MessagesPage() {
                                 (item) =>
                                   item.kind === "file" &&
                                   (item.type.startsWith("image/") ||
-                                    item.type.startsWith("video/")),
+                                    item.type.startsWith("video/") ||
+                                    item.type.startsWith("audio/")),
                               )
                               .map((item) => item.getAsFile())
                               .filter((file): file is File => Boolean(file));

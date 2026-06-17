@@ -428,6 +428,25 @@ class _MessageChatScreenState extends State<MessageChatScreen>
   Future<void> _pickAndUploadMedia() async {
     await MessagesMediaService.refreshBoostStatus();
     final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const [
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'webp',
+        'heic',
+        'heif',
+        'mp4',
+        'mov',
+        'm4v',
+        'webm',
+        'mp3',
+        'm4a',
+        'aac',
+        'wav',
+        'ogg',
+      ],
       allowMultiple: true,
       withReadStream: false,
     );
@@ -436,6 +455,15 @@ class _MessageChatScreenState extends State<MessageChatScreen>
     for (final file in picked.files) {
       final path = file.path;
       if (path == null || path.isEmpty) continue;
+      if (!MessagesMediaService.isAllowedMessagingMediaPath(path)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(MessagesMediaService.formatMediaTypeNotAllowedError()),
+          ),
+        );
+        return;
+      }
       final len = file.size;
       if (len > MessagesMediaService.maxUploadBytes) {
         if (!mounted) return;
@@ -464,31 +492,28 @@ class _MessageChatScreenState extends State<MessageChatScreen>
         final mime = MessagesMediaService.resolveUploadContentType(
           filePath: path,
         );
-        final isImage = mime.startsWith('image/');
-        final isVideo = mime.startsWith('video/');
-        if (isImage || isVideo) {
-          await widget.controller.sendUploadedImageOrVideo(
-            peerUserId: widget.thread.id,
-            filePath: path,
-            mimeType: mime,
-            replyTo: _replyingTo?.id,
-          );
-        } else {
-          await widget.controller.sendUploadedFile(
-            peerUserId: widget.thread.id,
-            filePath: path,
-            mimeType: mime,
-            fileName: file.name,
-            replyTo: _replyingTo?.id,
-          );
+        if (!MessagesMediaService.isAllowedMessagingMediaType(mime)) {
+          throw Exception(MessagesMediaService.formatMediaTypeNotAllowedError());
         }
+        await widget.controller.sendUploadedImageOrVideo(
+          peerUserId: widget.thread.id,
+          filePath: path,
+          mimeType: mime,
+          replyTo: _replyingTo?.id,
+        );
       }
       if (mounted) setState(() => _replyingTo = null);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$e')));
+        ).showSnackBar(
+          SnackBar(
+            content: Text(
+              MessagesMediaService.mapUploadErrorMessage(e.toString()),
+            ),
+          ),
+        );
       }
     } finally {
       final ctx = loaderCtx;
@@ -730,9 +755,9 @@ class _MessageChatScreenState extends State<MessageChatScreen>
                   Icons.upload_file_rounded,
                   color: Colors.white,
                 ),
-                title: const Text(
-                  'Upload file',
-                  style: TextStyle(
+                title: Text(
+                  LanguageController.instance.t('chat.composer.plusUploadFile'),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
                   ),

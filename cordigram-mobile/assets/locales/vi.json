@@ -1245,6 +1245,11 @@
     "failedSend": "Không gửi được tin nhắn: {error}",
     "failedSendVoice": "Không gửi được voice message: {error}",
     "fileTooLarge": "File quá lớn (tối đa 25MB)",
+    "onlyImageVideoAudioAllowed": "Chỉ cho phép tệp ảnh, video hoặc âm thanh",
+    "uploadFailed": "Không tải lên được tệp",
+    "uploadLimitFree": "Tệp vượt quá giới hạn 100MB. Nâng cấp Boost để tải lên tối đa 300MB hoặc 600MB.",
+    "uploadLimitBasic": "Tệp vượt quá giới hạn 300MB (Boost cơ bản). Nâng cấp lên gói Boost để tải lên tối đa 600MB.",
+    "uploadLimitMax": "Tệp vượt quá giới hạn 600MB cho phép.",
     "addOption": "Thêm phương án",
     "hours": "{h} giờ",
     "cancel": "Hủy",
@@ -2053,8 +2058,13 @@
       "replyServerInvite": "Lời mời máy chủ",
       "replyVoice": "Tin nhắn thoại",
       "replyWelcomeFallback": "Lời chào mừng",
-      "plusUploadFile": "Tải tệp lên",
-      "plusCreatePoll": "Tạo khảo sát"
+      "plusUploadFile": "Tải media lên",
+      "plusCreatePoll": "Tạo khảo sát",
+      "onlyImageVideoAudioAllowed": "Chỉ cho phép tệp ảnh, video hoặc âm thanh",
+      "uploadFailed": "Không tải lên được tệp",
+      "uploadLimitFree": "Tệp vượt quá giới hạn 100MB. Nâng cấp Boost để tải lên tối đa 300MB hoặc 600MB.",
+      "uploadLimitBasic": "Tệp vượt quá giới hạn 300MB (Boost cơ bản). Nâng cấp lên gói Boost để tải lên tối đa 600MB.",
+      "uploadLimitMax": "Tệp vượt quá giới hạn 600MB cho phép."
     },
     "createPoll": {
       "title": "Tạo khảo sát",

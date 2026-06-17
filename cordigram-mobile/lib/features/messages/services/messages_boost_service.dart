@@ -6,6 +6,7 @@ import '../../ads/ads_service.dart';
 class MessagesBoostStatus {
   const MessagesBoostStatus({
     required this.active,
+    required this.unlocked,
     this.tier,
     this.expiresAt,
     this.billingCycle,
@@ -13,15 +14,13 @@ class MessagesBoostStatus {
   });
 
   final bool active;
+  final bool unlocked;
   final String? tier;
   final DateTime? expiresAt;
   final String? billingCycle;
   final int? maxUploadBytes;
 
-  bool get isUnlocked =>
-      active ||
-      tier == 'basic' ||
-      tier == 'boost';
+  bool get isUnlocked => unlocked;
 
   factory MessagesBoostStatus.fromJson(Map<String, dynamic> json) {
     final limits = json['limits'];
@@ -30,10 +29,13 @@ class MessagesBoostStatus {
       final v = limits['maxUploadBytes'];
       if (v is num && v > 0) maxBytes = v.toInt();
     }
+    final active = json['active'] == true;
+    final unlocked = json['unlocked'] == true ||
+        active ||
+        json['accountBoost'] == true;
     return MessagesBoostStatus(
-      active: json['active'] == true ||
-          json['accountBoost'] == true ||
-          json['unlocked'] == true,
+      active: active,
+      unlocked: unlocked,
       tier: json['tier']?.toString(),
       expiresAt: DateTime.tryParse((json['expiresAt'] ?? '').toString())
           ?.toLocal(),
@@ -42,7 +44,7 @@ class MessagesBoostStatus {
     );
   }
 
-  static const empty = MessagesBoostStatus(active: false);
+  static const empty = MessagesBoostStatus(active: false, unlocked: false);
 }
 
 class BoostGiftRecipient {

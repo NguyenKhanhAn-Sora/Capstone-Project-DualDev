@@ -1233,6 +1233,11 @@
     "failedSend": "无法发送消息: {error}",
     "failedSendVoice": "无法发送语音消息: {error}",
     "fileTooLarge": "文件太大（最大25MB）",
+    "onlyImageVideoAudioAllowed": "仅允许上传图片、视频或音频文件",
+    "uploadFailed": "无法上传文件",
+    "uploadLimitFree": "文件超过 100MB 限制。升级 Boost 后可上传最多 300MB 或 600MB。",
+    "uploadLimitBasic": "文件超过 300MB 限制（Basic Boost）。升级 Boost 后可上传最多 600MB。",
+    "uploadLimitMax": "文件超过 600MB 限制。",
     "addOption": "添加选项",
     "hours": "{h}小时",
     "cancel": "取消",
@@ -2041,8 +2046,13 @@
       "replyServerInvite": "服务器邀请",
       "replyVoice": "语音消息",
       "replyWelcomeFallback": "欢迎",
-      "plusUploadFile": "上传文件",
-      "plusCreatePoll": "创建投票"
+      "plusUploadFile": "上传媒体",
+      "plusCreatePoll": "创建投票",
+      "onlyImageVideoAudioAllowed": "仅允许上传图片、视频或音频文件",
+      "uploadFailed": "无法上传文件",
+      "uploadLimitFree": "文件超过 100MB 限制。升级 Boost 后可上传最多 300MB 或 600MB。",
+      "uploadLimitBasic": "文件超过 300MB 限制（Basic Boost）。升级 Boost 后可上传最多 600MB。",
+      "uploadLimitMax": "文件超过 600MB 限制。"
     },
     "createPoll": {
       "title": "创建投票",

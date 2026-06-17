@@ -131,6 +131,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
       _dmListFrom = (settings['dmListFrom'] ?? 'everyone').toString();
       _dmCallFrom = (settings['dmCallFrom'] ?? 'everyone').toString();
       _notifEnabled = settings['chatDesktopNotificationsEnabled'] != false;
+      DirectMessagesService.applyUserSettings(settings);
       _soundEnabled = settings['chatSoundEnabled'] != false;
       await AccentColorController.instance.bindUser(
         DirectMessagesService.currentUserId,
@@ -161,6 +162,11 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
         chatSoundEnabled: _soundEnabled,
         chatDesktopNotificationsEnabled: _notifEnabled,
         showCordigramMemberSince: _showMemberSince,
+      );
+      DirectMessagesService.applyChatPushNotificationsEnabled(_notifEnabled);
+      await ProfileService.updateNotificationSettings(
+        enabled: _notifEnabled,
+        mutedIndefinitely: !_notifEnabled,
       );
       await DmSidebarPrefs.setPeersMode(_peersMode);
       if (!mounted) return;

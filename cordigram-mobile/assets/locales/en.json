@@ -1224,6 +1224,11 @@
     "failedSend": "Unable to send message: {error}",
     "failedSendVoice": "Unable to send voice message: {error}",
     "fileTooLarge": "File too large (max 25MB)",
+    "onlyImageVideoAudioAllowed": "Only image, video, or audio files are allowed",
+    "uploadFailed": "Could not upload file",
+    "uploadLimitFree": "File exceeds the 100MB limit. Upgrade Boost to upload up to 300MB or 600MB.",
+    "uploadLimitBasic": "File exceeds the 300MB limit (Basic Boost). Upgrade to Boost to upload up to 600MB.",
+    "uploadLimitMax": "File exceeds the 600MB limit.",
     "addOption": "Add option",
     "hours": "{h} hours",
     "cancel": "Cancel",
@@ -2028,8 +2033,13 @@
       "replyServerInvite": "Server invite",
       "replyVoice": "Voice message",
       "replyWelcomeFallback": "Welcome",
-      "plusUploadFile": "Upload file",
-      "plusCreatePoll": "Create poll"
+      "plusUploadFile": "Upload media",
+      "plusCreatePoll": "Create poll",
+      "onlyImageVideoAudioAllowed": "Only image, video, or audio files are allowed",
+      "uploadFailed": "Could not upload file",
+      "uploadLimitFree": "File exceeds the 100MB limit. Upgrade Boost to upload up to 300MB or 600MB.",
+      "uploadLimitBasic": "File exceeds the 300MB limit (Basic Boost). Upgrade to Boost to upload up to 600MB.",
+      "uploadLimitMax": "File exceeds the 600MB limit."
     },
     "createPoll": {
       "title": "Create poll",

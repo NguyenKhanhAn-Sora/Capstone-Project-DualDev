@@ -210,6 +210,7 @@ class MessagesController extends ChangeNotifier {
       _dmListFrom = (settings['dmListFrom'] ?? 'everyone').toString();
       _dmCallFrom = (settings['dmCallFrom'] ?? 'everyone').toString();
       _myOnline = settings['sharePresence'] != false;
+      DirectMessagesService.applyUserSettings(settings);
       _dmSidebarPeersMode = await DmSidebarPrefs.getPeersMode();
       final following = await DirectMessagesService.getFollowingAsConversations();
       _followingUserIds
@@ -536,6 +537,9 @@ class MessagesController extends ChangeNotifier {
     required String mimeType,
     String? replyTo,
   }) async {
+    if (!MessagesMediaService.isAllowedMessagingMediaType(mimeType)) {
+      throw Exception(MessagesMediaService.formatMediaTypeNotAllowedError());
+    }
     final upload = await MessagesMediaService.uploadFile(
       filePath: filePath,
       contentType: mimeType,
@@ -545,35 +549,12 @@ class MessagesController extends ChangeNotifier {
     final rt = upload['resourceType']?.toString() ?? '';
     final isVideo =
         mimeType.startsWith('video/') || rt == 'video' || rt.contains('video');
-    final content = isVideo ? '🎬 [Video]: $url' : '📷 [Image]: $url';
-    final sent = await DirectMessagesService.sendMessage(
-      peerUserId,
-      content: content,
-      attachments: [url],
-      replyTo: replyTo,
-    );
-    if (sent != null) {
-      prependMessageToCache(peerUserId, sent);
-      MessageNotificationSound.play();
-    }
-    return sent;
-  }
-
-  Future<DmMessage?> sendUploadedFile({
-    required String peerUserId,
-    required String filePath,
-    required String mimeType,
-    required String fileName,
-    String? replyTo,
-  }) async {
-    final upload = await MessagesMediaService.uploadFile(
-      filePath: filePath,
-      contentType: mimeType,
-    );
-    final url = MessagesMediaService.pickDisplayUrl(upload);
-    if (url.isEmpty) throw Exception('Upload failed');
-    final safeName = fileName.trim().isEmpty ? 'file' : fileName.trim();
-    final content = '📎 [File]: $safeName\n$url';
+    final isAudio = mimeType.startsWith('audio/');
+    final content = isVideo
+        ? '🎬 [Video]: $url'
+        : isAudio
+        ? '🎵 [Audio]: $url'
+        : '📷 [Image]: $url';
     final sent = await DirectMessagesService.sendMessage(
       peerUserId,
       content: content,

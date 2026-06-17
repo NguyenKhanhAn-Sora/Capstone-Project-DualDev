@@ -1,5 +1,6 @@
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
+import '../../../core/services/language_controller.dart';
 import 'messages_boost_service.dart';
 
 /// Mirrors web `uploadMedia` — `POST /posts/upload` with
@@ -59,6 +60,38 @@ class MessagesMediaService {
     return 'application/octet-stream';
   }
 
+  static bool isAllowedMessagingMediaType(String mimeType) {
+    final mime = mimeType.trim().toLowerCase();
+    return mime.startsWith('image/') ||
+        mime.startsWith('video/') ||
+        mime.startsWith('audio/');
+  }
+
+  static bool isAllowedMessagingMediaPath(String filePath) {
+    return isAllowedMessagingMediaType(
+      resolveUploadContentType(filePath: filePath),
+    );
+  }
+
+  static String formatMediaTypeNotAllowedError() {
+    return LanguageController.instance.t('messages.onlyImageVideoAudioAllowed');
+  }
+
+  static String mapUploadErrorMessage(String rawMessage) {
+    final msg = rawMessage.trim();
+    if (msg.isEmpty) {
+      return LanguageController.instance.t('messages.uploadFailed');
+    }
+    if (msg.contains('Only image, video, or audio') ||
+        msg.contains('Only image or video')) {
+      return formatMediaTypeNotAllowedError();
+    }
+    if (msg.contains('File too large')) {
+      return formatUploadLimitError();
+    }
+    return msg;
+  }
+
   static Future<Map<String, dynamic>> uploadFile({
     required String filePath,
     required String contentType,
@@ -76,12 +109,16 @@ class MessagesMediaService {
 
   static Future<void> refreshBoostStatus({bool force = false}) async {
     if (_boostStatusLoaded && !force) return;
-    _boostStatusLoaded = true;
     final status = await MessagesBoostService.fetchStatus();
+    applyBoostFromStatus(status);
+  }
+
+  static void applyBoostFromStatus(MessagesBoostStatus status) {
+    _boostStatusLoaded = true;
     _boostActive = status.isUnlocked;
     if (status.maxUploadBytes != null && status.maxUploadBytes! > 0) {
       _maxUploadBytes = status.maxUploadBytes!;
-    } else {
+    } else if (!status.isUnlocked) {
       _maxUploadBytes = 100 * 1024 * 1024;
     }
   }
@@ -89,9 +126,10 @@ class MessagesMediaService {
   static void applyBoostEntitlement({
     required bool active,
     int? maxUploadBytes,
+    bool? unlocked,
   }) {
     _boostStatusLoaded = true;
-    _boostActive = active;
+    _boostActive = unlocked ?? active;
     if (maxUploadBytes != null && maxUploadBytes > 0) {
       _maxUploadBytes = maxUploadBytes;
     }
@@ -159,11 +197,11 @@ class MessagesMediaService {
   static String formatUploadLimitError() {
     final mb = (maxUploadBytes / (1024 * 1024)).round();
     if (mb <= 100) {
-      return 'File vượt quá giới hạn 100MB. Nâng cấp Boost để tải lên tối đa 300MB hoặc 600MB.';
+      return LanguageController.instance.t('messages.uploadLimitFree');
     }
     if (mb <= 300) {
-      return 'File vượt quá giới hạn 300MB (Boost cơ bản). Nâng cấp lên gói Boost để tải lên tối đa 600MB.';
+      return LanguageController.instance.t('messages.uploadLimitBasic');
     }
-    return 'File vượt quá giới hạn 600MB cho phép.';
+    return LanguageController.instance.t('messages.uploadLimitMax');
   }
 }
