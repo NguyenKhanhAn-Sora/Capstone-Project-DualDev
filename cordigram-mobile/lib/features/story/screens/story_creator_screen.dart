@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -106,6 +108,9 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
   double _trimStart = 0.0; // 0–1 fraction
   double _trimEnd = 1.0;
 
+  // Trim-range loop listener (active after trim is confirmed, in preview mode)
+  VoidCallback? _trimLoopCb;
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +123,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
     _tabCtrl.dispose();
     _textCtrl.dispose();
     _textFocus.dispose();
+    if (_trimLoopCb != null) _videoCtrl?.removeListener(_trimLoopCb!);
     _videoCtrl?.dispose();
     super.dispose();
   }
@@ -213,6 +219,31 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
       _trimStartMs = (start * ms).round();
       _trimEndMs = (end * ms).round();
     });
+    _startTrimLoop();
+  }
+
+  void _startTrimLoop() {
+    // Remove old listener
+    if (_trimLoopCb != null) {
+      _videoCtrl?.removeListener(_trimLoopCb!);
+      _trimLoopCb = null;
+    }
+    final startMs = _trimStartMs ?? 0;
+    final endMs = _trimEndMs ?? _mediaDurationMs ?? 0;
+    if (endMs <= startMs) return;
+
+    _videoCtrl?.setLooping(false);
+    _videoCtrl?.seekTo(Duration(milliseconds: startMs));
+
+    _trimLoopCb = () {
+      final ctrl = _videoCtrl;
+      if (ctrl == null || !ctrl.value.isInitialized) return;
+      final pos = ctrl.value.position.inMilliseconds;
+      if (pos >= endMs) {
+        ctrl.seekTo(Duration(milliseconds: startMs));
+      }
+    };
+    _videoCtrl?.addListener(_trimLoopCb!);
   }
 
   // ── Tab switching with confirm ────────────────────────────────────────────
@@ -353,11 +384,16 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
                 .toList()
             : [];
 
+        final trimmedDurMs =
+            (type == 'video' && _trimStartMs != null && _trimEndMs != null && _trimEndMs! > _trimStartMs!)
+                ? _trimEndMs! - _trimStartMs!
+                : dur;
+
         body = {
           'type': 'media',
           'mediaType': type,
           'mediaUrl': url,
-          if (dur != null) 'mediaDurationMs': dur,
+          if (trimmedDurMs != null) 'mediaDurationMs': trimmedDurMs,
           if (_trimStartMs != null) 'trimStartMs': _trimStartMs,
           if (_trimEndMs != null) 'trimEndMs': _trimEndMs,
           'visibility': _vis.key,
@@ -764,11 +800,12 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
               ),
             ),
           ),
-        // Bottom bar: visibility + post button
-        Positioned(
-          bottom: 0, left: 0, right: 0,
-          child: _buildBottomPostBar(t, isDark, bottomPad),
-        ),
+        // Bottom bar: visibility + post button (hidden while trimming)
+        if (_mediaStep != 'trim')
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: _buildBottomPostBar(t, isDark, bottomPad),
+          ),
       ],
     );
   }
@@ -859,7 +896,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         if (!_isText && _mediaType == 'image') ...[
           _ToolbarIconBtn(
             icon: Icons.text_fields_rounded,
-            label: 'Chữ',
+            label: t('story.toolText'),
             onTap: () => setState(() => _textAddTrigger++),
           ),
           const SizedBox(height: 18),
@@ -868,7 +905,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         if (_mediaType != 'video') ...[
           _ToolbarIconBtn(
             icon: Icons.music_note_rounded,
-            label: 'Nhạc',
+            label: t('story.toolMusic'),
             onTap: _showMusicPicker,
             active: _selectedMusic != null,
           ),
@@ -878,7 +915,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         if (_isText) ...[
           _ToolbarIconBtn(
             icon: Icons.palette_outlined,
-            label: 'Màu nền',
+            label: t('story.toolBg'),
             onTap: () => _showBgPicker(isDark),
           ),
           const SizedBox(height: 18),
@@ -887,7 +924,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         if (!_isText && _mediaFile != null) ...[
           _ToolbarIconBtn(
             icon: Icons.swap_horiz_rounded,
-            label: 'Đổi',
+            label: t('story.toolSwap'),
             onTap: () => _showMediaPicker(isDark),
           ),
           const SizedBox(height: 18),
@@ -896,7 +933,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
         if (_mediaType == 'video' && _mediaDurationMs != null) ...[
           _ToolbarIconBtn(
             icon: Icons.content_cut_rounded,
-            label: 'Cắt',
+            label: t('story.toolTrim'),
             onTap: () => setState(() => _mediaStep = 'trim'),
             active: _mediaStep == 'trim',
           ),
@@ -1010,9 +1047,9 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Màu nền',
-              style: TextStyle(
+            Text(
+              LanguageController.instance.t('story.toolBg'),
+              style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: 16),
@@ -1243,6 +1280,7 @@ class _StoryCreatorScreenState extends State<StoryCreatorScreen>
           Positioned(
             bottom: 0, left: 0, right: 0,
             child: _VideoTrimBar(
+              mediaFile: _mediaFile!,
               durationMs: _mediaDurationMs!,
               trimStart: _trimStart,
               trimEnd: _trimEnd,
@@ -1538,10 +1576,11 @@ class _MediaPickBtn extends StatelessWidget {
   }
 }
 
-// ── Video trim bar ────────────────────────────────────────────────────────────
+// ── Video trim bar (filmstrip style) ─────────────────────────────────────────
 
 class _VideoTrimBar extends StatefulWidget {
   const _VideoTrimBar({
+    required this.mediaFile,
     required this.durationMs,
     required this.trimStart,
     required this.trimEnd,
@@ -1551,6 +1590,7 @@ class _VideoTrimBar extends StatefulWidget {
     required this.isDark,
   });
 
+  final File mediaFile;
   final int durationMs;
   final double trimStart;
   final double trimEnd;
@@ -1564,49 +1604,276 @@ class _VideoTrimBar extends StatefulWidget {
 }
 
 class _VideoTrimBarState extends State<_VideoTrimBar> {
+  static const _maxSec = 20.0;
+  static const _thumbCount = 10;
+  static const _railH = 60.0;
+  static const _handleW = 14.0;
+
   late double _start;
   late double _end;
+  double _railWidth = 0;
+  double _playFrac = 0;
+  bool _scrubbing = false;
+
+  // Thumbnail frame extraction (secondary controller + off-screen render)
+  VideoPlayerController? _thumbCtrl;
+  final _captureKey = GlobalKey();
+  OverlayEntry? _captureEntry;
+  final Map<int, Uint8List> _frames = {};
+  bool _extractingFrames = false;
+  bool _confirmed = false;
 
   @override
   void initState() {
     super.initState();
     _start = widget.trimStart;
     _end = widget.trimEnd;
+    _clampToMax();
+    _playFrac = _start;
+
+    // Take over looping from parent — loop within trim window
+    widget.videoCtrl.setLooping(false);
+    widget.videoCtrl.seekTo(
+        Duration(milliseconds: (_start * widget.durationMs).round()));
+    widget.videoCtrl.addListener(_onVideoPos);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _extractFrames());
   }
 
-  String _fmt(double frac) {
-    final ms = (frac * widget.durationMs).round();
-    final s = ms ~/ 1000;
-    final m = s ~/ 60;
-    final sec = s % 60;
-    return m > 0
-        ? '$m:${sec.toString().padLeft(2, '0')}'
-        : '${sec}s';
+  void _clampToMax() {
+    final durSec = widget.durationMs / 1000.0;
+    if (durSec <= 0) return;
+    if ((_end - _start) * durSec > _maxSec) {
+      _end = (_start + _maxSec / durSec).clamp(0.0, 1.0);
+    }
+  }
+
+  double get _selSec => (_end - _start) * widget.durationMs / 1000.0;
+  bool get _atMax => _selSec >= _maxSec - 0.15;
+
+  // ── Playhead tracking + looping within trim window ───────────────────────
+
+  void _onVideoPos() {
+    if (!mounted || _scrubbing) return;
+    final dur = widget.durationMs;
+    if (dur <= 0) return;
+    final pos = widget.videoCtrl.value.position.inMilliseconds;
+    final frac = pos / dur;
+
+    // Loop back to trim start when end is reached
+    if (frac > _end + 0.01) {
+      widget.videoCtrl
+          .seekTo(Duration(milliseconds: (_start * dur).round()));
+      return;
+    }
+    final clamped = frac.clamp(_start, _end);
+    if ((clamped - _playFrac).abs() > 0.003) {
+      setState(() => _playFrac = clamped);
+    }
+  }
+
+  // ── Playhead scrubbing ───────────────────────────────────────────────────
+
+  void _onPlayheadDragStart(DragStartDetails _) {
+    _scrubbing = true;
+    widget.videoCtrl.pause();
+  }
+
+  void _onPlayheadDragUpdate(DragUpdateDetails details) {
+    if (_railWidth <= 0) return;
+    final effW = _railWidth - _handleW;
+    final delta = (details.primaryDelta ?? 0) / effW;
+    setState(() {
+      _playFrac = (_playFrac + delta).clamp(_start, _end);
+    });
+    widget.videoCtrl
+        .seekTo(Duration(milliseconds: (_playFrac * widget.durationMs).round()));
+  }
+
+  void _onPlayheadDragEnd(DragEndDetails _) {
+    _scrubbing = false;
+    widget.videoCtrl.play();
+  }
+
+  // ── Handle dragging ──────────────────────────────────────────────────────
+
+  void _onDrag(bool isLeft, double delta) {
+    final durSec = widget.durationMs / 1000.0;
+    if (durSec <= 0 || _railWidth <= 0) return;
+    final frac = delta / _railWidth;
+    final minFrac = 1.0 / durSec; // at least 1 second
+
+    setState(() {
+      if (isLeft) {
+        _start = (_start + frac).clamp(0.0, _end - minFrac);
+        if ((_end - _start) * durSec > _maxSec) {
+          _end = (_start + _maxSec / durSec).clamp(0.0, 1.0);
+        }
+      } else {
+        _end = (_end + frac).clamp(_start + minFrac, 1.0);
+        if ((_end - _start) * durSec > _maxSec) {
+          _start = (_end - _maxSec / durSec).clamp(0.0, 1.0);
+        }
+      }
+      _playFrac = _playFrac.clamp(_start, _end);
+    });
+
+    widget.videoCtrl.seekTo(
+        Duration(milliseconds: (_start * widget.durationMs).round()));
+  }
+
+  // ── Frame extraction ─────────────────────────────────────────────────────
+
+  Future<void> _extractFrames() async {
+    if (_extractingFrames || !mounted) return;
+    _extractingFrames = true;
+    try {
+      final ctrl = VideoPlayerController.file(widget.mediaFile);
+      _thumbCtrl = ctrl;
+      await ctrl.initialize();
+      await ctrl.pause();
+
+      final durMs = ctrl.value.duration.inMilliseconds;
+      if (durMs <= 0 || !mounted) {
+        _extractingFrames = false;
+        return;
+      }
+
+      // Mount an off-screen VideoPlayer (outside the visible viewport)
+      // so RepaintBoundary can capture each frame.
+      _captureEntry = OverlayEntry(
+        builder: (_) => Positioned(
+          left: -800,
+          top: -200,
+          width: 80,
+          height: 56,
+          child: RepaintBoundary(
+            key: _captureKey,
+            child: VideoPlayer(ctrl),
+          ),
+        ),
+      );
+      Overlay.of(context).insert(_captureEntry!);
+      await WidgetsBinding.instance.endOfFrame;
+
+      for (int i = 0; i < _thumbCount; i++) {
+        if (!mounted) break;
+        final ms = (durMs * i / (_thumbCount - 1)).round();
+        await ctrl.seekTo(Duration(milliseconds: ms));
+        // Allow the GPU texture to update before capturing
+        await Future.delayed(const Duration(milliseconds: 180));
+        await WidgetsBinding.instance.endOfFrame;
+
+        try {
+          final boundary = _captureKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+          if (boundary != null) {
+            final img = await boundary.toImage(pixelRatio: 1.0);
+            final bytes = await img.toByteData(
+                format: ui.ImageByteFormat.png);
+            final uint8 = bytes?.buffer.asUint8List();
+            if (uint8 != null && mounted) {
+              setState(() => _frames[i] = uint8);
+            }
+          }
+        } catch (_) {
+          // Frame capture failed — keep placeholder for this tile
+        }
+      }
+    } catch (_) {
+      // Extraction setup failed — UI still works with placeholder tiles
+    }
+
+    _captureEntry?.remove();
+    _captureEntry = null;
+    _extractingFrames = false;
+  }
+
+  // ── Confirm / dismiss ────────────────────────────────────────────────────
+
+  void _confirm() {
+    _confirmed = true;
+    widget.onChanged(_start, _end);
+    widget.onDone();
   }
 
   @override
+  void dispose() {
+    widget.videoCtrl.removeListener(_onVideoPos);
+    if (!_confirmed) {
+      // User cancelled — restore full-video looping
+      widget.videoCtrl.setLooping(true);
+      widget.videoCtrl.play();
+    }
+    _captureEntry?.remove();
+    _thumbCtrl?.dispose();
+    super.dispose();
+  }
+
+  // ── Formatting ───────────────────────────────────────────────────────────
+
+  String _fmtMs(int ms) {
+    final s = ms ~/ 1000;
+    final m = s ~/ 60;
+    final sec = s % 60;
+    if (m > 0) return '$m:${sec.toString().padLeft(2, '0')}';
+    return '${(ms / 1000).toStringAsFixed(1)}s';
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────────
+
+  @override
   Widget build(BuildContext context) {
+    final durMs = widget.durationMs;
+    final selSec = _selSec;
+    final atMax = _atMax;
+    final accent =
+        atMax ? const Color(0xFF48BB78) : const Color(0xFF4AA3E4);
     final t = LanguageController.instance.t;
+
     return Container(
-      color: Colors.black87,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      color: Colors.black.withValues(alpha: 0.93),
+      padding: EdgeInsets.fromLTRB(
+          16, 14, 16, MediaQuery.of(context).padding.bottom + 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Title row
+          // ── Header ──
           Row(
             children: [
+              const Icon(Icons.content_cut_rounded,
+                  color: Colors.white70, size: 16),
+              const SizedBox(width: 6),
               Text(t('story.trimTitle'),
                   style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 14)),
               const Spacer(),
+              // Duration badge
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: atMax
+                      ? const Color(0xFFE53E3E)
+                      : const Color(0xFF1A2535),
+                ),
+                child: Text(
+                  '${selSec.toStringAsFixed(1)}s${atMax ? ' MAX' : ''}',
+                  style: TextStyle(
+                    color: atMax ? Colors.white : const Color(0xFF4AA3E4),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Confirm button
               GestureDetector(
-                onTap: () {
-                  widget.onChanged(_start, _end);
-                  widget.onDone();
-                },
+                onTap: _confirm,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 14, vertical: 6),
@@ -1625,51 +1892,268 @@ class _VideoTrimBarState extends State<_VideoTrimBar> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // Range sliders
-          RangeSlider(
-            values: RangeValues(_start, _end),
-            min: 0,
-            max: 1,
-            activeColor: const Color(0xFF4AA3E4),
-            inactiveColor: const Color(0xFF253347),
-            onChanged: (v) {
-              setState(() {
-                _start = v.start;
-                _end = v.end;
-              });
-              final durationMs = widget.durationMs;
-              widget.videoCtrl.seekTo(
-                  Duration(milliseconds: (v.start * durationMs).round()));
-            },
-          ),
+          // ── Filmstrip rail ──
+          LayoutBuilder(builder: (ctx, constraints) {
+            _railWidth = constraints.maxWidth;
+            final effW = _railWidth - _handleW;
+            final selLeft = _start * effW + _handleW / 2;
+            final selW = (_end - _start) * effW;
+            final playX = _playFrac * effW + _handleW / 2;
 
-          // Time labels
+            return SizedBox(
+              height: _railH + 20,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Filmstrip tiles
+                  Positioned(
+                    left: _handleW / 2,
+                    width: effW,
+                    top: 10,
+                    height: _railH,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: _FilmstripRail(
+                        count: _thumbCount,
+                        frames: _frames,
+                      ),
+                    ),
+                  ),
+
+                  // Dim: left of selection
+                  if (_start > 0.005)
+                    Positioned(
+                      left: _handleW / 2,
+                      width: _start * effW,
+                      top: 10,
+                      height: _railH,
+                      child: Container(
+                          color: Colors.black.withValues(alpha: 0.58)),
+                    ),
+
+                  // Dim: right of selection
+                  if (_end < 0.995)
+                    Positioned(
+                      left: _end * effW + _handleW / 2,
+                      width: (1 - _end) * effW,
+                      top: 10,
+                      height: _railH,
+                      child: Container(
+                          color: Colors.black.withValues(alpha: 0.58)),
+                    ),
+
+                  // Selection top/bottom border
+                  Positioned(
+                    left: selLeft,
+                    width: selW,
+                    top: 10,
+                    height: _railH,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.symmetric(
+                          horizontal: BorderSide(
+                              color: accent, width: 2.5),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Playhead (draggable scrubber)
+                  Positioned(
+                    left: playX - 12,
+                    top: 4,
+                    height: _railH + 12,
+                    width: 24,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: _onPlayheadDragStart,
+                      onHorizontalDragUpdate: _onPlayheadDragUpdate,
+                      onHorizontalDragEnd: _onPlayheadDragEnd,
+                      child: Center(
+                        child: Container(
+                          width: 3,
+                          height: _railH + 12,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(2),
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: Colors.black38,
+                                  blurRadius: 3,
+                                  spreadRadius: 1),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Left handle
+                  Positioned(
+                    left: _start * effW,
+                    top: 0,
+                    height: _railH + 20,
+                    width: _handleW,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragUpdate: (d) =>
+                          _onDrag(true, d.primaryDelta ?? 0),
+                      child: _TrimHandle(
+                          isLeft: true,
+                          color: accent,
+                          height: _railH + 20),
+                    ),
+                  ),
+
+                  // Right handle
+                  Positioned(
+                    left: _end * effW,
+                    top: 0,
+                    height: _railH + 20,
+                    width: _handleW,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragUpdate: (d) =>
+                          _onDrag(false, d.primaryDelta ?? 0),
+                      child: _TrimHandle(
+                          isLeft: false,
+                          color: accent,
+                          height: _railH + 20),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          const SizedBox(height: 8),
+
+          // ── Time labels ──
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_fmt(_start),
-                  style: const TextStyle(
-                      color: Color(0xFF4AA3E4),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
               Text(
-                '${t('story.trimTotal')}: ${_fmt(1)}',
+                _fmtMs((_start * durMs).round()),
+                style: TextStyle(
+                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              Text(
+                '${t('story.trimTotal')}: ${_fmtMs(durMs)}',
                 style: const TextStyle(
                     color: Color(0xFF7A8BB0), fontSize: 11),
               ),
-              Text(_fmt(_end),
-                  style: const TextStyle(
-                      color: Color(0xFF4AA3E4),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text(
+                _fmtMs((_end * durMs).round()),
+                style: TextStyle(
+                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
+              ),
             ],
           ),
         ],
       ),
     );
   }
+}
+
+// ── Filmstrip rail ────────────────────────────────────────────────────────────
+
+class _FilmstripRail extends StatelessWidget {
+  const _FilmstripRail({required this.count, required this.frames});
+  final int count;
+  final Map<int, Uint8List> frames;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(count, (i) {
+        final bytes = frames[i];
+        if (bytes != null) {
+          return Expanded(
+            child: Image.memory(bytes,
+                fit: BoxFit.cover, gaplessPlayback: true),
+          );
+        }
+        return Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: i.isEven
+                  ? const Color(0xFF131D2B)
+                  : const Color(0xFF1A2535),
+              border: Border(
+                right: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    width: 0.5),
+              ),
+            ),
+            child: const Center(
+              child: Icon(Icons.movie_outlined,
+                  color: Color(0xFF2D3F5A), size: 12),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ── Trim handle ───────────────────────────────────────────────────────────────
+
+class _TrimHandle extends StatelessWidget {
+  const _TrimHandle(
+      {required this.isLeft,
+      required this.color,
+      required this.height});
+  final bool isLeft;
+  final Color color;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(isLeft ? 4 : 0),
+          bottomLeft: Radius.circular(isLeft ? 4 : 0),
+          topRight: Radius.circular(isLeft ? 0 : 4),
+          bottomRight: Radius.circular(isLeft ? 0 : 4),
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          _HandleDot(),
+          SizedBox(height: 4),
+          _HandleDot(),
+          SizedBox(height: 4),
+          _HandleDot(),
+        ],
+      ),
+    );
+  }
+}
+
+class _HandleDot extends StatelessWidget {
+  const _HandleDot();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 3,
+        height: 3,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white70,
+        ),
+      );
 }
 
 // ── Floating toolbar icon button ──────────────────────────────────────────────

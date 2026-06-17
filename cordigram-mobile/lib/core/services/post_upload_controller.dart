@@ -185,6 +185,7 @@ class PostUploadController extends ChangeNotifier {
               'moderationDecision': result.moderationDecision,
             if (result.moderationProvider != null)
               'moderationProvider': result.moderationProvider,
+            if (result.qualities != null) 'qualities': result.qualities,
           },
         });
 

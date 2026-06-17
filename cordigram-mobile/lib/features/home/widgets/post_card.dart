@@ -579,6 +579,7 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
                   playbackScopeKey: post.id,
                   enableAutoPlayOnVisible: !widget.detailMode,
                   isParentVisible: _isVisibleForAutoplay,
+                  primaryVideoDurationMs: post.primaryVideoDurationMs,
                 ),
               ],
               if (_localPoll != null) ...[

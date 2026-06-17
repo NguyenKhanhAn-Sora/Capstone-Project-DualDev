@@ -3926,6 +3926,15 @@
     "timeNow": "刚才",
     "timeMinutes": "{n}分钟",
     "timeHours": "{n}小时",
-    "timeDays": "{n}天"
+    "timeDays": "{n}天",
+    "deleteConfirmBody": "此故事将被永久删除且无法恢复。",
+    "loadingMusic": "正在加载音乐...",
+    "editVisibility": "编辑可见性",
+    "toolText": "文字",
+    "toolMusic": "音乐",
+    "toolBg": "背景",
+    "toolSwap": "更换",
+    "toolTrim": "修剪",
+    "editText": "编辑文字"
   }
 }

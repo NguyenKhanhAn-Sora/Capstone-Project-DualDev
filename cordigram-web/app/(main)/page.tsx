@@ -1000,8 +1000,9 @@ export default function HomePage({
     if (!currentToken) return;
     try {
       const searchKey = (searchQueryOverride ?? "").trim();
-      // Sync stats for all currently loaded pages in parallel requests
-      const pageCount = Math.max(1, page);
+      // Sync stats for loaded pages — cap at 3 to avoid unbounded parallel requests
+      // when the user has scrolled deep. Items beyond page 3 retain their last-known stats.
+      const pageCount = Math.min(Math.max(1, page), 3);
       const pages = Array.from({ length: pageCount }, (_, i) => i + 1);
       const allFetched = await Promise.all(
         pages.map((p) =>

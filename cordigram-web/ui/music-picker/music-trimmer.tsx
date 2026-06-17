@@ -25,53 +25,109 @@ type Props = {
   onUpdate: (startTime: number) => void;
 };
 
+// Module-level cache: survives component unmount/remount (e.g. opening music picker).
+// Keyed by audioUrl so switching tracks re-fetches but same track is instant.
+type CachedAudio = { bars: number[]; duration: number; blobUrl: string };
+const audioCache = new Map<string, CachedAudio>();
+
 export default function MusicTrimmer({ music, onUpdate }: Props) {
-  const [bars, setBars] = useState<number[]>(() => seededBars(music.trackId));
-  const [totalDuration, setTotalDuration] = useState(30);
+  const cached = audioCache.get(music.audioUrl);
+
+  const [bars, setBars] = useState<number[]>(cached?.bars ?? []);
+  const [totalDuration, setTotalDuration] = useState(cached?.duration ?? 0);
   const [startOffset, setStartOffset] = useState(music.startTime ?? 0);
   const [playing, setPlaying] = useState(false);
+  // loading = full audio not yet decoded; waveform is hidden until done
+  const [loading, setLoading] = useState(!cached);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const blobUrlRef = useRef<string | null>(cached?.blobUrl ?? null);
   const waveRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
 
-  const segDur = Math.min(SEGMENT_SEC, totalDuration);
+  const segDur = Math.min(SEGMENT_SEC, totalDuration || SEGMENT_SEC);
   const maxOffset = Math.max(0, totalDuration - segDur);
 
-  // Load real waveform via Web Audio API
+  // ── Load + decode full audio ──────────────────────────────────────────────
   useEffect(() => {
-    setBars(seededBars(music.trackId));
+    const hit = audioCache.get(music.audioUrl);
+    if (hit) {
+      setBars(hit.bars);
+      setTotalDuration(hit.duration);
+      blobUrlRef.current = hit.blobUrl;
+      setStartOffset(0);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setBars([]);
     setStartOffset(0);
     let cancelled = false;
+
     (async () => {
+      let blobUrl: string | null = null;
       try {
-        const res = await fetch(music.audioUrl, { mode: "cors" });
+        const res = await fetch(music.audioUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buf = await res.arrayBuffer();
-        const ctx = new AudioContext();
-        const audioBuf = await ctx.decodeAudioData(buf);
         if (cancelled) return;
+
+        // Create blob URL first (decodeAudioData may detach the buffer).
+        const blob = new Blob([buf], { type: "audio/mpeg" });
+        blobUrl = URL.createObjectURL(blob);
+
+        const ctx = new AudioContext();
+        const audioBuf = await ctx.decodeAudioData(buf.slice(0));
+        ctx.close();
+        if (cancelled) { URL.revokeObjectURL(blobUrl); return; }
+
         const data = audioBuf.getChannelData(0);
-        setTotalDuration(audioBuf.duration);
-        const blockSize = Math.floor(data.length / NUM_BARS);
+        const dur = audioBuf.duration;
+        const blockSize = Math.max(1, Math.floor(data.length / NUM_BARS));
         const raw = Array.from({ length: NUM_BARS }, (_, i) => {
           let sum = 0;
           for (let j = 0; j < blockSize; j++) sum += Math.abs(data[i * blockSize + j]);
           return sum / blockSize;
         });
         const peak = Math.max(...raw, 0.001);
-        setBars(raw.map((b) => b / peak));
-        ctx.close();
+        const realBars = raw.map((b) => b / peak);
+
+        audioCache.set(music.audioUrl, { bars: realBars, duration: dur, blobUrl });
+        blobUrlRef.current = blobUrl;
+
+        setBars(realBars);
+        setTotalDuration(dur);
+        setLoading(false);
       } catch {
-        // keep seeded fallback
+        if (cancelled) return;
+        // fetch/decode failed — try at least getting duration from an <audio> element,
+        // then show seeded fallback bars so the UI is usable.
+        let dur = 180; // safe default (3 min)
+        try {
+          dur = await new Promise<number>((resolve, reject) => {
+            const a = new Audio();
+            a.preload = "metadata";
+            a.onloadedmetadata = () => resolve(isFinite(a.duration) ? a.duration : 180);
+            a.onerror = reject;
+            a.src = music.audioUrl;
+            setTimeout(() => reject(new Error("timeout")), 6000);
+          });
+        } catch { /* keep default */ }
+        if (cancelled) return;
+        setBars(seededBars(music.trackId));
+        setTotalDuration(dur);
+        setLoading(false);
       }
     })();
+
     return () => { cancelled = true; };
   }, [music.trackId, music.audioUrl]);
 
-  // Push startTime to parent
+  // ── Sync startTime to parent ──────────────────────────────────────────────
   useEffect(() => { onUpdate(startOffset); }, [startOffset, onUpdate]);
 
-  // Audio preview
+  // ── Audio preview ─────────────────────────────────────────────────────────
   const stopAudio = useCallback(() => {
     audioRef.current?.pause();
     if (audioRef.current) { audioRef.current.src = ""; audioRef.current = null; }
@@ -82,13 +138,16 @@ export default function MusicTrimmer({ music, onUpdate }: Props) {
 
   const togglePlay = () => {
     if (playing) { stopAudio(); return; }
-    const audio = new Audio(music.audioUrl);
+    // Prefer cached blob URL (instant, no re-fetch), fall back to original URL.
+    const src = blobUrlRef.current ?? music.audioUrl;
+    const audio = new Audio(src);
     audio.currentTime = startOffset;
     audio.volume = 0.8;
     audio.play().catch(() => {});
+    const end = startOffset + segDur;
     const check = () => {
       if (!audioRef.current) return;
-      if (audio.currentTime >= startOffset + segDur) { stopAudio(); return; }
+      if (audio.currentTime >= end) { stopAudio(); return; }
       requestAnimationFrame(check);
     };
     requestAnimationFrame(check);
@@ -97,10 +156,10 @@ export default function MusicTrimmer({ music, onUpdate }: Props) {
     setPlaying(true);
   };
 
-  // Drag to reposition selection window
+  // ── Drag to reposition selection window ──────────────────────────────────
   const calcOffset = useCallback((clientX: number) => {
     const rect = waveRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect || totalDuration <= 0) return;
     const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     const halfSeg = segDur / totalDuration / 2;
     const raw = (pct - halfSeg) * totalDuration;
@@ -108,6 +167,7 @@ export default function MusicTrimmer({ music, onUpdate }: Props) {
   }, [totalDuration, segDur, maxOffset]);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    if (loading) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     draggingRef.current = true;
     calcOffset(e.clientX);
@@ -127,6 +187,7 @@ export default function MusicTrimmer({ music, onUpdate }: Props) {
       <button
         className={`${styles.playBtn} ${playing ? styles.playBtnActive : ""}`}
         onClick={togglePlay}
+        disabled={loading}
         aria-label={playing ? "Dừng" : "Nghe thử đoạn nhạc"}
       >
         {playing ? <IconPause /> : <IconPlay />}
@@ -134,34 +195,42 @@ export default function MusicTrimmer({ music, onUpdate }: Props) {
 
       <div
         ref={waveRef}
-        className={styles.wave}
+        className={`${styles.wave} ${loading ? styles.waveLoading : ""}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
       >
-        {/* Bars */}
-        {bars.map((h, i) => {
-          const t = (i / NUM_BARS) * totalDuration;
-          const inSel = t >= startOffset && t < startOffset + segDur;
-          return (
+        {loading ? (
+          // Skeleton shimmer while fetching + decoding full audio
+          <div className={styles.skeleton}>
+            <div className={styles.skeletonGlow} />
+          </div>
+        ) : (
+          <>
+            {bars.map((h, i) => {
+              const t = (i / NUM_BARS) * totalDuration;
+              const inSel = t >= startOffset && t < startOffset + segDur;
+              return (
+                <div
+                  key={i}
+                  className={`${styles.bar} ${inSel ? styles.barActive : ""}`}
+                  style={{ height: `${Math.max(h * 100, 8)}%` }}
+                />
+              );
+            })}
             <div
-              key={i}
-              className={`${styles.bar} ${inSel ? styles.barActive : ""}`}
-              style={{ height: `${Math.max(h * 100, 8)}%` }}
+              className={styles.selWindow}
+              style={{ left: `${selLeft}%`, width: `${selWidth}%` }}
             />
-          );
-        })}
-
-        {/* Selection window overlay */}
-        <div
-          className={styles.selWindow}
-          style={{ left: `${selLeft}%`, width: `${selWidth}%` }}
-        />
+          </>
+        )}
       </div>
 
       <span className={styles.timeLabel}>
-        {fmtSec(startOffset)}–{fmtSec(Math.min(startOffset + segDur, totalDuration))}
+        {loading
+          ? "Đang tải..."
+          : `${fmtSec(startOffset)}–${fmtSec(Math.min(startOffset + segDur, totalDuration))}`}
       </span>
     </div>
   );

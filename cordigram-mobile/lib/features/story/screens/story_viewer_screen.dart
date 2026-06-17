@@ -40,6 +40,14 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   bool _videoReady = false;
   AudioPlayer? _audioPlayer;
 
+  // Pre-initialized video controllers keyed by mediaUrl.
+  // Filled by _preloadNextVideos() while the current story plays.
+  final Map<String, VideoPlayerController> _videoPool = {};
+
+  // Last-known rotation/AR so the listener only calls setState when they change.
+  int _lastRotation = -1;
+  double _lastAspectRatio = -1;
+
   // True while waiting for audio to buffer before starting progress.
   bool _waitingForAudio = false;
   // Tracks which story the current audio-load belongs to (cancels stale loads).
@@ -98,7 +106,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _prefetchUpcoming();
   }
 
-  /// Prefetches music for the next few stories so they play instantly.
+  /// Prefetches audio + pre-initializes video controllers for upcoming stories.
   void _prefetchUpcoming() {
     const lookahead = 3;
     var fetched = 0;
@@ -112,6 +120,73 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           fetched++;
         }
       }
+    }
+    _preloadNextVideos(); // fire-and-forget
+  }
+
+  /// Pre-initializes VideoPlayerControllers for the next video stories so
+  /// that when they are shown there is zero initialization delay.
+  void _preloadNextVideos() {
+    const maxPreload = 2;
+    var loaded = 0;
+    for (var gi = _groupIdx; gi < widget.groups.length && loaded < maxPreload; gi++) {
+      final group = widget.groups[gi];
+      final startSi = gi == _groupIdx ? _storyIdx + 1 : 0;
+      for (var si = startSi;
+          si < group.stories.length && loaded < maxPreload;
+          si++) {
+        final story = group.stories[si];
+        if (story.mediaType == 'video' && story.mediaUrl != null) {
+          final url = story.mediaUrl!;
+          if (!_videoPool.containsKey(url)) {
+            _initPoolEntry(url, story.trimStartMs); // fire-and-forget
+          }
+          loaded++;
+        }
+      }
+    }
+    _evictStalePool();
+  }
+
+  Future<void> _initPoolEntry(String url, int? trimStartMs) async {
+    try {
+      final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
+      // Register key immediately so concurrent calls don't double-init.
+      _videoPool[url] = ctrl;
+      await ctrl.initialize();
+      if (!mounted) {
+        ctrl.dispose();
+        _videoPool.remove(url);
+        return;
+      }
+      // Pre-seek to trimStartMs so playback can start instantly at the right
+      // position when this controller is eventually promoted to active.
+      if (trimStartMs != null && trimStartMs > 0) {
+        await ctrl.seekTo(Duration(milliseconds: trimStartMs));
+      }
+    } catch (_) {
+      _videoPool.remove(url);
+    }
+  }
+
+  /// Disposes pool entries whose URLs are no longer upcoming (e.g. after the
+  /// user navigates backward or skips ahead).
+  void _evictStalePool() {
+    final upcoming = <String>{};
+    const lookahead = 4;
+    var count = 0;
+    for (var gi = _groupIdx; gi < widget.groups.length && count < lookahead; gi++) {
+      final group = widget.groups[gi];
+      final startSi = gi == _groupIdx ? _storyIdx + 1 : 0;
+      for (var si = startSi; si < group.stories.length && count < lookahead; si++) {
+        final url = group.stories[si].mediaUrl;
+        if (url != null) upcoming.add(url);
+        count++;
+      }
+    }
+    final stale = _videoPool.keys.where((u) => !upcoming.contains(u)).toList();
+    for (final u in stale) {
+      _videoPool.remove(u)?.dispose();
     }
   }
 
@@ -254,21 +329,60 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   Future<void> _loadVideo(String url) async {
     try {
-      final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
-      await ctrl.initialize();
-      if (!mounted) {
-        ctrl.dispose();
-        return;
+      VideoPlayerController ctrl;
+
+      if (_videoPool.containsKey(url)) {
+        // ── Fast path: controller already initialized by _preloadNextVideos ──
+        ctrl = _videoPool.remove(url)!;
+      } else {
+        // ── Cold start: initialize now (first story, or prefetch missed) ──
+        ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
+        await ctrl.initialize();
+        if (!mounted) {
+          ctrl.dispose();
+          return;
+        }
       }
+
       _videoCtrl = ctrl;
       _videoReady = true;
+      // Rebuild when rotation / aspect-ratio metadata arrives (may be late).
+      ctrl.addListener(_onVideoValueChanged);
+
+      // Seek to trimStartMs before playing (mirrors web story-viewer behavior).
+      // Pool entries are already pre-seeked; only re-seek on cold start or
+      // when current position is outside the trim window.
+      final startMs = _story.trimStartMs ?? 0;
+      final endMs   = _story.trimEndMs;
+      final currentPos = ctrl.value.position.inMilliseconds;
+      final needsSeek = currentPos < startMs ||
+          (endMs != null && currentPos >= endMs);
+      if (needsSeek && startMs > 0) {
+        await ctrl.seekTo(Duration(milliseconds: startMs));
+      }
+      await ctrl.setLooping(false);
       await ctrl.play();
 
+      // Enforce trimEndMs: pause video when position reaches the trim boundary.
+      // The AnimationController (progress bar) is the authoritative timer for
+      // advancing to the next story — this listener only stops the video track.
+      if (endMs != null) {
+        ctrl.addListener(() {
+          if (_videoCtrl != ctrl) return; // stale listener after story change
+          final pos = ctrl.value.position.inMilliseconds;
+          if (pos >= endMs && ctrl.value.isPlaying) {
+            ctrl.pause();
+          }
+        });
+      }
+
+      // Use displayDurationMs (trim-aware: trimEnd - trimStart) for the
+      // progress bar so the story advances exactly when the clip finishes.
       _disposeProgress();
-      final ms = ctrl.value.duration.inMilliseconds;
+      final displayMs = _story.displayDurationMs;
       _progressCtrl = AnimationController(
         vsync: this,
-        duration: Duration(milliseconds: ms > 0 ? ms : 5000),
+        duration: Duration(milliseconds: displayMs > 0 ? displayMs : 5000),
       )
         ..forward()
         ..addStatusListener((s) {
@@ -384,15 +498,18 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ── Reactions ─────────────────────────────────────────────────────────────
 
   Future<void> _react(String emoji) async {
+    // Snapshot the story ID immediately — _story may change if the story
+    // advances while an async gap is pending (e.g. after the picker closes).
+    final storyId = _story.id;
     final prev = _localReaction;
     final removing = _localReaction == emoji;
     // Optimistic update
     setState(() => _localReaction = removing ? null : emoji);
     try {
       if (removing) {
-        await StoryService.removeReaction(_story.id);
+        await StoryService.removeReaction(storyId);
       } else {
-        await StoryService.reactToStory(_story.id, emoji);
+        await StoryService.reactToStory(storyId, emoji);
       }
     } catch (_) {
       // Roll back on failure
@@ -404,27 +521,28 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   Future<void> _deleteStory() async {
     _pause();
+    final t = LanguageController.instance.t;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A2435),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xóa story',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-        content: const Text(
-          'Story này sẽ bị xóa vĩnh viễn và không thể khôi phục.',
-          style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+        title: Text(t('story.deleteStory'),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        content: Text(
+          t('story.deleteConfirmBody'),
+          style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy',
-                style: TextStyle(color: Color(0xFF4AA3E4))),
+            child: Text(t('common.cancel'),
+                style: const TextStyle(color: Color(0xFF4AA3E4))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Xóa',
-                style: TextStyle(
+            child: Text(t('common.delete'),
+                style: const TextStyle(
                     color: Colors.redAccent, fontWeight: FontWeight.w700)),
           ),
         ],
@@ -449,10 +567,26 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _progressCtrl = null;
   }
 
+  // Rebuilds only when rotation or aspect-ratio metadata actually changes.
+  // Called by the VideoPlayerController listener added in _loadVideo.
+  void _onVideoValueChanged() {
+    if (!mounted || _videoCtrl == null) return;
+    final v = _videoCtrl!.value;
+    if (v.rotationCorrection != _lastRotation ||
+        v.aspectRatio != _lastAspectRatio) {
+      _lastRotation = v.rotationCorrection;
+      _lastAspectRatio = v.aspectRatio;
+      setState(() {});
+    }
+  }
+
   void _disposeVideo() {
+    _videoCtrl?.removeListener(_onVideoValueChanged);
     _videoCtrl?.dispose();
     _videoCtrl = null;
     _videoReady = false;
+    _lastRotation = -1;
+    _lastAspectRatio = -1;
   }
 
   @override
@@ -460,6 +594,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _disposeProgress();
     _disposeVideo();
     _stopAudio();
+    // Release all pre-initialized controllers that were never used.
+    for (final ctrl in _videoPool.values) {
+      ctrl.dispose();
+    }
+    _videoPool.clear();
     super.dispose();
   }
 
@@ -532,10 +671,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                       color: Colors.black54,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SizedBox(
+                        const SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(
@@ -544,10 +683,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                                 AlwaysStoppedAnimation(Colors.white70),
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
-                          'Đang tải nhạc...',
-                          style: TextStyle(
+                          LanguageController.instance.t('story.loadingMusic'),
+                          style: const TextStyle(
                               color: Colors.white70, fontSize: 12),
                         ),
                       ],
@@ -600,11 +739,15 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       );
     }
     if (story.mediaType == 'video' && _videoReady && _videoCtrl != null) {
+      // video_player already returns the display-correct aspectRatio once
+      // metadata loads. _onVideoValueChanged ensures we rebuild at that point,
+      // so no manual rotation flip needed here.
+      final displayAR = _videoCtrl!.value.aspectRatio;
       return ColoredBox(
         color: Colors.black,
         child: Center(
           child: AspectRatio(
-            aspectRatio: _videoCtrl!.value.aspectRatio,
+            aspectRatio: displayAR,
             child: VideoPlayer(_videoCtrl!),
           ),
         ),
@@ -831,7 +974,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ── Bottom bar ────────────────────────────────────────────────────────────
 
   Widget _buildBottomBar() {
-    final t = LanguageController.instance.t;
     return Container(
       padding: EdgeInsets.only(
         left: 16, right: 16,
@@ -869,44 +1011,14 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
             ),
             const Spacer(),
           ] else ...[
-            Expanded(
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: Colors.white38),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: () {},
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          t('story.replyPlaceholder', {
-                            'name': _group.displayName.isNotEmpty
-                                ? _group.displayName
-                                : _group.username,
-                          }),
-                          style: const TextStyle(
-                              color: Colors.white54, fontSize: 14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-          ],
-          if (!_isOwn)
+            const Spacer(),
             _ReactionButton(
               currentReaction: _localReaction,
               onReact: _react,
+              onPause: _pause,
+              onResume: _resume,
             ),
+          ],
         ],
       ),
     );
@@ -1029,8 +1141,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ListTile(
                 leading: const Icon(Icons.tune_rounded,
                     color: Color(0xFFE8ECF8)),
-                title: const Text('Chỉnh sửa quyền xem',
-                    style: TextStyle(color: Color(0xFFE8ECF8))),
+                title: Text(t('story.editVisibility'),
+                    style: const TextStyle(color: Color(0xFFE8ECF8))),
                 trailing: _visibilityChip(_localVisibility ?? 'followers'),
                 onTap: () {
                   Navigator.pop(sheetCtx);
@@ -1061,8 +1173,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
             ListTile(
               leading: const Icon(Icons.close_rounded,
                   color: Color(0xFF7A8BB0)),
-              title: const Text('Đóng',
-                  style: TextStyle(color: Color(0xFF7A8BB0))),
+              title: Text(t('common.close'),
+                  style: const TextStyle(color: Color(0xFF7A8BB0))),
               onTap: () => Navigator.pop(sheetCtx),
             ),
             const SizedBox(height: 8),
@@ -1128,15 +1240,15 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    Icon(Icons.tune_rounded,
+                    const Icon(Icons.tune_rounded,
                         color: Color(0xFF4AA3E4), size: 18),
-                    SizedBox(width: 8),
-                    Text('Chỉnh sửa quyền xem',
-                        style: TextStyle(
+                    const SizedBox(width: 8),
+                    Text(LanguageController.instance.t('story.editVisibility'),
+                        style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
                             fontSize: 16)),
@@ -1223,10 +1335,14 @@ class _ReactionButton extends StatelessWidget {
   const _ReactionButton({
     required this.currentReaction,
     required this.onReact,
+    required this.onPause,
+    required this.onResume,
   });
 
   final String? currentReaction;
   final void Function(String emoji) onReact;
+  final VoidCallback onPause;
+  final VoidCallback onResume;
 
   static const _emojis = ['❤️', '😮', '😂', '😢', '😡', '👍'];
 
@@ -1251,6 +1367,9 @@ class _ReactionButton extends StatelessWidget {
   }
 
   void _showPicker(BuildContext ctx) {
+    // Pause the story progress while the picker is open so the story cannot
+    // advance to the next item and change _story.id before the reaction fires.
+    onPause();
     showModalBottomSheet(
       context: ctx,
       backgroundColor: const Color(0xFF1A2435),
@@ -1270,6 +1389,7 @@ class _ReactionButton extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(ctx);
                   onReact(e);
+                  // Resume is handled after the sheet closes (see .then below).
                 },
                 child: Container(
                   padding: const EdgeInsets.all(10),
@@ -1290,7 +1410,7 @@ class _ReactionButton extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ).whenComplete(onResume);
   }
 }
 

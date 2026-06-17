@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/language_controller.dart';
 
 // ── Color palette (matches web OVERLAY_COLORS) ────────────────────────────────
 
@@ -726,7 +727,7 @@ class TextLayerControls extends StatelessWidget {
                   size: 14, color: Color(0xFF4AA3E4)),
               const SizedBox(width: 6),
               Text(
-                'Chỉnh sửa chữ',
+                LanguageController.instance.t('story.editText'),
                 style:
                     TextStyle(color: labelColor, fontSize: 12, fontWeight: FontWeight.w600),
               ),
