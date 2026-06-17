@@ -6,6 +6,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/services/auth_storage.dart';
 import '../../../core/services/language_controller.dart';
 import '../../../core/services/theme_controller.dart';
+import 'direct_messages_service.dart';
 import 'messages_media_service.dart';
 import '../models/dm_message.dart';
 import '../models/presence_state.dart';
