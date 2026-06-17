@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { fetchStoryFeed, type StoryFeedGroup, type StoryItem } from "@/lib/api";
 import styles from "./story-bar.module.css";
 
@@ -56,6 +57,7 @@ export default function StoryBar({
   onCreateStory,
   refreshKey,
 }: Props) {
+  const t = useTranslations("ui");
   const [groups, setGroups] = useState<StoryFeedGroup[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -80,14 +82,14 @@ export default function StoryBar({
   if (!token) return null;
 
   return (
-    <div className={styles.bar} role="list" aria-label="Stories">
+    <div className={styles.bar} role="list" aria-label={t("storyBar.ariaLabel")}>
 
       {/* ── Create Story card ── */}
       <div
         className={`${styles.card} ${styles.createCard}`}
         role="listitem"
         onClick={onCreateStory}
-        title="Tạo story"
+        title={t("storyBar.createStory")}
       >
         {/* Blurred bg */}
         {viewerAvatarUrl && (
@@ -98,7 +100,7 @@ export default function StoryBar({
         {/* Avatar */}
         <div className={styles.createAvatarWrap}>
           {viewerAvatarUrl ? (
-            <img src={viewerAvatarUrl} alt="avatar" className={styles.avatarImg} />
+            <img src={viewerAvatarUrl} alt={t("storyBar.avatarAlt")} className={styles.avatarImg} />
           ) : (
             <div className={styles.avatarPlaceholder}>
               {(viewerUsername ?? "U")[0].toUpperCase()}
@@ -115,7 +117,7 @@ export default function StoryBar({
 
         {/* Label */}
         <div className={styles.createFooter}>
-          <span className={styles.createLabel}>Tạo story</span>
+          <span className={styles.createLabel}>{t("storyBar.createStory")}</span>
         </div>
       </div>
 
@@ -134,7 +136,7 @@ export default function StoryBar({
             const myIdx = groups.findIndex((g) => g.userId === viewerId);
             onOpenStory(groups, myIdx);
           }}
-          title="Story của bạn"
+          title={t("storyBar.yourStory")}
         >
           <div className={styles.cardPreview} style={getPreviewStyle(myGroup.stories[0])} />
           <StoryPreview story={myGroup.stories[0]} />
@@ -142,7 +144,7 @@ export default function StoryBar({
           <div className={`${styles.ringWrap} ${hasUnviewedStories(myGroup) ? styles.ringUnviewed : styles.ringViewed}`}>
             <div className={styles.avatarInner}>
               {viewerAvatarUrl ? (
-                <img src={viewerAvatarUrl} alt="avatar" className={styles.avatarImg} />
+                <img src={viewerAvatarUrl} alt={t("storyBar.avatarAlt")} className={styles.avatarImg} />
               ) : (
                 <div className={styles.avatarPlaceholder}>
                   {(viewerUsername ?? "U")[0].toUpperCase()}
@@ -151,7 +153,7 @@ export default function StoryBar({
             </div>
           </div>
           <div className={styles.cardFooter}>
-            <span className={styles.cardLabel}>Story của bạn</span>
+            <span className={styles.cardLabel}>{t("storyBar.yourStory")}</span>
           </div>
         </div>
       )}

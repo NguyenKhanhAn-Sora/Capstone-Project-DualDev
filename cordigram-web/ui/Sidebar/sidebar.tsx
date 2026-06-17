@@ -77,6 +77,7 @@ export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations("sidebar");
+  const tUI = useTranslations("ui");
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [isGuest, setIsGuest] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -503,7 +504,7 @@ export default function Sidebar() {
         <Link href="/" className={styles.brand} onClick={clearSessionAndGoHome}>
           <Image
             src="/logo.png"
-            alt="Cordigram logo"
+            alt={tUI("sidebar.logo")}
             width={52}
             height={52}
             className={styles.logo}
@@ -611,9 +612,9 @@ export default function Sidebar() {
                 type="button"
                 className={styles.guestToolBtn}
                 onClick={toggleTheme}
-                aria-label="Toggle theme"
+                aria-label={tUI("sidebar.toggleTheme")}
               >
-                <IconTheme />
+                <IconTheme label={tUI("sidebar.themeIcon")} />
                 {mounted ? (theme === "dark" ? "Light" : "Dark") : "Theme"}
               </button>
               <div ref={langRef} className={styles.guestToolBtn} style={{ position: "relative" }}>
@@ -851,6 +852,7 @@ function SwitchAccountOverlay({
   onSuccess,
 }: SwitchAccountOverlayProps) {
   const t = useTranslations("sidebar.switchAccount");
+  const tUI = useTranslations("ui");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -925,7 +927,7 @@ function SwitchAccountOverlay({
           <Image
             className=""
             src="/logo.png"
-            alt="Logo"
+            alt={tUI("sidebar.logoAlt")}
             width={48}
             height={48}
           />
@@ -1225,13 +1227,14 @@ function IconSaved() {
   );
 }
 
-function IconTheme() {
+function IconTheme({ label }: { label?: string } = {}) {
   return (
     <svg
-      aria-label="Theme icon"
+      aria-label={label}
+      aria-hidden={!label}
       fill="currentColor"
       height="18"
-      role="img"
+      role={label ? "img" : undefined}
       viewBox="0 0 24 24"
       width="18"
     >

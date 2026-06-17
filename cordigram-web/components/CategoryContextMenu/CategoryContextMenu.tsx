@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { CategoryNotifyMode, NotifyLevel } from "@/lib/sidebar-prefs";
 import { notifyLabelCategory } from "@/lib/sidebar-prefs";
 import type { MuteDurationKey } from "@/components/ChannelContextMenu/ChannelContextMenu";
@@ -54,6 +55,7 @@ export default function CategoryContextMenu({
   onEditCategory,
   onDeleteCategory,
 }: CategoryContextMenuProps) {
+  const t = useTranslations("server");
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notify" | null>(null);
@@ -120,7 +122,7 @@ export default function CategoryContextMenu({
         className={styles.menu}
         style={{ left: menuPos.left, top: menuPos.top }}
         role="menu"
-        aria-label="Menu danh mục"
+        aria-label={t("common.categoryMenuAria")}
       >
         <button
           type="button"

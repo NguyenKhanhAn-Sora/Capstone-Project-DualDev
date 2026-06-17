@@ -3100,5 +3100,47 @@
     "labelConfirm": "ブロック",
     "labelConfirming": "ブロック中...",
     "labelCancel": "キャンセル"
+  },
+  "auth": {
+    "login": {
+      "emailPlaceholder": "メールアドレス",
+      "passwordPlaceholder": "パスワード",
+      "showPassword": "パスワードを表示",
+      "hidePassword": "パスワードを非表示",
+      "forgotPassword": "パスワードをお忘れですか？",
+      "signIn": "ログイン",
+      "continueWithGoogle": "Googleで続ける",
+      "noAccount": "アカウントをお持ちでないですか？",
+      "signUp": "登録",
+      "recentAccounts": "最近のアカウント",
+      "deleteAll": "すべて削除",
+      "deleting": "削除中...",
+      "account": "アカウント",
+      "continueAs": "{label}として続ける",
+      "enterEmail": "メールアドレスを入力",
+      "enterPassword": "パスワードを入力",
+      "enterEmailAddress": "メールアドレス"
+    },
+    "signup": {
+      "emailAddress": "メールアドレス",
+      "emailPlaceholder": "email@example.com",
+      "sendOTP": "OTPを送信",
+      "sending": "送信中...",
+      "otpInstruction": "送信された6桁のコードを入力してください",
+      "displayNamePlaceholder": "例: Cordigrammer",
+      "usernamePlaceholder": "ユーザー名",
+      "passwordPlaceholder": "パスワード",
+      "confirmPasswordPlaceholder": "確認のため再入力",
+      "locationPlaceholder": "都市、ランドマーク、または場所を追加",
+      "bioPlaceholder": "自己紹介を入力してください",
+      "showPassword": "パスワードを表示",
+      "hidePassword": "パスワードを非表示"
+    },
+    "forgotPassword": {
+      "emailPlaceholder": "メールアドレス",
+      "otpAriaLabel": "OTPコードを入力",
+      "newPasswordPlaceholder": "新しいパスワード",
+      "confirmPasswordPlaceholder": "新しいパスワードを確認"
+    }
   }
 }

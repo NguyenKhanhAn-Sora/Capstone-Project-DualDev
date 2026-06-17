@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/services/language_controller.dart';
 import 'models/server_models.dart';
 import 'server_settings/server_settings_ui.dart';
 import 'services/messages_media_service.dart';
@@ -48,6 +49,9 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
   Map<String, dynamic>? _stats;
 
   bool get _canEdit => widget.canManageSettings;
+
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
 
   @override
   void initState() {
@@ -177,7 +181,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
       if (!mounted) return;
       setState(() => _avatarUrl = url);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã cập nhật biểu tượng (nhấn Lưu để gửi máy chủ)')),
+        SnackBar(content: Text(_t('server.iconUpdated'))),
       );
     } catch (e) {
       if (mounted) {
@@ -220,7 +224,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
       if (!mounted) return;
       setState(() => _bannerImageUrl = url);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã chọn ảnh biểu ngữ (nhấn Lưu để gửi máy chủ)')),
+        SnackBar(content: Text(_t('server.bannerSelected'))),
       );
     } catch (e) {
       if (mounted) {
@@ -241,7 +245,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tên máy chủ không được để trống')),
+        SnackBar(content: Text(_t('server.nameRequired'))),
       );
       return;
     }
@@ -272,7 +276,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
       }
       final updated = ServerSummary.fromJson(m);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu thay đổi')),
+        SnackBar(content: Text(_t('server.changesSaved'))),
       );
       Navigator.of(context).pop(updated);
     } catch (e) {

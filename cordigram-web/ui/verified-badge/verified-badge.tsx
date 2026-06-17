@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import styles from "./verified-badge.module.css";
 
 type VerifiedBadgeProps = {
@@ -6,15 +7,17 @@ type VerifiedBadgeProps = {
   className?: string;
 };
 
-export default function VerifiedBadge(props: VerifiedBadgeProps) {
+export default async function VerifiedBadge(props: VerifiedBadgeProps) {
   const { visible = true, size = 18, className } = props;
   if (!visible) return null;
+
+  const t = await getTranslations("ui");
 
   return (
     <span
       className={`${styles.badge} ${className ?? ""}`.trim()}
-      aria-label="Creator verified"
-      title="Creator verified"
+      aria-label={t("verifiedBadge.creatorVerified")}
+      title={t("verifiedBadge.creatorVerified")}
     >
       <svg
         width={size}

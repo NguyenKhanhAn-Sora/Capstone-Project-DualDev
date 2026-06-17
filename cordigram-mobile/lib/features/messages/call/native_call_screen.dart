@@ -7,6 +7,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../messages_shell.dart';
 import '../utils/messages_navigator.dart';
 import 'calls_api_service.dart';
@@ -723,7 +724,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _hangup,
-                child: const Text('Đóng'),
+                child: Text(LanguageController.instance.t('messages.call.close')),
               ),
             ],
           ),

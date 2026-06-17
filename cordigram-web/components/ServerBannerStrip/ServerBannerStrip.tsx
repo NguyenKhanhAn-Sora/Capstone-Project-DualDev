@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { normalizeServerBanner, type ServerBannerFields } from "@/lib/server-banner";
 import styles from "./ServerBannerStrip.module.css";
 
@@ -12,13 +13,14 @@ type Props = {
 };
 
 export default function ServerBannerStrip({ server, className, height = 88 }: Props) {
+  const t = useTranslations("server");
   const { bannerColor, bannerImageUrl } = normalizeServerBanner(server);
   return (
     <div
       className={`${styles.strip} ${className ?? ""}`}
       style={{ height, background: bannerColor }}
       role="img"
-      aria-label="Biểu ngữ máy chủ"
+      aria-label={t("common.serverBannerAria")}
     >
       {bannerImageUrl ? (
         <div

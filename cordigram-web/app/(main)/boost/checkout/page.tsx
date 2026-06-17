@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./checkout.module.css";
 import { getAvailableUsers } from "@/lib/api";
@@ -47,6 +48,7 @@ const IcoStar = () => (
 );
 
 export default function BoostCheckoutPage() {
+  const t = useTranslations("ui");
   const router = useRouter();
   const sp = useSearchParams();
   const mode = (sp.get("mode") === "gift" ? "gift" : "subscribe") as Mode;
@@ -161,7 +163,7 @@ export default function BoostCheckoutPage() {
               className={styles.input}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm theo tên hoặc username..."
+              placeholder={t("boost.searchPlaceholder")}
             />
             <p className={styles.hint}>
               Chọn người nhận từ danh sách bạn đã nhắn tin / có sẵn.

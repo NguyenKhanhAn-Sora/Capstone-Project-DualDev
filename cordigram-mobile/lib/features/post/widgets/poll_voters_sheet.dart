@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/poll_data.dart';
+import '../../../core/services/language_controller.dart';
 import '../../messages/services/polls_api_service.dart';
 
 /// Bottom sheet showing the list of users who voted in a poll.
@@ -191,7 +192,7 @@ class _PollVotersSheetState extends State<PollVotersSheet> {
                             const SizedBox(height: 12),
                             TextButton(
                               onPressed: () => _loadVoters(reset: true),
-                              child: const Text('Thử lại'),
+                              child: Text(LanguageController.instance.t('common.retry')),
                             ),
                           ],
                         ),
@@ -227,7 +228,7 @@ class _PollVotersSheetState extends State<PollVotersSheet> {
                                   )
                                 : TextButton(
                                     onPressed: _loadVoters,
-                                    child: const Text('Tải thêm'),
+                                    child: Text(LanguageController.instance.t('common.loadMore')),
                                   );
                           }
                           final voter = filtered[i];

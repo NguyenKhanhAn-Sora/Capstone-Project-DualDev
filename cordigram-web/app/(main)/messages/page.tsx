@@ -20,6 +20,7 @@ import {
   type DmCallSessionSyncItem,
 } from "@/lib/dm-call-session-sync";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
+import { useTranslations } from "next-intl";
 import {
   useDirectMessages,
   type DirectMessage,
@@ -1507,6 +1508,7 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { t, language } = useLanguage();
+  const tMsg = useTranslations("messages");
 
   const isAdminView = searchParams.get("from") === "admin";
   const adminReturnUrl = searchParams.get("returnUrl");
@@ -8354,8 +8356,8 @@ export default function MessagesPage() {
             />
             {/* Fullscreen button overlay */}
             <button
-              aria-label="Xem toàn màn hình"
-              title="Xem toàn màn hình"
+              aria-label={tMsg("viewFullscreen")}
+              title={tMsg("viewFullscreen")}
               style={{
                 position: "absolute",
                 top: 8,
@@ -9427,7 +9429,7 @@ export default function MessagesPage() {
               type="password"
               inputMode="numeric"
               maxLength={6}
-              placeholder="••••••"
+              placeholder={tMsg("channelPasswordPlaceholder")}
               value={passkeyInput}
               onChange={(e) =>
                 setPasskeyInput(e.target.value.replace(/\D/g, ""))
@@ -10268,8 +10270,8 @@ export default function MessagesPage() {
                           {catCollapse.enabled && currentUserId && selectedServer && (
                             <button
                               type="button"
-                              title={catCollapse.collapsed ? "Mở rộng danh mục" : "Thu gọn danh mục"}
-                              aria-label={catCollapse.collapsed ? "Mở rộng" : "Thu gọn"}
+                              title={catCollapse.collapsed ? tMsg("expandCategory") : tMsg("collapseCategory")}
+                              aria-label={catCollapse.collapsed ? tMsg("expandCategory") : tMsg("collapseCategory")}
                               className={styles.addChannelBtn}
                               style={{ flexShrink: 0 }}
                               onClick={(e) => {
@@ -10534,7 +10536,7 @@ export default function MessagesPage() {
                     <div className={styles.section}>
                       <div className={styles.sectionHeader}>
                         <h3 className={styles.sectionTitle}>{t("chat.messagesPage.sectionVoice")}</h3>
-                        <button type="button" className={styles.addChannelBtn} title="Tạo kênh thoại" onClick={() => openCreateChannelModal("voice")}>
+                        <button type="button" className={styles.addChannelBtn} title={tMsg("createVoiceChannel")} onClick={() => openCreateChannelModal("voice")}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
                       </div>
@@ -11861,8 +11863,8 @@ export default function MessagesPage() {
                     </button>
                     <button
                       type="button"
-                      title="Chi tiết cuộc trò chuyện"
-                      aria-label="Chi tiết cuộc trò chuyện"
+                      title={tMsg("conversationDetails")}
+                      aria-label={tMsg("conversationDetails")}
                       onClick={() => setDetailsPanelOpen((v) => !v)}
                       style={detailsPanelOpen ? { background: "var(--color-surface-muted)", color: "var(--color-text)" } : undefined}
                     >

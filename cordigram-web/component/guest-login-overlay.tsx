@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./guest-login-overlay.module.css";
 
 type Props = {
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export default function GuestLoginOverlay({ open, onClose }: Props) {
+  const t = useTranslations("ui");
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -33,7 +35,7 @@ export default function GuestLoginOverlay({ open, onClose }: Props) {
         <button
           type="button"
           className={styles.closeBtn}
-          aria-label="Close"
+          aria-label={t("guestLogin.close")}
           onClick={onClose}
         >
           <IconClose />

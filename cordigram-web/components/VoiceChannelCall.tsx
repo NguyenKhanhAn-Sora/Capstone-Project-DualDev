@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -60,6 +61,7 @@ function VoiceChannelGrid({
   onDisconnect: () => void;
   micMuted?: boolean;
 }) {
+  const t = useTranslations("voice");
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
@@ -131,14 +133,14 @@ function VoiceChannelGrid({
                       {track.participant.name || "Khách"}
                     </span>
                     {isMicEnabled ? (
-                      <span className={styles.micOn} title="Đang bật mic">
+                      <span className={styles.micOn} title={t("micOn")}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                           <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                         </svg>
                       </span>
                     ) : (
-                      <span className={styles.micOff} title="Đã tắt tiếng">
+                      <span className={styles.micOff} title={t("micMuted")}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                           <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="2" />
                           <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
@@ -164,6 +166,7 @@ function VoiceChannelControls({
   onDisconnect: () => void;
   micMuted?: boolean;
 }) {
+  const t = useTranslations("voice");
   const { localParticipant } = useLocalParticipant();
   const isVideoOff = localParticipant ? !localParticipant.isCameraEnabled : false;
   const isScreenSharing = localParticipant ? localParticipant.isScreenShareEnabled : false;
@@ -223,7 +226,7 @@ function VoiceChannelControls({
         type="button"
         onClick={onDisconnect}
         className={styles.leaveBtn}
-        title="Rời kênh"
+        title={t("leaveChannel")}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72" />

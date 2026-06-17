@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
+import '../../../core/services/language_controller.dart';
 import 'dm_call_manager.dart';
 import '../services/voice_channel_session_controller.dart';
 import '../voice_channel_room_screen.dart';
@@ -251,11 +252,11 @@ Future<void> _acceptIncomingDmCall(DmCallManager mgr) async {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Từ chối'),
+            child: Text(LanguageController.instance.t('messages.call.reject')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Rời kênh và nhận'),
+            child: Text(LanguageController.instance.t('messages.call.leaveAndAccept')),
           ),
         ],
       );

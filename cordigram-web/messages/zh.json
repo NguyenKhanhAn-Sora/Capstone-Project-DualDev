@@ -2222,5 +2222,128 @@
     "trimTotal": "总计",
     "trimWillUse": "（将使用）",
     "trimSeconds": "{s}秒"
+  },
+  "messages": {
+    "viewFullscreen": "全屏查看",
+    "createVoiceChannel": "创建语音频道",
+    "expandCategory": "展开分类",
+    "collapseCategory": "折叠分类",
+    "conversationDetails": "会话详情",
+    "channelPasswordPlaceholder": "••••••"
+  },
+  "voice": {
+    "micOn": "麦克风已开",
+    "micMuted": "麦克风已静音",
+    "leaveChannel": "离开频道",
+    "joinCall": "加入通话",
+    "rejectCall": "拒绝通话",
+    "acceptCall": "接受通话",
+    "endCall": "结束通话",
+    "cancel": "取消",
+    "send": "发送"
+  }
+,
+  "ui": {
+    "storyBar": {
+      "ariaLabel": "动态",
+      "createStory": "创建故事",
+      "avatarAlt": "头像",
+      "yourStory": "我的故事"
+    },
+    "storyCreator": {
+      "goBack": "返回",
+      "addEmoji": "添加表情",
+      "doneShiftEnter": "完成 (Shift+Enter)"
+    },
+    "musicPicker": {
+      "searchPlaceholder": "搜索音乐..."
+    },
+    "emojiPicker": {
+      "searchPlaceholder": "搜索表情"
+    },
+    "quickReaction": {
+      "addReaction": "添加回应",
+      "reply": "回复",
+      "more": "更多"
+    },
+    "boost": {
+      "searchPlaceholder": "按名称或用户名搜索..."
+    },
+    "sidebar": {
+      "logo": "Cordigram标志",
+      "toggleTheme": "切换主题",
+      "themeIcon": "主题图标",
+      "logoAlt": "标志"
+    },
+    "dateSelect": {
+      "prevMonth": "上个月",
+      "month": "月",
+      "year": "年",
+      "nextMonth": "下个月"
+    },
+    "timeSelect": {
+      "hour": "时",
+      "minute": "分"
+    },
+    "verifiedBadge": {
+      "creatorVerified": "已认证创作者"
+    },
+    "videoPlayer": {
+      "progress": "视频进度",
+      "volume": "音量",
+      "quality": "视频质量",
+      "captions": "字幕",
+      "download": "下载视频"
+    },
+    "commentLikes": {
+      "searchPlaceholder": "搜索用户名",
+      "searchAria": "搜索用户名"
+    },
+    "postUpload": {
+      "cancelUpload": "取消上传"
+    },
+    "guestLogin": {
+      "close": "关闭"
+    }
+  },
+  "server": {
+    "common": {
+      "close": "关闭",
+      "reset": "重置",
+      "rotate90": "旋转90°",
+      "rotate90Aria": "旋转90度",
+      "flipHorizontal": "水平翻转",
+      "flipHorizontalAria": "水平翻转",
+      "zoom": "缩放",
+      "deleteName": "清除名称",
+      "serverAvatar": "服务器头像",
+      "cover": "封面",
+      "reason": "原因",
+      "reasonPlaceholder": "输入原因...",
+      "serverBannerAria": "服务器横幅",
+      "channelMenuAria": "频道菜单",
+      "cannotDeleteDefault": "无法删除默认频道",
+      "categoryMenuAria": "分类菜单",
+      "preview": "预览"
+    },
+    "emoji": {
+      "namePlaceholder": "emoji_name",
+      "editTitle": "编辑表情",
+      "uploadTitle": "上传表情",
+      "uploadHint": "上传图片作为自定义表情"
+    },
+    "sticker": {
+      "namePlaceholder": "sticker_name",
+      "editTitle": "编辑贴纸",
+      "uploadTitle": "上传贴纸"
+    },
+    "event": {
+      "topicPlaceholder": "您的活动主题是什么？",
+      "descriptionPlaceholder": "让大家了解更多关于您活动的信息。支持Markdown、换行和链接。",
+      "coverAlt": "封面",
+      "close": "关闭",
+      "guestNamePlaceholder": "大家怎么称呼您？",
+      "rotateImage": "旋转图片"
+    }
   }
 }

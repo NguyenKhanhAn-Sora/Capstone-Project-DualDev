@@ -2,6 +2,7 @@
 
 import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useTranslations } from "next-intl";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./ServerMembersSidebar.module.css";
 
@@ -84,6 +85,7 @@ export default function ServerMembersSidebar({
   onNavigateToDM,
   onViewProfile,
 }: ServerMembersSidebarProps) {
+  const t = useTranslations("server");
   // State
   const [members, setMembers] = useState<MemberWithRoles[]>([]);
   const [permissions, setPermissions] = useState<CurrentUserPermissions>({
@@ -546,7 +548,7 @@ export default function ServerMembersSidebar({
               className={styles.formTextarea}
               value={moderationReason}
               onChange={(e) => setModerationReason(e.target.value)}
-              placeholder="Nhập lý do..."
+              placeholder={t("common.reasonPlaceholder")}
               rows={3}
             />
           </div>

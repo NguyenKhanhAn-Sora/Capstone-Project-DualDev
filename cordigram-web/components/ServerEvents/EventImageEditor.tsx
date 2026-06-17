@@ -2,6 +2,7 @@
 
 import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useRef, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./EventImageEditor.module.css";
 import { uploadMedia } from "@/lib/api";
 
@@ -18,6 +19,7 @@ export default function EventImageEditor({
   currentImageUrl,
   onConfirm,
 }: EventImageEditorProps) {
+  const t = useTranslations("server");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentImageUrl);
   const [rotation, setRotation] = useState(0);
@@ -81,7 +83,7 @@ export default function EventImageEditor({
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>Chỉnh sửa Hình ảnh</h2>
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("event.close")}>
             ×
           </button>
         </div>
@@ -104,7 +106,7 @@ export default function EventImageEditor({
           <div className={styles.previewWrap}>
             <img
               src={previewUrl}
-              alt="Preview"
+              alt={t("common.preview")}
               style={{
                 transform: `rotate(${rotation}deg) scale(${scale})`,
               }}
@@ -127,7 +129,7 @@ export default function EventImageEditor({
             type="button"
             className={styles.rotateBtn}
             onClick={() => setRotation((r) => (r + 90) % 360)}
-            title="Xoay ảnh"
+            title={t("event.rotateImage")}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 2v6h-6" />

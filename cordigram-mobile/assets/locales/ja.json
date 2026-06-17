@@ -542,7 +542,8 @@
       "errorEmailRequired": "メールアドレスを入力してください",
       "errorEmailInvalid": "メール形式が正しくありません",
       "errorPasswordRequired": "パスワードを入力してください",
-      "errorPasswordShort": "パスワードは8文字以上必要です"
+      "errorPasswordShort": "パスワードは8文字以上必要です",
+      "emailHint": "you@example.com"
     },
     "signup": {
       "cropPhoto": "写真をトリミング",
@@ -554,7 +555,20 @@
       "shortBio": "短い自己紹介（任意）",
       "chooseFromGallery": "ギャラリーから選ぶ",
       "continueWithGoogle": "Googleで続ける",
-      "googleSignInFailed": "Googleサインインに失敗しました。もう一度お試しください。"
+      "googleSignInFailed": "Googleサインインに失敗しました。もう一度お試しください。",
+      "emailHint": "email@example.com",
+      "displayNameHint": "例：Cordigrammer",
+      "usernameHint": "ユーザー名",
+      "passwordHint": "8文字以上",
+      "confirmPasswordHint": "再入力して確認",
+      "bioHint": "自己紹介を書いてください",
+      "creatingAccount": "アカウント作成中...",
+      "createAccount": "アカウントを作成",
+      "finishing": "完了中...",
+      "finish": "完了",
+      "otpPlaceholder": "• • • • • •",
+      "sendingOtp": "送信中...",
+      "verifying": "確認中..."
     },
     "forgotPassword": {
       "email": "メールアドレス",
@@ -563,7 +577,13 @@
       "confirmPassword": "パスワードの確認",
       "resendCode": "コードを再送信",
       "otpResent": "OTPを再送信しました – 受信箱を確認してください。",
-      "passwordUpdated": "パスワードを更新しました！サインインしてください。"
+      "passwordUpdated": "パスワードを更新しました！サインインしてください。",
+      "emailHint": "you@example.com",
+      "otpHint": "6桁のコード",
+      "passwordHint": "8文字以上",
+      "confirmPasswordHint": "再入力して確認",
+      "weSentCode": "6桁のコードを送信しました",
+      "codeExpires": "。5分で有効期限が切れます。"
     }
   },
   "home": {
@@ -1237,6 +1257,10 @@
     "voiceChannel": "ボイスチャンネル",
     "voiceMessage": "音声メッセージ",
     "messageRecalled": "メッセージが取り消されました",
+    "messagePinned": "メッセージをピン留めしました",
+    "cannotPinMessage": "メッセージをピン留めできません",
+    "cannotDeleteMessage": "メッセージを削除できません",
+    "messageNotInSegment": "読み込み中のセグメントにメッセージが見つかりません",
     "call": {
       "reject": "拒否",
       "leaveAndAccept": "チャンネルを退出して受信",
@@ -3937,5 +3961,27 @@
     "toolSwap": "変更",
     "toolTrim": "トリム",
     "editText": "テキストを編集"
+  },
+  "server": {
+    "iconUpdated": "アイコンを更新しました（保存を押して適用）",
+    "bannerSelected": "バナー画像を選択しました（保存を押して適用）",
+    "nameRequired": "サーバー名を空にできません",
+    "changesSaved": "変更を保存しました",
+    "noPermissionManageEmoji": "表現を管理する権限がありません。",
+    "createRole": "ロールを作成",
+    "reject": "拒否",
+    "approve": "承認",
+    "approveFailed": "承認に失敗しました",
+    "rejectFailed": "拒否に失敗しました",
+    "loadDetailFailed": "詳細を読み込めませんでした",
+    "noChatChannel": "サーバーに開くチャットチャンネルがありません。",
+    "members": {
+      "days7": "7日間",
+      "days14": "14日間",
+      "days30": "30日間",
+      "allRoles": "すべてのロール",
+      "noRole": "ロールなし",
+      "memberRole": "メンバー"
+    }
   }
 }

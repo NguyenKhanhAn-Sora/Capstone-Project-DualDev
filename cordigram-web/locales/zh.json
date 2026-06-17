@@ -3100,5 +3100,47 @@
     "labelConfirm": "屏蔽",
     "labelConfirming": "屏蔽中...",
     "labelCancel": "取消"
+  },
+  "auth": {
+    "login": {
+      "emailPlaceholder": "电子邮件",
+      "passwordPlaceholder": "密码",
+      "showPassword": "显示密码",
+      "hidePassword": "隐藏密码",
+      "forgotPassword": "忘记密码？",
+      "signIn": "登录",
+      "continueWithGoogle": "使用 Google 继续",
+      "noAccount": "还没有账户？",
+      "signUp": "注册",
+      "recentAccounts": "最近的账户",
+      "deleteAll": "全部删除",
+      "deleting": "删除中...",
+      "account": "账户",
+      "continueAs": "以 {label} 身份继续",
+      "enterEmail": "输入您的电子邮件",
+      "enterPassword": "输入您的密码",
+      "enterEmailAddress": "电子邮件地址"
+    },
+    "signup": {
+      "emailAddress": "电子邮件地址",
+      "emailPlaceholder": "email@example.com",
+      "sendOTP": "发送 OTP",
+      "sending": "发送中...",
+      "otpInstruction": "输入发送到您邮箱的 6 位验证码",
+      "displayNamePlaceholder": "例如: Cordigrammer",
+      "usernamePlaceholder": "用户名",
+      "passwordPlaceholder": "密码",
+      "confirmPasswordPlaceholder": "重新输入以确认",
+      "locationPlaceholder": "添加城市、地标或地点",
+      "bioPlaceholder": "分享一些关于您自己的信息",
+      "showPassword": "显示密码",
+      "hidePassword": "隐藏密码"
+    },
+    "forgotPassword": {
+      "emailPlaceholder": "您的电子邮件地址",
+      "otpAriaLabel": "输入 OTP 验证码",
+      "newPasswordPlaceholder": "新密码",
+      "confirmPasswordPlaceholder": "确认新密码"
+    }
   }
 }

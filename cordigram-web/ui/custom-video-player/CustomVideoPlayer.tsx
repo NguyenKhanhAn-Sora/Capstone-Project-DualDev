@@ -11,6 +11,7 @@ import React, {
 import styles from "./custom-video-player.module.css";
 import { videoVolumeStore } from "@/hooks/use-video-volume";
 import { useLanguage } from "@/component/language-provider";
+import { useTranslations } from "next-intl";
 
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 const HIDE_DELAY = 3000;
@@ -88,6 +89,7 @@ const CustomVideoPlayer = forwardRef<HTMLVideoElement, Props>(
     forwardedRef,
   ) {
     const { t } = useLanguage();
+    const tUI = useTranslations("ui");
     const getLangLabel = (lang: string) =>
       t(CAPTION_LANG_T_KEYS[lang] ?? "") || lang.toUpperCase();
 
@@ -535,7 +537,7 @@ const CustomVideoPlayer = forwardRef<HTMLVideoElement, Props>(
               onMouseUp={handleSeekMouseUp}
               onTouchStart={handleSeekMouseDown}
               onTouchEnd={handleSeekMouseUp}
-              aria-label="Video progress"
+              aria-label={tUI("videoPlayer.progress")}
             />
           </div>
 
@@ -595,7 +597,7 @@ const CustomVideoPlayer = forwardRef<HTMLVideoElement, Props>(
                       step={0.02}
                       value={muted ? 0 : volume}
                       onChange={handleVolumeChange}
-                      aria-label="Volume"
+                      aria-label={tUI("videoPlayer.volume")}
                     />
                   </div>
                 )}
@@ -613,7 +615,7 @@ const CustomVideoPlayer = forwardRef<HTMLVideoElement, Props>(
                       setShowVolume(false);
                       setShowCaptionMenu(false);
                     }}
-                    aria-label="Video quality"
+                    aria-label={tUI("videoPlayer.quality")}
                   >
                     <span className={styles.speedLabel}>{qualityLabel}</span>
                   </button>
@@ -703,7 +705,7 @@ const CustomVideoPlayer = forwardRef<HTMLVideoElement, Props>(
                       setShowSpeed(false);
                       setShowQuality(false);
                     }}
-                    aria-label="Captions"
+                    aria-label={tUI("videoPlayer.captions")}
                     aria-pressed={selectedCaptionLang !== null}
                   >
                     <CcIcon />
@@ -748,7 +750,7 @@ const CustomVideoPlayer = forwardRef<HTMLVideoElement, Props>(
                   type="button"
                   className={styles.iconBtn}
                   onClick={onDownload}
-                  aria-label="Download video"
+                  aria-label={tUI("videoPlayer.download")}
                 >
                   <DownloadIcon />
                 </button>

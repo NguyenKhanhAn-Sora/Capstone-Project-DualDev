@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
@@ -57,6 +58,7 @@ export default function AddServerEmojiModal({
   onClose,
   onSuccess,
 }: Props) {
+  const t = useTranslations("server");
   const blobUrlsRef = useRef<Set<string>>(new Set());
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [gif, setGif] = useState(false);
@@ -364,7 +366,7 @@ export default function AddServerEmojiModal({
           <button
             type="button"
             className={styles.iconBtn}
-            aria-label="Đóng"
+            aria-label={t("common.close")}
             onClick={onClose}
           >
             ×
@@ -375,8 +377,8 @@ export default function AddServerEmojiModal({
           <button
             type="button"
             className={styles.iconBtn}
-            aria-label="Đặt lại"
-            title="Đặt lại"
+            aria-label={t("common.reset")}
+            title={t("common.reset")}
             onClick={resetEditor}
           >
             ↺
@@ -419,8 +421,8 @@ export default function AddServerEmojiModal({
                 type="button"
                 className={styles.toolBtn}
                 disabled={gif || busyTransform}
-                title="Xoay 90°"
-                aria-label="Xoay 90 độ"
+                title={t("common.rotate90")}
+                aria-label={t("common.rotate90Aria")}
                 onClick={() => void handleRotate()}
               >
                 ↻
@@ -429,8 +431,8 @@ export default function AddServerEmojiModal({
                 type="button"
                 className={styles.toolBtn}
                 disabled={gif || busyTransform}
-                title="Lật ngang"
-                aria-label="Lật ngang"
+                title={t("common.flipHorizontal")}
+                aria-label={t("common.flipHorizontalAria")}
                 onClick={() => void handleFlipH()}
               >
                 ⇄
@@ -448,7 +450,7 @@ export default function AddServerEmojiModal({
                   value={zoom}
                   disabled={gif}
                   onChange={(e) => setZoom(Number(e.target.value))}
-                  aria-label="Thu phóng"
+                  aria-label={t("common.zoom")}
                 />
                 <span className={styles.zoomLabel} aria-hidden>
                   +
@@ -489,13 +491,13 @@ export default function AddServerEmojiModal({
                   className={styles.nameInput}
                   value={emojiName}
                   onChange={(e) => setEmojiName(e.target.value)}
-                  placeholder="ten_emoji"
+                  placeholder={t("emoji.namePlaceholder")}
                   autoComplete="off"
                 />
                 <button
                   type="button"
                   className={styles.nameClear}
-                  aria-label="Xóa tên"
+                  aria-label={t("common.deleteName")}
                   onClick={() => setEmojiName("")}
                 >
                   ×

@@ -3129,5 +3129,47 @@
     "labelConfirm": "Chặn",
     "labelConfirming": "Đang chặn...",
     "labelCancel": "Hủy"
+  },
+  "auth": {
+    "login": {
+      "emailPlaceholder": "Email",
+      "passwordPlaceholder": "Mật khẩu",
+      "showPassword": "Hiện mật khẩu",
+      "hidePassword": "Ẩn mật khẩu",
+      "forgotPassword": "Quên mật khẩu?",
+      "signIn": "Đăng nhập",
+      "continueWithGoogle": "Tiếp tục với Google",
+      "noAccount": "Chưa có tài khoản?",
+      "signUp": "Đăng ký",
+      "recentAccounts": "Tài khoản gần đây",
+      "deleteAll": "Xóa tất cả",
+      "deleting": "Đang xóa...",
+      "account": "Tài khoản",
+      "continueAs": "Tiếp tục với {label}",
+      "enterEmail": "Nhập email của bạn",
+      "enterPassword": "Nhập mật khẩu của bạn",
+      "enterEmailAddress": "Địa chỉ email"
+    },
+    "signup": {
+      "emailAddress": "Địa chỉ email",
+      "emailPlaceholder": "email@example.com",
+      "sendOTP": "Gửi OTP",
+      "sending": "Đang gửi...",
+      "otpInstruction": "Nhập mã 6 chữ số đã gửi đến",
+      "displayNamePlaceholder": "Ví dụ: Cordigrammer",
+      "usernamePlaceholder": "tênđăngnhập",
+      "passwordPlaceholder": "Mật khẩu",
+      "confirmPasswordPlaceholder": "Nhập lại để xác nhận",
+      "locationPlaceholder": "Thêm thành phố, địa danh hoặc địa điểm",
+      "bioPlaceholder": "Chia sẻ một chút về bản thân",
+      "showPassword": "Hiện mật khẩu",
+      "hidePassword": "Ẩn mật khẩu"
+    },
+    "forgotPassword": {
+      "emailPlaceholder": "Địa chỉ email của bạn",
+      "otpAriaLabel": "Nhập mã OTP",
+      "newPasswordPlaceholder": "Mật khẩu mới",
+      "confirmPasswordPlaceholder": "Xác nhận mật khẩu mới"
+    }
   }
 }

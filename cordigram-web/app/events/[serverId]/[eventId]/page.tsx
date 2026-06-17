@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter, useParams } from "next/navigation";
 import * as serversApi from "@/lib/servers-api";
 import type { EventPreviewResponse } from "@/lib/servers-api";
@@ -23,6 +24,7 @@ function isValidAvatarUrl(url: string | null | undefined): boolean {
 }
 
 export default function EventSharePage() {
+  const t = useTranslations("server");
   const params = useParams();
   const router = useRouter();
   const serverId = params.serverId as string;
@@ -322,7 +324,7 @@ export default function EventSharePage() {
                   type="text"
                   value={serverNickname}
                   onChange={(e) => setServerNickname(e.target.value)}
-                  placeholder="Mọi người gọi bạn là gì?"
+                  placeholder={t("event.guestNamePlaceholder")}
                   className="w-full px-3 py-2 rounded bg-[#1e1f22] border border-[#313338] text-[#f2f3f5] placeholder-[#6d6f78] focus:outline-none focus:border-[#5865f2]"
                 />
               </div>

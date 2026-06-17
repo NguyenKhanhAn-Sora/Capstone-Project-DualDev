@@ -1431,5 +1431,128 @@
     "trimTotal": "Tổng",
     "trimWillUse": "(sẽ dùng)",
     "trimSeconds": "{s} giây"
+  },
+  "messages": {
+    "viewFullscreen": "Xem toàn màn hình",
+    "createVoiceChannel": "Tạo kênh thoại",
+    "expandCategory": "Mở rộng danh mục",
+    "collapseCategory": "Thu gọn danh mục",
+    "conversationDetails": "Chi tiết cuộc trò chuyện",
+    "channelPasswordPlaceholder": "••••••"
+  },
+  "voice": {
+    "micOn": "Đang bật mic",
+    "micMuted": "Đã tắt tiếng",
+    "leaveChannel": "Rời kênh",
+    "joinCall": "Tham gia cuộc gọi",
+    "rejectCall": "Từ chối cuộc gọi",
+    "acceptCall": "Chấp nhận cuộc gọi",
+    "endCall": "Kết thúc cuộc gọi",
+    "cancel": "Hủy",
+    "send": "Gửi"
+  }
+,
+  "ui": {
+    "storyBar": {
+      "ariaLabel": "Stories",
+      "createStory": "Tạo story",
+      "avatarAlt": "ảnh đại diện",
+      "yourStory": "Story của bạn"
+    },
+    "storyCreator": {
+      "goBack": "Quay lại",
+      "addEmoji": "Thêm emoji",
+      "doneShiftEnter": "Xong (Shift+Enter)"
+    },
+    "musicPicker": {
+      "searchPlaceholder": "Tìm kiếm nhạc..."
+    },
+    "emojiPicker": {
+      "searchPlaceholder": "Tìm kiếm biểu tượng cảm xúc"
+    },
+    "quickReaction": {
+      "addReaction": "Thêm cảm xúc",
+      "reply": "Trả lời",
+      "more": "Thêm"
+    },
+    "boost": {
+      "searchPlaceholder": "Tìm theo tên hoặc username..."
+    },
+    "sidebar": {
+      "logo": "Logo Cordigram",
+      "toggleTheme": "Chuyển đổi giao diện",
+      "themeIcon": "Biểu tượng giao diện",
+      "logoAlt": "Logo"
+    },
+    "dateSelect": {
+      "prevMonth": "Tháng trước",
+      "month": "Tháng",
+      "year": "Năm",
+      "nextMonth": "Tháng sau"
+    },
+    "timeSelect": {
+      "hour": "Giờ",
+      "minute": "Phút"
+    },
+    "verifiedBadge": {
+      "creatorVerified": "Creator được xác minh"
+    },
+    "videoPlayer": {
+      "progress": "Tiến trình video",
+      "volume": "Âm lượng",
+      "quality": "Chất lượng video",
+      "captions": "Phụ đề",
+      "download": "Tải xuống video"
+    },
+    "commentLikes": {
+      "searchPlaceholder": "Tìm kiếm username",
+      "searchAria": "Tìm kiếm username"
+    },
+    "postUpload": {
+      "cancelUpload": "Hủy tải lên"
+    },
+    "guestLogin": {
+      "close": "Đóng"
+    }
+  },
+  "server": {
+    "common": {
+      "close": "Đóng",
+      "reset": "Đặt lại",
+      "rotate90": "Xoay 90°",
+      "rotate90Aria": "Xoay 90 độ",
+      "flipHorizontal": "Lật ngang",
+      "flipHorizontalAria": "Lật ngang",
+      "zoom": "Thu phóng",
+      "deleteName": "Xóa tên",
+      "serverAvatar": "Ảnh đại diện máy chủ",
+      "cover": "Bìa",
+      "reason": "Lý do",
+      "reasonPlaceholder": "Nhập lý do...",
+      "serverBannerAria": "Biểu ngữ máy chủ",
+      "channelMenuAria": "Menu kênh",
+      "cannotDeleteDefault": "Không thể xóa kênh mặc định",
+      "categoryMenuAria": "Menu danh mục",
+      "preview": "Xem trước"
+    },
+    "emoji": {
+      "namePlaceholder": "ten_emoji",
+      "editTitle": "Chỉnh sửa emoji",
+      "uploadTitle": "Tải lên emoji",
+      "uploadHint": "Tải ảnh lên để dùng làm emoji tùy chỉnh"
+    },
+    "sticker": {
+      "namePlaceholder": "ten_sticker",
+      "editTitle": "Chỉnh sửa sticker",
+      "uploadTitle": "Tải lên sticker"
+    },
+    "event": {
+      "topicPlaceholder": "Chủ đề sự kiện của bạn là gì?",
+      "descriptionPlaceholder": "Cho mọi người biết thêm một chút về sự kiện của bạn. Markdown, dòng mới và liên kết đều được hỗ trợ.",
+      "coverAlt": "Bìa",
+      "close": "Đóng",
+      "guestNamePlaceholder": "Mọi người gọi bạn là gì?",
+      "rotateImage": "Xoay ảnh"
+    }
   }
 }

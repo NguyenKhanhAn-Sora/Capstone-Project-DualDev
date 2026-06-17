@@ -594,7 +594,7 @@ class _SignupScreenState extends State<SignupScreen> {
           _InputField(
             controller: _emailController,
             label: LanguageController.instance.t('auth.signup.emailAddress'),
-            hint: 'email@example.com',
+            hint: LanguageController.instance.t('auth.signup.emailHint'),
             icon: Icons.mail_outline_rounded,
             keyboardType: TextInputType.emailAddress,
             autofillHints: const [AutofillHints.email],
@@ -617,7 +617,7 @@ class _SignupScreenState extends State<SignupScreen> {
           ],
           const SizedBox(height: 18),
           _PrimaryButton(
-            label: _loading ? 'Sending...' : 'Send OTP',
+            label: _loading ? LanguageController.instance.t('auth.signup.sendingOtp') : LanguageController.instance.t('settings.common.sendOtp'),
             onPressed: _loading ? null : _handleSendOtp,
           ),
           const SizedBox(height: 14),
@@ -689,7 +689,7 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 10),
           _PrimaryButton(
-            label: _loading ? 'Verifying...' : 'Verify',
+            label: _loading ? LanguageController.instance.t('auth.signup.verifying') : LanguageController.instance.t('settings.common.verify'),
             onPressed: _loading ? null : _handleVerifyOtp,
           ),
         ],
@@ -709,7 +709,7 @@ class _SignupScreenState extends State<SignupScreen> {
           _InputField(
             controller: _displayNameController,
             label: LanguageController.instance.t('auth.signup.displayName'),
-            hint: 'E.g. Cordigrammer',
+            hint: LanguageController.instance.t('auth.signup.displayNameHint'),
             icon: Icons.badge_outlined,
             onChanged: (_) => _clearError(),
             validator: (v) {
@@ -730,7 +730,7 @@ class _SignupScreenState extends State<SignupScreen> {
           _InputField(
             controller: _usernameController,
             label: LanguageController.instance.t('auth.signup.username'),
-            hint: 'username',
+            hint: LanguageController.instance.t('auth.signup.usernameHint'),
             icon: Icons.alternate_email_rounded,
             onChanged: (_) {
               _clearError();
@@ -763,7 +763,7 @@ class _SignupScreenState extends State<SignupScreen> {
             _PasswordField(
               controller: _passwordController,
               label: LanguageController.instance.t('auth.signup.password'),
-              hint: 'At least 8 characters',
+              hint: LanguageController.instance.t('auth.signup.passwordHint'),
               show: _showPassword,
               onToggle: () => setState(() => _showPassword = !_showPassword),
               onChanged: (_) => _clearError(),
@@ -783,7 +783,7 @@ class _SignupScreenState extends State<SignupScreen> {
             _PasswordField(
               controller: _confirmPasswordController,
               label: LanguageController.instance.t('auth.signup.confirmPassword'),
-              hint: 'Re-enter to confirm',
+              hint: LanguageController.instance.t('auth.signup.confirmPasswordHint'),
               show: _showConfirmPassword,
               onToggle: () =>
                   setState(() => _showConfirmPassword = !_showConfirmPassword),
@@ -813,7 +813,7 @@ class _SignupScreenState extends State<SignupScreen> {
           _InputField(
             controller: _bioController,
             label: LanguageController.instance.t('auth.signup.shortBio'),
-            hint: 'Share a little about yourself',
+            hint: LanguageController.instance.t('auth.signup.bioHint'),
             icon: Icons.edit_note_rounded,
             maxLines: 3,
             maxLength: 300,
@@ -821,7 +821,7 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 18),
           _PrimaryButton(
-            label: _loading ? 'Creating account...' : 'Create account',
+            label: _loading ? LanguageController.instance.t('auth.signup.creatingAccount') : LanguageController.instance.t('auth.signup.createAccount'),
             onPressed: _loading ? null : _handleCompleteProfile,
           ),
         ],
@@ -903,7 +903,7 @@ class _SignupScreenState extends State<SignupScreen> {
             Expanded(
               flex: 2,
               child: _PrimaryButton(
-                label: _loading ? 'Finishing...' : 'Finish',
+                label: _loading ? LanguageController.instance.t('auth.signup.finishing') : LanguageController.instance.t('auth.signup.finish'),
                 onPressed: _loading ? null : _handleAvatarFinish,
               ),
             ),
@@ -1032,7 +1032,7 @@ class _OtpField extends StatelessWidget {
       ),
       decoration: InputDecoration(
         labelText: 'OTP code',
-        hintText: '• • • • • •',
+        hintText: LanguageController.instance.t('auth.signup.otpPlaceholder'),
         hintStyle: const TextStyle(
           letterSpacing: 8,
           color: Color(0xFFCBD5E1),

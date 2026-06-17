@@ -474,7 +474,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 AppTextField(
                                   controller: _emailController,
                                   label: lc.t('auth.login.email'),
-                                  hint: 'you@example.com',
+                                  hint: lc.t('auth.login.emailHint'),
                                   prefixIcon: Icons.mail_outline_rounded,
                                   keyboardType: TextInputType.emailAddress,
                                   autofillHints: const [AutofillHints.email],

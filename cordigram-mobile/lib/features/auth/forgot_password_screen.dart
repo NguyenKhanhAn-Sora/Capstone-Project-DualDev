@@ -251,8 +251,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         TextFormField(
           controller: _emailController,
           decoration: _fieldDecoration(
-            label: 'Email',
-            hint: 'you@example.com',
+            label: LanguageController.instance.t('auth.forgotPassword.email'),
+            hint: LanguageController.instance.t('auth.forgotPassword.emailHint'),
             icon: Icons.email_outlined,
           ),
           keyboardType: TextInputType.emailAddress,
@@ -307,7 +307,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           text: TextSpan(
             style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
             children: [
-              const TextSpan(text: 'We sent a 6-digit code to '),
+              TextSpan(text: "${LanguageController.instance.t('auth.forgotPassword.weSentCode')} "),
               TextSpan(
                 text: _emailController.text.trim(),
                 style: const TextStyle(
@@ -315,7 +315,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   color: Color(0xFF1F2937),
                 ),
               ),
-              const TextSpan(text: '. It expires in 5 minutes.'),
+              TextSpan(text: LanguageController.instance.t('auth.forgotPassword.codeExpires')),
             ],
           ),
         ),
@@ -324,8 +324,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         TextFormField(
           controller: _otpController,
           decoration: _fieldDecoration(
-            label: 'Verification code',
-            hint: '6-digit code',
+            label: LanguageController.instance.t('auth.forgotPassword.verificationCode'),
+            hint: LanguageController.instance.t('auth.forgotPassword.otpHint'),
             icon: Icons.lock_outline_rounded,
           ),
           keyboardType: TextInputType.number,
@@ -404,8 +404,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           controller: _newPasswordController,
           obscureText: !_showNew,
           decoration: _fieldDecoration(
-            label: 'New password',
-            hint: 'At least 8 characters',
+            label: LanguageController.instance.t('auth.forgotPassword.newPassword'),
+            hint: LanguageController.instance.t('auth.forgotPassword.passwordHint'),
             icon: Icons.lock_outline_rounded,
             suffix: IconButton(
               icon: Icon(
@@ -425,8 +425,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           controller: _confirmPasswordController,
           obscureText: !_showConfirm,
           decoration: _fieldDecoration(
-            label: 'Confirm password',
-            hint: 'Re-enter to confirm',
+            label: LanguageController.instance.t('auth.forgotPassword.confirmPassword'),
+            hint: LanguageController.instance.t('auth.forgotPassword.confirmPasswordHint'),
             icon: Icons.lock_outline_rounded,
             suffix: IconButton(
               icon: Icon(

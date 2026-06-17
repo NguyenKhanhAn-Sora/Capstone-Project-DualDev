@@ -31,6 +31,7 @@ import 'widgets/chat_media_viewer.dart';
 import 'widgets/messages_chrome_builder.dart';
 import 'utils/chat_media_resolver.dart';
 import '../../core/services/accent_color_controller.dart';
+import '../../core/services/language_controller.dart';
 import '../../core/theme/messages_chrome_palette.dart';
 
 class ChannelChatScreen extends StatefulWidget {
@@ -82,8 +83,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tin nhắn không có trong đoạn đang tải'),
+        SnackBar(
+          content: Text(LanguageController.instance.t('messages.messageNotInSegment')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -348,7 +349,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không gửi được sticker vẫy tay: $e')),
+          SnackBar(content: Text(LanguageController.instance.t('messages.failedSend', {'error': e.toString()}))),
         );
       }
     } finally {
@@ -531,7 +532,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Không gửi được tin nhắn: $e')));
+      ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('messages.failedSend', {'error': e.toString()}))));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -555,7 +556,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không gửi được voice message: $e')),
+        SnackBar(content: Text(LanguageController.instance.t('messages.failedSendVoice', {'error': e.toString()}))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -572,7 +573,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (len > MessagesMediaService.maxUploadBytes) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File quá lớn (tối đa 25MB)')),
+          SnackBar(content: Text(LanguageController.instance.t('messages.fileTooLarge'))),
         );
         return;
       }
@@ -704,7 +705,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 () => optionCtrls.add(TextEditingController()),
                               ),
                         icon: const Icon(Icons.add),
-                        label: const Text('Thêm phương án'),
+                        label: Text(LanguageController.instance.t('messages.addOption')),
                       ),
                     ),
                     DropdownButtonFormField<int>(
@@ -715,7 +716,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           .map(
                             (h) => DropdownMenuItem(
                               value: h,
-                              child: Text('$h giờ'),
+                              child: Text(LanguageController.instance.t('messages.hours', {'h': h.toString()})),
                             ),
                           )
                           .toList(),
@@ -740,7 +741,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Hủy'),
+                  child: Text(LanguageController.instance.t('messages.cancel')),
                 ),
                 TextButton(
                   onPressed: () async {
@@ -772,7 +773,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                       }
                     }
                   },
-                  child: const Text('Tạo'),
+                  child: Text(LanguageController.instance.t('messages.create')),
                 ),
               ],
             );
@@ -1351,7 +1352,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Không thể xóa tin nhắn: $e')));
+      ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('messages.cannotDeleteMessage'))));
     }
   }
 
@@ -1370,7 +1371,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Bạn đã ghim tin nhắn'),
+          content: Text(LanguageController.instance.t('messages.messagePinned')),
           action: SnackBarAction(
             label: 'Xem tất cả',
             onPressed: () async {
@@ -1391,7 +1392,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Không thể ghim tin nhắn: $e')));
+      ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('messages.cannotPinMessage'))));
     }
   }
 
@@ -1843,7 +1844,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: const Text('Hoàn thành'),
+                          child: Text(LanguageController.instance.t('messages.done')),
                         ),
                       ],
                     ],
@@ -2126,7 +2127,7 @@ class _VoiceRecordPanelState extends State<_VoiceRecordPanel> {
             FilledButton.icon(
               onPressed: _busy ? null : _start,
               icon: const Icon(Icons.mic),
-              label: const Text('Bắt đầu ghi'),
+              label: Text(LanguageController.instance.t('messages.startRecording')),
             )
           else
             Row(
@@ -2134,7 +2135,7 @@ class _VoiceRecordPanelState extends State<_VoiceRecordPanel> {
               children: [
                 OutlinedButton(
                   onPressed: _busy ? null : _cancel,
-                  child: const Text('Hủy'),
+                  child: Text(LanguageController.instance.t('messages.cancel')),
                 ),
                 FilledButton(
                   onPressed: _busy ? null : _send,
@@ -2144,7 +2145,7 @@ class _VoiceRecordPanelState extends State<_VoiceRecordPanel> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Gửi'),
+                      : Text(LanguageController.instance.t('messages.send')),
                 ),
               ],
             ),
@@ -2441,14 +2442,14 @@ class _PollMessageCardState extends State<_PollMessageCard> {
               if (!_showResults)
                 TextButton(
                   onPressed: () => setState(() => _showResults = true),
-                  child: const Text('Xem kết quả'),
+                  child: Text(LanguageController.instance.t('messages.viewResults')),
                 ),
               if (!_hasVoted && !_showResults)
                 FilledButton(
                   onPressed: _selectedOptions.isEmpty || _submitting
                       ? null
                       : _vote,
-                  child: const Text('Bình chọn'),
+                  child: Text(LanguageController.instance.t('messages.vote')),
                 ),
             ],
           ),

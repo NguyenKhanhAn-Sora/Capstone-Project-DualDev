@@ -3131,5 +3131,49 @@
     "labelConfirm": "Block",
     "labelConfirming": "Blocking...",
     "labelCancel": "Cancel"
+  },
+  "auth": {
+    "login": {
+      "emailPlaceholder": "Email",
+      "passwordPlaceholder": "Password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "forgotPassword": "Forgot password?",
+      "signIn": "Sign in",
+      "continueWithGoogle": "Continue with Google",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign up",
+      "recentAccounts": "Recent accounts",
+      "deleteAll": "Delete all",
+      "deleting": "Deleting...",
+      "account": "Account",
+      "continueAs": "Continue as {label}",
+      "enterEmail": "Enter your email",
+      "enterPassword": "Enter your password",
+      "enterEmailAddress": "Email address"
+    },
+    "signup": {
+      "emailAddress": "Email address",
+      "emailPlaceholder": "email@example.com",
+      "sendOTP": "Send OTP",
+      "sending": "Sending...",
+      "otpInstruction": "Enter the 6-digit code sent to",
+      "displayNamePlaceholder": "E.g. Cordigrammer",
+      "usernamePlaceholder": "username",
+      "passwordPlaceholder": "Password",
+      "confirmPasswordPlaceholder": "Re-enter to confirm",
+      "locationPlaceholder": "Add a city, landmark, or place",
+      "bioPlaceholder": "Share a little about yourself",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "signUp": "Sign up",
+      "otpCodePlaceholder": "------"
+    },
+    "forgotPassword": {
+      "emailPlaceholder": "Your email address",
+      "otpAriaLabel": "Enter OTP code",
+      "newPasswordPlaceholder": "New password",
+      "confirmPasswordPlaceholder": "Confirm new password"
+    }
   }
 }
