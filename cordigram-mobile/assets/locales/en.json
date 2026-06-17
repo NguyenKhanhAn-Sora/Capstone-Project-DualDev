@@ -3923,6 +3923,15 @@
     "timeNow": "now",
     "timeMinutes": "{n}m",
     "timeHours": "{n}h",
-    "timeDays": "{n}d"
+    "timeDays": "{n}d",
+    "deleteConfirmBody": "This story will be permanently deleted and cannot be recovered.",
+    "loadingMusic": "Loading music...",
+    "editVisibility": "Edit visibility",
+    "toolText": "Text",
+    "toolMusic": "Music",
+    "toolBg": "Background",
+    "toolSwap": "Swap",
+    "toolTrim": "Trim",
+    "editText": "Edit text"
   }
 }

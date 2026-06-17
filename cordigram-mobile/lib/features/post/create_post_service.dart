@@ -19,6 +19,7 @@ class UploadResult {
     this.folder,
     this.moderationDecision,
     this.moderationProvider,
+    this.qualities,
   });
 
   final String url;
@@ -32,12 +33,23 @@ class UploadResult {
   final String? folder;
   final String? moderationDecision;
   final String? moderationProvider;
+  /// Quality variant URLs returned by the backend after Cloudinary eager encoding.
+  final List<Map<String, dynamic>>? qualities;
 
   static UploadResult fromJson(Map<String, dynamic> json) {
     double? dur;
     final rawDur = json['duration'];
     if (rawDur is num) dur = rawDur.toDouble();
     if (rawDur is String) dur = double.tryParse(rawDur);
+
+    List<Map<String, dynamic>>? qualities;
+    final rawQ = json['qualities'];
+    if (rawQ is List) {
+      qualities = rawQ
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      if (qualities.isEmpty) qualities = null;
+    }
 
     return UploadResult(
       url: (json['secureUrl'] as String?) ?? (json['url'] as String?) ?? '',
@@ -51,6 +63,7 @@ class UploadResult {
       folder: json['folder'] as String?,
       moderationDecision: json['moderationDecision'] as String?,
       moderationProvider: json['moderationProvider'] as String?,
+      qualities: qualities,
     );
   }
 }

@@ -6,6 +6,13 @@ import '../services/story_service.dart';
 import '../screens/story_viewer_screen.dart';
 import '../screens/story_creator_screen.dart';
 
+// Card dimensions — matches the web story card proportions.
+const double _kCardW = 90.0;
+const double _kCardH = 148.0;
+const double _kRadius = 14.0;
+const double _kAvatarSize = 36.0;
+const double _kBarH = _kCardH + 28.0; // card + label below
+
 class StoryBar extends StatefulWidget {
   const StoryBar({super.key, this.viewerId, this.avatarUrl});
 
@@ -47,11 +54,6 @@ class _StoryBarState extends State<StoryBar> {
     await Navigator.of(context, rootNavigator: true).push(
       PageRouteBuilder<void>(
         pageBuilder: (_, __, ___) => const StoryCreatorScreen(),
-        // Use an opaque scaffold-colour backdrop on frame 0, then fade the
-        // story creator in on top.  This prevents the home screen from showing
-        // through during the entrance animation (Flutter only skips painting
-        // covered routes AFTER the opaque transition completes, so a plain
-        // FadeTransition from opacity-0 lets the home feed bleed through).
         transitionsBuilder: (ctx, animation, __, child) {
           return Stack(
             fit: StackFit.expand,
@@ -84,29 +86,29 @@ class _StoryBarState extends State<StoryBar> {
         fullscreenDialog: true,
       ),
     );
-    _load(); // Refresh viewed state
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = LanguageController.instance.t;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = isDark
+    final dividerColor = isDark
         ? const Color(0xFF1E2D48)
-        : const Color(0xFFE3EAF5);
+        : const Color(0xFFDDE4F0);
 
     return Container(
-      height: 108,
+      height: _kBarH + 20, // extra vertical padding
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: borderColor, width: 0.5),
+          bottom: BorderSide(color: dividerColor, width: 0.5),
         ),
       ),
       child: _loading
           ? _StoryBarSkeleton(isDark: isDark)
           : ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               itemCount: _groups.length + 1,
               itemBuilder: (context, index) {
                 if (index == 0) {
@@ -129,6 +131,61 @@ class _StoryBarState extends State<StoryBar> {
   }
 }
 
+// ── Shared card shell ─────────────────────────────────────────────────────────
+
+/// Wraps any card content in the standard rounded + border shell.
+class _CardShell extends StatelessWidget {
+  const _CardShell({
+    required this.child,
+    required this.unviewed,
+    required this.isDark,
+  });
+
+  final Widget child;
+  final bool unviewed;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    // For unviewed stories: 2-px gradient border.
+    // Implemented by wrapping in a gradient container and inset by 2 px.
+    if (unviewed) {
+      return Container(
+        width: _kCardW,
+        height: _kCardH,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(_kRadius),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
+          ),
+        ),
+        padding: const EdgeInsets.all(2),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(_kRadius - 2),
+          child: child,
+        ),
+      );
+    }
+    return Container(
+      width: _kCardW,
+      height: _kCardH,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(_kRadius),
+        border: Border.all(
+          color: isDark ? const Color(0xFF253347) : const Color(0xFFD4DCEC),
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_kRadius - 1),
+        child: child,
+      ),
+    );
+  }
+}
+
 // ── Add Story card ────────────────────────────────────────────────────────────
 
 class _AddStoryCard extends StatelessWidget {
@@ -146,81 +203,113 @@ class _AddStoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = isDark ? const Color(0xFF131E2E) : const Color(0xFFF0F4FB);
+    final textColor =
+        isDark ? const Color(0xFFE8ECF8) : const Color(0xFF0F1629);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 72,
-        margin: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(right: 10),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 62,
-              height: 62,
-              child: Stack(
-                children: [
-                  // Avatar
-                  Container(
-                    width: 62,
-                    height: 62,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isDark
-                            ? const Color(0xFF1E2D48)
-                            : const Color(0xFFE3EAF5),
-                        width: 2,
-                      ),
-                    ),
-                    child: ClipOval(
-                      child: avatarUrl != null && avatarUrl!.isNotEmpty
-                          ? Image.network(
-                              avatarUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  _AvatarPlaceholder(isDark: isDark),
-                            )
-                          : _AvatarPlaceholder(isDark: isDark),
-                    ),
-                  ),
-                  // Plus badge
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
+            // Card body
+            Container(
+              width: _kCardW,
+              height: _kCardH,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_kRadius),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF253347)
+                      : const Color(0xFFD4DCEC),
+                  width: 1,
+                ),
+                color: bgColor,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(_kRadius - 1),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Avatar as background (blurred / dimmed)
+                    if (avatarUrl != null && avatarUrl!.isNotEmpty)
+                      Opacity(
+                        opacity: 0.18,
+                        child: Image.network(
+                          avatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const SizedBox.shrink(),
                         ),
                       ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        color: Colors.white,
-                        size: 15,
+                    // Center: avatar circle + plus badge
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Avatar circle
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDark
+                                    ? const Color(0xFF2A3A52)
+                                    : const Color(0xFFD4DCEC),
+                                width: 1.5,
+                              ),
+                              color: isDark
+                                  ? const Color(0xFF1E2D48)
+                                  : const Color(0xFFE8EEF8),
+                            ),
+                            child: ClipOval(
+                              child: avatarUrl != null && avatarUrl!.isNotEmpty
+                                  ? Image.network(avatarUrl!, fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          _AvatarPlaceholder(isDark: isDark))
+                                  : _AvatarPlaceholder(isDark: isDark),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          // Plus badge
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
+                              ),
+                            ),
+                            child: const Icon(Icons.add_rounded,
+                                color: Colors.white, size: 18),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: isDark
-                    ? const Color(0xFFE8ECF8)
-                    : const Color(0xFF0F1629),
+            SizedBox(
+              width: _kCardW,
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -249,77 +338,182 @@ class _StoryCard extends StatelessWidget {
         ? group.displayName
         : '@${group.username}';
 
+    // Pick best thumbnail from the group's stories
+    final thumb = _thumbnail(group);
+
+    final nameColor = isDark
+        ? (unviewed ? const Color(0xFFE8ECF8) : const Color(0xFF7A8BB0))
+        : (unviewed ? const Color(0xFF0F1629) : const Color(0xFF5B6378));
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 72,
-        margin: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(right: 10),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 62,
-              height: 62,
-              padding: const EdgeInsets.all(2.5),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: unviewed
-                    ? const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
-                      )
-                    : null,
-                color: unviewed
-                    ? null
-                    : (isDark
-                        ? const Color(0xFF1E2D48)
-                        : const Color(0xFFDDE4EF)),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark
-                        ? const Color(0xFF0F1829)
-                        : Colors.white,
-                    width: 2,
+            _CardShell(
+              unviewed: unviewed,
+              isDark: isDark,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // ── Thumbnail ──────────────────────────────────────────
+                  if (thumb != null)
+                    Image.network(
+                      thumb,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _GradientFill(style: _firstGradient(group)),
+                    )
+                  else
+                    _GradientFill(style: _firstGradient(group)),
+
+                  // ── Bottom gradient scrim + username inside card ───────
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [Color(0xDD000000), Colors.transparent],
+                        ),
+                      ),
+                      alignment: Alignment.bottomCenter,
+                      padding: const EdgeInsets.only(
+                          left: 5, right: 5, bottom: 6),
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          shadows: [
+                            Shadow(color: Colors.black54, blurRadius: 4),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
-                ),
-                child: ClipOval(
-                  child: group.avatarUrl.isNotEmpty
-                      ? Image.network(
-                          group.avatarUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _AvatarPlaceholder(isDark: isDark),
-                        )
-                      : _AvatarPlaceholder(isDark: isDark),
-                ),
+
+                  // ── Avatar circle at top-center ────────────────────────
+                  Positioned(
+                    top: 8,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        width: _kAvatarSize,
+                        height: _kAvatarSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: group.avatarUrl.isNotEmpty
+                              ? Image.network(
+                                  group.avatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _AvatarPlaceholder(isDark: isDark),
+                                )
+                              : _AvatarPlaceholder(isDark: isDark),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              name,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: unviewed ? FontWeight.w600 : FontWeight.w400,
-                color: isDark
-                    ? (unviewed
-                        ? const Color(0xFFE8ECF8)
-                        : const Color(0xFF7A8BB0))
-                    : (unviewed
-                        ? const Color(0xFF0F1629)
-                        : const Color(0xFF5B6378)),
+            SizedBox(
+              width: _kCardW,
+              child: Text(
+                name,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: unviewed ? FontWeight.w600 : FontWeight.w400,
+                  color: nameColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Returns the media URL of the latest story with an image, or null.
+  String? _thumbnail(StoryFeedGroup g) {
+    for (final s in g.stories.reversed) {
+      if (s.mediaType == 'image' && s.mediaUrl != null) return s.mediaUrl;
+    }
+    return null;
+  }
+
+  /// Returns the background gradient style of the first text story, if any.
+  String? _firstGradient(StoryFeedGroup g) {
+    for (final s in g.stories) {
+      if (s.backgroundStyle != null) return s.backgroundStyle;
+    }
+    return null;
+  }
+}
+
+// ── Gradient fill fallback ────────────────────────────────────────────────────
+
+class _GradientFill extends StatelessWidget {
+  const _GradientFill({this.style});
+  final String? style;
+
+  @override
+  Widget build(BuildContext context) {
+    // Try to use the story's own gradient; fall back to the app default.
+    final gradient = _parse(style) ??
+        const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E3A5F), Color(0xFF2D1B69)],
+        );
+    return Container(
+      decoration: BoxDecoration(gradient: gradient),
+    );
+  }
+
+  static LinearGradient? _parse(String? css) {
+    if (css == null || css.isEmpty) return null;
+    try {
+      final colorPattern = RegExp(r'#[0-9a-fA-F]{6}');
+      final matches = colorPattern.allMatches(css).toList();
+      if (matches.isEmpty) return null;
+      final colors = matches.map((m) {
+        final hex = m.group(0)!.replaceFirst('#', '');
+        return Color(int.parse('FF$hex', radix: 16));
+      }).toList();
+      if (colors.length == 1) {
+        return LinearGradient(colors: [colors[0], colors[0]]);
+      }
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: colors,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }
 
@@ -332,11 +526,11 @@ class _AvatarPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: isDark ? const Color(0xFF1E2D48) : const Color(0xFFE3EAF5),
+      color: isDark ? const Color(0xFF1E2D48) : const Color(0xFFDDE4F0),
       child: Icon(
         Icons.person_rounded,
         color: isDark ? const Color(0xFF4AA3E4) : const Color(0xFF2C6AA0),
-        size: 28,
+        size: 20,
       ),
     );
   }
@@ -378,31 +572,30 @@ class _StoryBarSkeletonState extends State<_StoryBarSkeleton>
     return AnimatedBuilder(
       animation: _anim,
       builder: (_, __) {
-        final opacity = 0.3 + (_anim.value * 0.4);
+        final opacity = 0.25 + (_anim.value * 0.35);
         final base = widget.isDark
             ? const Color(0xFF1E2D48)
-            : const Color(0xFFE3EAF5);
+            : const Color(0xFFD4DCEC);
         return ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          itemCount: 6,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          itemCount: 5,
           itemBuilder: (_, i) => Container(
-            width: 72,
-            margin: const EdgeInsets.only(right: 12),
+            margin: const EdgeInsets.only(right: 10),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 62,
-                  height: 62,
+                  width: _kCardW,
+                  height: _kCardH,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(_kRadius),
                     color: base.withValues(alpha: opacity),
                   ),
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  width: 44,
+                  width: 56,
                   height: 9,
                   decoration: BoxDecoration(
                     color: base.withValues(alpha: opacity),

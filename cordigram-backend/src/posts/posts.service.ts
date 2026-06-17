@@ -54,9 +54,9 @@ const ADS_FREQUENCY_COOLDOWN_MINUTES = 30
 const ADS_FREQUENCY_MAX_IMPRESSIONS_24H = 3
 const REACH_RESTRICT_SCORE_MULTIPLIER = 0.15
 // Feed ranking tunables
-const FRESHNESS_HALF_LIFE_HOURS = 24          // 24 h half-life — standard social-media decay; prevents old viral posts from dominating
+const FRESHNESS_HALF_LIFE_HOURS = 12          // 12 h half-life — aggressive recency bias; old viral posts no longer dominate
 const FOLLOW_RELATIONSHIP_BOOST = 2.0         // score multiplier for followed users (home feed)
-const VERIFIED_CREATOR_BOOST = 1.25           // reduced from 1.8 — prevents explore being dominated by influencers
+const VERIFIED_CREATOR_BOOST = 1.5            // increased from 1.25 — stronger priority for verified creators
 const NEW_CREATOR_BOOST = 1.15                // mild discovery boost for accounts < 90 days old
 const MAX_POSTS_PER_AUTHOR_PER_FEED = 2       // author diversity cap across the ranked pool
 const MIN_CANDIDATE_POOL_SIZE = 300           // minimum candidates to rank before slicing
@@ -86,6 +86,7 @@ export class PostsService {
         username?: string;
         avatarUrl?: string;
         isCreatorVerified?: boolean;
+        isNewCreator?: boolean;
       }>;
 
     const profiles = await this.profileModel
@@ -95,20 +96,28 @@ export class PostsService {
 
     const users = await this.userModel
       .find({ _id: { $in: userIds } })
-      .select('_id isCreatorVerified')
+      .select('_id isCreatorVerified createdAt')
       .lean();
 
     const verifiedMap = new Map<string, boolean>();
+    const newCreatorMap = new Map<string, boolean>();
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 3_600_000);
     users.forEach((user) => {
       const id = user._id?.toString?.();
       if (!id) return;
       verifiedMap.set(id, Boolean(user.isCreatorVerified));
+      const userCreatedAt = (user as any).createdAt
+        ? new Date((user as any).createdAt)
+        : null;
+      newCreatorMap.set(id, userCreatedAt ? userCreatedAt > ninetyDaysAgo : false);
     });
 
     return profiles.map((profile) => ({
       ...profile,
       isCreatorVerified:
         verifiedMap.get(profile.userId?.toString?.() ?? '') ?? false,
+      isNewCreator:
+        newCreatorMap.get(profile.userId?.toString?.() ?? '') ?? false,
     }));
   }
 
@@ -1423,37 +1432,37 @@ export class PostsService {
       return scored;
     }
 
-    const minSpacing = 5;
-    // Exactly 1 sponsored post per page — better UX, less intrusive
-    const maxSponsored = 1;
-
-    const arranged: Array<{ post: Post; score: number }> = [];
-    const overflowSponsored: Array<{ post: Post; score: number }> = [];
-    let sponsoredCount = 0;
-    let lastSponsoredIndex = -minSpacing;
-
-    scored.forEach((item) => {
+    // Separate sponsored from organic so the ad slot is guaranteed regardless of
+    // the sponsored post's organic score. Previously ads competed on score alone and
+    // low-engagement/older sponsored posts always ranked below the organic pool,
+    // meaning they never appeared in the page slice.
+    const sponsoredItems: Array<{ post: Post; score: number }> = [];
+    const organicItems: Array<{ post: Post; score: number }> = [];
+    for (const item of scored) {
       const postId = item.post._id?.toString?.() ?? '';
-      const isSponsored = sponsoredPostIds.has(postId);
-      if (!isSponsored) {
-        arranged.push(item);
-        return;
+      const repostSourceId = (item.post as any).repostOf?.toString?.() ?? '';
+      const isSponsored =
+        sponsoredPostIds.has(postId) ||
+        Boolean(repostSourceId && sponsoredPostIds.has(repostSourceId));
+      if (isSponsored) {
+        sponsoredItems.push(item);
+      } else {
+        organicItems.push(item);
       }
+    }
 
-      const canPlaceBySpacing =
-        arranged.length - lastSponsoredIndex >= minSpacing;
-      if (sponsoredCount < maxSponsored && canPlaceBySpacing) {
-        arranged.push(item);
-        sponsoredCount += 1;
-        lastSponsoredIndex = arranged.length - 1;
-        return;
-      }
+    if (!sponsoredItems.length) return organicItems;
 
-      overflowSponsored.push(item);
-    });
-
-    // Keep stable output length by appending overflow campaigns after normal posts.
-    return [...arranged, ...overflowSponsored];
+    // Insert 1 sponsored post after the 3rd organic item so the feed doesn't
+    // open with an ad. Remaining sponsored posts go to the end (overflow).
+    const AD_INSERT_POSITION = 3;
+    const insertAt = Math.min(AD_INSERT_POSITION, organicItems.length);
+    return [
+      ...organicItems.slice(0, insertAt),
+      sponsoredItems[0],
+      ...organicItems.slice(insertAt),
+      ...sponsoredItems.slice(1),
+    ];
   }
 
   private applyAuthorDiversity<T extends { post: Post }>(
@@ -2033,7 +2042,9 @@ export class PostsService {
       500,
     );
 
-    // Guest (no userId): use scoring algorithm (freshness + engagement) instead of raw sort
+    // Guest (no userId): use scoring algorithm (freshness + engagement) instead of raw sort.
+    // Apply the same minimum-engagement gate as explore candidates so the guest feed
+    // also excludes posts that haven't received any community validation yet.
     if (!userId) {
       const guestRaw = await this.postModel
         .find({
@@ -2043,6 +2054,12 @@ export class PostsService {
           moderationState: publicDiscoveryModerationFilter,
           deletedAt: null,
           publishedAt: { $ne: null },
+          $or: [
+            { 'stats.hearts': { $gte: 5 } },
+            { 'stats.comments': { $gte: 1 } },
+            { 'stats.saves': { $gte: 1 } },
+            { 'stats.reposts': { $gte: 1 } },
+          ],
         })
         .sort({ createdAt: -1 })
         .limit(candidateLimit)
@@ -2099,10 +2116,10 @@ export class PostsService {
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
     const now = new Date();
-    // Explore pool only surfaces content published within the last 90 days.
-    // Posts older than this are excluded from discovery so that highly-engaged
-    // but stale content cannot keep outscoring newer posts in the ranking.
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 3_600_000);
+    // Explore pool only surfaces content published within the last 30 days.
+    // Reduced from 90 days so that old highly-engaged posts cannot crowd out
+    // fresh content — the scoring algorithm's freshness decay handles the rest.
+    const ninetyDaysAgo = new Date(now.getTime() - 30 * 24 * 3_600_000);
     const activeSponsoredPostIds = await this.getActiveSponsoredPostIds(
       now,
       candidateLimit,
@@ -2147,6 +2164,10 @@ export class PostsService {
       .limit(candidateLimit)
       .lean();
 
+    // Explore candidates: posts from non-followed creators that have cleared a
+    // minimum community-validation bar. Without this gate, brand-new posts with
+    // 0–2 interactions appear at the top purely on freshness, which feels spammy.
+    // Own posts and followed users' posts are always shown regardless of engagement.
     const exploreCandidates = await this.postModel
       .find({
         authorId: { $nin: [...followeeObjectIds, ...excludedAuthorIds] },
@@ -2157,8 +2178,14 @@ export class PostsService {
         deletedAt: null,
         publishedAt: { $gte: ninetyDaysAgo },
         _id: { $nin: hiddenObjectIds },
+        $or: [
+          { 'stats.hearts': { $gte: 5 } },
+          { 'stats.comments': { $gte: 1 } },
+          { 'stats.saves': { $gte: 1 } },
+          { 'stats.reposts': { $gte: 1 } },
+        ],
       })
-      .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
+      .sort({ publishedAt: -1, 'stats.hearts': -1, 'stats.comments': -1 })
       .limit(candidateLimit)
       .lean();
 
@@ -2260,6 +2287,12 @@ export class PostsService {
         p.isCreatorVerified ?? false,
       ]),
     );
+    const isNewCreatorByAuthorId = new Map<string, boolean>(
+      allCandidateProfiles.map((p) => [
+        p.userId?.toString?.() ?? '',
+        p.isNewCreator ?? false,
+      ]),
+    );
 
     const scored = merged
       .map((post) => {
@@ -2276,6 +2309,7 @@ export class PostsService {
           ? (sponsoredSignals.reputationByAuthorId.get(authorId) ?? 0)
           : 0;
         const isCreatorVerified = verifiedByAuthorId.get(authorId) ?? false;
+        const isNewCreator = isNewCreatorByAuthorId.get(authorId) ?? false;
         return {
           post,
           score: this.scorePost(
@@ -2285,6 +2319,7 @@ export class PostsService {
             boost,
             reachRestrictedAuthorIds.has(authorId),
             isCreatorVerified,
+            isNewCreator,
           ),
           isSponsored,
           boost,
@@ -2293,15 +2328,19 @@ export class PostsService {
         };
       })
       .sort((a, b) => {
-        if (a.isSponsored && b.isSponsored) {
-          // Sponsored priority order: boost package -> creator verified -> reputation.
+        // Sort organic posts by score; sort sponsored posts among themselves
+        // by boost package → creator verified → reputation. The two groups
+        // are merged later by applySponsoredSpacing which guarantees ad placement.
+        if (a.isSponsored !== b.isSponsored) {
+          // Sponsored posts bubble to END so applySponsoredSpacing can isolate them.
+          return a.isSponsored ? 1 : -1;
+        }
+        // At this point both items are in the same group (both sponsored or both organic).
+        if (a.isSponsored) {
+          // Among sponsored: highest boost package wins; ties broken by creator then reputation.
           if (b.boost !== a.boost) return b.boost - a.boost;
-          if (b.creatorPriority !== a.creatorPriority) {
-            return b.creatorPriority - a.creatorPriority;
-          }
-          if (b.reputationPriority !== a.reputationPriority) {
-            return b.reputationPriority - a.reputationPriority;
-          }
+          if (b.creatorPriority !== a.creatorPriority) return b.creatorPriority - a.creatorPriority;
+          if (b.reputationPriority !== a.reputationPriority) return b.reputationPriority - a.reputationPriority;
         }
         return b.score - a.score;
       });
@@ -2667,34 +2706,35 @@ export class PostsService {
         p.isCreatorVerified ?? false,
       ]),
     );
+    const followingNewCreatorByAuthorId = new Map<string, boolean>(
+      followingCandidateProfiles.map((p) => [
+        p.userId?.toString?.() ?? '',
+        p.isNewCreator ?? false,
+      ]),
+    );
 
     const scored = merged
       .map((post) => {
-        const boost = 0;
         const authorId = post.authorId?.toString?.() ?? '';
         const isCreatorVerified = followingVerifiedByAuthorId.get(authorId) ?? false;
+        const isNewCreator = followingNewCreatorByAuthorId.get(authorId) ?? false;
         return {
           post,
           score: this.scorePost(
             post,
             followeeSet,
             now,
-            boost,
+            0,
             reachRestrictedAuthorIds.has(authorId),
             isCreatorVerified,
+            isNewCreator,
           ),
         };
       })
       .sort((a, b) => b.score - a.score);
 
-    const prioritized = this.applySponsoredSpacing(
-      scored,
-      new Set(sponsoredBoostByPostId.keys()),
-      safeLimit,
-    );
-
     // Apply author diversity then slice for the requested page
-    const diversified = this.applyAuthorDiversity(prioritized);
+    const diversified = this.applyAuthorDiversity(scored);
     const topPosts = diversified
       .slice(sliceStart, sliceEnd)
       .map((item) => item.post);
@@ -2953,6 +2993,12 @@ export class PostsService {
           moderationState: 'normal',
           deletedAt: null,
           publishedAt: { $ne: null },
+          $or: [
+            { 'stats.hearts': { $gte: 5 } },
+            { 'stats.comments': { $gte: 1 } },
+            { 'stats.saves': { $gte: 1 } },
+            { 'stats.reposts': { $gte: 1 } },
+          ],
         })
         .sort({
           'stats.views': -1,
@@ -3095,6 +3141,9 @@ export class PostsService {
             .lean()
         : Promise.resolve([] as typeof trendingDocs),
 
+      // Pool C — fresh injection: last 7 days. Lower bar than main explore
+      // so newly viral content gets discovered early, but still requires at
+      // least 1 heart or comment as a minimum community-validation signal.
       this.postModel
         .find({
           authorId: authorExclusion,
@@ -3106,6 +3155,11 @@ export class PostsService {
           publishedAt: { $ne: null },
           _id: { $nin: hiddenObjectIds },
           createdAt: { $gte: sevenDaysAgo },
+          $or: [
+            { 'stats.hearts': { $gte: 1 } },
+            { 'stats.comments': { $gte: 1 } },
+            { 'stats.saves': { $gte: 1 } },
+          ],
         })
         .sort({ createdAt: -1 })
         .limit(200)
@@ -3159,7 +3213,7 @@ export class PostsService {
       viewed.map((v) => v.postId?.toString?.()).filter(Boolean),
     );
 
-    // Pre-fetch which candidate authors are creator-verified (single lightweight query)
+    // Pre-fetch verification + new-creator status for all candidate authors
     const candidateAuthorObjectIds = Array.from(
       new Set(
         candidates
@@ -3168,13 +3222,19 @@ export class PostsService {
       ),
     ).map((id: string) => new Types.ObjectId(id));
 
-    const verifiedCreatorProfiles = await this.profileModel
-      .find({ userId: { $in: candidateAuthorObjectIds }, isCreatorVerified: true })
-      .select('userId')
-      .lean();
+    const exploreAuthorProfiles = await this.getProfilesWithCreatorVerification(
+      candidateAuthorObjectIds,
+    );
     const verifiedCreatorSet = new Set<string>(
-      verifiedCreatorProfiles
-        .map((p: any) => p.userId?.toString?.())
+      exploreAuthorProfiles
+        .filter((p) => p.isCreatorVerified)
+        .map((p) => p.userId?.toString?.() ?? '')
+        .filter(Boolean),
+    );
+    const newCreatorSet = new Set<string>(
+      exploreAuthorProfiles
+        .filter((p) => p.isNewCreator)
+        .map((p) => p.userId?.toString?.() ?? '')
         .filter(Boolean),
     );
 
@@ -3182,7 +3242,7 @@ export class PostsService {
       .map((post) => {
         const authorId = post.authorId?.toString?.() ?? '';
 
-        // Base engagement + freshness score — now correctly passes isCreatorVerified
+        // Base engagement + freshness score with creator signals
         const base = this.scorePost(
           post,
           new Set<string>(),
@@ -3190,6 +3250,7 @@ export class PostsService {
           0,
           reachRestrictedAuthorIds.has(authorId),
           verifiedCreatorSet.has(authorId),
+          newCreatorSet.has(authorId),
         );
 
         // Personalisation boost — up to 2.5× (was 0.6×)
@@ -3200,14 +3261,13 @@ export class PostsService {
         );
 
         // Velocity signal — reward posts that earned engagement faster (trending now)
-        const ageHours = Math.max(
-          0.1,
-          (now.getTime() -
-            (post.createdAt
-              ? new Date(post.createdAt).getTime()
-              : now.getTime())) /
-            3_600_000,
-        );
+        // Use publishedAt so scheduled posts measure velocity from their live date
+        const referenceMs = (post as any).publishedAt
+          ? new Date((post as any).publishedAt).getTime()
+          : post.createdAt
+            ? new Date(post.createdAt).getTime()
+            : now.getTime();
+        const ageHours = Math.max(0.1, (now.getTime() - referenceMs) / 3_600_000);
         const stats = post.stats ?? ({} as any);
         const totalEngagement =
           (stats.hearts ?? 0) * 2 +
@@ -5214,11 +5274,17 @@ export class PostsService {
     sponsoredBoostWeight = 0,
     reachRestricted = false,
     isCreatorVerified = false,
+    isNewCreator = false,
   ) {
-    const createdAt = post.createdAt ? new Date(post.createdAt) : now;
+    // Use publishedAt for freshness so scheduled posts age from their publish date, not draft date
+    const referenceDate = (post as any).publishedAt
+      ? new Date((post as any).publishedAt)
+      : post.createdAt
+        ? new Date(post.createdAt)
+        : now;
     const ageHours = Math.max(
       0.1,
-      (now.getTime() - createdAt.getTime()) / 3_600_000,
+      (now.getTime() - referenceDate.getTime()) / 3_600_000,
     );
     const freshness = 1 / (1 + ageHours / FRESHNESS_HALF_LIFE_HOURS);
     const stats = post.stats ?? ({} as PostStats);
@@ -5237,11 +5303,12 @@ export class PostsService {
     const relationshipBoost = followeeSet.has(post.authorId?.toString?.() ?? '')
       ? FOLLOW_RELATIONSHIP_BOOST
       : 1;
-    // Verified creators always rank higher within the same score tier
+    // Verified creators rank higher; new accounts get a mild discovery push
     const verifiedBoost = isCreatorVerified ? VERIFIED_CREATOR_BOOST : 1;
+    const newCreatorBoost = isNewCreator ? NEW_CREATOR_BOOST : 1;
 
     const baseScore =
-      (engagement + 1) * freshness * qualityBoost * relationshipBoost * verifiedBoost;
+      (engagement + 1) * freshness * qualityBoost * relationshipBoost * verifiedBoost * newCreatorBoost;
     const sponsoredBoost = 1 + Math.max(0, sponsoredBoostWeight);
     const reachPenalty = reachRestricted ? REACH_RESTRICT_SCORE_MULTIPLIER : 1;
     return baseScore * sponsoredBoost * reachPenalty;

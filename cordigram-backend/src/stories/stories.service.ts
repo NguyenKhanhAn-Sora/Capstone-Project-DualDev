@@ -109,6 +109,13 @@ export class StoriesService {
     if (type === 'text' && !dto.textContent && !dto.backgroundStyle) {
       throw new BadRequestException('textContent or backgroundStyle is required for text stories');
     }
+    if (
+      dto.trimStartMs != null &&
+      dto.trimEndMs != null &&
+      dto.trimStartMs >= dto.trimEndMs
+    ) {
+      throw new BadRequestException('trimStartMs must be less than trimEndMs');
+    }
 
     const story = await this.storyModel.create({
       authorId: new Types.ObjectId(userId),
@@ -221,13 +228,21 @@ export class StoriesService {
   }
 
   async markViewed(viewerId: string, storyId: string): Promise<{ viewed: boolean }> {
-    const story = await this.storyModel.findById(storyId);
-    if (!story) throw new NotFoundException('Story not found');
-
-    const alreadyViewed = story.views.some((v) => v.userId.toString() === viewerId);
-    if (!alreadyViewed) {
-      story.views.push({ userId: new Types.ObjectId(viewerId), viewedAt: new Date() } as any);
-      await story.save();
+    // Atomic conditional push — avoids Mongoose version-key (VersionError) race
+    // condition with concurrent reactToStory / markViewed calls from the same client.
+    const result = await this.storyModel.updateOne(
+      {
+        _id: new Types.ObjectId(storyId),
+        'views.userId': { $ne: new Types.ObjectId(viewerId) },
+      },
+      {
+        $push: { views: { userId: new Types.ObjectId(viewerId), viewedAt: new Date() } },
+      },
+    );
+    if (result.matchedCount === 0) {
+      // Either story not found, or viewer already in the list — both are fine.
+      const exists = await this.storyModel.exists({ _id: new Types.ObjectId(storyId) });
+      if (!exists) throw new NotFoundException('Story not found');
     }
     return { viewed: true };
   }
@@ -276,16 +291,23 @@ export class StoriesService {
     storyId: string,
     emoji: string,
   ): Promise<{ ok: boolean }> {
-    const story = await this.storyModel.findById(storyId);
-    if (!story) throw new NotFoundException('Story not found');
+    // Atomic upsert: update existing reaction first; if no match, push a new one.
+    // Two separate updateOne calls avoid the Mongoose VersionError race condition
+    // that occurs when findById+save is used concurrently with markViewed.
+    const updateExisting = await this.storyModel.updateOne(
+      { _id: new Types.ObjectId(storyId), 'reactions.userId': new Types.ObjectId(viewerId) },
+      { $set: { 'reactions.$.emoji': emoji, 'reactions.$.createdAt': new Date() } },
+    );
 
-    const existingIdx = story.reactions.findIndex((r) => r.userId.toString() === viewerId);
-    if (existingIdx >= 0) {
-      story.reactions[existingIdx].emoji = emoji;
-    } else {
-      story.reactions.push({ userId: new Types.ObjectId(viewerId), emoji, createdAt: new Date() } as any);
+    if (updateExisting.matchedCount === 0) {
+      // No existing reaction for this user — push a new entry.
+      const pushResult = await this.storyModel.updateOne(
+        { _id: new Types.ObjectId(storyId) },
+        { $push: { reactions: { userId: new Types.ObjectId(viewerId), emoji, createdAt: new Date() } } },
+      );
+      if (pushResult.matchedCount === 0) throw new NotFoundException('Story not found');
     }
-    await story.save();
+
     return { ok: true };
   }
 

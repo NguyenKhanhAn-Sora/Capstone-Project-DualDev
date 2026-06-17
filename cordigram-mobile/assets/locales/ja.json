@@ -3927,6 +3927,15 @@
     "timeNow": "たった今",
     "timeMinutes": "{n}分",
     "timeHours": "{n}時間",
-    "timeDays": "{n}日"
+    "timeDays": "{n}日",
+    "deleteConfirmBody": "このストーリーは完全に削除され、元に戻せません。",
+    "loadingMusic": "音楽を読み込み中...",
+    "editVisibility": "公開設定を編集",
+    "toolText": "テキスト",
+    "toolMusic": "音楽",
+    "toolBg": "背景",
+    "toolSwap": "変更",
+    "toolTrim": "トリム",
+    "editText": "テキストを編集"
   }
 }

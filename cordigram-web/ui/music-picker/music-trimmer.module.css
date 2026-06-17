@@ -91,6 +91,38 @@
 .selWindow::before { left: 2px; }
 .selWindow::after  { right: 2px; }
 
+/* ── Loading skeleton ────────────────────────────── */
+.waveLoading {
+  cursor: default;
+}
+.skeleton {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  align-self: center;
+}
+.skeletonGlow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(167,139,250,0.6) 50%,
+    transparent 100%
+  );
+  animation: skeletonSlide 1.4s ease-in-out infinite;
+}
+@keyframes skeletonSlide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
 /* ── Time label ──────────────────────────────────── */
 .timeLabel {
   font-size: 10px;

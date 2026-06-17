@@ -43,6 +43,7 @@ class MediaCarousel extends StatefulWidget {
     this.playbackScopeKey,
     this.enableAutoPlayOnVisible = false,
     this.isParentVisible = false,
+    this.primaryVideoDurationMs,
   });
 
   final List<FeedMedia> media;
@@ -50,6 +51,9 @@ class MediaCarousel extends StatefulWidget {
   final String? playbackScopeKey;
   final bool enableAutoPlayOnVisible;
   final bool isParentVisible;
+  /// Post-level video duration from the server (milliseconds).
+  /// Used as fallback when a media item has no duration in its metadata.
+  final int? primaryVideoDurationMs;
 
   @override
   State<MediaCarousel> createState() => _MediaCarouselState();
@@ -97,6 +101,7 @@ class _MediaCarouselState extends State<MediaCarousel> {
         initialIndex: startIndex,
         allowDownload: widget.allowDownload,
         onDownloadRequested: _downloadOriginalMedia,
+        primaryVideoDurationMs: widget.primaryVideoDurationMs,
       ),
     );
   }
@@ -269,7 +274,10 @@ class _MediaCarouselState extends State<MediaCarousel> {
                           _isVideoFeedMedia(media[i]),
                       allowDownload: widget.allowDownload,
                       qualities: media[i].qualities,
-                      expectedDuration: media[i].metadataDurationSeconds,
+                      expectedDuration: media[i].metadataDurationSeconds ??
+                          (widget.primaryVideoDurationMs != null
+                              ? widget.primaryVideoDurationMs! / 1000.0
+                              : null),
                       onDownload: widget.allowDownload
                           ? () => _downloadOriginalMedia(media[i])
                           : null,
@@ -391,12 +399,14 @@ class _ImageViewerRoute extends PageRoute<void> {
     required this.initialIndex,
     required this.allowDownload,
     required this.onDownloadRequested,
+    this.primaryVideoDurationMs,
   }) : super(fullscreenDialog: true);
 
   final List<FeedMedia> media;
   final int initialIndex;
   final bool allowDownload;
   final Future<void> Function(FeedMedia media) onDownloadRequested;
+  final int? primaryVideoDurationMs;
 
   @override
   Color get barrierColor => Colors.transparent;
@@ -426,6 +436,7 @@ class _ImageViewerRoute extends PageRoute<void> {
         initialIndex: initialIndex,
         allowDownload: allowDownload,
         onDownloadRequested: onDownloadRequested,
+        primaryVideoDurationMs: primaryVideoDurationMs,
       ),
     );
   }
@@ -437,12 +448,14 @@ class _ImageViewerOverlay extends StatefulWidget {
     required this.initialIndex,
     required this.allowDownload,
     required this.onDownloadRequested,
+    this.primaryVideoDurationMs,
   });
 
   final List<FeedMedia> media;
   final int initialIndex;
   final bool allowDownload;
   final Future<void> Function(FeedMedia media) onDownloadRequested;
+  final int? primaryVideoDurationMs;
 
   @override
   State<_ImageViewerOverlay> createState() => _ImageViewerOverlayState();
@@ -600,7 +613,10 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                                   allowDownload: widget.allowDownload,
                                   qualities: item.qualities,
                                   expectedDuration:
-                                      item.metadataDurationSeconds,
+                                      item.metadataDurationSeconds ??
+                                      (widget.primaryVideoDurationMs != null
+                                          ? widget.primaryVideoDurationMs! / 1000.0
+                                          : null),
                                   onDownload: widget.allowDownload
                                       ? () => widget.onDownloadRequested(item)
                                       : null,
@@ -961,6 +977,58 @@ String _fmtDuration(Duration d) {
   return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
 }
 
+// ExoPlayer on Android sometimes reports duration = 0 or a tiny value (< 1 s)
+// for Cloudinary URLs whose MOOV atom hasn't been read yet.  When that happens
+// we fall back to the duration stored in the post's media metadata so the UI
+// shows the correct total length and the progress bar stays accurate.
+Duration _resolveEffectiveDuration(Duration raw, double? expectedSeconds) {
+  if (raw.inMilliseconds >= 1000) return raw;
+  if (expectedSeconds != null && expectedSeconds > 0) {
+    return Duration(milliseconds: (expectedSeconds * 1000).round());
+  }
+  return raw;
+}
+
+/// Picks the best initial playback URL for ExoPlayer.
+/// Quality-variant URLs are Cloudinary-transcoded MP4s with MOOV at the
+/// beginning, allowing ExoPlayer to report correct duration AND position
+/// immediately. Falls back to the raw upload URL (with [_toFaststartUrl]
+/// applied by [_initController]) when no quality variants exist.
+String _pickInitialUrl(String rawUrl, List<VideoQuality>? qualities) {
+  if (qualities != null && qualities.isNotEmpty) {
+    // Prefer 720p → 480p → 1080p → 360p → 240p for mobile
+    const preferredHeights = [720, 480, 1080, 360, 240];
+    for (final h in preferredHeights) {
+      for (final q in qualities) {
+        if (q.height == h) return q.url;
+      }
+    }
+    return qualities.last.url;
+  }
+  return rawUrl; // _initController will apply _toFaststartUrl as fallback
+}
+
+// Injects fl_faststart into a raw Cloudinary /video/upload/ URL so that
+// ExoPlayer can read the MOOV atom from the beginning of the stream.
+// This lets ExoPlayer report correct duration AND position immediately.
+// URLs that already have transformations (quality variants, blur, etc.)
+// pass through unchanged. Non-Cloudinary URLs are never modified.
+String _toFaststartUrl(String url) {
+  if (!url.contains('res.cloudinary.com')) return url;
+  const marker = '/video/upload/';
+  final idx = url.indexOf(marker);
+  if (idx == -1) return url;
+  final afterUpload = url.substring(idx + marker.length);
+  // Skip if the segment after /upload/ looks like a transformation parameter
+  // (e.g. "h_480,", "fl_faststart", "q_auto", "e_blur", "c_limit").
+  final firstSegment = afterUpload.split('/').first;
+  final looksLikeTransform = firstSegment.contains('_') &&
+      !firstSegment.startsWith('v') &&
+      !RegExp(r'^[a-zA-Z0-9]+$').hasMatch(firstSegment);
+  if (looksLikeTransform) return url;
+  return '${url.substring(0, idx + marker.length)}fl_faststart/$afterUpload';
+}
+
 // ─── Inline video preview (feed card) ─────────────────────────────────────────
 
 class _InlineVideoPreview extends StatefulWidget {
@@ -1133,7 +1201,7 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   void initState() {
     super.initState();
     _volumeUnsub = VideoVolumeStore.instance.subscribe(_onVolumeChanged);
-    _initController(widget.url);
+    _initController(_pickInitialUrl(widget.url, widget.qualities));
   }
 
   void _onVolumeChanged() {
@@ -1146,7 +1214,7 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   }
 
   Future<void> _initController(String url, {Duration? seekTo, bool resume = false}) async {
-    final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
+    final ctrl = VideoPlayerController.networkUrl(Uri.parse(_toFaststartUrl(url)));
     _controller = ctrl;
     ctrl.addListener(_onVideoTick);
 
@@ -1169,9 +1237,20 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
     } else {
       final snapshot = _VideoPlaybackStore.read(widget.playbackKey);
       if (snapshot != null) {
-        final maxMs = ctrl.value.duration.inMilliseconds;
-        final ms = snapshot.position.inMilliseconds.clamp(0, maxMs);
-        await ctrl.seekTo(Duration(milliseconds: ms));
+        // Guard: only restore position when the player reports a plausible duration
+        // (≥ 1 s).  When ExoPlayer hasn't loaded the MOOV atom yet it can report a
+        // tiny wrong duration; clamping a large saved position to that tiny value
+        // would immediately put the slider at 100 % and show "00:00 / 00:00".
+        final rawMs = ctrl.value.duration.inMilliseconds;
+        final effectiveMs = _resolveEffectiveDuration(
+          ctrl.value.duration,
+          widget.expectedDuration,
+        ).inMilliseconds;
+        final maxMs = effectiveMs > 0 ? effectiveMs : rawMs;
+        if (rawMs >= 1000 && maxMs > 0) {
+          final ms = snapshot.position.inMilliseconds.clamp(0, maxMs);
+          await ctrl.seekTo(Duration(milliseconds: ms));
+        }
         if (snapshot.wasPlaying) resume = true;
       }
     }
@@ -1302,8 +1381,8 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
     _seekAfterLoad = savedPos;
     _resumeAfterQuality = wasPlaying;
 
-    final nextUrl = quality?.url ?? widget.url;
-    final newCtrl = VideoPlayerController.networkUrl(Uri.parse(nextUrl));
+    final nextUrl = quality?.url ?? _pickInitialUrl(widget.url, widget.qualities);
+    final newCtrl = VideoPlayerController.networkUrl(Uri.parse(_toFaststartUrl(nextUrl)));
     _controller = newCtrl;
     newCtrl.addListener(_onVideoTick);
 
@@ -1499,7 +1578,7 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
     }
 
     final position = ctrl.value.position;
-    final duration = ctrl.value.duration;
+    final duration = _resolveEffectiveDuration(ctrl.value.duration, widget.expectedDuration);
     final progress = duration.inMilliseconds > 0
         ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
@@ -1908,7 +1987,7 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
   void initState() {
     super.initState();
     _volumeUnsub = VideoVolumeStore.instance.subscribe(_onVolumeChanged);
-    _initController(widget.url);
+    _initController(_pickInitialUrl(widget.url, widget.qualities));
   }
 
   void _onVolumeChanged() {
@@ -1919,7 +1998,7 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
   }
 
   Future<void> _initController(String url) async {
-    final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
+    final ctrl = VideoPlayerController.networkUrl(Uri.parse(_toFaststartUrl(url)));
     _controller = ctrl;
     ctrl.addListener(_onVideoTick);
 
@@ -1935,9 +2014,16 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
 
     final snapshot = _VideoPlaybackStore.read(widget.playbackKey);
     if (snapshot != null) {
-      final maxMs = ctrl.value.duration.inMilliseconds;
-      final ms = snapshot.position.inMilliseconds.clamp(0, maxMs);
-      await ctrl.seekTo(Duration(milliseconds: ms));
+      final rawMs = ctrl.value.duration.inMilliseconds;
+      final effectiveMs = _resolveEffectiveDuration(
+        ctrl.value.duration,
+        widget.expectedDuration,
+      ).inMilliseconds;
+      final maxMs = effectiveMs > 0 ? effectiveMs : rawMs;
+      if (rawMs >= 1000 && maxMs > 0) {
+        final ms = snapshot.position.inMilliseconds.clamp(0, maxMs);
+        await ctrl.seekTo(Duration(milliseconds: ms));
+      }
     }
 
     await ctrl.play();
@@ -2030,8 +2116,8 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
     _seekAfterLoad = savedPos;
     _resumeAfterQuality = wasPlaying;
 
-    final nextUrl = quality?.url ?? widget.url;
-    final newCtrl = VideoPlayerController.networkUrl(Uri.parse(nextUrl));
+    final nextUrl = quality?.url ?? _pickInitialUrl(widget.url, widget.qualities);
+    final newCtrl = VideoPlayerController.networkUrl(Uri.parse(_toFaststartUrl(nextUrl)));
     _controller = newCtrl;
     newCtrl.addListener(_onVideoTick);
 
@@ -2240,7 +2326,7 @@ class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
     }
 
     final position = ctrl.value.position;
-    final duration = ctrl.value.duration;
+    final duration = _resolveEffectiveDuration(ctrl.value.duration, widget.expectedDuration);
     final progress = duration.inMilliseconds > 0
         ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
