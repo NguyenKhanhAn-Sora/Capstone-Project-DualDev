@@ -8,6 +8,7 @@ class MessagesMediaService {
   MessagesMediaService._();
   static bool _boostStatusLoaded = false;
   static bool _boostActive = false;
+  static int _maxUploadBytes = 100 * 1024 * 1024;
 
   static const _messagesUploadHeader = {
     'x-cordigram-upload-context': 'messages',
@@ -78,6 +79,22 @@ class MessagesMediaService {
     _boostStatusLoaded = true;
     final status = await MessagesBoostService.fetchStatus();
     _boostActive = status.isUnlocked;
+    if (status.maxUploadBytes != null && status.maxUploadBytes! > 0) {
+      _maxUploadBytes = status.maxUploadBytes!;
+    } else {
+      _maxUploadBytes = 100 * 1024 * 1024;
+    }
+  }
+
+  static void applyBoostEntitlement({
+    required bool active,
+    int? maxUploadBytes,
+  }) {
+    _boostStatusLoaded = true;
+    _boostActive = active;
+    if (maxUploadBytes != null && maxUploadBytes > 0) {
+      _maxUploadBytes = maxUploadBytes;
+    }
   }
 
   /// Chat thumbnail — WebP/JPEG auto format, capped width (never use video transforms).
@@ -136,6 +153,17 @@ class MessagesMediaService {
     return url;
   }
 
-  /// Max size aligned with web UX (25MB).
-  static int get maxUploadBytes => 25 * 1024 * 1024;
+  /// Max upload size from Boost tier (100MB free / 300MB basic / 600MB boost).
+  static int get maxUploadBytes => _maxUploadBytes;
+
+  static String formatUploadLimitError() {
+    final mb = (maxUploadBytes / (1024 * 1024)).round();
+    if (mb <= 100) {
+      return 'File vượt quá giới hạn 100MB. Nâng cấp Boost để tải lên tối đa 300MB hoặc 600MB.';
+    }
+    if (mb <= 300) {
+      return 'File vượt quá giới hạn 300MB (Boost cơ bản). Nâng cấp lên gói Boost để tải lên tối đa 600MB.';
+    }
+    return 'File vượt quá giới hạn 600MB cho phép.';
+  }
 }

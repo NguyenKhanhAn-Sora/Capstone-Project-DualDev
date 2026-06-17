@@ -243,6 +243,8 @@ class DirectMessagesService {
     int? voiceDuration,
     List<String>? attachments,
     String? giphyId,
+    String? customStickerUrl,
+    String? serverStickerId,
     String? replyTo,
   }) async {
     final res = await ApiService.post(
@@ -256,6 +258,10 @@ class DirectMessagesService {
         if (attachments != null && attachments.isNotEmpty)
           'attachments': attachments,
         if (giphyId != null && giphyId.isNotEmpty) 'giphyId': giphyId,
+        if (customStickerUrl != null && customStickerUrl.isNotEmpty)
+          'customStickerUrl': customStickerUrl,
+        if (serverStickerId != null && serverStickerId.isNotEmpty)
+          'serverStickerId': serverStickerId,
         if (replyTo != null && replyTo.isNotEmpty) 'replyTo': replyTo,
       },
     );
@@ -356,27 +362,36 @@ class DirectMessagesService {
   }
 
   static Future<Map<String, dynamic>> updateUserSettings({
+    String? theme,
+    String? language,
     String? dmListFrom,
     String? dmCallFrom,
     bool? sharePresence,
     bool? chatSoundEnabled,
+    bool? chatDesktopNotificationsEnabled,
     bool? showCordigramMemberSince,
     String? appearancePreset,
     String? appearanceBackground,
+    bool? appearanceSync,
   }) async {
     return ApiService.patch(
       '/users/settings',
       extraHeaders: _authHeaders,
       body: {
+        if (theme != null) 'theme': theme,
+        if (language != null) 'language': language,
         if (dmListFrom != null) 'dmListFrom': dmListFrom,
         if (dmCallFrom != null) 'dmCallFrom': dmCallFrom,
         if (sharePresence != null) 'sharePresence': sharePresence,
         if (chatSoundEnabled != null) 'chatSoundEnabled': chatSoundEnabled,
+        if (chatDesktopNotificationsEnabled != null)
+          'chatDesktopNotificationsEnabled': chatDesktopNotificationsEnabled,
         if (showCordigramMemberSince != null)
           'showCordigramMemberSince': showCordigramMemberSince,
         if (appearancePreset != null) 'appearancePreset': appearancePreset,
         if (appearanceBackground != null)
           'appearanceBackground': appearanceBackground,
+        if (appearanceSync != null) 'appearanceSync': appearanceSync,
       },
     );
   }

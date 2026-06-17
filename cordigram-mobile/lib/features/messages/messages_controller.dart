@@ -18,6 +18,7 @@ import 'utils/dm_call_message_utils.dart';
 import 'utils/dm_sidebar_prefs.dart';
 import 'utils/messages_i18n.dart';
 import '../../core/services/language_controller.dart';
+import '../../core/services/user_notifier.dart';
 
 class MessagesController extends ChangeNotifier {
   final List<MessageThread> _threads = [];
@@ -41,6 +42,7 @@ class MessagesController extends ChangeNotifier {
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
   StreamSubscription<Map<String, dynamic>>? _messagesReadSub;
   StreamSubscription<DmProfileStyleUpdatedEvent>? _profileStyleSub;
+  StreamSubscription<Map<String, dynamic>>? _userSettingsSub;
   StreamSubscription<Map<String, dynamic>>? _channelInboxSub;
   StreamSubscription<Map<String, dynamic>>? _inboxForYouSub;
   Timer? _inboxPollTimer;
@@ -143,6 +145,10 @@ class MessagesController extends ChangeNotifier {
         DirectMessagesRealtimeService.profileStyleUpdated.listen(
       _onProfileStyleUpdated,
     );
+    _userSettingsSub =
+        DirectMessagesRealtimeService.userSettingsUpdated.listen((_) {
+      unawaited(refreshChatSettings());
+    });
     _startInboxPolling();
     _languageCode = LanguageController.instance.language;
     LanguageController.instance.addListener(_onLanguageChanged);
@@ -248,6 +254,7 @@ class MessagesController extends ChangeNotifier {
     await _deletedSub?.cancel();
     await _messagesReadSub?.cancel();
     await _profileStyleSub?.cancel();
+    await _userSettingsSub?.cancel();
     await _channelInboxSub?.cancel();
     await _inboxForYouSub?.cancel();
     _inboxPollTimer?.cancel();
@@ -443,6 +450,31 @@ class MessagesController extends ChangeNotifier {
     return sent;
   }
 
+  Future<DmMessage?> sendServerStickerMessage({
+    required String peerUserId,
+    required String stickerName,
+    required String imageUrl,
+    required String serverStickerId,
+    String? replyTo,
+  }) async {
+    final token = stickerName.trim().isEmpty
+        ? ':sticker:'
+        : ':${stickerName.trim()}:';
+    final sent = await DirectMessagesService.sendMessage(
+      peerUserId,
+      content: token,
+      type: 'sticker',
+      customStickerUrl: imageUrl,
+      serverStickerId: serverStickerId,
+      replyTo: replyTo,
+    );
+    if (sent != null) {
+      prependMessageToCache(peerUserId, sent);
+      MessageNotificationSound.play();
+    }
+    return sent;
+  }
+
   Future<DmMessage?> sendGiphyMessage({
     required String peerUserId,
     required String giphyId,
@@ -514,6 +546,34 @@ class MessagesController extends ChangeNotifier {
     final isVideo =
         mimeType.startsWith('video/') || rt == 'video' || rt.contains('video');
     final content = isVideo ? '🎬 [Video]: $url' : '📷 [Image]: $url';
+    final sent = await DirectMessagesService.sendMessage(
+      peerUserId,
+      content: content,
+      attachments: [url],
+      replyTo: replyTo,
+    );
+    if (sent != null) {
+      prependMessageToCache(peerUserId, sent);
+      MessageNotificationSound.play();
+    }
+    return sent;
+  }
+
+  Future<DmMessage?> sendUploadedFile({
+    required String peerUserId,
+    required String filePath,
+    required String mimeType,
+    required String fileName,
+    String? replyTo,
+  }) async {
+    final upload = await MessagesMediaService.uploadFile(
+      filePath: filePath,
+      contentType: mimeType,
+    );
+    final url = MessagesMediaService.pickDisplayUrl(upload);
+    if (url.isEmpty) throw Exception('Upload failed');
+    final safeName = fileName.trim().isEmpty ? 'file' : fileName.trim();
+    final content = '📎 [File]: $safeName\n$url';
     final sent = await DirectMessagesService.sendMessage(
       peerUserId,
       content: content,
@@ -688,6 +748,7 @@ class MessagesController extends ChangeNotifier {
       }
       if (event.avatarUrl != null) {
         _myAvatarUrl = event.avatarUrl;
+        UserNotifier.avatarUrl.value = event.avatarUrl;
       }
       _myDisplayNameStyle = _myDisplayNameStyle.copyWith(
         fontId: event.displayNameFontId,

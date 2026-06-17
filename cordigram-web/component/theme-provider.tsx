@@ -472,8 +472,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const onRefresh = () => {
       void load();
     };
+    const onUserSettings = (e: Event) => {
+      const detail = (e as CustomEvent<Record<string, unknown>>).detail;
+      if (!detail || typeof detail !== "object") return;
+      void load();
+    };
     if (typeof window !== "undefined") {
       window.addEventListener("cordigram-chat-settings", onRefresh);
+      window.addEventListener("cordigram-user-settings-updated", onUserSettings as any);
     }
     return () => {
       cancelled = true;
@@ -482,6 +488,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
       if (typeof window !== "undefined") {
         window.removeEventListener("cordigram-chat-settings", onRefresh);
+        window.removeEventListener("cordigram-user-settings-updated", onUserSettings as any);
       }
     };
   }, [appearanceSync]);

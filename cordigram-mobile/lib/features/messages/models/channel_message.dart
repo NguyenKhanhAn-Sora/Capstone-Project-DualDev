@@ -23,6 +23,8 @@ class ChannelMessage {
     this.stickerReplyWelcomeEnabled = true,
     this.welcomeWaveDismissedByMe = false,
     this.linkPreviews = const [],
+    this.isDeletedForEveryone = false,
+    this.deletedAt,
   });
 
   final String id;
@@ -52,6 +54,9 @@ class ChannelMessage {
   /// Pre-fetched link previews (fetched server-side on message send).
   final List<DmLinkPreview> linkPreviews;
 
+  final bool isDeletedForEveryone;
+  final DateTime? deletedAt;
+
   ChannelMessage copyWith({
     String? id,
     String? channelId,
@@ -73,6 +78,8 @@ class ChannelMessage {
     bool? stickerReplyWelcomeEnabled,
     bool? welcomeWaveDismissedByMe,
     List<DmLinkPreview>? linkPreviews,
+    bool? isDeletedForEveryone,
+    DateTime? deletedAt,
   }) {
     return ChannelMessage(
       id: id ?? this.id,
@@ -97,7 +104,18 @@ class ChannelMessage {
       welcomeWaveDismissedByMe:
           welcomeWaveDismissedByMe ?? this.welcomeWaveDismissedByMe,
       linkPreviews: linkPreviews ?? this.linkPreviews,
+      isDeletedForEveryone:
+          isDeletedForEveryone ?? this.isDeletedForEveryone,
+      deletedAt: deletedAt ?? this.deletedAt,
     );
+  }
+
+  static String _pickUserId(dynamic value) {
+    if (value is Map) {
+      final id = value['_id'] ?? value['id'] ?? value['userId'];
+      return id?.toString() ?? '';
+    }
+    return value?.toString() ?? '';
   }
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
@@ -106,13 +124,14 @@ class ChannelMessage {
         ? Map<String, dynamic>.from(senderRaw)
         : const <String, dynamic>{};
     final reactionsRaw = json['reactions'];
+    final senderUserId = _pickUserId(senderRaw);
     return ChannelMessage(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       channelId: (json['channelId'] is Map
               ? (json['channelId'] as Map)['_id']
               : json['channelId'])?.toString() ??
           '',
-      senderId: (sender['_id'] ?? json['senderId'] ?? '').toString(),
+      senderId: senderUserId,
       senderName: (sender['displayName'] ?? sender['username'] ?? '')
           .toString(),
       senderAvatarUrl: (() {
@@ -169,6 +188,9 @@ class ChannelMessage {
             .map((e) => DmLinkPreview.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       }(),
+      isDeletedForEveryone: json['isDeleted'] == true,
+      deletedAt: DateTime.tryParse((json['deletedAt'] ?? '').toString())
+          ?.toLocal(),
     );
   }
 }

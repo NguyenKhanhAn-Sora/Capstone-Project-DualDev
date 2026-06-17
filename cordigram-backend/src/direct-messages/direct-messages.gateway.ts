@@ -1018,6 +1018,9 @@ export class DirectMessagesGateway
         'call-incoming',
         incomingPayload,
       );
+      this.emitToAllUserSockets(data.receiverId, 'call-sessions-sync', {
+        sessions: await this.dmCallSessions.getSessionsForUser(data.receiverId),
+      });
       // Always FCM as well: mobile may be foreground without DM socket while a
       // web tab still holds an online socket for this user.
       void this.fcmPushService.pushDmCallIncoming({

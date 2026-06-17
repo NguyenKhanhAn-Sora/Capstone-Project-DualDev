@@ -94,6 +94,31 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
 
   void _onServerRealtimeEvent(Map<String, dynamic> payload) {
     final event = (payload['event'] ?? '').toString();
+    if (event == 'server-deleted') {
+      final sid = (payload['serverId'] ?? '').toString();
+      if (sid.isEmpty) return;
+      final session = VoiceChannelSessionController.instance;
+      if (session.active && session.serverId == sid) {
+        unawaited(session.leave());
+      }
+      _scheduleServerListRefresh();
+      final name = (payload['serverName'] ?? '').toString().trim();
+      final label = name.isNotEmpty ? name : 'Server';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              LanguageController.instance.t(
+                'chat.popups.inbox.serverDeletedToast',
+                {'server': label},
+              ),
+            ),
+          ),
+        );
+        unawaited(_messagesController.refreshInboxCount());
+      }
+      return;
+    }
     if (event != 'server-updated' && event != 'server-membership-updated') {
       return;
     }
@@ -331,11 +356,11 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       ),
     );
     if (!mounted) return;
-    if (hubResult == 'deleted' ||
-        hubResult == 'left' ||
+    await _serverListController.loadServers();
+    if (hubResult == 'left' ||
         hubResult == 'join_rejected' ||
         hubResult == 'apply_withdrawn') {
-      unawaited(_serverListController.loadServers());
+      // list already refreshed above
     }
   }
 

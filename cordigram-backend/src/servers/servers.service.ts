@@ -3903,7 +3903,7 @@ export class ServersService {
     const ageMinutes = Math.floor(ageMs / (60 * 1000));
 
     /** Đồng bộ với UI Truy cập / kích hoạt cộng đồng (Khám Phá). */
-    const minMembers = 1000;
+    const minMembers = 3;
     const minDiscoveryAgeWeeks = 8;
     const minDiscoveryAgeMs = minDiscoveryAgeWeeks * 7 * 24 * 60 * 60 * 1000;
     const minMembersToEvaluate = 2;
@@ -3973,6 +3973,7 @@ export class ServersService {
         'communitySettings.enabled': true,
         communityDiscoveryStatus: 'approved',
         isActive: true,
+        memberCount: { $gte: 3 },
       })
       .select(
         'name description avatarUrl bannerUrl bannerImageUrl bannerColor memberCount accessMode isPublic',

@@ -123,7 +123,8 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
     if (ok != true || !mounted) return;
     try {
       await ServersService.deleteServer(_server.id);
-      if (mounted) Navigator.of(context).pop('deleted');
+      if (!mounted) return;
+      await exitMessagesAfterServerDeleted(_server.id);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -217,13 +218,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
     final canBan = widget.permissions.canBan || widget.isOwner;
 
     return MessagesChromeBuilder(
-      builder: (context, chrome) => PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        Navigator.of(context).pop(_server);
-      },
-      child: Scaffold(
+      builder: (context, chrome) => Scaffold(
       backgroundColor: chrome.bg,
       appBar: AppBar(
         backgroundColor: chrome.bg,
@@ -394,7 +389,6 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
           ],
         ],
       ),
-    ),
     ),
     );
   }

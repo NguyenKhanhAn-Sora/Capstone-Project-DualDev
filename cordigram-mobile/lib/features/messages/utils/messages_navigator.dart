@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
 
 import '../messages_shell.dart';
+import '../services/voice_channel_session_controller.dart';
 
 /// Mở Messages từ Social (feed) — một scope chrome cho cả phiên Messages.
 Route<T> messagesEntryRoute<T>(Widget child) {
   return MaterialPageRoute<T>(builder: (_) => child);
+}
+
+/// Sau khi server bị xóa: rời voice (nếu đang trong server đó) và về Messages home.
+Future<void> exitMessagesAfterServerDeleted(String serverId) async {
+  final session = VoiceChannelSessionController.instance;
+  if (session.active && session.serverId == serverId) {
+    try {
+      await session.leave();
+    } catch (_) {}
+  }
+  final nav = MessagesShell.navigatorKey.currentState;
+  if (nav != null) {
+    nav.popUntil((route) => route.isFirst);
+  }
 }
 
 /// Push màn con trong Messages — phải gọi từ context bên trong [MessagesShell].

@@ -4,6 +4,9 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../core/config/app_config.dart';
 import '../../../core/services/auth_storage.dart';
+import '../../../core/services/language_controller.dart';
+import '../../../core/services/theme_controller.dart';
+import 'messages_media_service.dart';
 import '../models/dm_message.dart';
 import '../models/presence_state.dart';
 
@@ -190,6 +193,10 @@ class DirectMessagesRealtimeService {
   static final StreamController<DmProfileStyleUpdatedEvent>
   _profileStyleController =
       StreamController<DmProfileStyleUpdatedEvent>.broadcast();
+  static final StreamController<Map<String, dynamic>> _userSettingsController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _boostEntitlementController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   static Timer? _presencePingTimer;
   static final Set<String> _presencePeerIds = <String>{};
@@ -218,10 +225,22 @@ class DirectMessagesRealtimeService {
   static Stream<DmUserTypingEvent> get userTyping => _typingController.stream;
   static Stream<DmProfileStyleUpdatedEvent> get profileStyleUpdated =>
       _profileStyleController.stream;
+  static Stream<Map<String, dynamic>> get userSettingsUpdated =>
+      _userSettingsController.stream;
+  static Stream<Map<String, dynamic>> get boostEntitlementUpdated =>
+      _boostEntitlementController.stream;
 
   /// Local-only emit (e.g. after saving style in profile editor).
   static void emitLocalProfileStyleUpdated(DmProfileStyleUpdatedEvent event) {
     _profileStyleController.add(event);
+  }
+
+  static void _applyRemoteUserSettings(Map<String, dynamic> settings) {
+    final lang = (settings['language'] ?? '').toString().toLowerCase();
+    if (LanguageController.supported.contains(lang)) {
+      unawaited(LanguageController.instance.applyRemoteLanguage(lang));
+    }
+    unawaited(ThemeController.instance.applyFromServerSettings(settings));
   }
 
   static Future<void> connect() async {
@@ -450,6 +469,29 @@ class DirectMessagesRealtimeService {
       );
     });
 
+    socket.on('user-settings-updated', (payload) {
+      if (payload is! Map) return;
+      final settings = Map<String, dynamic>.from(payload);
+      _userSettingsController.add(settings);
+      _applyRemoteUserSettings(settings);
+    });
+
+    socket.on('boost-entitlement-updated', (payload) {
+      if (payload is! Map) return;
+      final data = Map<String, dynamic>.from(payload);
+      _boostEntitlementController.add(data);
+      final limits = data['limits'];
+      int? maxBytes;
+      if (limits is Map) {
+        final v = limits['maxUploadBytes'];
+        if (v is num && v > 0) maxBytes = v.toInt();
+      }
+      MessagesMediaService.applyBoostEntitlement(
+        active: data['active'] == true,
+        maxUploadBytes: maxBytes,
+      );
+    });
+
     socket.on('connect', (_) {
       _startPresenceHeartbeat();
       _resubscribePresence();
@@ -628,6 +670,8 @@ class DirectMessagesRealtimeService {
       socket.off('messages-read');
       socket.off('user-typing');
       socket.off('user-profile-style-updated');
+      socket.off('user-settings-updated');
+      socket.off('boost-entitlement-updated');
       socket.off('connect');
       socket.off('disconnect');
       socket.disconnect();

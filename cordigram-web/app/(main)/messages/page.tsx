@@ -47,7 +47,7 @@ import {
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
-import { DEFAULT_FREE_MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
+import { DEFAULT_FREE_MAX_UPLOAD_BYTES, formatUploadLimitExceededMessage } from "@/lib/upload-limits";
 import { shouldPlayChannelMessageNotificationSound } from "@/lib/channel-notification-sound";
 import { playMessageNotificationSound } from "@/lib/message-notification-sound";
 import {
@@ -2858,6 +2858,22 @@ export default function MessagesPage() {
     );
   }, []);
 
+  const resolvePeerForCall = useCallback((peerId: string) => {
+    const friend = friendsRef.current.find((f) => f._id === peerId);
+    if (friend) {
+      return {
+        displayName: friend.displayName || friend.username,
+        username: friend.username,
+        avatarUrl: friend.avatarUrl,
+      };
+    }
+    return {
+      displayName: peerId,
+      username: peerId,
+      avatarUrl: undefined as string | undefined,
+    };
+  }, []);
+
   const handleStartCall = useCallback(
     async (isVideo: boolean) => {
       if (!selectedDirectMessageFriend || !token || !currentUserProfile) {
@@ -3487,6 +3503,67 @@ export default function MessagesPage() {
       }
     }
 
+    // Hydrate caller UI when call was started on another device (e.g. mobile app).
+    let hydratedOutgoing: Record<string, OutgoingCallEntry> | null = null;
+    for (const session of sessions) {
+      if (session.role !== "caller") continue;
+      if (
+        session.state !== "ringing" &&
+        session.state !== "connecting" &&
+        session.state !== "connected" &&
+        session.state !== "reconnecting"
+      ) {
+        continue;
+      }
+      const peerId = session.peerId;
+      if (outgoingCallsByPeerRef.current[peerId]) continue;
+      if (openedCallTabPeersRef.current.has(peerId)) continue;
+      if (isCallTabActiveForPeer(peerId)) continue;
+      const peerInfo = resolvePeerForCall(peerId);
+      const entry: OutgoingCallEntry = {
+        to: peerId,
+        toUser: peerInfo,
+        type: session.type,
+        status:
+          session.state === "connected" || session.state === "connecting"
+            ? "answered"
+            : "calling",
+        roomName: session.roomId,
+        callId: session.callId,
+      };
+      hydratedOutgoing = {
+        ...(hydratedOutgoing ?? outgoingCallsByPeerRef.current),
+        [peerId]: entry,
+      };
+    }
+    if (hydratedOutgoing) {
+      outgoingCallsByPeerRef.current = hydratedOutgoing;
+      setOutgoingCallsByPeer(hydratedOutgoing);
+    }
+
+    // Backup incoming ring when call-incoming socket event was missed.
+    for (const session of sessions) {
+      if (session.role !== "callee" || session.state !== "ringing") continue;
+      const peerId = session.peerId;
+      if (openedCallTabPeersRef.current.has(peerId)) continue;
+      const peerInfo = resolvePeerForCall(peerId);
+      setIncomingCall((prev) => {
+        if (prev?.from === peerId) return prev;
+        return {
+          from: peerId,
+          type: session.type,
+          callerInfo: {
+            userId: peerId,
+            username: peerInfo.username,
+            displayName: peerInfo.displayName,
+            avatar: peerInfo.avatarUrl,
+          },
+          status: "incoming" as const,
+          callId: session.callId,
+        };
+      });
+    }
+
     for (const session of sessions) {
       if (session.role !== "caller") continue;
       if (session.state !== "connected" && session.state !== "connecting") {
@@ -3498,7 +3575,10 @@ export default function MessagesPage() {
         continue;
       }
       const out = outgoingCallsByPeerRef.current[peerId];
-      if (!out) continue;
+      if (!out) {
+        handlePeerAnsweredCall(peerId, session.roomId, session.callId);
+        continue;
+      }
       if (out.status === "calling") {
         handlePeerAnsweredCall(peerId, session.roomId, session.callId);
       }
@@ -3521,7 +3601,13 @@ export default function MessagesPage() {
       }
       return prev;
     });
-  }, [callSessionsSync, handlePeerAnsweredCall, dismissOutgoingCallPopup, isCallTabActiveForPeer]);
+  }, [
+    callSessionsSync,
+    handlePeerAnsweredCall,
+    dismissOutgoingCallPopup,
+    isCallTabActiveForPeer,
+    resolvePeerForCall,
+  ]);
 
   useEffect(() => {
     if (!callMediaTransferred?.peerId) return;
@@ -7054,9 +7140,7 @@ export default function MessagesPage() {
         const audioFile = new File([audioBlob], fileName, { type: mimeType });
 
         if (audioFile.size > maxUploadBytes) {
-          setError(
-            `File quá lớn. Tối đa ${(maxUploadBytes / 1024 / 1024).toFixed(0)}MB`,
-          );
+          setError(formatUploadLimitExceededMessage(maxUploadBytes));
           setIsUploadingVoice(false);
           return;
         }
@@ -7130,9 +7214,7 @@ export default function MessagesPage() {
       });
 
       if (audioFile.size > maxUploadBytes) {
-        setError(
-          `File quá lớn. Tối đa ${(maxUploadBytes / 1024 / 1024).toFixed(0)}MB`,
-        );
+        setError(formatUploadLimitExceededMessage(maxUploadBytes));
         setIsUploadingVoice(false);
         return;
       }
@@ -8533,9 +8615,7 @@ export default function MessagesPage() {
       try {
         const tooLarge = files.find((f) => f.size > maxUploadBytes);
         if (tooLarge) {
-          setError(
-            `File quá lớn. Tối đa ${(maxUploadBytes / 1024 / 1024).toFixed(0)}MB`,
-          );
+          setError(formatUploadLimitExceededMessage(maxUploadBytes));
           return;
         }
 
@@ -8605,12 +8685,20 @@ export default function MessagesPage() {
         // Group all images into a single combined message; videos stay separate.
         const imageResults: UploadMediaResponse[] = [];
         const videoResults: { media: UploadMediaResponse; loadingMsgId: string }[] = [];
+        const fileResults: { media: UploadMediaResponse; loadingMsgId: string; fileName: string }[] = [];
         for (let i = 0; i < uploadResults.length; i++) {
           const media = uploadResults[i];
+          const sourceFile = files[i];
           if (media.resourceType === "image") {
             imageResults.push(media);
-          } else {
+          } else if (media.resourceType === "video" || sourceFile.type.startsWith("video/")) {
             videoResults.push({ media, loadingMsgId: loadingMessages[i].id });
+          } else {
+            fileResults.push({
+              media,
+              loadingMsgId: loadingMessages[i].id,
+              fileName: sourceFile.name || "file",
+            });
           }
         }
 
@@ -8713,6 +8801,45 @@ export default function MessagesPage() {
             await serversApi.createMessage(selectedChannel, mediaMessage);
           }
         }
+
+        for (const { media, loadingMsgId, fileName } of fileResults) {
+          const fileMessage = `📎 [File]: ${fileName}\n${media.url}`;
+          const finalMessage: UIMessage = {
+            id: `temp-${Date.now()}-${loadingMsgId}`,
+            text: fileMessage,
+            senderId: currentUserId,
+            senderEmail: "",
+            senderDisplayName: selfMessagingIdentity.displayName || undefined,
+            senderName: selfMessagingIdentity.chatUsername || "",
+            senderAvatar: selfMessagingIdentity.avatar,
+            timestamp: new Date(),
+            isFromCurrentUser: true,
+            type: selectedDirectMessageFriend ? "direct" : "server",
+          };
+
+          if (selectedDirectMessageFriend) {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
+            );
+            setConversations((prev) => {
+              const newMap = new Map(prev);
+              const current = newMap.get(selectedDirectMessageFriend._id) || [];
+              newMap.set(
+                selectedDirectMessageFriend._id,
+                current.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
+              );
+              return newMap;
+            });
+            emitSendMessage(selectedDirectMessageFriend._id, fileMessage, [
+              media.url,
+            ]);
+          } else if (selectedChannel) {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
+            );
+            await serversApi.createMessage(selectedChannel, fileMessage);
+          }
+        }
       } catch (error: any) {
         console.error("❌ Failed to upload files:", error);
         setError(error?.message || "Không tải lên được tệp");
@@ -8736,7 +8863,7 @@ export default function MessagesPage() {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = "image/*,video/*";
+    input.accept = "*/*";
     input.onchange = async (e: any) => {
       const files: File[] = Array.from(e.target.files || []);
       await handleMediaFilesSelected(files);

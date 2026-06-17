@@ -2054,9 +2054,13 @@ class _HomeScreenState extends State<HomeScreen>
           iconSize: 27,
           count: _dmUnread,
           tooltip: LanguageController.instance.t('home.tooltip.messages'),
-          onTap: () => Navigator.of(
-            context,
-          ).push(messagesEntryRoute(const MessagesShell())),
+          onTap: () async {
+            await Navigator.of(
+              context,
+            ).push(messagesEntryRoute(const MessagesShell()));
+            if (!mounted) return;
+            _showTopNav();
+          },
         ),
         // Profile avatar
         GestureDetector(

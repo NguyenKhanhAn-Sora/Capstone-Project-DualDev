@@ -66,6 +66,12 @@ class LanguageController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Apply language pushed from another device — do not PATCH back to server.
+  Future<void> applyRemoteLanguage(String code) async {
+    if (!supported.contains(code) || code == _lang) return;
+    await _apply(code, saveToPrefs: true);
+  }
+
   Future<void> _apply(String code, {required bool saveToPrefs}) async {
     final raw = await rootBundle.loadString('assets/locales/$code.json');
     _dict = json.decode(raw) as Map<String, dynamic>;
