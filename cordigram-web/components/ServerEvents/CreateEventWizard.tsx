@@ -2,6 +2,7 @@
 
 import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./CreateEventWizard.module.css";
 import * as serversApi from "@/lib/servers-api";
 import type { Channel, EventFrequency, EventLocationType, ServerEvent } from "@/lib/servers-api";
@@ -221,6 +222,7 @@ export default function CreateEventWizard({
   onCreateSuccess,
   onOpenImageEditor,
 }: CreateEventWizardProps) {
+  const t = useTranslations("server");
   const [step, setStep] = useState(1);
   const [locationType, setLocationType] = useState<EventLocationType>("voice");
   const [channelId, setChannelId] = useState<string>("");
@@ -326,7 +328,7 @@ export default function CreateEventWizard({
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("event.close")}>
           ×
         </button>
 
@@ -452,7 +454,7 @@ export default function CreateEventWizard({
                 className={styles.input}
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="Chủ đề sự kiện của bạn là gì?"
+                placeholder={t("event.topicPlaceholder")}
               />
             </div>
             <div className={styles.formRow}>
@@ -506,7 +508,7 @@ export default function CreateEventWizard({
                 className={`${styles.input} ${styles.textarea}`}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Cho mọi người biết thêm một chút về sự kiện của bạn. Markdown, dòng mới và liên kết đều được hỗ trợ."
+                placeholder={t("event.descriptionPlaceholder")}
               />
             </div>
             <div className={`${styles.section} ${styles.coverSection}`}>
@@ -518,7 +520,7 @@ export default function CreateEventWizard({
                 Tải lên ảnh bìa
               </button>
               {coverImageUrl && (
-                <img src={coverImageUrl} alt="Bìa" className={styles.coverPreview} />
+                <img src={coverImageUrl} alt={t("event.coverAlt")} className={styles.coverPreview} />
               )}
             </div>
             <div className={styles.footer}>

@@ -1146,6 +1146,50 @@ export class DirectMessagesGateway
     await this.dmCallSessions.heartbeat(data.callId, userId);
   }
 
+  /** Claim LiveKit media on this socket/device without ending the call for the peer. */
+  @SubscribeMessage('call-media-claim')
+  async handleCallMediaClaim(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: { peerId: string },
+  ) {
+    const userId = socket.data.userId;
+    if (!userId || !data?.peerId) {
+      return { ok: false };
+    }
+
+    const session = await this.dmCallSessions.claimMedia({
+      userId,
+      peerId: data.peerId,
+      socketId: socket.id,
+    });
+    if (!session) {
+      return { ok: false };
+    }
+
+    this.emitToAllUserSockets(
+      userId,
+      'call-media-transferred',
+      {
+        peerId: data.peerId,
+        callId: session.callId,
+        roomId: session.roomId,
+        type: session.type,
+      },
+      socket.id,
+    );
+
+    this.emitToAllUserSockets(userId, 'call-sessions-sync', {
+      sessions: await this.dmCallSessions.getSessionsForUser(userId),
+    });
+
+    return {
+      ok: true,
+      callId: session.callId,
+      roomId: session.roomId,
+      type: session.type,
+    };
+  }
+
   @SubscribeMessage('ice-candidate')
   async handleIceCandidate(
     @ConnectedSocket() socket: Socket,

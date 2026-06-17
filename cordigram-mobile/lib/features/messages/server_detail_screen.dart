@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/services/language_controller.dart';
 import 'channel_chat_screen.dart';
 import 'create_server_event_screen.dart';
 import 'models/server_models.dart';
@@ -62,6 +63,9 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
 
   ServerSummary get _effectiveServer =>
       _serverOverride ?? widget.server;
+
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.t(key, vars);
 
   @override
   void initState() {
@@ -303,7 +307,11 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
 
   Future<void> _openInviteSheet() async {
     if (!_permissions.canCreateInvite) return;
-    await InviteToServerSheet.show(context, _effectiveServer);
+    await InviteToServerSheet.show(
+      context,
+      _effectiveServer,
+      canCreateInvite: _permissions.canCreateInvite,
+    );
   }
 
   Future<void> _openJoinApplications() async {
@@ -446,8 +454,8 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Server chưa có kênh chat để mở.'),
+      SnackBar(
+        content: Text(_t('server.noChatChannel')),
       ),
     );
   }

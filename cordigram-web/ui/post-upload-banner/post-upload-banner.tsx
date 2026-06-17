@@ -1,9 +1,11 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { usePostUpload } from "@/context/post-upload-context";
 import styles from "./post-upload-banner.module.css";
 
 export default function PostUploadBanner() {
+  const t = useTranslations("ui");
   const { upload, cancelUpload } = usePostUpload();
 
   if (!upload) return null;
@@ -55,7 +57,7 @@ export default function PostUploadBanner() {
             type="button"
             className={styles.cancelBtn}
             onClick={cancelUpload}
-            aria-label="Cancel upload"
+            aria-label={t("postUpload.cancelUpload")}
           >
             ✕
           </button>

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -30,15 +32,27 @@ Set<String> _memberUserIdsFromServerJson(Map<String, dynamic> server) {
 
 /// Mirrors cordigram-web `InviteToServerPopup`: copy link + mời bạn (follow/followers, trừ đã trong server).
 class InviteToServerSheet extends StatefulWidget {
-  const InviteToServerSheet({super.key, required this.server});
+  const InviteToServerSheet({
+    super.key,
+    required this.server,
+    this.canCreateInvite = true,
+  });
 
   final ServerSummary server;
+  final bool canCreateInvite;
 
-  static Future<void> show(BuildContext context, ServerSummary server) {
+  static Future<void> show(
+    BuildContext context,
+    ServerSummary server, {
+    bool canCreateInvite = true,
+  }) {
     return MessagesUi.showBottomSheet<void>(
       context,
       isScrollControlled: true,
-      child: InviteToServerSheet(server: server),
+      child: InviteToServerSheet(
+        server: server,
+        canCreateInvite: canCreateInvite,
+      ),
     );
   }
 
@@ -53,14 +67,23 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
   List<_InviteRow> _rows = const [];
   final Set<String> _invitedIds = {};
   String? _sendingId;
+  bool _inviteBlocked = false;
 
   String get _inviteLink =>
       '${AppConfig.webBaseUrl}/invite/server/${widget.server.id}';
+
+  String get _noPermissionMessage =>
+      _t('chat.inviteToServerSheet.noCreateInvitePermission');
+
+  bool get _canInvite => widget.canCreateInvite && !_inviteBlocked;
 
   @override
   void initState() {
     super.initState();
     _search.addListener(() => setState(() {}));
+    if (!widget.canCreateInvite) {
+      _error = _noPermissionMessage;
+    }
     _load();
   }
 
@@ -71,9 +94,11 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
   }
 
   Future<void> _load() async {
+    final permissionError =
+        !widget.canCreateInvite ? _noPermissionMessage : null;
     setState(() {
       _loading = true;
-      _error = null;
+      _error = permissionError;
     });
     try {
       final following =
@@ -124,6 +149,10 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
   }
 
   Future<void> _copyLink() async {
+    if (!_canInvite) {
+      setState(() => _error = _noPermissionMessage);
+      return;
+    }
     await Clipboard.setData(ClipboardData(text: _inviteLink));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -131,7 +160,36 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
     );
   }
 
+  String _resolveInviteError(Object e) {
+    var msg = e.toString().replaceFirst('ApiException: ', '').trim();
+    if (msg.startsWith('{')) {
+      try {
+        final parsed = Map<String, dynamic>.from(
+          jsonDecode(msg) as Map,
+        );
+        final raw = parsed['message'];
+        if (raw is String) {
+          msg = raw;
+        } else if (raw is List && raw.isNotEmpty) {
+          msg = raw.first.toString();
+        }
+      } catch (_) {}
+    }
+    if (msg.contains('quyền tạo lời mời') ||
+        msg.contains('permission to create invite') ||
+        msg.contains('create invite') ||
+        msg.contains('招待を作成') ||
+        msg.contains('创建邀请')) {
+      return _noPermissionMessage;
+    }
+    return msg;
+  }
+
   Future<void> _inviteFriend(_InviteRow row) async {
+    if (!_canInvite) {
+      setState(() => _error = _noPermissionMessage);
+      return;
+    }
     setState(() {
       _error = null;
       _sendingId = row.userId;
@@ -148,7 +206,13 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
       setState(() => _invitedIds.add(row.userId));
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      final friendly = _resolveInviteError(e);
+      setState(() {
+        _error = friendly;
+        if (friendly == _noPermissionMessage) {
+          _inviteBlocked = true;
+        }
+      });
     } finally {
       if (mounted) setState(() => _sendingId = null);
     }
@@ -226,22 +290,23 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: OutlinedButton.icon(
-                      onPressed: _copyLink,
-                      icon: Icon(Icons.link_rounded, color: chrome.accent),
-                      label: Text(
-                        _t('chat.inviteToServerSheet.copyInviteLink'),
-                        style: TextStyle(color: chrome.text),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: chrome.text,
-                        side: BorderSide(color: chrome.border),
-                        minimumSize: const Size.fromHeight(44),
+                  if (_canInvite)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: OutlinedButton.icon(
+                        onPressed: _copyLink,
+                        icon: Icon(Icons.link_rounded, color: chrome.accent),
+                        label: Text(
+                          _t('chat.inviteToServerSheet.copyInviteLink'),
+                          style: TextStyle(color: chrome.text),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: chrome.text,
+                          side: BorderSide(color: chrome.border),
+                          minimumSize: const Size.fromHeight(44),
+                        ),
                       ),
                     ),
-                  ),
                   if (_error != null) ...[
                     const SizedBox(height: 8),
                     Padding(
@@ -329,7 +394,9 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
                                   style: TextStyle(color: chrome.textMuted),
                                 ),
                                 trailing: TextButton(
-                                  onPressed: invited || sending
+                                  onPressed: !_canInvite ||
+                                          invited ||
+                                          sending
                                       ? null
                                       : () => _inviteFriend(row),
                                   child: sending

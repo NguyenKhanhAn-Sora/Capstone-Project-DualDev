@@ -193,7 +193,7 @@ export default function ForgotPasswordPage() {
               className={styles["overlay-input"]}
               style={{ width: "100%" }}
               type="email"
-              placeholder="Your email address"
+              placeholder={t("auth.forgotPassword.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
@@ -261,7 +261,7 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
                 autoFocus
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "text" }}
-                aria-label="Enter OTP code"
+                aria-label={t("auth.forgotPassword.otpAriaLabel")}
               />
             </div>
 
@@ -305,7 +305,7 @@ export default function ForgotPasswordPage() {
                   className={`${styles["overlay-input"]} ${styles.passwordInput}${newPasswordBlurred && !allRulesMet ? ` ${styles.inputError}` : ""}`}
                   style={{ width: "100%" }}
                   type={showNewPassword ? "text" : "password"}
-                  placeholder="New password"
+                  placeholder={t("auth.forgotPassword.newPasswordPlaceholder")}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   onBlur={() => { if (newPassword) setNewPasswordBlurred(true); }}
@@ -339,7 +339,7 @@ export default function ForgotPasswordPage() {
                 className={`${styles["overlay-input"]} ${styles.passwordInput}`}
                 style={{ width: "100%" }}
                 type={showConfirmPassword ? "text" : "password"}
-                placeholder="Confirm new password"
+                placeholder={t("auth.forgotPassword.confirmPasswordPlaceholder")}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"

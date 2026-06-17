@@ -2,6 +2,7 @@
 
 import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useState, useRef, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./VoiceRecorder.module.css";
 
 interface VoiceRecorderProps {
@@ -13,6 +14,7 @@ export default function VoiceRecorder({
   onRecordComplete,
   onCancel,
 }: VoiceRecorderProps) {
+  const t = useTranslations("voice");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -161,7 +163,7 @@ export default function VoiceRecorder({
           type="button"
           className={styles.cancelButton}
           onClick={handleCancel}
-          title="Cancel"
+          title={t("cancel")}
         >
           <svg
             width="24"
@@ -223,7 +225,7 @@ export default function VoiceRecorder({
           className={styles.sendButton}
           onClick={handleSend}
           disabled={recordingTime < 1000}
-          title="Send"
+          title={t("send")}
         >
           <svg
             width="20"

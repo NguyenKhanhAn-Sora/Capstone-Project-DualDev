@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import type { JamendoTrack, StoryMusic } from "@/lib/api";
 import styles from "./music-picker.module.css";
 
@@ -85,6 +86,7 @@ type Props = {
 };
 
 export default function MusicPicker({ token, selected, onSelect, onClose }: Props) {
+  const t = useTranslations("ui");
   const [tab, setTab] = useState<"trending" | "search">("trending");
   const [query, setQuery] = useState("");
   const [tracks, setTracks] = useState<JamendoTrack[]>([]);
@@ -186,7 +188,7 @@ export default function MusicPicker({ token, selected, onSelect, onClose }: Prop
           <span className={styles.searchIcon}><IconSearch /></span>
           <input
             className={styles.searchInput}
-            placeholder="Tìm kiếm nhạc..."
+            placeholder={t("musicPicker.searchPlaceholder")}
             value={query}
             onChange={handleSearch}
             onFocus={() => setTab("search")}

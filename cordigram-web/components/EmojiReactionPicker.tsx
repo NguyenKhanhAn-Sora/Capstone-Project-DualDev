@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./EmojiReactionPicker.module.css";
 
 // Main 6 emotions
@@ -57,6 +58,7 @@ export default function EmojiReactionPicker({
   onClose,
   position,
 }: EmojiReactionPickerProps) {
+  const t = useTranslations("ui");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] =
     useState<EmojiCategoryKey | null>(null);
@@ -110,7 +112,7 @@ export default function EmojiReactionPicker({
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Tìm kiếm biểu tượng cảm xúc"
+            placeholder={t("emojiPicker.searchPlaceholder")}
             className={styles.searchInput}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

@@ -12,7 +12,7 @@ import {
   DM_CALL_INCOMING_EVENT,
   type DmCallIncomingDetail,
 } from "@/lib/dm-call-session-sync";
-import { isInActiveDmCall } from "@/lib/dm-call-active-peers";
+import { getActiveDmCallPeerIds } from "@/lib/dm-call-active-peers";
 import { getDMRoomName } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 
@@ -123,8 +123,15 @@ export default function GlobalDmIncomingCalls() {
       ) {
         return;
       }
-      if (isInActiveDmCall()) {
+      const activePeers = getActiveDmCallPeerIds();
+      if (
+        activePeers.length > 0 &&
+        !activePeers.includes(String(ev.from))
+      ) {
         rejectCall(ev.from);
+        return;
+      }
+      if (activePeers.includes(String(ev.from))) {
         return;
       }
       setIncomingCall({
@@ -147,8 +154,15 @@ export default function GlobalDmIncomingCalls() {
       ) {
         return;
       }
-      if (isInActiveDmCall()) {
+      const activePeers = getActiveDmCallPeerIds();
+      if (
+        activePeers.length > 0 &&
+        !activePeers.includes(String(detail.from))
+      ) {
         rejectCall(detail.from);
+        return;
+      }
+      if (activePeers.includes(String(detail.from))) {
         return;
       }
       setIncomingCall({

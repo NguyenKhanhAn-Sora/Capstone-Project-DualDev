@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { createPortal } from "react-dom";
 import styles from "./comment-likes-overlay.module.css";
 import {
@@ -51,6 +52,7 @@ function toProfileHref(item: { userId: string; username?: string }) {
 }
 
 export default function CommentLikesOverlay(props: Props) {
+  const t = useTranslations("ui");
   const { open, closing, postId, commentId, viewerId, onClose } = props;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -252,10 +254,10 @@ export default function CommentLikesOverlay(props: Props) {
           <input
             className={styles.searchInput}
             type="search"
-            placeholder="Search username"
+            placeholder={t("commentLikes.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search username"
+            aria-label={t("commentLikes.searchAria")}
           />
         </div>
 

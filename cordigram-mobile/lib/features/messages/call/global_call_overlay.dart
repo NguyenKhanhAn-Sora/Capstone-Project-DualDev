@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
+import '../../../core/services/language_controller.dart';
 import 'dm_call_manager.dart';
 import '../services/voice_channel_session_controller.dart';
 import '../voice_channel_room_screen.dart';
@@ -251,11 +252,11 @@ Future<void> _acceptIncomingDmCall(DmCallManager mgr) async {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Từ chối'),
+            child: Text(LanguageController.instance.t('messages.call.reject')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Rời kênh và nhận'),
+            child: Text(LanguageController.instance.t('messages.call.leaveAndAccept')),
           ),
         ],
       );
@@ -308,24 +309,102 @@ const double _kMinimizedCallTotalHeight =
 /// Small floating chip when the user tucks the mini call UI into a corner.
 const double _kDockedChipSize = 56;
 
-/// Vertical voice-channel PiP: narrow strip + scrollable participant list.
-const double _kVoicePipWidth = 142;
+const double _kVoiceMeetPipWidth = 288;
+const double _kVoiceMeetMainH = 132;
+const double _kVoiceMeetFilmstripH = 54;
 const double _kVoicePipHeaderH = 32;
 const double _kVoicePipFooterH = 38;
 
-VideoTrack? _voicePipPickVideo(Participant p) {
-  VideoTrack? camera;
-  VideoTrack? screen;
+VideoTrack? _voicePipPickScreen(Participant p) {
   for (final pub in p.videoTrackPublications) {
     final track = pub.track;
     if (track is! VideoTrack || pub.muted) continue;
-    if (pub.source == TrackSource.screenShareVideo) {
-      screen = track;
-    } else if (pub.source == TrackSource.camera) {
-      camera = track;
-    }
+    if (pub.source == TrackSource.screenShareVideo) return track;
   }
-  return screen ?? camera;
+  return null;
+}
+
+VideoTrack? _voicePipPickCamera(Participant p) {
+  for (final pub in p.videoTrackPublications) {
+    final track = pub.track;
+    if (track is! VideoTrack || pub.muted) continue;
+    if (pub.source == TrackSource.camera) return track;
+  }
+  return null;
+}
+
+class _VoiceMeetPipLayout {
+  const _VoiceMeetPipLayout({
+    required this.mainTrack,
+    required this.mainIsScreenShare,
+    required this.mainParticipant,
+    required this.filmstripParticipants,
+  });
+
+  final VideoTrack? mainTrack;
+  final bool mainIsScreenShare;
+  final Participant? mainParticipant;
+  final List<Participant> filmstripParticipants;
+
+  static _VoiceMeetPipLayout fromParticipants(List<Participant> raw) {
+    final participants = _voicePipSortedParticipants(raw);
+    if (participants.isEmpty) {
+      return const _VoiceMeetPipLayout(
+        mainTrack: null,
+        mainIsScreenShare: false,
+        mainParticipant: null,
+        filmstripParticipants: [],
+      );
+    }
+
+    for (final p in participants) {
+      final screen = _voicePipPickScreen(p);
+      if (screen != null) {
+        return _VoiceMeetPipLayout(
+          mainTrack: screen,
+          mainIsScreenShare: true,
+          mainParticipant: p,
+          filmstripParticipants: participants,
+        );
+      }
+    }
+
+    if (participants.length > 1) {
+      Participant? spotlight;
+      VideoTrack? spotlightCam;
+      for (final p in participants) {
+        if (!p.isSpeaking) continue;
+        final cam = _voicePipPickCamera(p);
+        if (cam != null) {
+          spotlight = p;
+          spotlightCam = cam;
+          break;
+        }
+      }
+      spotlight ??= participants.firstWhere(
+        (p) => _voicePipPickCamera(p) != null,
+        orElse: () => participants.first,
+      );
+      spotlightCam ??= _voicePipPickCamera(spotlight);
+      final strip = participants.where((p) => p != spotlight).toList();
+      return _VoiceMeetPipLayout(
+        mainTrack: spotlightCam,
+        mainIsScreenShare: false,
+        mainParticipant: spotlight,
+        filmstripParticipants: strip,
+      );
+    }
+
+    final only = participants.first;
+    final screen = _voicePipPickScreen(only);
+    final camera = _voicePipPickCamera(only);
+    return _VoiceMeetPipLayout(
+      mainTrack: screen ?? camera,
+      mainIsScreenShare: screen != null,
+      mainParticipant: only,
+      filmstripParticipants: const [],
+    );
+  }
 }
 
 List<Participant> _voicePipSortedParticipants(List<Participant> raw) {
@@ -338,94 +417,67 @@ List<Participant> _voicePipSortedParticipants(List<Participant> raw) {
   return copy;
 }
 
-/// Voice PiP lives in [MaterialApp.builder]'s [Stack], where the default
-/// texture [VideoTrackRenderer] can show Android's red "No overlay /
-/// RawTexture" debug strip. Platform views avoid that path.
-Widget _voiceChannelPipVideoTrack(VideoTrack track) {
+/// PiP video renderer — platform views avoid Android texture debug strip in overlays.
+Widget _pipVideoTrack(
+  VideoTrack track, {
+  VideoViewFit fit = VideoViewFit.cover,
+}) {
   final usePlatformView = !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
   return VideoTrackRenderer(
     track,
-    fit: VideoViewFit.cover,
+    fit: fit,
     renderMode:
         usePlatformView ? VideoRenderMode.platformView : VideoRenderMode.texture,
     autoCenter: false,
   );
 }
 
-class _VoicePipParticipantRow extends StatelessWidget {
-  const _VoicePipParticipantRow({required this.participant});
+class _VoiceMeetFilmstripTile extends StatelessWidget {
+  const _VoiceMeetFilmstripTile({required this.participant});
 
   final Participant participant;
 
   @override
   Widget build(BuildContext context) {
-    final participantName = participant.name.trim();
     final name =
-        participantName.isNotEmpty ? participantName : participant.identity;
-    final displayName =
-        participant is LocalParticipant ? '$name (Bạn)' : name;
+        participant.name.trim().isNotEmpty ? participant.name.trim() : participant.identity;
     final initial =
         name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
-    final videoTrack = _voicePipPickVideo(participant);
+    final camera = _voicePipPickCamera(participant);
     final speaking = participant.isSpeaking;
 
-    return SizedBox(
-      height: 56,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: videoTrack != null
-                  ? _voiceChannelPipVideoTrack(videoTrack)
-                  : ColoredBox(
-                      color: const Color(0xFF1B2A4A),
-                      child: Center(
-                        child: Text(
-                          initial,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+    return Container(
+      width: 48,
+      margin: const EdgeInsets.only(right: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: speaking
+              ? const Color(0xFF00C48C)
+              : Colors.white.withValues(alpha: 0.12),
+          width: speaking ? 2 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: camera != null
+            ? _pipVideoTrack(camera)
+            : ColoredBox(
+                color: const Color(0xFF1B2A4A),
+                child: Center(
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
                     ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFE8F5E0),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Icon(
-                  speaking ? Icons.graphic_eq_rounded : Icons.hearing_rounded,
-                  size: 13,
-                  color: speaking
-                      ? const Color(0xFF00C48C)
-                      : const Color(0xFF8EA3CC),
-                ),
-              ],
-            ),
-          ),
-        ],
+              ),
       ),
     );
   }
@@ -617,24 +669,15 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
     final media = MediaQuery.sizeOf(context);
     final pad = MediaQuery.paddingOf(context);
     final offset = widget.offset;
-    final maxCardH = (media.height * 0.52 - pad.vertical).clamp(220.0, 480.0);
-    final minCardH = 200.0;
-    const rowH = 56.0;
-    const sep = 5.0;
-    const listPadV = 10.0;
-    final pipList = _voicePipSortedParticipants(v.participants);
-    final listContentH = pipList.isEmpty
-        ? 72.0
-        : pipList.length * rowH +
-            (pipList.length - 1) * sep +
-            listPadV * 2;
-    final cardH =
-        (_kVoicePipHeaderH + listContentH + _kVoicePipFooterH)
-            .clamp(minCardH, maxCardH);
+    final layout = _VoiceMeetPipLayout.fromParticipants(v.participants);
+    final hasFilmstrip = layout.filmstripParticipants.isNotEmpty;
+    final bodyH = _kVoiceMeetMainH + (hasFilmstrip ? _kVoiceMeetFilmstripH + 8 : 0);
+    final cardH = (_kVoicePipHeaderH + bodyH + _kVoicePipFooterH)
+        .clamp(200.0, (media.height * 0.52 - pad.vertical).clamp(220.0, 480.0));
 
     final nextX = offset.dx.clamp(
       8.0,
-      (media.width - _kVoicePipWidth - 8).clamp(8.0, double.infinity),
+      (media.width - _kVoiceMeetPipWidth - 8).clamp(8.0, double.infinity),
     );
     final nextY = offset.dy.clamp(
       8.0 + pad.top,
@@ -647,6 +690,11 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
         : 'Kênh thoại';
     final subtitle = (v.serverName ?? '').trim();
     final micOn = v.micEnabled;
+    final mainName = layout.mainParticipant != null
+        ? (layout.mainParticipant!.name.trim().isNotEmpty
+            ? layout.mainParticipant!.name.trim()
+            : layout.mainParticipant!.identity)
+        : '';
 
     return Positioned(
       left: nextX,
@@ -657,7 +705,7 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
           final o = widget.session.voicePipOffset;
           final nx = (o.dx + e.delta.dx).clamp(
             8.0,
-            (media.width - _kVoicePipWidth - 8).clamp(8.0, double.infinity),
+            (media.width - _kVoiceMeetPipWidth - 8).clamp(8.0, double.infinity),
           );
           final ny = (o.dy + e.delta.dy).clamp(
             8.0 + pad.top,
@@ -676,7 +724,7 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
             borderRadius: BorderRadius.circular(22),
             clipBehavior: Clip.antiAlias,
             child: SizedBox(
-              width: _kVoicePipWidth,
+              width: _kVoiceMeetPipWidth,
               height: cardH,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -753,47 +801,89 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: widget.onRestore,
-                      child: ColoredBox(
-                        color: const Color(0xFF0C1528),
-                        child: pipList.isEmpty
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Text(
-                                    subtitle.isNotEmpty
-                                        ? subtitle
-                                        : 'Đang chờ…',
-                                    textAlign: TextAlign.center,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFF8EA3CC),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: widget.onRestore,
+                    child: ColoredBox(
+                      color: const Color(0xFF0C1528),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                            height: _kVoiceMeetMainH,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                if (layout.mainTrack != null)
+                                  _pipVideoTrack(
+                                    layout.mainTrack!,
+                                    fit: layout.mainIsScreenShare
+                                        ? VideoViewFit.contain
+                                        : VideoViewFit.cover,
+                                  )
+                                else
+                                  Center(
+                                    child: Text(
+                                      mainName.isNotEmpty ? mainName : 'Đang chờ…',
+                                      style: const TextStyle(
+                                        color: Color(0xFF8EA3CC),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              )
-                            : ListView.separated(
-                                padding: const EdgeInsets.fromLTRB(
-                                  8,
-                                  10,
-                                  8,
-                                  10,
-                                ),
-                                itemCount: pipList.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: sep),
-                                itemBuilder: (_, i) {
-                                  return _VoicePipParticipantRow(
-                                    participant: pipList[i],
-                                  );
-                                },
+                                if (layout.mainIsScreenShare)
+                                  Positioned(
+                                    top: 6,
+                                    left: 6,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.55),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 3,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.screen_share_rounded,
+                                              color: Colors.white,
+                                              size: 12,
+                                            ),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'Chia sẻ',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (hasFilmstrip)
+                            SizedBox(
+                              height: _kVoiceMeetFilmstripH,
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                                children: [
+                                  for (final p in layout.filmstripParticipants)
+                                    _VoiceMeetFilmstripTile(participant: p),
+                                ],
                               ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -1062,7 +1152,8 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
 
     final title = act.peerName.isNotEmpty ? act.peerName : 'Cuộc gọi';
     final remoteTrack = widget.mgr.minimizedRemoteMainTrack;
-    final localTrack = widget.mgr.minimizedLocalPipTrack;
+    final pipTrack = widget.mgr.minimizedPipTrack;
+    final pipSharing = widget.mgr.minimizedPipIsSharingPlaceholder;
     final remoteIsScreen = widget.mgr.minimizedRemoteMainIsScreenShare;
     final micOn = widget.mgr.activeMicEnabled;
     final isVideo = act.video;
@@ -1168,7 +1259,7 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
                           child: remoteTrack != null
                               ? ColoredBox(
                                   color: Colors.black,
-                                  child: VideoTrackRenderer(
+                                  child: _pipVideoTrack(
                                     remoteTrack,
                                     fit: remoteIsScreen
                                         ? VideoViewFit.contain
@@ -1214,6 +1305,42 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
                                 ),
                         ),
                       ),
+                      if (remoteIsScreen)
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 3,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.screen_share_rounded,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Chia sẻ',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       if (isVideo)
                         Positioned(
                           top: 8,
@@ -1225,24 +1352,47 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
                             borderRadius: BorderRadius.circular(10),
                             clipBehavior: Clip.antiAlias,
                             color: Colors.black,
-                                    child: localTrack != null
-                                ? VideoTrackRenderer(
-                                    localTrack,
-                                    fit: VideoViewFit.cover,
-                                  )
-                                : ColoredBox(
-                                    color: const Color(0xFF0F1B37),
+                            child: pipSharing
+                                ? const ColoredBox(
+                                    color: Color(0xFF1B2A4A),
                                     child: Center(
-                                      child: Text(
-                                        myInitial,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 22,
-                                        ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.screen_share_rounded,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                          SizedBox(height: 4),
+                                          Text(
+                                            'Đang chia sẻ',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
+                                  )
+                                : pipTrack != null
+                                    ? _pipVideoTrack(pipTrack)
+                                    : ColoredBox(
+                                        color: const Color(0xFF0F1B37),
+                                        child: Center(
+                                          child: Text(
+                                            myInitial,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 22,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                           ),
                         ),
                       Positioned(

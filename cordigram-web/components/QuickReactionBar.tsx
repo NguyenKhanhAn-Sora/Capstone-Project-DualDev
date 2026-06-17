@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import styles from "./QuickReactionBar.module.css";
 
 const MAIN_EMOTIONS = ["❤️", "😆", "😮", "😢", "😡", "👍"];
@@ -20,6 +21,7 @@ export default function QuickReactionBar({
   onMenuClick,
   position,
 }: QuickReactionBarProps) {
+  const t = useTranslations("ui");
   return (
     <div className={styles.container} style={position}>
       <div className={styles.bar}>
@@ -38,7 +40,7 @@ export default function QuickReactionBar({
           <button
             className={styles.addButton}
             onClick={onMoreClick}
-            title="Thêm cảm xúc"
+            title={t("quickReaction.addReaction")}
           >
             +
           </button>
@@ -49,7 +51,7 @@ export default function QuickReactionBar({
           <button
             className={styles.actionButton}
             onClick={onReplyClick}
-            title="Trả lời"
+            title={t("quickReaction.reply")}
           >
             <svg
               width="20"
@@ -70,7 +72,7 @@ export default function QuickReactionBar({
           <button
             className={styles.actionButton}
             onClick={onMenuClick}
-            title="Thêm"
+            title={t("quickReaction.more")}
           >
             <svg
               width="20"

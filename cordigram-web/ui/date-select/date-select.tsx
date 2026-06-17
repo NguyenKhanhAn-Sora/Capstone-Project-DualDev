@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { createPortal } from "react-dom";
 import styles from "./date-select.module.css";
 import {
@@ -69,6 +70,7 @@ export function DateSelect({
   minYear = 1900,
   forceLight = false,
 }: DateSelectProps) {
+  const t = useTranslations("ui");
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const monthShellRef = useRef<HTMLDivElement | null>(null);
@@ -311,7 +313,7 @@ export function DateSelect({
                 <button
                   type="button"
                   className={styles.navButton}
-                  aria-label="Previous month"
+                  aria-label={t("dateSelect.prevMonth")}
                   onClick={() => setView((prev) => subMonths(prev, 1))}
                   disabled={
                     minAllowed
@@ -328,7 +330,7 @@ export function DateSelect({
                     <button
                       type="button"
                       className={`${styles.headerSelect} ${styles.monthButton}`}
-                      aria-label="Month"
+                      aria-label={t("dateSelect.month")}
                       aria-haspopup="listbox"
                       aria-expanded={monthMenuOpen}
                       onClick={() => {
@@ -346,7 +348,7 @@ export function DateSelect({
                       <div
                         className={styles.monthMenu}
                         role="listbox"
-                        aria-label="Month"
+                        aria-label={t("dateSelect.month")}
                       >
                         {Array.from({ length: 12 }).map((_, idx) => {
                           const maxMonth =
@@ -400,7 +402,7 @@ export function DateSelect({
                     <button
                       type="button"
                       className={`${styles.headerSelect} ${styles.yearButton}`}
-                      aria-label="Year"
+                      aria-label={t("dateSelect.year")}
                       aria-haspopup="listbox"
                       aria-expanded={yearMenuOpen}
                       onClick={() => {
@@ -416,7 +418,7 @@ export function DateSelect({
                       <div
                         className={styles.yearMenu}
                         role="listbox"
-                        aria-label="Year"
+                        aria-label={t("dateSelect.year")}
                       >
                         {yearOptions.map((y) => {
                           const active = y === view.getFullYear();
@@ -472,7 +474,7 @@ export function DateSelect({
                 <button
                   type="button"
                   className={styles.navButton}
-                  aria-label="Next month"
+                  aria-label={t("dateSelect.nextMonth")}
                   onClick={() => setView((prev) => addMonths(prev, 1))}
                   disabled={
                     maxAllowed

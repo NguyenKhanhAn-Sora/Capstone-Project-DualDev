@@ -5,6 +5,7 @@ import React, { useState, useRef, useEffect } from "react";
 import styles from "./ServerCustomization.module.css";
 import { uploadMedia } from "@/lib/api";
 import { useLanguage } from "@/component/language-provider";
+import { useTranslations } from "next-intl";
 
 interface ServerCustomizationProps {
   onCreateServer: (name: string, avatarUrl?: string) => void;
@@ -32,6 +33,7 @@ export default function ServerCustomization({
   isCreating,
 }: ServerCustomizationProps) {
   const { t } = useLanguage();
+  const tServer = useTranslations("server");
   const [serverName, setServerName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -108,7 +110,7 @@ export default function ServerCustomization({
           disabled={uploading}
         >
           {avatarUrl ? (
-            <img src={avatarUrl} alt="Server avatar" className={styles.avatar} />
+            <img src={avatarUrl} alt={tServer("common.serverAvatar")} className={styles.avatar} />
           ) : (
             <div className={styles.uploadPlaceholder}>
               <span className={styles.uploadCameraIcon}>

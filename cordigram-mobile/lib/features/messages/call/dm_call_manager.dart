@@ -43,8 +43,10 @@ class DmCallManager extends ChangeNotifier {
   StreamSubscription<DmCallBusyEvent>? _busySub;
   StreamSubscription<DmCallIncomingDismissEvent>? _dismissSub;
   StreamSubscription<List<DmCallSessionSyncItem>>? _sessionsSyncSub;
+  StreamSubscription<DmCallMediaTransferredEvent>? _mediaTransferSub;
   Timer? _callHeartbeatTimer;
   final Map<String, String> _callIdsByPeer = {};
+  List<DmCallSessionSyncItem> _lastSyncedSessions = const [];
   String? _focusedPeerUserId;
   bool _initialized = false;
   final Set<String> _openCallRoutes = {};
@@ -66,8 +68,9 @@ class DmCallManager extends ChangeNotifier {
 
   /// Live tracks for the floating PiP while minimized (fed by [NativeCallScreen]).
   VideoTrack? _minimizedRemoteMainTrack;
-  VideoTrack? _minimizedLocalPipTrack;
+  VideoTrack? _minimizedPipTrack;
   bool _minimizedRemoteMainIsScreenShare = false;
+  bool _minimizedPipIsSharingPlaceholder = false;
   DateTime? _activeCallStartedAt;
 
   /// Cached display/username of the currently authenticated user. Fetched
@@ -112,25 +115,29 @@ class DmCallManager extends ChangeNotifier {
   String? get myDisplayName => _myName;
 
   VideoTrack? get minimizedRemoteMainTrack => _minimizedRemoteMainTrack;
-  VideoTrack? get minimizedLocalPipTrack => _minimizedLocalPipTrack;
+  VideoTrack? get minimizedPipTrack => _minimizedPipTrack;
   bool get minimizedRemoteMainIsScreenShare => _minimizedRemoteMainIsScreenShare;
+  bool get minimizedPipIsSharingPlaceholder => _minimizedPipIsSharingPlaceholder;
   DateTime? get activeCallStartedAt => _activeCallStartedAt;
 
   void setMinimizedPipVideoTracks({
     VideoTrack? remoteMain,
-    VideoTrack? localPip,
+    VideoTrack? pipTrack,
     bool remoteMainIsScreenShare = false,
+    bool pipIsSharingPlaceholder = false,
   }) {
     _minimizedRemoteMainTrack = remoteMain;
-    _minimizedLocalPipTrack = localPip;
+    _minimizedPipTrack = pipTrack;
     _minimizedRemoteMainIsScreenShare = remoteMainIsScreenShare;
+    _minimizedPipIsSharingPlaceholder = pipIsSharingPlaceholder;
     if (_isCallMinimized) notifyListeners();
   }
 
   void clearMinimizedPipVideoTracks() {
     _minimizedRemoteMainTrack = null;
-    _minimizedLocalPipTrack = null;
+    _minimizedPipTrack = null;
     _minimizedRemoteMainIsScreenShare = false;
+    _minimizedPipIsSharingPlaceholder = false;
   }
 
   /// Call once at app startup (after [AuthStorage.loadAll]) with the root
@@ -267,6 +274,10 @@ class DmCallManager extends ChangeNotifier {
       _sessionsSyncSub = DirectMessagesRealtimeService.callSessionsSync
           .listen(_onCallSessionsSync);
     }
+    if (_mediaTransferSub == null) {
+      _mediaTransferSub = DirectMessagesRealtimeService.callMediaTransferred
+          .listen(_onMediaTransferred);
+    }
   }
 
   void _dismissActiveCallRoutes() {
@@ -281,6 +292,7 @@ class DmCallManager extends ChangeNotifier {
   }
 
   void _onCallSessionsSync(List<DmCallSessionSyncItem> sessions) {
+    _lastSyncedSessions = sessions;
     const activeStates = {
       'ringing',
       'connecting',
@@ -365,6 +377,8 @@ class DmCallManager extends ChangeNotifier {
     _dismissSub = null;
     await _sessionsSyncSub?.cancel();
     _sessionsSyncSub = null;
+    await _mediaTransferSub?.cancel();
+    _mediaTransferSub = null;
     await _callSub?.cancel();
     _callSub = null;
     await _endedSub?.cancel();
@@ -436,6 +450,75 @@ class DmCallManager extends ChangeNotifier {
   // Public actions (invoked by UI)
   // ---------------------------------------------------------------------------
 
+  /// Continue an in-progress DM call on this device without ending it for the peer.
+  Future<void> continueCallOnDevice(
+    String peerUserId, {
+    DmCallSessionSyncItem? session,
+    String? peerName,
+    String? peerAvatarUrl,
+  }) async {
+    final resolved = session ?? _findConnectedSession(peerUserId);
+    final roomId = resolved?.roomId;
+    if (roomId == null || roomId.isEmpty) {
+      _showSnack('Không thể tiếp tục cuộc gọi trên thiết bị này.');
+      return;
+    }
+
+    final video = (resolved?.type ?? 'audio') == 'video';
+    try {
+      await _ensurePermissions(video: video);
+    } catch (err) {
+      _showSnack('$err');
+      return;
+    }
+
+    final claim = await DirectMessagesRealtimeService.claimCallMedia(peerUserId);
+    final claimVideo = (claim['type'] ?? resolved?.type ?? 'audio').toString();
+    final isVideo = claimVideo == 'video';
+    final callId = (claim['callId'] ?? resolved?.callId ?? '').toString();
+
+    if (_myName == null || _myName!.isEmpty) {
+      await _refreshMyName();
+    }
+    final participantName = _resolveMyName();
+
+    final CallSession callSession;
+    try {
+      callSession = await CallsApiService.joinCall(
+        roomId: roomId,
+        participantName: participantName,
+        video: isVideo,
+      );
+    } catch (err) {
+      _showSnack('Không mở được cuộc gọi: $err');
+      return;
+    }
+
+    _incomingTimer?.cancel();
+    _incoming = null;
+    _outgoings.remove(peerUserId);
+    _startActiveCall(
+      session: callSession,
+      peerUserId: peerUserId,
+      peerName: peerName ?? peerUserId,
+      peerAvatarUrl: peerAvatarUrl,
+      video: isVideo,
+      callId: callId.isEmpty ? null : callId,
+    );
+  }
+
+  DmCallSessionSyncItem? _findConnectedSession(String peerUserId) {
+    for (final session in _lastSyncedSessions) {
+      if (session.peerId != peerUserId) continue;
+      if (session.state == 'connected' ||
+          session.state == 'connecting' ||
+          session.state == 'reconnecting') {
+        return session;
+      }
+    }
+    return null;
+  }
+
   /// Start an outbound call to [peerUserId]. Blocks only if already calling
   /// or in a call with the same peer.
   Future<void> startCall({
@@ -448,7 +531,19 @@ class DmCallManager extends ChangeNotifier {
     if (_incoming != null) return;
     if (_outgoings.containsKey(peerUserId)) return;
     if (_actives.containsKey(peerUserId)) {
-      _showSnack('Bạn đang trong cuộc gọi với người này.');
+      _focusedPeerUserId = peerUserId;
+      _pushCallScreen(peerUserId);
+      notifyListeners();
+      return;
+    }
+    final connected = _findConnectedSession(peerUserId);
+    if (connected != null) {
+      await continueCallOnDevice(
+        peerUserId,
+        session: connected,
+        peerName: peerName,
+        peerAvatarUrl: peerAvatarUrl,
+      );
       return;
     }
     if ((AuthStorage.accessToken ?? '').isEmpty) {
@@ -520,6 +615,14 @@ class DmCallManager extends ChangeNotifier {
       rejectIncoming();
       return;
     }
+    if (_actives.containsKey(inc.callerUserId)) {
+      await continueCallOnDevice(
+        inc.callerUserId,
+        peerName: inc.callerName,
+        peerAvatarUrl: inc.callerAvatarUrl,
+      );
+      return;
+    }
     try {
       await _ensurePermissions(video: inc.video);
     } catch (err) {
@@ -553,6 +656,8 @@ class DmCallManager extends ChangeNotifier {
     DirectMessagesRealtimeService.answerCall(inc.callerUserId, {
       'roomName': session.roomId,
     });
+
+    await DirectMessagesRealtimeService.claimCallMedia(inc.callerUserId);
 
     _incomingTimer?.cancel();
     _incoming = null;
@@ -749,9 +854,10 @@ class DmCallManager extends ChangeNotifier {
 
   void _handleIncoming(DmCallEvent event) {
     if (_actives.isNotEmpty) {
-      if (!_actives.containsKey(event.fromUserId)) {
-        DirectMessagesRealtimeService.rejectCall(event.fromUserId);
+      if (_actives.containsKey(event.fromUserId)) {
+        return;
       }
+      DirectMessagesRealtimeService.rejectCall(event.fromUserId);
       return;
     }
     // If we're already ringing the same person, just refresh; otherwise the
@@ -791,6 +897,11 @@ class DmCallManager extends ChangeNotifier {
     if (!_outgoings.containsKey(peerId)) return;
     _cancelOutgoingFor(peerId);
     if (event.code == 'already_in_call') {
+      final session = _findConnectedSession(peerId);
+      if (session != null) {
+        unawaited(continueCallOnDevice(peerId, session: session));
+        return;
+      }
       _showSnack(
         'Bạn đang gọi người này từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
       );
@@ -805,6 +916,29 @@ class DmCallManager extends ChangeNotifier {
       return;
     }
     _showSnack('Không thể bắt đầu cuộc gọi. Vui lòng thử lại.');
+  }
+
+  void _onMediaTransferred(DmCallMediaTransferredEvent event) {
+    final peer = event.peerId;
+    if (!_actives.containsKey(peer)) return;
+    _stopCallHeartbeatForPeer(peer);
+    _actives.remove(peer);
+    _openCallRoutes.remove(peer);
+    if (_focusedPeerUserId == peer) {
+      _focusedPeerUserId =
+          _actives.isEmpty ? null : _actives.keys.first;
+      clearMinimizedPipVideoTracks();
+      _isCallMinimized = false;
+      _miniCallTuckedToCorner = false;
+      _activeMicEnabled = true;
+      _activeSoundEnabled = true;
+      _setMicEnabledDelegate = null;
+      _setSoundEnabledDelegate = null;
+      _activeCallStartedAt = _focusedPeerUserId == null
+          ? null
+          : _actives[_focusedPeerUserId!]?.startedAt;
+    }
+    notifyListeners();
   }
 
   Future<void> _handleAnswer(DmCallEvent event) async {
@@ -837,6 +971,7 @@ class DmCallManager extends ChangeNotifier {
 
     _outgoings.remove(event.fromUserId);
     final callId = event.payload?['callId']?.toString();
+    await DirectMessagesRealtimeService.claimCallMedia(event.fromUserId);
     _syncCallSounds();
     _startActiveCall(
       session: session,

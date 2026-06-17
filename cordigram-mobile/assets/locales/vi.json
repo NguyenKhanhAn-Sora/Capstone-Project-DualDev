@@ -549,7 +549,8 @@
       "errorEmailRequired": "Vui lòng nhập email",
       "errorEmailInvalid": "Email không hợp lệ",
       "errorPasswordRequired": "Vui lòng nhập mật khẩu",
-      "errorPasswordShort": "Mật khẩu tối thiểu 8 ký tự"
+      "errorPasswordShort": "Mật khẩu tối thiểu 8 ký tự",
+      "emailHint": "you@example.com"
     },
     "signup": {
       "cropPhoto": "Cắt ảnh",
@@ -561,7 +562,20 @@
       "shortBio": "Tiểu sử ngắn (tuỳ chọn)",
       "chooseFromGallery": "Chọn từ thư viện",
       "continueWithGoogle": "Tiếp tục với Google",
-      "googleSignInFailed": "Đăng nhập Google thất bại. Vui lòng thử lại."
+      "googleSignInFailed": "Đăng nhập Google thất bại. Vui lòng thử lại.",
+      "emailHint": "email@example.com",
+      "displayNameHint": "Ví dụ: Cordigrammer",
+      "usernameHint": "tênđăngnhập",
+      "passwordHint": "Ít nhất 8 ký tự",
+      "confirmPasswordHint": "Nhập lại để xác nhận",
+      "bioHint": "Chia sẻ một chút về bản thân",
+      "creatingAccount": "Đang tạo tài khoản...",
+      "createAccount": "Tạo tài khoản",
+      "finishing": "Đang hoàn thành...",
+      "finish": "Hoàn thành",
+      "otpPlaceholder": "• • • • • •",
+      "sendingOtp": "Đang gửi...",
+      "verifying": "Đang xác minh..."
     },
     "forgotPassword": {
       "email": "Email",
@@ -570,7 +584,13 @@
       "confirmPassword": "Xác nhận mật khẩu",
       "resendCode": "Gửi lại mã",
       "otpResent": "Đã gửi lại OTP – kiểm tra hộp thư của bạn.",
-      "passwordUpdated": "Đã cập nhật mật khẩu! Vui lòng đăng nhập."
+      "passwordUpdated": "Đã cập nhật mật khẩu! Vui lòng đăng nhập.",
+      "emailHint": "you@example.com",
+      "otpHint": "Mã 6 chữ số",
+      "passwordHint": "Ít nhất 8 ký tự",
+      "confirmPasswordHint": "Nhập lại để xác nhận",
+      "weSentCode": "Chúng tôi đã gửi mã 6 chữ số đến",
+      "codeExpires": ". Mã hết hạn sau 5 phút."
     }
   },
   "home": {
@@ -1249,6 +1269,10 @@
     "voiceChannel": "Kênh đàm thoại",
     "voiceMessage": "Tin nhắn thoại",
     "messageRecalled": "Tin nhắn đã được thu hồi",
+    "messagePinned": "Bạn đã ghim tin nhắn",
+    "cannotPinMessage": "Không thể ghim tin nhắn",
+    "cannotDeleteMessage": "Không thể xóa tin nhắn",
+    "messageNotInSegment": "Tin nhắn không có trong đoạn đang tải",
     "call": {
       "reject": "Từ chối",
       "leaveAndAccept": "Rời kênh và nhận",
@@ -3033,7 +3057,8 @@
       "searchPlaceholder": "Tìm theo tên hoặc username...",
       "invite": "Mời",
       "copiedToast": "Đã sao chép link mời vào máy chủ",
-      "errorLoad": "Không tải được danh sách bạn bè"
+      "errorLoad": "Không tải được danh sách bạn bè",
+      "noCreateInvitePermission": "Bạn không có quyền tạo lời mời"
     },
     "createEvent": {
       "title": "Tạo sự kiện",
@@ -3948,5 +3973,27 @@
     "toolSwap": "Đổi",
     "toolTrim": "Cắt",
     "editText": "Chỉnh sửa chữ"
+  },
+  "server": {
+    "iconUpdated": "Đã cập nhật biểu tượng (nhấn Lưu để gửi máy chủ)",
+    "bannerSelected": "Đã chọn ảnh biểu ngữ (nhấn Lưu để gửi máy chủ)",
+    "nameRequired": "Tên máy chủ không được để trống",
+    "changesSaved": "Đã lưu thay đổi",
+    "noPermissionManageEmoji": "Bạn không có quyền quản lý biểu cảm.",
+    "createRole": "Tạo vai trò",
+    "reject": "Từ chối",
+    "approve": "Duyệt",
+    "approveFailed": "Duyệt thất bại",
+    "rejectFailed": "Từ chối thất bại",
+    "loadDetailFailed": "Không tải chi tiết",
+    "noChatChannel": "Server chưa có kênh chat để mở.",
+    "members": {
+      "days7": "7 ngày",
+      "days14": "14 ngày",
+      "days30": "30 ngày",
+      "allRoles": "Mọi vai trò",
+      "noRole": "Không có vai trò",
+      "memberRole": "Thành viên"
+    }
   }
 }

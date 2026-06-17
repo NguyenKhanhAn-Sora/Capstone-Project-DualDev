@@ -2,6 +2,7 @@
 
 import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { CategoryNotifyMode, ChannelNotifyMode, NotifyLevel } from "@/lib/sidebar-prefs";
 import { notifyLabelChannel } from "@/lib/sidebar-prefs";
 import styles from "./ChannelContextMenu.module.css";
@@ -64,11 +65,13 @@ export default function ChannelContextMenu({
   onDeleteChannel,
   onJoinServerThenOpenChannel,
 }: ChannelContextMenuProps) {
+  const t = useTranslations("server");
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notify" | null>(null);
   const [submenuPos, setSubmenuPos] = useState({ left: 0, top: 0 });
+  const [menuPos, setMenuPos] = useState({ left: x, top: y });
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [editName, setEditName] = useState(channel.name);
@@ -95,18 +98,26 @@ export default function ChannelContextMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
+    const pad = 8;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    if (rect.right > vw) {
-      menuRef.current.style.left = `${Math.max(4, vw - rect.width - 8)}px`;
+    let left = x;
+    let top = y;
+    if (left + rect.width > vw - pad) {
+      left = Math.max(pad, vw - pad - rect.width);
     }
-    if (rect.bottom > vh) {
-      menuRef.current.style.top = `${Math.max(4, vh - rect.height - 8)}px`;
+    const spaceBelow = vh - y - pad;
+    const spaceAbove = y - pad;
+    if (rect.height > spaceBelow && spaceAbove > spaceBelow) {
+      top = Math.max(pad, y - rect.height);
+    } else if (top + rect.height > vh - pad) {
+      top = Math.max(pad, vh - pad - rect.height);
     }
-  }, [x, y]);
+    setMenuPos({ left, top });
+  }, [x, y, submenu, showEdit, showDelete]);
 
   useEffect(() => {
     if (showEdit && editInputRef.current) {
@@ -265,9 +276,9 @@ export default function ChannelContextMenu({
       <div
         ref={menuRef}
         className={styles.menu}
-        style={{ left: x, top: y }}
+        style={{ left: menuPos.left, top: menuPos.top }}
         role="menu"
-        aria-label="Menu kênh"
+        aria-label={t("common.channelMenuAria")}
       >
         <button
           type="button"
@@ -368,7 +379,7 @@ export default function ChannelContextMenu({
             </button>
 
             {channel.isDefault ? (
-              <div className={`${styles.menuItem} ${styles.menuItemDisabled}`} title="Không thể xóa kênh mặc định">
+              <div className={`${styles.menuItem} ${styles.menuItemDisabled}`} title={t("common.cannotDeleteDefault")}>
                 <svg className={styles.menuIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />

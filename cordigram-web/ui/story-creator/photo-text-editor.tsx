@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./photo-text-editor.module.css";
 
 export type PhotoOverlay = {
@@ -34,6 +35,7 @@ export default function PhotoTextEditor({
   onSelectChange, onInputModeToggle,
   inputColor = "#ffffff", inputFontSize = 28,
 }: Props) {
+  const t = useTranslations("ui");
   const [mode, setMode]             = useState<"idle" | "input">("idle");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId]   = useState<string | null>(null);
@@ -369,7 +371,7 @@ export default function PhotoTextEditor({
               overflow: "hidden",
             }}
           />
-          <button className={styles.inputDoneBtn} onClick={confirmInput} title="Xong (Shift+Enter)">Xong</button>
+          <button className={styles.inputDoneBtn} onClick={confirmInput} title={t("storyCreator.doneShiftEnter")}>Xong</button>
         </div>
       )}
     </div>

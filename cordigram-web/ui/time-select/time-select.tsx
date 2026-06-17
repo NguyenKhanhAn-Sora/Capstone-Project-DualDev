@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./time-select.module.css";
 
 type TimeSelectProps = {
@@ -35,6 +36,7 @@ export function TimeSelect({
   minDateTime,
   placeholder = "hh:mm",
 }: TimeSelectProps) {
+  const t = useTranslations("ui");
   const [hourOpen, setHourOpen] = useState(false);
   const [minuteOpen, setMinuteOpen] = useState(false);
   const hourRef = useRef<HTMLDivElement | null>(null);
@@ -133,7 +135,7 @@ export function TimeSelect({
             <span className={styles.chevron} aria-hidden />
           </button>
           {hourOpen ? (
-            <div className={styles.menu} role="listbox" aria-label="Hour">
+            <div className={styles.menu} role="listbox" aria-label={t("timeSelect.hour")}>
               {hours.map((candidate) => {
                 const disabledOption = isHourDisabled(candidate);
                 const active = candidate === hourNumber;
@@ -179,7 +181,7 @@ export function TimeSelect({
             <span className={styles.chevron} aria-hidden />
           </button>
           {minuteOpen ? (
-            <div className={styles.menu} role="listbox" aria-label="Minute">
+            <div className={styles.menu} role="listbox" aria-label={t("timeSelect.minute")}>
               {minutes.map((candidate) => {
                 const disabledOption = isMinuteDisabled(candidate);
                 const active = candidate === minuteNumber;

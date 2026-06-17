@@ -372,7 +372,8 @@
         "notFound": "No friends found."
       },
       "errors": {
-        "cannotSendInvite": "Couldn't send the invite"
+        "cannotSendInvite": "Couldn't send the invite",
+        "noCreateInvitePermission": "You don't have permission to create invites"
       }
     },
     "inviteServer": {
@@ -1034,6 +1035,7 @@
       "viewFullProfile": "View full profile",
       "inviteToServer": "Invite to server",
       "ignore": "Ignore",
+      "changeNickname": "Change Nickname",
       "block": "Block",
       "reportProfile": "Report user profile",
       "message": "Message",
@@ -1426,6 +1428,7 @@
       "memberBadge": "Member",
       "menuProfile": "Profile",
       "menuMessage": "Message",
+      "menuNickname": "Change Nickname",
       "menuTimeout": "Timeout {name}",
       "menuKick": "Kick {name}",
       "menuBan": "Ban {name}",
@@ -1557,6 +1560,38 @@
       "questionTemplate3": "What makes you unique?",
       "defaultQuestion": "Why do you want to join our server?"
     },
+    "modView": {
+      "colUser": "Username",
+      "colJoined": "Joined Server",
+      "colAccountAge": "Account Age",
+      "colJoinMethod": "Join Method",
+      "colRoles": "Roles",
+      "colFlags": "Flags",
+      "loading": "Loading Moderator View data...",
+      "empty": "No members found.",
+      "days": "days",
+      "joinOwner": "Server Owner",
+      "joinInvited": "Invited by {name}",
+      "joinUrl": "Joined via URL",
+      "flagNew": "New Account",
+      "flagSpam": "Spam",
+      "flagSuspicious": "Suspicious Invite",
+      "detailTitle": "Moderator View",
+      "close": "Close",
+      "detailLoading": "Loading member details...",
+      "activity": "Activity",
+      "messages30d": "Messages (30 days)",
+      "links30d": "Links (30 days)",
+      "media30d": "Media (30 days)",
+      "roles": "Roles",
+      "rolesHint": "Add / remove roles using the Roles tab and existing modal.",
+      "accountInfo": "Account Info",
+      "accountCreated": "Account Created",
+      "serverJoined": "Joined Server",
+      "joinMethod": "Join Method",
+      "auditLog": "Permission Log",
+      "auditLogHint": "Detailed audit log is stored on the backend via AuditLog; UI list will be added later."
+    },
     "serverBans": {
       "desc": "Bans are enforced by account and IP. A user may bypass an IP ban by using a proxy. Bypassing bans is much harder when phone verification is enabled in",
       "moderation": "Moderation",
@@ -1580,7 +1615,11 @@
       "confirmSubmit": "Revoke Ban",
       "confirming": "Revoking...",
       "loadFail": "Failed to load ban list",
-      "unbanFail": "Failed to revoke ban"
+      "unbanFail": "Failed to revoke ban",
+      "statusBanned": "Banned",
+      "statusRestricted": "Restricted",
+      "statusKicked": "Kicked",
+      "durationUntil": "Until {date}"
     },
     "autoMod": {
       "loadError": "Failed to load AutoMod settings.",
@@ -1882,8 +1921,8 @@
       "mutualHint": "Messages saves one UI tint: Background presets and Boost theme colors share the same value, so they never stack in storage. Each swatch repaints the whole Messages chrome (backgrounds, panels, and accents). Without Boost you only use Background; with Boost you can switch to Theme colors.",
       "modeBackground": "Active: Background presets",
       "modeAccent": "Active: Theme colors (Boost)",
-      "modeFollowSocial": "Active: Match Social",
-      "followSocialTitle": "Match Social",
+      "modeFollowSocial": "Active: Default appearance",
+      "followSocialTitle": "Default appearance",
       "followSocialHint": "Follow Social light, dark, or Galaxy. Messages only — does not change Social.",
       "followSocialPick": "Use Social appearance"
     },
@@ -1906,7 +1945,7 @@
       "unlockToast": "Upgrade Boost to unlock background customization."
     },
     "themeColors": {
-      "title": "Theme colors",
+      "title": "Custom colors",
       "hint": "Boost only: pick any color or a custom value — it tints the whole Messages UI like Background presets. Selecting here clears Background highlights.",
       "lockedHint": "Subscribe to Cordigram Boost to unlock custom theme colors. You can still use Background presets above."
     },
@@ -3092,5 +3131,49 @@
     "labelConfirm": "Block",
     "labelConfirming": "Blocking...",
     "labelCancel": "Cancel"
+  },
+  "auth": {
+    "login": {
+      "emailPlaceholder": "Email",
+      "passwordPlaceholder": "Password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "forgotPassword": "Forgot password?",
+      "signIn": "Sign in",
+      "continueWithGoogle": "Continue with Google",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign up",
+      "recentAccounts": "Recent accounts",
+      "deleteAll": "Delete all",
+      "deleting": "Deleting...",
+      "account": "Account",
+      "continueAs": "Continue as {label}",
+      "enterEmail": "Enter your email",
+      "enterPassword": "Enter your password",
+      "enterEmailAddress": "Email address"
+    },
+    "signup": {
+      "emailAddress": "Email address",
+      "emailPlaceholder": "email@example.com",
+      "sendOTP": "Send OTP",
+      "sending": "Sending...",
+      "otpInstruction": "Enter the 6-digit code sent to",
+      "displayNamePlaceholder": "E.g. Cordigrammer",
+      "usernamePlaceholder": "username",
+      "passwordPlaceholder": "Password",
+      "confirmPasswordPlaceholder": "Re-enter to confirm",
+      "locationPlaceholder": "Add a city, landmark, or place",
+      "bioPlaceholder": "Share a little about yourself",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "signUp": "Sign up",
+      "otpCodePlaceholder": "------"
+    },
+    "forgotPassword": {
+      "emailPlaceholder": "Your email address",
+      "otpAriaLabel": "Enter OTP code",
+      "newPasswordPlaceholder": "New password",
+      "confirmPasswordPlaceholder": "Confirm new password"
+    }
   }
 }

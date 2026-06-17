@@ -1431,5 +1431,128 @@
     "trimTotal": "Total",
     "trimWillUse": "(will use)",
     "trimSeconds": "{s}s"
+  },
+  "messages": {
+    "viewFullscreen": "View fullscreen",
+    "createVoiceChannel": "Create voice channel",
+    "expandCategory": "Expand category",
+    "collapseCategory": "Collapse category",
+    "conversationDetails": "Conversation details",
+    "channelPasswordPlaceholder": "••••••"
+  },
+  "voice": {
+    "micOn": "Microphone on",
+    "micMuted": "Microphone muted",
+    "leaveChannel": "Leave channel",
+    "joinCall": "Join call",
+    "rejectCall": "Reject call",
+    "acceptCall": "Accept call",
+    "endCall": "End call",
+    "cancel": "Cancel",
+    "send": "Send"
+  }
+,
+  "ui": {
+    "storyBar": {
+      "ariaLabel": "Stories",
+      "createStory": "Create story",
+      "avatarAlt": "avatar",
+      "yourStory": "Your story"
+    },
+    "storyCreator": {
+      "goBack": "Go back",
+      "addEmoji": "Add emoji",
+      "doneShiftEnter": "Done (Shift+Enter)"
+    },
+    "musicPicker": {
+      "searchPlaceholder": "Search music..."
+    },
+    "emojiPicker": {
+      "searchPlaceholder": "Search emoji"
+    },
+    "quickReaction": {
+      "addReaction": "Add reaction",
+      "reply": "Reply",
+      "more": "More"
+    },
+    "boost": {
+      "searchPlaceholder": "Search by name or username..."
+    },
+    "sidebar": {
+      "logo": "Cordigram logo",
+      "toggleTheme": "Toggle theme",
+      "themeIcon": "Theme icon",
+      "logoAlt": "Logo"
+    },
+    "dateSelect": {
+      "prevMonth": "Previous month",
+      "month": "Month",
+      "year": "Year",
+      "nextMonth": "Next month"
+    },
+    "timeSelect": {
+      "hour": "Hour",
+      "minute": "Minute"
+    },
+    "verifiedBadge": {
+      "creatorVerified": "Creator verified"
+    },
+    "videoPlayer": {
+      "progress": "Video progress",
+      "volume": "Volume",
+      "quality": "Video quality",
+      "captions": "Captions",
+      "download": "Download video"
+    },
+    "commentLikes": {
+      "searchPlaceholder": "Search username",
+      "searchAria": "Search username"
+    },
+    "postUpload": {
+      "cancelUpload": "Cancel upload"
+    },
+    "guestLogin": {
+      "close": "Close"
+    }
+  },
+  "server": {
+    "common": {
+      "close": "Close",
+      "reset": "Reset",
+      "rotate90": "Rotate 90°",
+      "rotate90Aria": "Rotate 90 degrees",
+      "flipHorizontal": "Flip horizontal",
+      "flipHorizontalAria": "Flip horizontal",
+      "zoom": "Zoom",
+      "deleteName": "Clear name",
+      "serverAvatar": "Server avatar",
+      "cover": "Cover",
+      "reason": "Reason",
+      "reasonPlaceholder": "Enter reason...",
+      "serverBannerAria": "Server banner",
+      "channelMenuAria": "Channel menu",
+      "cannotDeleteDefault": "Cannot delete default channel",
+      "categoryMenuAria": "Category menu",
+      "preview": "Preview"
+    },
+    "emoji": {
+      "namePlaceholder": "emoji_name",
+      "editTitle": "Edit emoji",
+      "uploadTitle": "Upload emoji",
+      "uploadHint": "Upload an image to use as a custom emoji"
+    },
+    "sticker": {
+      "namePlaceholder": "sticker_name",
+      "editTitle": "Edit sticker",
+      "uploadTitle": "Upload sticker"
+    },
+    "event": {
+      "topicPlaceholder": "What is your event about?",
+      "descriptionPlaceholder": "Let everyone know a little more about your event. Markdown, newlines and links are supported.",
+      "coverAlt": "Cover",
+      "close": "Close",
+      "guestNamePlaceholder": "What do people call you?",
+      "rotateImage": "Rotate image"
+    }
   }
 }

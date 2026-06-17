@@ -159,6 +159,57 @@ describe('DmCallSessionService (in-memory)', () => {
     if (!duplicate.ok) expect(duplicate.code).toBe('already_in_call');
   });
 
+  it('allows web caller to re-ring from a different socket while still ringing', async () => {
+    const noop = () => undefined;
+    const a = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'audio',
+      initiatorSocketId: 'sock-1',
+      platform: 'web',
+      onRingTimeout: noop,
+    });
+    const b = await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'audio',
+      initiatorSocketId: 'sock-2',
+      platform: 'web',
+      onRingTimeout: noop,
+    });
+    expect(a.ok && b.ok).toBe(true);
+    if (a.ok && b.ok) expect(a.callId).toBe(b.callId);
+  });
+
+  it('claimMedia moves media socket without ending connected session', async () => {
+    const noop = () => undefined;
+    await service.tryInitiate({
+      initiatorId: 'user-a',
+      calleeId: 'user-b',
+      type: 'video',
+      initiatorSocketId: 'sock-init',
+      onRingTimeout: noop,
+    });
+    await service.markAnswered({
+      userId: 'user-b',
+      callerId: 'user-a',
+      answeringSocketId: 'sock-callee-1',
+      roomId: 'room-ab',
+    });
+
+    const claimed = await service.claimMedia({
+      userId: 'user-b',
+      peerId: 'user-a',
+      socketId: 'sock-callee-2',
+    });
+    expect(claimed).not.toBeNull();
+    expect(claimed?.calleeMediaSocketId).toBe('sock-callee-2');
+    expect(claimed?.state).toBe('connected');
+
+    const stillActive = await service.hasActiveSessionBetween('user-a', 'user-b');
+    expect(stillActive).toBe(true);
+  });
+
   it('rejects markAnswered from caller (only callee may answer)', async () => {
     const noop = () => undefined;
     await service.tryInitiate({

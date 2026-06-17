@@ -18,6 +18,7 @@ import {
   verifyTwoFactorLogin,
 } from "@/lib/api";
 import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
+import { useLanguage } from "@/component/language-provider";
 import {
   clearStoredAccessToken,
   getAccessTokenStatus,
@@ -91,6 +92,7 @@ const LockIcon = () => (
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -716,7 +718,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email"
+                  placeholder={t("auth.login.emailPlaceholder")}
                   autoComplete="email"
                   className="w-full h-[52px] pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
                 />
@@ -731,7 +733,7 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(null); }}
-                  placeholder="Mật khẩu"
+                  placeholder={t("auth.login.passwordPlaceholder")}
                   autoComplete="current-password"
                   className="w-full h-[52px] pl-[44px] pr-[44px] rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
                 />
@@ -739,7 +741,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] p-1"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? t("auth.login.hidePassword") : t("auth.login.showPassword")}
                 >
                   <EyeIcon open={showPassword} />
                 </button>
@@ -752,7 +754,7 @@ export default function LoginPage() {
                   onClick={() => router.push("/forgot-password")}
                   className="text-[#3470A2] font-semibold text-[14px] py-1.5"
                 >
-                  Quên mật khẩu?
+                  {t("auth.login.forgotPassword")}
                 </button>
               </div>
 
@@ -771,7 +773,7 @@ export default function LoginPage() {
               >
                 {loading ? (
                   <span className="w-[22px] h-[22px] border-[2.5px] border-white border-t-transparent rounded-full animate-spin inline-block" />
-                ) : "Sign in"}
+                ) : t("auth.login.signIn")}
               </button>
             </form>
 
@@ -787,27 +789,27 @@ export default function LoginPage() {
                 <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
                 <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
               </svg>
-              Tiếp tục với Google
+              {t("auth.login.continueWithGoogle")}
             </button>
 
             {/* Sign up */}
             <div className="flex items-center justify-center mt-[14px] text-[14px]">
-              <span className="text-[#64748B] font-medium">{"Don't have an account? "}</span>
-              <Link href="/signup" className="text-[#3470A2] font-bold ml-1">Sign up</Link>
+              <span className="text-[#64748B] font-medium">{t("auth.login.noAccount")}</span>
+              <Link href="/signup" className="text-[#3470A2] font-bold ml-1">{t("auth.login.signUp")}</Link>
             </div>
 
             {/* Recent accounts */}
             {recentAccounts.length > 0 && (
               <div className="mt-[14px]">
                 <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-[16px] text-[#0F172A]">Recent accounts</span>
+                  <span className="font-extrabold text-[16px] text-[#0F172A]">{t("auth.login.recentAccounts")}</span>
                   <button
                     type="button"
                     onClick={() => setConfirmAll(true)}
                     disabled={clearingAll || !!removingEmail}
                     className="text-[#3470A2] font-semibold text-[13px] px-2 py-1.5 disabled:opacity-50"
                   >
-                    {clearingAll ? "Đang xóa..." : "Xóa tất cả"}
+                    {clearingAll ? t("auth.login.deleting") : t("auth.login.deleteAll")}
                   </button>
                 </div>
                 <div className="mt-2 flex flex-col gap-2.5">
@@ -862,7 +864,7 @@ export default function LoginPage() {
                 <div className={styles["recent-panel-card"]}>
                   <div className={styles["recent-panel-header"]}>
                     <div>
-                      <p className={styles["recent-title"]}>Recent accounts</p>
+                      <p className={styles["recent-title"]}>{t("auth.login.recentAccounts")}</p>
                     </div>
                     <div className={styles["recent-actions"]}>
                       <button
@@ -871,7 +873,7 @@ export default function LoginPage() {
                         onClick={() => setConfirmAll(true)}
                         disabled={clearingAll || !!removingEmail}
                       >
-                        {clearingAll ? "Deleting..." : "Delete all"}
+                        {clearingAll ? t("auth.login.deleting") : t("auth.login.deleteAll")}
                       </button>
                     </div>
                   </div>
@@ -888,7 +890,7 @@ export default function LoginPage() {
                           tabIndex={0}
                           onClick={() => handleAccountSelect(acct)}
                           onKeyDown={(event) => handleCardKeyDown(event, acct)}
-                          aria-label={`Continue as ${label}`}
+                          aria-label={t("auth.login.continueAs", { label })}
                         >
                           <div className={styles["recent-avatar-wrapper"]}>
                             {acct.avatarUrl ? (
@@ -1005,14 +1007,14 @@ export default function LoginPage() {
               >
                 <div className="space-y-1.5">
                   <label className="block text-[13px] font-semibold leading-normal text-slate-700">
-                    Email address
+                    {t("auth.login.enterEmailAddress")}
                   </label>
                   <input
                     type="email"
                     name="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
+                    placeholder={t("auth.login.enterEmail")}
                     autoComplete="email"
                     className="h-11 w-full rounded-[10px] border border-[#d7e5f2] bg-[#F8FBFF] px-3 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45"
                   />
@@ -1033,7 +1035,7 @@ export default function LoginPage() {
                         setPassword(e.target.value);
                         setError(null);
                       }}
-                      placeholder="Enter your password"
+                      placeholder={t("auth.login.enterPassword")}
                       autoComplete="current-password"
                       className={`h-11 w-full rounded-[10px] border border-[#d7e5f2] bg-[#F8FBFF] pl-3 pr-11 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45 ${styles.passwordInput}`}
                     />
@@ -1042,7 +1044,7 @@ export default function LoginPage() {
                       className={styles.passwordToggle}
                       onClick={() => setShowPassword((prev) => !prev)}
                       aria-label={
-                        showPassword ? "Hide password" : "Show password"
+                        showPassword ? t("auth.login.hidePassword") : t("auth.login.showPassword")
                       }
                     >
                       <EyeIcon open={showPassword} />
@@ -1071,16 +1073,16 @@ export default function LoginPage() {
                   className={styles["link-button"]}
                   onClick={() => router.push("/forgot-password")}
                 >
-                  Forgot password?
+                  {t("auth.login.forgotPassword")}
                 </button>
 
                 <div className="text-center text-[14px] font-medium leading-normal text-slate-700">
-                  Don't have an account?{" "}
+                  {t("auth.login.noAccount")}{" "}
                   <Link
                     href="/signup"
                     className="font-semibold text-[#3470A2] decoration-[#559AC2]/60 underline-offset-4 transition hover:brightness-110"
                   >
-                    Sign up
+                    {t("auth.login.signUp")}
                   </Link>
                 </div>
               </form>
@@ -1123,7 +1125,7 @@ export default function LoginPage() {
                       ></path>
                     </svg>
                   </span>
-                  Sign in with Google
+                  {t("auth.login.continueWithGoogle")}
                 </button>
               </div>
             </div>
@@ -1172,7 +1174,7 @@ export default function LoginPage() {
             <p className={styles["overlay-name"]}>
               {selectedAccount.displayName ||
                 selectedAccount.username ||
-                "Account"}
+                t("auth.login.account")}
             </p>
 
             <form
@@ -1183,7 +1185,7 @@ export default function LoginPage() {
                 <input
                   type={showModalPassword ? "text" : "password"}
                   autoFocus
-                  placeholder="Enter your password"
+                  placeholder={t("auth.login.enterPassword")}
                   value={modalPassword}
                   onChange={(e) => {
                     setModalPassword(e.target.value);
@@ -1197,7 +1199,7 @@ export default function LoginPage() {
                   className={styles.passwordToggle}
                   onClick={() => setShowModalPassword((prev) => !prev)}
                   aria-label={
-                    showModalPassword ? "Hide password" : "Show password"
+                    showModalPassword ? t("auth.login.hidePassword") : t("auth.login.showPassword")
                   }
                 >
                   <EyeIcon open={showModalPassword} />
@@ -1219,7 +1221,7 @@ export default function LoginPage() {
                 className={`${styles["link-button"]} flex `}
                 onClick={() => router.push("/forgot-password")}
               >
-                Forgot password?
+                {t("auth.login.forgotPassword")}
               </button>
             </form>
           </div>
@@ -1279,7 +1281,7 @@ export default function LoginPage() {
                 onClick={clearRecentAccountsConfirmed}
                 disabled={clearingAll || !!removingEmail}
               >
-                {clearingAll ? "Deleting..." : "Delete all"}
+                {clearingAll ? t("auth.login.deleting") : t("auth.login.deleteAll")}
               </button>
             </div>
           </div>

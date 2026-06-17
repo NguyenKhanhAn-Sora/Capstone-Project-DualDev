@@ -104,8 +104,12 @@ export default function ServerBansSection({ serverId, canManageBans }: ServerBan
                 <div className={styles.nameBlock}>
                   <span className={styles.displayName}>{user.displayName}</span>
                   <span className={styles.username}>@{user.username}</span>
+                  <span className={styles.banStatus}>{t("chat.serverBans.statusBanned")}</span>
                 </div>
-                {user.reason && <span className={styles.reason} title={user.reason}>{t("chat.serverBans.reason").replace("{reason}", user.reason)}</span>}
+                <div className={styles.banDetails}>
+                  {user.reason && <span className={styles.reason} title={user.reason}>{t("chat.serverBans.reason").replace("{reason}", user.reason)}</span>}
+                  {user.bannedAt && <span className={styles.banDate}>{new Date(user.bannedAt).toLocaleDateString()}</span>}
+                </div>
                 {canManageBans && (
                   <button type="button" className={styles.unbanBtn} onClick={() => setConfirmTarget(user)}>{t("chat.serverBans.unbanBtn")}</button>
                 )}
@@ -131,10 +135,10 @@ export default function ServerBansSection({ serverId, canManageBans }: ServerBan
                 <div className={styles.restrictedAvatar}>{(m.displayName || "?")[0].toUpperCase()}</div>
               )}
               <div className={styles.restrictedInfo}>
-                <p className={styles.restrictedName}>{m.displayName}</p>
+                <p className={styles.restrictedName}>{m.displayName} <span className={styles.restrictedUsername}>@{m.username}</span></p>
                 <p className={styles.restrictedMeta}>
-                  {m.mentionRestricted && t("chat.serverBans.restricted")}
-                  {m.mentionBlockedUntil && <> · {t("chat.serverBans.mentionBlocked").replace("{date}", new Date(m.mentionBlockedUntil).toLocaleString())}</>}
+                  <span className={styles.restrictedStatus}>{t("chat.serverBans.statusRestricted")}</span>
+                  {m.mentionBlockedUntil && <> · {t("chat.serverBans.durationUntil").replace("{date}", new Date(m.mentionBlockedUntil).toLocaleString())}</>}
                 </p>
               </div>
               <button type="button" className={styles.unrestrictBtn} onClick={() => handleUnrestrict(m.userId)}>{t("chat.serverBans.unrestrictBtn")}</button>

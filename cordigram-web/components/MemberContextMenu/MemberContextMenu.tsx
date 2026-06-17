@@ -19,11 +19,12 @@ export interface MemberContextMenuProps {
   canBan?: boolean;
   /** Quyền timeout members - true thì hiện nút Tạm khóa */
   canTimeout?: boolean;
+  /** Quyền đổi biệt danh - true thì hiện nút Đổi Biệt Danh */
+  canManageNicknames?: boolean;
   onClose: () => void;
   onProfile: () => void;
   onMessage: () => void;
   onNickname: () => void;
-  onIgnore: () => void;
   onBlock: () => void;
   onModView?: () => void;
   onRestrict?: () => void;
@@ -41,11 +42,11 @@ export default function MemberContextMenu({
   canKick = false,
   canBan = false,
   canTimeout = false,
+  canManageNicknames = false,
   onClose,
   onProfile,
   onMessage,
   onNickname,
-  onIgnore,
   onBlock,
   onModView,
   onRestrict,
@@ -89,12 +90,11 @@ export default function MemberContextMenu({
         <div className={styles.divider} />
 
         {/* User management */}
-        <button type="button" className={styles.menuItem} onClick={onNickname} role="menuitem">
-          Đổi Biệt Danh
-        </button>
-        <button type="button" className={styles.menuItem} onClick={onIgnore} role="menuitem">
-          Bỏ qua
-        </button>
+        {canManageNicknames && (
+          <button type="button" className={styles.menuItem} onClick={onNickname} role="menuitem">
+            Đổi Biệt Danh
+          </button>
+        )}
         <button type="button" className={`${styles.menuItem} ${styles.danger}`} onClick={onBlock} role="menuitem">
           Chặn
         </button>

@@ -2222,5 +2222,128 @@
     "trimTotal": "合計",
     "trimWillUse": "（使用される）",
     "trimSeconds": "{s}秒"
+  },
+  "messages": {
+    "viewFullscreen": "全画面表示",
+    "createVoiceChannel": "ボイスチャンネルを作成",
+    "expandCategory": "カテゴリを展開",
+    "collapseCategory": "カテゴリを折りたたむ",
+    "conversationDetails": "会話の詳細",
+    "channelPasswordPlaceholder": "••••••"
+  },
+  "voice": {
+    "micOn": "マイクオン",
+    "micMuted": "マイクミュート",
+    "leaveChannel": "チャンネルを退出",
+    "joinCall": "通話に参加",
+    "rejectCall": "通話を拒否",
+    "acceptCall": "通話を受ける",
+    "endCall": "通話を終了",
+    "cancel": "キャンセル",
+    "send": "送信"
+  }
+,
+  "ui": {
+    "storyBar": {
+      "ariaLabel": "ストーリー",
+      "createStory": "ストーリーを作成",
+      "avatarAlt": "アバター",
+      "yourStory": "あなたのストーリー"
+    },
+    "storyCreator": {
+      "goBack": "戻る",
+      "addEmoji": "絵文字を追加",
+      "doneShiftEnter": "完了 (Shift+Enter)"
+    },
+    "musicPicker": {
+      "searchPlaceholder": "音楽を検索..."
+    },
+    "emojiPicker": {
+      "searchPlaceholder": "絵文字を検索"
+    },
+    "quickReaction": {
+      "addReaction": "リアクションを追加",
+      "reply": "返信",
+      "more": "もっと見る"
+    },
+    "boost": {
+      "searchPlaceholder": "名前またはユーザー名で検索..."
+    },
+    "sidebar": {
+      "logo": "Cordigramロゴ",
+      "toggleTheme": "テーマを切り替え",
+      "themeIcon": "テーマアイコン",
+      "logoAlt": "ロゴ"
+    },
+    "dateSelect": {
+      "prevMonth": "前の月",
+      "month": "月",
+      "year": "年",
+      "nextMonth": "次の月"
+    },
+    "timeSelect": {
+      "hour": "時",
+      "minute": "分"
+    },
+    "verifiedBadge": {
+      "creatorVerified": "認証済みクリエイター"
+    },
+    "videoPlayer": {
+      "progress": "ビデオの進行状況",
+      "volume": "音量",
+      "quality": "ビデオ品質",
+      "captions": "字幕",
+      "download": "ビデオをダウンロード"
+    },
+    "commentLikes": {
+      "searchPlaceholder": "ユーザー名を検索",
+      "searchAria": "ユーザー名を検索"
+    },
+    "postUpload": {
+      "cancelUpload": "アップロードをキャンセル"
+    },
+    "guestLogin": {
+      "close": "閉じる"
+    }
+  },
+  "server": {
+    "common": {
+      "close": "閉じる",
+      "reset": "リセット",
+      "rotate90": "90°回転",
+      "rotate90Aria": "90度回転",
+      "flipHorizontal": "水平反転",
+      "flipHorizontalAria": "水平反転",
+      "zoom": "ズーム",
+      "deleteName": "名前をクリア",
+      "serverAvatar": "サーバーアバター",
+      "cover": "カバー",
+      "reason": "理由",
+      "reasonPlaceholder": "理由を入力...",
+      "serverBannerAria": "サーバーバナー",
+      "channelMenuAria": "チャンネルメニュー",
+      "cannotDeleteDefault": "デフォルトチャンネルは削除できません",
+      "categoryMenuAria": "カテゴリメニュー",
+      "preview": "プレビュー"
+    },
+    "emoji": {
+      "namePlaceholder": "emoji_name",
+      "editTitle": "絵文字を編集",
+      "uploadTitle": "絵文字をアップロード",
+      "uploadHint": "カスタム絵文字として使用する画像をアップロード"
+    },
+    "sticker": {
+      "namePlaceholder": "sticker_name",
+      "editTitle": "スタンプを編集",
+      "uploadTitle": "スタンプをアップロード"
+    },
+    "event": {
+      "topicPlaceholder": "イベントのトピックは何ですか？",
+      "descriptionPlaceholder": "イベントについてもう少し詳しく教えてください。Markdown、改行、リンクがサポートされています。",
+      "coverAlt": "カバー",
+      "close": "閉じる",
+      "guestNamePlaceholder": "みんなはあなたを何と呼びますか？",
+      "rotateImage": "画像を回転"
+    }
   }
 }

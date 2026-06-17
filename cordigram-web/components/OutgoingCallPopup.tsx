@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { useCallSound } from "@/hooks/use-call-sound";
 import { useMessagesUiTone } from "@/hooks/use-messages-ui-tone";
 import styles from "./OutgoingCallPopup.module.css";
@@ -26,6 +27,7 @@ export default function OutgoingCallPopup({
   lightBackdrop = false,
 }: OutgoingCallPopupProps) {
   const { t } = useLanguage();
+  const tVoice = useTranslations("voice");
   const uiTone = useMessagesUiTone();
 
   // ✅ Play outgoing call dialing tone (only when status is 'calling')
@@ -107,7 +109,7 @@ export default function OutgoingCallPopup({
               onClick={onJoin}
               className={`${styles.button}`}
               style={{ background: "#43b581" }}
-              aria-label="Tham gia cuộc gọi"
+              aria-label={tVoice("joinCall")}
             >
               <svg
                 width="28"

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { CategoryNotifyMode, NotifyLevel } from "@/lib/sidebar-prefs";
 import { notifyLabelCategory } from "@/lib/sidebar-prefs";
 import type { MuteDurationKey } from "@/components/ChannelContextMenu/ChannelContextMenu";
@@ -54,10 +55,12 @@ export default function CategoryContextMenu({
   onEditCategory,
   onDeleteCategory,
 }: CategoryContextMenuProps) {
+  const t = useTranslations("server");
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notify" | null>(null);
   const [submenuPos, setSubmenuPos] = useState({ left: 0, top: 0 });
+  const [menuPos, setMenuPos] = useState({ left: x, top: y });
 
   const notifySubLabel = notifyLabelCategory(categoryNotifyMode, serverNotificationLevel);
 
@@ -73,18 +76,26 @@ export default function CategoryContextMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
+    const pad = 8;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    if (rect.right > vw) {
-      menuRef.current.style.left = `${Math.max(4, vw - rect.width - 8)}px`;
+    let left = x;
+    let top = y;
+    if (left + rect.width > vw - pad) {
+      left = Math.max(pad, vw - pad - rect.width);
     }
-    if (rect.bottom > vh) {
-      menuRef.current.style.top = `${Math.max(4, vh - rect.height - 8)}px`;
+    const spaceBelow = vh - y - pad;
+    const spaceAbove = y - pad;
+    if (rect.height > spaceBelow && spaceAbove > spaceBelow) {
+      top = Math.max(pad, y - rect.height);
+    } else if (top + rect.height > vh - pad) {
+      top = Math.max(pad, vh - pad - rect.height);
     }
-  }, [x, y]);
+    setMenuPos({ left, top });
+  }, [x, y, submenu]);
 
   useLayoutEffect(() => {
     if (!submenu || !menuRef.current) return;
@@ -109,9 +120,9 @@ export default function CategoryContextMenu({
       <div
         ref={menuRef}
         className={styles.menu}
-        style={{ left: x, top: y }}
+        style={{ left: menuPos.left, top: menuPos.top }}
         role="menu"
-        aria-label="Menu danh mục"
+        aria-label={t("common.categoryMenuAria")}
       >
         <button
           type="button"

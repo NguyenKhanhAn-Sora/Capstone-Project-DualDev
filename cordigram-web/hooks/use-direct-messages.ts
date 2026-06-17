@@ -187,6 +187,12 @@ export const useDirectMessages = ({
   const [callSessionsSync, setCallSessionsSync] = useState<{
     sessions: DmCallSessionSyncItem[];
   } | null>(null);
+  const [callMediaTransferred, setCallMediaTransferred] = useState<{
+    peerId: string;
+    callId?: string;
+    roomId?: string;
+    type?: "audio" | "video";
+  } | null>(null);
   const [messageDeleted, setMessageDeleted] = useState<{
     messageId: string;
     deleteType?: "for-everyone" | "for-me";
@@ -214,6 +220,7 @@ export const useDirectMessages = ({
       setCallEnded(null);
       setCallIncomingDismiss(null);
       setCallSessionsSync(null);
+      setCallMediaTransferred(null);
       setUserTyping(null);
       setMessagesRead(null);
       setReactionUpdate(null);
@@ -232,6 +239,7 @@ export const useDirectMessages = ({
       setCallEnded(null);
       setCallIncomingDismiss(null);
       setCallSessionsSync(null);
+      setCallMediaTransferred(null);
       setUserTyping(null);
       setMessagesRead(null);
       setReactionUpdate(null);
@@ -555,6 +563,26 @@ export const useDirectMessages = ({
     );
 
     socket.on(
+      "call-media-transferred",
+      (data: {
+        peerId?: string;
+        callId?: string;
+        roomId?: string;
+        type?: "audio" | "video";
+      }) => {
+        if (!data?.peerId) return;
+        const evt = {
+          peerId: String(data.peerId),
+          callId: data.callId,
+          roomId: data.roomId,
+          type: data.type,
+        };
+        setCallMediaTransferred(evt);
+        setTimeout(() => setCallMediaTransferred(null), 1200);
+      },
+    );
+
+    socket.on(
       "message-deleted",
       (data: {
         messageId: string;
@@ -763,6 +791,42 @@ export const useDirectMessages = ({
     [],
   );
 
+  const claimCallMedia = useCallback(
+    (
+      peerId: string,
+    ): Promise<{
+      ok: boolean;
+      callId?: string;
+      roomId?: string;
+      type?: "audio" | "video";
+    }> => {
+      return new Promise((resolve) => {
+        if (!socketRef.current?.connected) {
+          resolve({ ok: false });
+          return;
+        }
+        socketRef.current.emit(
+          "call-media-claim",
+          { peerId },
+          (res: {
+            ok?: boolean;
+            callId?: string;
+            roomId?: string;
+            type?: "audio" | "video";
+          }) => {
+            resolve({
+              ok: Boolean(res?.ok),
+              callId: res?.callId,
+              roomId: res?.roomId,
+              type: res?.type,
+            });
+          },
+        );
+      });
+    },
+    [],
+  );
+
   const emitDeleteMessage = useCallback(
     (messageId: string, deleteType?: string, receiverId?: string) => {
       if (socketRef.current && socketRef.current.connected) {
@@ -789,6 +853,7 @@ export const useDirectMessages = ({
     callEnded,
     callIncomingDismiss,
     callSessionsSync,
+    callMediaTransferred,
     messageDeleted,
     userProfileStyleUpdated,
     boostEntitlementUpdated,
@@ -801,6 +866,7 @@ export const useDirectMessages = ({
     rejectCall,
     sendIceCandidate,
     endCall,
+    claimCallMedia,
     emitDeleteMessage,
   };
 };

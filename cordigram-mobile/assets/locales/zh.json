@@ -542,7 +542,8 @@
       "errorEmailRequired": "请输入邮箱",
       "errorEmailInvalid": "邮箱格式无效",
       "errorPasswordRequired": "请输入密码",
-      "errorPasswordShort": "密码至少8个字符"
+      "errorPasswordShort": "密码至少8个字符",
+      "emailHint": "you@example.com"
     },
     "signup": {
       "cropPhoto": "裁剪照片",
@@ -554,7 +555,20 @@
       "shortBio": "简短介绍（可选）",
       "chooseFromGallery": "从相册选择",
       "continueWithGoogle": "使用Google继续",
-      "googleSignInFailed": "Google登录失败，请重试。"
+      "googleSignInFailed": "Google登录失败，请重试。",
+      "emailHint": "email@example.com",
+      "displayNameHint": "例如：Cordigrammer",
+      "usernameHint": "用户名",
+      "passwordHint": "至少8个字符",
+      "confirmPasswordHint": "重新输入确认",
+      "bioHint": "分享一下关于你自己",
+      "creatingAccount": "创建账号中...",
+      "createAccount": "创建账号",
+      "finishing": "完成中...",
+      "finish": "完成",
+      "otpPlaceholder": "• • • • • •",
+      "sendingOtp": "发送中...",
+      "verifying": "验证中..."
     },
     "forgotPassword": {
       "email": "邮箱",
@@ -563,7 +577,13 @@
       "confirmPassword": "确认密码",
       "resendCode": "重新发送验证码",
       "otpResent": "OTP已重新发送 – 请查看您的收件箱。",
-      "passwordUpdated": "密码已更新！请登录。"
+      "passwordUpdated": "密码已更新！请登录。",
+      "emailHint": "you@example.com",
+      "otpHint": "6位验证码",
+      "passwordHint": "至少8个字符",
+      "confirmPasswordHint": "重新输入确认",
+      "weSentCode": "我们已向以下地址发送6位验证码",
+      "codeExpires": "。验证码将在5分钟内过期。"
     }
   },
   "home": {
@@ -1237,6 +1257,10 @@
     "voiceChannel": "语音频道",
     "voiceMessage": "语音消息",
     "messageRecalled": "消息已撤回",
+    "messagePinned": "已固定消息",
+    "cannotPinMessage": "无法固定消息",
+    "cannotDeleteMessage": "无法删除消息",
+    "messageNotInSegment": "消息不在加载段中",
     "call": {
       "reject": "拒绝",
       "leaveAndAccept": "离开频道并接听",
@@ -3021,7 +3045,8 @@
       "searchPlaceholder": "按名称或用户名搜索...",
       "invite": "邀请",
       "copiedToast": "已复制服务器邀请链接",
-      "errorLoad": "无法加载好友列表"
+      "errorLoad": "无法加载好友列表",
+      "noCreateInvitePermission": "您没有创建邀请的权限"
     },
     "createEvent": {
       "title": "创建活动",
@@ -3936,5 +3961,27 @@
     "toolSwap": "更换",
     "toolTrim": "修剪",
     "editText": "编辑文字"
+  },
+  "server": {
+    "iconUpdated": "图标已更新（点击保存以应用）",
+    "bannerSelected": "已选择横幅图片（点击保存以应用）",
+    "nameRequired": "服务器名称不能为空",
+    "changesSaved": "更改已保存",
+    "noPermissionManageEmoji": "您没有管理表情的权限。",
+    "createRole": "创建角色",
+    "reject": "拒绝",
+    "approve": "批准",
+    "approveFailed": "批准失败",
+    "rejectFailed": "拒绝失败",
+    "loadDetailFailed": "无法加载详情",
+    "noChatChannel": "服务器没有可打开的聊天频道。",
+    "members": {
+      "days7": "7天",
+      "days14": "14天",
+      "days30": "30天",
+      "allRoles": "所有角色",
+      "noRole": "无角色",
+      "memberRole": "成员"
+    }
   }
 }

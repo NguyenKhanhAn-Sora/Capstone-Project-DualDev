@@ -30,6 +30,7 @@ export default function CallPage() {
 
   const channelRef = useRef<BroadcastChannel | null>(null);
   const remoteJoinedAtRef = useRef<number | null>(null);
+  const transferringMediaRef = useRef(false);
 
   const buildSelfEndedMessage = useCallback(() => {
     if (!peerId) return null;
@@ -174,6 +175,22 @@ export default function CallPage() {
       const data = event.data as { type?: string; peerId?: string } | null;
       if (!data) return;
       if (
+        data.type === "media-transferred" &&
+        (!peerId || !data.peerId || data.peerId === peerId)
+      ) {
+        transferringMediaRef.current = true;
+        if (data.peerId) {
+          removeActiveDmCallPeer(data.peerId);
+        }
+        setEnded(true);
+        setTimeout(() => {
+          try {
+            window.close();
+          } catch (_) {}
+        }, 50);
+        return;
+      }
+      if (
         data.type === "peer-ended" &&
         (!peerId || !data.peerId || data.peerId === peerId)
       ) {
@@ -208,6 +225,11 @@ export default function CallPage() {
     if (embedded || !peerId || typeof window === "undefined") return;
 
     const cleanupActivePeer = () => {
+      if (transferringMediaRef.current) {
+        removeActiveDmCallPeer(peerId);
+        setActiveDmCallIdForHeartbeat(null);
+        return;
+      }
       removeActiveDmCallPeer(peerId);
       setActiveDmCallIdForHeartbeat(null);
       postSelfEnded();
@@ -228,6 +250,14 @@ export default function CallPage() {
   const handleDisconnect = useCallback(() => {
     if (embedded) {
       setEnded(true);
+      return;
+    }
+    if (transferringMediaRef.current) {
+      if (peerId) {
+        removeActiveDmCallPeer(peerId);
+        setActiveDmCallIdForHeartbeat(null);
+      }
+      window.close();
       return;
     }
     // Signal the opener tab so it can emit `call-end` via its socket — this

@@ -3032,7 +3032,8 @@
       "searchPlaceholder": "Search by name or username...",
       "invite": "Invite",
       "copiedToast": "Server invite link copied",
-      "errorLoad": "Could not load friends list"
+      "errorLoad": "Could not load friends list",
+      "noCreateInvitePermission": "You don't have permission to create invites"
     },
     "createEvent": {
       "title": "Create event",
@@ -3932,5 +3933,27 @@
     "toolSwap": "Swap",
     "toolTrim": "Trim",
     "editText": "Edit text"
+  },
+  "server": {
+    "iconUpdated": "Icon updated (tap Save to apply)",
+    "bannerSelected": "Banner image selected (tap Save to apply)",
+    "nameRequired": "Server name cannot be empty",
+    "changesSaved": "Changes saved",
+    "noPermissionManageEmoji": "You don't have permission to manage expressions.",
+    "createRole": "Create role",
+    "reject": "Reject",
+    "approve": "Approve",
+    "approveFailed": "Approval failed",
+    "rejectFailed": "Rejection failed",
+    "loadDetailFailed": "Failed to load details",
+    "noChatChannel": "Server has no chat channel to open.",
+    "members": {
+      "days7": "7 days",
+      "days14": "14 days",
+      "days30": "30 days",
+      "allRoles": "All roles",
+      "noRole": "No role",
+      "memberRole": "Member"
+    }
   }
 }

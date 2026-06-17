@@ -71,6 +71,7 @@ function toModeratorGridRow(m: ExtendedMember): ModeratorMemberRow {
 export interface ServerMembersSectionProps {
   serverId: string;
   isOwner: boolean;
+  canManageServer?: boolean;
   currentUserId: string;
   token: string | null;
   onNavigateToDM?: (userId: string, displayName: string, username: string, avatarUrl?: string) => void;
@@ -80,6 +81,7 @@ export interface ServerMembersSectionProps {
 export default function ServerMembersSection({
   serverId,
   isOwner,
+  canManageServer = false,
   currentUserId,
   token,
   onNavigateToDM,
@@ -87,8 +89,8 @@ export default function ServerMembersSection({
 }: ServerMembersSectionProps) {
   const { t } = useLanguage();
   const [members, setMembers] = useState<ExtendedMember[]>([]);
-  const [permissions, setPermissions] = useState<{ canKick: boolean; canBan: boolean; canTimeout: boolean; isOwner: boolean }>({
-    canKick: false, canBan: false, canTimeout: false, isOwner: false,
+  const [permissions, setPermissions] = useState<{ canKick: boolean; canBan: boolean; canTimeout: boolean; canManageNicknames: boolean; isOwner: boolean }>({
+    canKick: false, canBan: false, canTimeout: false, canManageNicknames: false, isOwner: false,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +112,7 @@ export default function ServerMembersSection({
   const [ignoreMember, setIgnoreMember] = useState<ExtendedMember | null>(null);
   const [transferConfirmMember, setTransferConfirmMember] = useState<ExtendedMember | null>(null);
   const [transferring, setTransferring] = useState(false);
+  const [serverRoles, setServerRoles] = useState<Array<{ _id: string; name: string; color: string }>>([]);
   const [moderationModal, setModerationModal] = useState<{ action: "kick" | "ban" | "timeout" | null; member: ExtendedMember | null }>({ action: null, member: null });
   const [moderationReason, setModerationReason] = useState("");
   const [timeoutDuration, setTimeoutDuration] = useState(60);
@@ -150,7 +153,7 @@ export default function ServerMembersSection({
           }),
         );
         setMembers(converted);
-        setPermissions({ canKick: isOwner, canBan: isOwner, canTimeout: isOwner, isOwner });
+        setPermissions({ canKick: isOwner, canBan: isOwner, canTimeout: isOwner, canManageNicknames: isOwner, isOwner });
       } catch (fallbackErr) {
         setError(fallbackErr instanceof Error ? fallbackErr.message : t("chat.serverMembers.loadFail"));
       }
@@ -160,6 +163,13 @@ export default function ServerMembersSection({
   }, [serverId, isOwner, t]);
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
+
+  useEffect(() => {
+    if (!serverId) return;
+    serversApi.getRoles(serverId).then((roles) => {
+      setServerRoles(roles.filter((r) => !r.isDefault).map((r) => ({ _id: r._id, name: r.name, color: r.color })));
+    }).catch(() => {});
+  }, [serverId]);
 
   useEffect(() => {
     const onUpdated = (e: Event) => {
@@ -251,15 +261,21 @@ export default function ServerMembersSection({
     return <span className={styles.memberBadge}>{t("chat.serverMembers.memberBadge")}</span>;
   };
 
+  const hasFullAccess = isOwner || canManageServer;
+
   return (
     <div className={styles.wrapper}>
-      <div className={styles.toggleRow}>
-        <span className={styles.toggleLabel}>{t("chat.serverMembers.showInChannelLabel")}</span>
-        <button type="button" role="switch" aria-checked={showInChannelList} className={styles.toggle} onClick={() => setShowInChannelList((v) => !v)}>
-          <span className={styles.toggleTrack}><span className={styles.toggleThumb} data-on={showInChannelList} /></span>
-        </button>
-      </div>
-      <p className={styles.desc}>{t("chat.serverMembers.showInChannelDesc")}</p>
+      {hasFullAccess && (
+        <>
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleLabel}>{t("chat.serverMembers.showInChannelLabel")}</span>
+            <button type="button" role="switch" aria-checked={showInChannelList} className={styles.toggle} onClick={() => setShowInChannelList((v) => !v)}>
+              <span className={styles.toggleTrack}><span className={styles.toggleThumb} data-on={showInChannelList} /></span>
+            </button>
+          </div>
+          <p className={styles.desc}>{t("chat.serverMembers.showInChannelDesc")}</p>
+        </>
+      )}
 
       <h3 className={styles.sectionTitle}>{t("chat.serverMembers.searchResults")}</h3>
       <div className={styles.toolbar}>
@@ -302,13 +318,15 @@ export default function ServerMembersSection({
                   onChange={(e) => setListFilters((f) => ({ ...f, serverRole: e.target.value as memberList.MemberListFilters["serverRole"] }))}>
                   <option value="all">{t("chat.serverMembers.roleAll")}</option>
                   <option value="owner">{t("chat.serverMembers.roleOwner")}</option>
-                  <option value="moderator">{t("chat.serverMembers.roleModerator")}</option>
+                  {serverRoles.map((role) => (
+                    <option key={role._id} value={role._id}>{role.name}</option>
+                  ))}
                   <option value="member">{t("chat.serverMembers.roleMember")}</option>
                 </select>
               </div>
             </div>
           )}
-          {isOwner && (
+          {hasFullAccess && (
             <button type="button" className={styles.btnSecondary} onClick={() => setFilterModalOpen(true)}>
               {t("chat.serverMembers.pruneBtn")}
             </button>
@@ -324,18 +342,22 @@ export default function ServerMembersSection({
           <table className={styles.table}>
             <thead>
               <tr>
-                <th className={styles.thCheck}>
-                  <input type="checkbox" checked={processedMembers.length > 0 && selectedIds.size === processedMembers.length} onChange={toggleSelectAll} aria-label={t("chat.serverMembers.colCheck")} />
-                </th>
+                {hasFullAccess && (
+                  <th className={styles.thCheck}>
+                    <input type="checkbox" checked={processedMembers.length > 0 && selectedIds.size === processedMembers.length} onChange={toggleSelectAll} aria-label={t("chat.serverMembers.colCheck")} />
+                  </th>
+                )}
                 <th className={styles.thName}>{t("chat.serverMembers.colName")}</th>
               </tr>
             </thead>
             <tbody>
               {processedMembers.map((row) => (
                 <tr key={row.userId} className={styles.row}>
-                  <td className={styles.tdCheck}>
-                    <input type="checkbox" checked={selectedIds.has(row.userId)} onChange={() => toggleSelect(row.userId)} aria-label={`${t("chat.serverMembers.colCheck")} ${row.displayName || row.username}`} />
-                  </td>
+                  {hasFullAccess && (
+                    <td className={styles.tdCheck}>
+                      <input type="checkbox" checked={selectedIds.has(row.userId)} onChange={() => toggleSelect(row.userId)} aria-label={`${t("chat.serverMembers.colCheck")} ${row.displayName || row.username}`} />
+                    </td>
+                  )}
                   <td className={styles.tdName}>
                     <div className={styles.avatar} style={{ backgroundImage: row.avatarUrl ? `url(${row.avatarUrl})` : undefined, backgroundColor: !row.avatarUrl ? "#5865f2" : undefined }}>
                       {!row.avatarUrl && <span>{(row.displayName || row.username || "?").charAt(0).toUpperCase()}</span>}
@@ -447,6 +469,25 @@ export default function ServerMembersSection({
             <button type="button" className={styles.simpleMenuItem} onClick={() => { onNavigateToDM?.(memberMenu.row.userId, memberMenu.row.displayName || memberMenu.row.username, memberMenu.row.username, memberMenu.row.avatarUrl); setMemberMenu(null); }}>
               {t("chat.serverMembers.menuMessage")}
             </button>
+            {(permissions.canManageNicknames || permissions.isOwner) && (
+              <button type="button" className={styles.simpleMenuItem} onClick={async () => {
+                const row = memberMenu.row;
+                setMemberMenu(null);
+                const newNick = await appPrompt(
+                  row.nickname ? `Đổi biệt danh (hiện tại: ${row.nickname})` : `Đổi biệt danh cho ${row.username}`,
+                  row.nickname ?? "",
+                );
+                if (newNick === null || newNick === undefined) return;
+                try {
+                  await serversApi.updateMemberNickname(serverId, row.userId, newNick);
+                  await fetchMembers();
+                } catch (err) {
+                  appAlert(err instanceof Error ? err.message : "Không đổi được biệt danh");
+                }
+              }}>
+                {t("chat.serverMembers.menuNickname")}
+              </button>
+            )}
             {canAffectMember(memberMenu.row) && (permissions.canTimeout || permissions.canKick || permissions.canBan) && (
               <>
                 <div style={{ height: 1, background: "var(--color-panel-border)", margin: "6px 8px" }} />

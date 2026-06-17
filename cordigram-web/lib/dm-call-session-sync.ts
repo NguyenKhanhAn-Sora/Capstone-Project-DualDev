@@ -72,6 +72,24 @@ export function setActiveDmCallIdForHeartbeat(callId: string | null): void {
 export const DM_CALL_ANSWER_EVENT = "cordigram-dm-call-answer";
 export const DM_CALL_INCOMING_EVENT = "cordigram-dm-call-incoming";
 
+export type DmCallMediaTransferredDetail = {
+  peerId: string;
+  callId?: string;
+  roomId?: string;
+  type?: "audio" | "video";
+};
+
+export function notifyDmCallMediaTransferred(peerId: string): void {
+  if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+  try {
+    const channel = new BroadcastChannel("cordigram-call");
+    channel.postMessage({ type: "media-transferred", peerId });
+    channel.close();
+  } catch {
+    // ignore
+  }
+}
+
 export type DmCallAnswerDetail = {
   from: string;
   sdpOffer?: { roomName?: string } | null;

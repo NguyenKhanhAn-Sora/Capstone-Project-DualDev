@@ -1159,13 +1159,13 @@ export default function SignupPage() {
     return (
       <form className="space-y-[16px]" onSubmit={handleRequestOtp}>
         <div className="space-y-[6px]">
-          <label className={styles.label}>Email address</label>
+          <label className={styles.label}>{t("auth.signup.emailAddress")}</label>
           <input
             type="email"
             name="email"
             value={email}
             onChange={(e) => setEmail(e.target.value.toLowerCase())}
-            placeholder="email@example.com"
+            placeholder={t("auth.signup.emailPlaceholder")}
             className={styles.input}
             required
           />
@@ -1178,7 +1178,7 @@ export default function SignupPage() {
           className={styles.primaryButton}
           disabled={loading}
         >
-          {loading ? "Sending..." : "Send OTP"}
+          {loading ? t("auth.signup.sending") : t("auth.signup.sendOTP")}
         </button>
       </form>
     );
@@ -1190,7 +1190,7 @@ export default function SignupPage() {
       <form className="space-y-[20px]" onSubmit={handleVerifyOtp}>
         <div className="space-y-[10px]">
           <p className="text-[13px] text-slate-500 font-medium text-center">
-            Enter the 6-digit code sent to <span className="font-semibold text-slate-700">{email}</span>
+            {t("auth.signup.otpInstruction")} <span className="font-semibold text-slate-700">{email}</span>
           </p>
           {/* 6-box OTP input */}
           <div className="relative flex gap-2.5 justify-center">
@@ -1228,7 +1228,7 @@ export default function SignupPage() {
               onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
               autoFocus
               className="absolute inset-0 w-full h-full opacity-0 cursor-text"
-              aria-label="Enter OTP code"
+              aria-label={t("auth.forgotPassword.otpAriaLabel")}
             />
           </div>
         </div>
@@ -1277,7 +1277,7 @@ export default function SignupPage() {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             className={styles.input}
-            placeholder="E.g. Cordigrammer"
+            placeholder={t("auth.signup.displayNamePlaceholder")}
             required
           />
           {fieldError.displayName && (
@@ -1299,7 +1299,7 @@ export default function SignupPage() {
               setUsername(cleaned);
             }}
             className={styles.input}
-            placeholder="username"
+            placeholder={t("auth.signup.usernamePlaceholder")}
             pattern="^[a-z0-9_\\.]{3,30}$"
             required
           />
@@ -1335,7 +1335,7 @@ export default function SignupPage() {
                 type="button"
                 className={styles.passwordToggle}
                 onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? t("auth.signup.hidePassword") : t("auth.signup.showPassword")}
               >
                 <EyeIcon open={showPassword} />
               </button>
@@ -1393,14 +1393,14 @@ export default function SignupPage() {
                   }
                 }}
                 className={`${styles.input} ${styles.passwordInput}`}
-                placeholder="Re-enter to confirm"
+                placeholder={t("auth.signup.confirmPasswordPlaceholder")}
               />
               <button
                 type="button"
                 className={styles.passwordToggle}
                 onClick={() => setShowConfirmPassword((prev) => !prev)}
                 aria-label={
-                  showConfirmPassword ? "Hide password" : "Show password"
+                  showConfirmPassword ? t("auth.signup.hidePassword") : t("auth.signup.showPassword")
                 }
               >
                 <EyeIcon open={showConfirmPassword} />
@@ -1569,7 +1569,7 @@ export default function SignupPage() {
               onKeyDown={onLocationKeyDown}
               onBlur={onLocationBlur}
               onFocus={onLocationFocus}
-              placeholder="Add a city, landmark, or place"
+              placeholder={t("auth.signup.locationPlaceholder")}
               aria-autocomplete="list"
               aria-expanded={locationOpen}
               aria-haspopup="listbox"
@@ -1633,7 +1633,7 @@ export default function SignupPage() {
           onChange={(e) => setBio(e.target.value.slice(0, BIO_CHAR_LIMIT))}
           className={styles.textarea}
           rows={3}
-          placeholder="Share a little about yourself"
+          placeholder={t("auth.signup.bioPlaceholder")}
         />
       </div>
 
@@ -1884,7 +1884,7 @@ export default function SignupPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value.toLowerCase())}
-                    placeholder="Địa chỉ email"
+                    placeholder={t("auth.signup.emailPlaceholder")}
                     autoComplete="email"
                     className="w-full h-[52px] pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
                   />
@@ -1897,7 +1897,7 @@ export default function SignupPage() {
                 >
                   {loading
                     ? <span className="w-[22px] h-[22px] border-[2.5px] border-white border-t-transparent rounded-full animate-spin inline-block" />
-                    : "Send OTP"}
+                    : t("auth.signup.sendOTP")}
                 </button>
                 <button
                   type="button"
@@ -1910,7 +1910,7 @@ export default function SignupPage() {
                     <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
                     <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
                   </svg>
-                  Tiếp tục với Google
+                  {t("auth.login.continueWithGoogle")}
                 </button>
                 <div className="flex items-center justify-center text-[13px]">
                   <span className="text-[#64748B]">{"Already have an account? "}</span>
@@ -1971,7 +1971,7 @@ export default function SignupPage() {
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Tên hiển thị"
+                    placeholder={t("auth.signup.displayNamePlaceholder")}
                     className="w-full h-[52px] pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
                   />
                   {fieldError.displayName && <p className="mt-1 text-red-600 text-[12px]">{fieldError.displayName}</p>}
@@ -1986,7 +1986,7 @@ export default function SignupPage() {
                       const cleaned = e.target.value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9_.]/g, "").slice(0, 30);
                       setUsername(cleaned);
                     }}
-                    placeholder="Tên người dùng"
+                    placeholder={t("auth.signup.usernamePlaceholder")}
                     className="w-full h-[52px] pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
                   />
                   {fieldError.username && <p className="mt-1 text-red-600 text-[12px]">{fieldError.username}</p>}
@@ -2006,7 +2006,7 @@ export default function SignupPage() {
                         onBlur={() => {
                           if (password) setPasswordBlurred(true);
                         }}
-                        placeholder="Mật khẩu"
+                        placeholder={t("auth.signup.passwordPlaceholder")}
                         className={`w-full h-[52px] pl-[44px] pr-[44px] rounded-[14px] border bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none transition-colors ${passwordBlurred && !allRulesMet ? "border-red-400 focus:border-red-400" : "border-[#D7E5F2] focus:border-[#3470A2]"}`}
                       />
                       <button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] p-1">
@@ -2039,7 +2039,7 @@ export default function SignupPage() {
                         type={showConfirmPassword ? "text" : "password"}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Xác nhận mật khẩu"
+                        placeholder={t("auth.signup.confirmPasswordPlaceholder")}
                         className="w-full h-[52px] pl-[44px] pr-[44px] rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2]"
                       />
                       <button type="button" onClick={() => setShowConfirmPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] p-1">
@@ -2083,7 +2083,7 @@ export default function SignupPage() {
                   <textarea
                     value={bio}
                     onChange={(e) => setBio(e.target.value.slice(0, 300))}
-                    placeholder="Tiểu sử ngắn (tùy chọn)"
+                    placeholder={t("auth.signup.bioPlaceholder")}
                     rows={3}
                     maxLength={300}
                     className="w-full pt-3.5 pb-3 pl-[44px] pr-3.5 rounded-[14px] border border-[#D7E5F2] bg-[#F8FBFF] text-[14px] text-[#0F172A] placeholder:text-[#ADB8C7] focus:outline-none focus:border-[#3470A2] resize-none"

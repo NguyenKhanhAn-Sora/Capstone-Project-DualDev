@@ -15,9 +15,12 @@ import { ensureTabAccessToken, getTabAccessToken } from "@/lib/auth";
 import {
   DM_CALL_ANSWER_EVENT,
   setActiveDmCallIdForHeartbeat,
+  notifyDmCallMediaTransferred,
   type DmCallAnswerDetail,
+  type DmCallSessionSyncItem,
 } from "@/lib/dm-call-session-sync";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
+import { useTranslations } from "next-intl";
 import {
   useDirectMessages,
   type DirectMessage,
@@ -1505,6 +1508,7 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { t, language } = useLanguage();
+  const tMsg = useTranslations("messages");
 
   const isAdminView = searchParams.get("from") === "admin";
   const adminReturnUrl = searchParams.get("returnUrl");
@@ -1728,6 +1732,7 @@ export default function MessagesPage() {
   const [inviteToServerTarget, setInviteToServerTarget] = useState<{
     serverId: string;
     serverName: string;
+    canCreateInvite: boolean;
   } | null>(null);
   const [inviteToServerCandidates, setInviteToServerCandidates] = useState<serversApi.Friend[]>([]);
   const [voiceChannelCallToken, setVoiceChannelCallToken] = useState<string | null>(null);
@@ -2173,6 +2178,10 @@ export default function MessagesPage() {
   /** Refs for call socket effect — avoid wrong incoming UI / stale deps (glare, self) */
   const outgoingCallsByPeerRef = useRef(outgoingCallsByPeer);
   const callIdsByPeerRef = useRef<Record<string, string>>({});
+  const dmCallSessionsRef = useRef<DmCallSessionSyncItem[]>([]);
+  const continueCallOnThisDeviceRef = useRef<
+    (peerId: string, session?: DmCallSessionSyncItem) => Promise<void>
+  >(async () => {});
   const openedCallTabPeersRef = useRef<Set<string>>(new Set());
   const openingCallTabForPeerRef = useRef<Set<string>>(new Set());
   const callTabIdRef = useRef<string>("");
@@ -2190,10 +2199,7 @@ export default function MessagesPage() {
     });
   }, []);
   const isCallTabActiveForPeer = useCallback((peerId: string) => {
-    return (
-      openedCallTabPeersRef.current.has(peerId) ||
-      getActiveDmCallPeerIds().includes(peerId)
-    );
+    return openedCallTabPeersRef.current.has(peerId);
   }, []);
   const markCallTabOpen = useCallback((peerId: string, callId?: string) => {
     openedCallTabPeersRef.current.add(peerId);
@@ -2307,6 +2313,7 @@ export default function MessagesPage() {
     callEnded,
     callIncomingDismiss,
     callSessionsSync,
+    callMediaTransferred,
     messageDeleted,
     dmUnreadCountEvent,
     dmBlockUpdatedEvent,
@@ -2314,6 +2321,7 @@ export default function MessagesPage() {
     answerCall,
     rejectCall,
     endCall,
+    claimCallMedia,
     emitDeleteMessage,
   } = useDirectMessages({
     userId: currentUserId,
@@ -2840,6 +2848,16 @@ export default function MessagesPage() {
   }, [selectedDirectMessageFriend, notifyTyping]);
 
   // ✅ Call handlers - Show outgoing popup first
+  const findConnectedSessionForPeer = useCallback((peerId: string) => {
+    return dmCallSessionsRef.current.find(
+      (s) =>
+        s.peerId === peerId &&
+        (s.state === "connected" ||
+          s.state === "connecting" ||
+          s.state === "reconnecting"),
+    );
+  }, []);
+
   const handleStartCall = useCallback(
     async (isVideo: boolean) => {
       if (!selectedDirectMessageFriend || !token || !currentUserProfile) {
@@ -2851,18 +2869,17 @@ export default function MessagesPage() {
       callTabIdRef.current = tabId;
       const peerId = selectedDirectMessageFriend._id;
 
-      if (openedCallTabPeersRef.current.has(peerId)) {
-        showTransientError("Bạn đã có cuộc gọi đang diễn ra với người này.");
+      const connectedSession = findConnectedSessionForPeer(peerId);
+      if (connectedSession?.roomId) {
+        void continueCallOnThisDeviceRef.current(peerId, connectedSession);
         return;
       }
 
-      if (!tryAcquireOutboundCallLock(tabId, peerId)) {
-        showTransientError(
-          "Bạn đang gọi người này từ tab hoặc cửa sổ trình duyệt khác. Hãy dùng tab đó hoặc kết thúc cuộc gọi trước.",
-        );
+      if (openedCallTabPeersRef.current.has(peerId)) {
         return;
       }
-      // Fresh call — clear any stale "already opened" guard for this peer.
+
+      tryAcquireOutboundCallLock(tabId, peerId);
       openedCallTabPeersRef.current.delete(peerId);
 
       try {
@@ -2909,7 +2926,7 @@ export default function MessagesPage() {
         showTransientError("Không thể bắt đầu cuộc gọi");
       }
     },
-    [selectedDirectMessageFriend, token, currentUserProfile, initiateCall, showTransientError],
+    [selectedDirectMessageFriend, token, currentUserProfile, initiateCall, showTransientError, findConnectedSessionForPeer],
   );
 
   const buildCallUrl = useCallback(
@@ -2938,6 +2955,49 @@ export default function MessagesPage() {
     [currentUserProfile, token],
   );
 
+  const continueCallOnThisDevice = useCallback(
+    async (peerId: string, session?: DmCallSessionSyncItem) => {
+      const resolved = session ?? findConnectedSessionForPeer(peerId);
+      const roomName = resolved?.roomId;
+      if (!roomName) {
+        showTransientError("Không thể tiếp tục cuộc gọi trên thiết bị này.");
+        return;
+      }
+
+      const claim = await claimCallMedia(peerId);
+      const callType = claim.type ?? resolved?.type ?? "audio";
+      const callId = claim.callId ?? resolved?.callId;
+      if (callId) {
+        callIdsByPeerRef.current[peerId] = callId;
+      }
+
+      notifyDmCallMediaTransferred(peerId);
+      removeActiveDmCallPeer(peerId);
+      openedCallTabPeersRef.current.delete(peerId);
+
+      const callUrl = buildCallUrl(peerId, roomName, callType, callId);
+      const callWindowName = `cordigram-dm-call-${peerId}`;
+      const win = window.open(callUrl, callWindowName, "noopener,noreferrer");
+      if (win || openedCallTabPeersRef.current.has(peerId)) {
+        markCallTabOpen(peerId, callId);
+      }
+      dismissOutgoingCallPopup(peerId);
+      setIncomingCall(null);
+    },
+    [
+      findConnectedSessionForPeer,
+      claimCallMedia,
+      buildCallUrl,
+      markCallTabOpen,
+      dismissOutgoingCallPopup,
+      showTransientError,
+    ],
+  );
+
+  useEffect(() => {
+    continueCallOnThisDeviceRef.current = continueCallOnThisDevice;
+  }, [continueCallOnThisDevice]);
+
   const openCallTabForPeer = useCallback(
     (peerId: string, roomNameOverride?: string): boolean => {
       if (!currentUserProfile || !token) return false;
@@ -2961,6 +3021,8 @@ export default function MessagesPage() {
         tryAcquireOutboundCallLock(tabId, peerId);
       }
 
+      void claimCallMedia(peerId);
+
       try {
         const callUrl = buildCallUrl(peerId, roomName, callType, callId);
         const callWindowName = `cordigram-dm-call-${peerId}`;
@@ -2983,6 +3045,7 @@ export default function MessagesPage() {
       markCallTabOpen,
       dismissOutgoingCallPopup,
       isCallTabActiveForPeer,
+      claimCallMedia,
     ],
   );
 
@@ -3033,6 +3096,8 @@ export default function MessagesPage() {
 
       openingCallTabForPeerRef.current.add(peerId);
       try {
+        void claimCallMedia(peerId);
+        notifyDmCallMediaTransferred(peerId);
         openCallTabForPeer(peerId, roomFromAnswer);
       } finally {
         openingCallTabForPeerRef.current.delete(peerId);
@@ -3041,6 +3106,7 @@ export default function MessagesPage() {
     },
     [
       openCallTabForPeer,
+      claimCallMedia,
       isCallTabActiveForPeer,
       scheduleDismissOutgoingPopup,
     ],
@@ -3053,13 +3119,13 @@ export default function MessagesPage() {
       return;
     }
 
-    if (openedCallTabPeersRef.current.has(incomingCall.from)) {
-      rejectCall(incomingCall.from);
+    const peerId = incomingCall.from;
+    if (openedCallTabPeersRef.current.has(peerId)) {
+      void continueCallOnThisDeviceRef.current(peerId);
       setIncomingCall(null);
       return;
     }
 
-    const peerId = incomingCall.from;
     const alreadyAccepted = incomingCall.status === "accepted";
 
     try {
@@ -3087,6 +3153,9 @@ export default function MessagesPage() {
         return;
       }
 
+      await claimCallMedia(peerId);
+      notifyDmCallMediaTransferred(peerId);
+
       const callUrl = buildCallUrl(
         peerId,
         roomName,
@@ -3110,6 +3179,7 @@ export default function MessagesPage() {
     currentUserProfile,
     answerCall,
     buildCallUrl,
+    claimCallMedia,
     showTransientError,
     markCallTabOpen,
     rejectCall,
@@ -3176,6 +3246,13 @@ export default function MessagesPage() {
         return next;
       });
     }
+    if (callBusy.code === "already_in_call" && peerId) {
+      const connectedSession = findConnectedSessionForPeer(peerId);
+      if (connectedSession?.roomId) {
+        void continueCallOnThisDeviceRef.current(peerId, connectedSession);
+        return;
+      }
+    }
     showTransientError(
       callBusy.code === "peer_busy"
         ? "Người dùng này đang bận cuộc gọi khác."
@@ -3185,7 +3262,7 @@ export default function MessagesPage() {
             ? "Bạn đã có cuộc gọi đang diễn ra với người này."
             : "Bạn đang gọi người này từ tab, cửa sổ trình duyệt hoặc thiết bị khác.",
     );
-  }, [callBusy, showTransientError]);
+  }, [callBusy, showTransientError, findConnectedSessionForPeer]);
 
   // ✅ Handle incoming call & call events
   useEffect(() => {
@@ -3211,7 +3288,6 @@ export default function MessagesPage() {
       }
 
       if (openedCallTabPeersRef.current.has(ev.from)) {
-        rejectCall(ev.from);
         return;
       }
 
@@ -3373,6 +3449,7 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!callSessionsSync?.sessions) return;
     const sessions = callSessionsSync.sessions;
+    dmCallSessionsRef.current = sessions;
     const ringingPeers = new Set(
       sessions
         .filter((s) => s.state === "ringing" && s.role === "callee")
@@ -3446,6 +3523,14 @@ export default function MessagesPage() {
     });
   }, [callSessionsSync, handlePeerAnsweredCall, dismissOutgoingCallPopup, isCallTabActiveForPeer]);
 
+  useEffect(() => {
+    if (!callMediaTransferred?.peerId) return;
+    const peerId = callMediaTransferred.peerId;
+    notifyDmCallMediaTransferred(peerId);
+    markCallTabClosed(peerId);
+    openedCallTabPeersRef.current.delete(peerId);
+  }, [callMediaTransferred, markCallTabClosed]);
+
   // ✅ Listen for the call tab telling us the user ended the call.
   //
   // Why a BroadcastChannel and not postMessage?
@@ -3473,6 +3558,11 @@ export default function MessagesPage() {
       if (data.type === "call-active" && data.peerId) {
         markCallTabOpen(data.peerId, data.callId);
         scheduleDismissOutgoingPopup(data.peerId);
+        return;
+      }
+      if (data.type === "media-transferred" && data.peerId) {
+        markCallTabClosed(data.peerId);
+        openedCallTabPeersRef.current.delete(data.peerId);
         return;
       }
       if (data.type === "self-ended" && data.peerId) {
@@ -8266,8 +8356,8 @@ export default function MessagesPage() {
             />
             {/* Fullscreen button overlay */}
             <button
-              aria-label="Xem toàn màn hình"
-              title="Xem toàn màn hình"
+              aria-label={tMsg("viewFullscreen")}
+              title={tMsg("viewFullscreen")}
               style={{
                 position: "absolute",
                 top: 8,
@@ -8852,6 +8942,15 @@ export default function MessagesPage() {
     currentServerPermissionsForId === selectedServer &&
     currentServerPermissions != null;
 
+  const canCreateInviteOnCurrentServer = Boolean(
+    serverPermissionsReady &&
+      (currentServerPermissions?.canCreateInvite ||
+        currentServerPermissions?.isOwner),
+  );
+
+  const showInviteServerBtn =
+    !serverPermissionsReady || canCreateInviteOnCurrentServer;
+
   useEffect(() => {
     if (!currentUserId || !selectedServer) return;
     const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
@@ -9330,7 +9429,7 @@ export default function MessagesPage() {
               type="password"
               inputMode="numeric"
               maxLength={6}
-              placeholder="••••••"
+              placeholder={tMsg("channelPasswordPlaceholder")}
               value={passkeyInput}
               onChange={(e) =>
                 setPasskeyInput(e.target.value.replace(/\D/g, ""))
@@ -9485,7 +9584,9 @@ export default function MessagesPage() {
                       canManageChannels: isOwner,
                       canManageEvents: isOwner,
                       canManageExpressions: isOwner,
-                      canCreateInvite: true,
+                      canCreateInvite: isOwner,
+                      canChangeNickname: isOwner,
+                      canManageNicknames: isOwner,
                       mentionEveryone: isOwner,
                     };
                   }
@@ -9893,6 +9994,7 @@ export default function MessagesPage() {
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                     </button>
+                    {showInviteServerBtn && (
                     <button
                       type="button"
                       className={styles.inviteServerBtn}
@@ -9902,6 +10004,7 @@ export default function MessagesPage() {
                           setInviteToServerTarget({
                             serverId: currentServer._id,
                             serverName: currentServer.name || t("chat.sidebar.serverFallback"),
+                            canCreateInvite: canCreateInviteOnCurrentServer,
                           });
                       }}
                     >
@@ -9913,12 +10016,13 @@ export default function MessagesPage() {
                         <path d="M12 5v14M5 12h14" />
                       </svg>
                     </button>
+                    )}
                   </div>
                   {showServerProfileDropdown && currentServer && (
                     <ServerProfileDropdown
                       server={currentServer}
                       canManageProfile={canManageJoinApplications}
-                      canCreateInvite={currentServerPermissions?.canCreateInvite ?? true}
+                      canCreateInvite={currentServerPermissions?.canCreateInvite ?? Boolean(currentServerPermissions?.isOwner)}
                       onEditProfile={() => {
                         setShowServerProfileDropdown(false);
                         void openServerSettingsFromMediaPicker(currentServer._id, "profile");
@@ -9928,6 +10032,7 @@ export default function MessagesPage() {
                         setInviteToServerTarget({
                           serverId: currentServer._id,
                           serverName: currentServer.name || t("chat.sidebar.serverFallback"),
+                          canCreateInvite: canCreateInviteOnCurrentServer,
                         });
                       }}
                     />
@@ -10165,8 +10270,8 @@ export default function MessagesPage() {
                           {catCollapse.enabled && currentUserId && selectedServer && (
                             <button
                               type="button"
-                              title={catCollapse.collapsed ? "Mở rộng danh mục" : "Thu gọn danh mục"}
-                              aria-label={catCollapse.collapsed ? "Mở rộng" : "Thu gọn"}
+                              title={catCollapse.collapsed ? tMsg("expandCategory") : tMsg("collapseCategory")}
+                              aria-label={catCollapse.collapsed ? tMsg("expandCategory") : tMsg("collapseCategory")}
                               className={styles.addChannelBtn}
                               style={{ flexShrink: 0 }}
                               onClick={(e) => {
@@ -10431,7 +10536,7 @@ export default function MessagesPage() {
                     <div className={styles.section}>
                       <div className={styles.sectionHeader}>
                         <h3 className={styles.sectionTitle}>{t("chat.messagesPage.sectionVoice")}</h3>
-                        <button type="button" className={styles.addChannelBtn} title="Tạo kênh thoại" onClick={() => openCreateChannelModal("voice")}>
+                        <button type="button" className={styles.addChannelBtn} title={tMsg("createVoiceChannel")} onClick={() => openCreateChannelModal("voice")}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
                       </div>
@@ -11758,8 +11863,8 @@ export default function MessagesPage() {
                     </button>
                     <button
                       type="button"
-                      title="Chi tiết cuộc trò chuyện"
-                      aria-label="Chi tiết cuộc trò chuyện"
+                      title={tMsg("conversationDetails")}
+                      aria-label={tMsg("conversationDetails")}
                       onClick={() => setDetailsPanelOpen((v) => !v)}
                       style={detailsPanelOpen ? { background: "var(--color-surface-muted)", color: "var(--color-text)" } : undefined}
                     >
@@ -13585,6 +13690,12 @@ export default function MessagesPage() {
           serverId={inviteToServerTarget.serverId}
           serverName={inviteToServerTarget.serverName}
           friends={inviteToServerCandidates}
+          canCreateInvite={
+            inviteToServerTarget.serverId === selectedServer &&
+            serverPermissionsReady
+              ? canCreateInviteOnCurrentServer
+              : inviteToServerTarget.canCreateInvite
+          }
         />
       )}
 
@@ -13649,20 +13760,14 @@ export default function MessagesPage() {
           permissions={serverContextMenu.permissions ?? {
             isOwner: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
-            hasCustomRole: currentUserId !== "" &&
-              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
-            canKick: false,
-            canBan: false,
-            canTimeout: false,
             canManageServer: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canManageChannels: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canManageEvents: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
-            canManageExpressions: currentUserId !== "" &&
-              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
-            canCreateInvite: true,
+            canCreateInvite: currentServerPermissions?.canCreateInvite ?? (currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId),
           }}
           onClose={() => setServerContextMenu(null)}
           onMarkAsRead={() => setServerContextMenu(null)}
@@ -13670,6 +13775,10 @@ export default function MessagesPage() {
             setInviteToServerTarget({
               serverId: serverContextMenu.server._id,
               serverName: serverContextMenu.server.name || "Máy chủ",
+              canCreateInvite: Boolean(
+                serverContextMenu.permissions?.canCreateInvite ??
+                  serverContextMenu.permissions?.isOwner,
+              ),
             });
             setServerContextMenu(null);
           }}
@@ -14065,6 +14174,7 @@ export default function MessagesPage() {
                     servers.find((s) => s._id === serverSettingsTarget?.serverId)?.ownerId === currentUserId
                   )
                 }
+                canManageServer={Boolean(currentServerPermissions?.canManageServer || currentServerPermissions?.isOwner)}
                 currentUserId={currentUserId ?? ""}
                 token={token}
                 onNavigateToDM={(userId, displayName, username, avatarUrl) => {
@@ -14716,6 +14826,22 @@ export default function MessagesPage() {
           context={channelProfileContext}
           token={token}
           inviteableServers={channelProfileInviteServers}
+          canManageNicknames={Boolean(currentServerPermissions?.canManageNicknames || currentServerPermissions?.isOwner)}
+          onChangeNickname={async (userId, currentNick) => {
+            const newNick = await appPrompt(
+              currentNick ? `Đổi biệt danh (hiện tại: ${currentNick})` : "Nhập biệt danh mới",
+              currentNick ?? "",
+            );
+            if (newNick === null || newNick === undefined) return;
+            try {
+              const sid = channelProfileContext?.serverId;
+              if (!sid) return;
+              await serversApi.updateMemberNickname(sid, userId, newNick);
+              setToastMessage("Đã đổi biệt danh thành công.");
+            } catch (err) {
+              setToastMessage(err instanceof Error ? err.message : "Không đổi được biệt danh");
+            }
+          }}
           onClose={() => setChannelProfileContext(null)}
           onOpenDirectMessage={handleOpenDmFromChannelProfile}
           onToast={(m) => setToastMessage(m)}
