@@ -1,4 +1,6 @@
-import { getTranslations } from "next-intl/server";
+"use client";
+
+import { useTranslations } from "next-intl";
 import styles from "./verified-badge.module.css";
 
 type VerifiedBadgeProps = {
@@ -7,11 +9,11 @@ type VerifiedBadgeProps = {
   className?: string;
 };
 
-export default async function VerifiedBadge(props: VerifiedBadgeProps) {
+export default function VerifiedBadge(props: VerifiedBadgeProps) {
   const { visible = true, size = 18, className } = props;
   if (!visible) return null;
 
-  const t = await getTranslations("ui");
+  const t = useTranslations("ui");
 
   return (
     <span
