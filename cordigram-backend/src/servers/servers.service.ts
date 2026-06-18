@@ -28,6 +28,12 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { AddServerEmojiDto } from './dto/add-server-emoji.dto';
 import { BoostService } from '../boost/boost.service';
 import { FcmPushService } from '../notifications/fcm-push.service';
+import {
+  SERVER_DISCOVERY_MIN_AGE_MS,
+  SERVER_DISCOVERY_MIN_AGE_MINUTES,
+  SERVER_DISCOVERY_MIN_EVALUATE_MEMBERS,
+  SERVER_DISCOVERY_MIN_MEMBERS,
+} from './server-discovery.constants';
 
 /** Tổng số emoji tùy chỉnh (tĩnh + GIF) tối đa mỗi máy chủ. */
 const MAX_CUSTOM_EMOJIS_PER_SERVER = 30;
@@ -3913,10 +3919,9 @@ export class ServersService {
     const ageMinutes = Math.floor(ageMs / (60 * 1000));
 
     /** Đồng bộ với UI Truy cập / kích hoạt cộng đồng (Khám Phá). */
-    const minMembers = 3;
-    const minDiscoveryAgeWeeks = 8;
-    const minDiscoveryAgeMs = minDiscoveryAgeWeeks * 7 * 24 * 60 * 60 * 1000;
-    const minMembersToEvaluate = 2;
+    const minMembers = SERVER_DISCOVERY_MIN_MEMBERS;
+    const minDiscoveryAgeMs = SERVER_DISCOVERY_MIN_AGE_MS;
+    const minMembersToEvaluate = SERVER_DISCOVERY_MIN_EVALUATE_MEMBERS;
 
     const canEvaluate = memberCount >= minMembersToEvaluate;
     const hasEnoughMembers = memberCount >= minMembers;
@@ -3953,7 +3958,7 @@ export class ServersService {
         label: isOldEnough ? 'Máy Chủ Đủ Tuổi' : 'Máy Chủ "Quá Trẻ"',
         description: isOldEnough
           ? 'Máy chủ đã đủ tuổi để lên Khám Phá.'
-          : `Máy chủ trong Khám Phá cần tồn tại ít nhất ${minDiscoveryAgeWeeks} tuần. Vui lòng kiểm tra lại sau.`,
+          : `Máy chủ trong Khám Phá cần tồn tại ít nhất ${SERVER_DISCOVERY_MIN_AGE_MINUTES} phút. Vui lòng kiểm tra lại sau.`,
         passed: isOldEnough,
       },
       {

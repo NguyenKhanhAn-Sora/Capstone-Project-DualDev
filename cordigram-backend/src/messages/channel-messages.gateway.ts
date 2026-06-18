@@ -100,6 +100,10 @@ export class ChannelMessagesGateway
     this.server.to(`channel:${channelId}`).emit('new-message', { message });
   }
 
+  emitMessageUpdated(channelId: string, message: any) {
+    this.server.to(`channel:${channelId}`).emit('message-updated', { message });
+  }
+
   emitReactionUpdate(channelId: string, messageId: string, reactions: any[]) {
     this.server
       .to(`channel:${channelId}`)

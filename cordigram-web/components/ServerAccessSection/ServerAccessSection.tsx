@@ -47,10 +47,10 @@ type RuleRow = { id: string; content: string };
 type JoinFormQuestionType = "short" | "paragraph" | "multiple_choice";
 type JoinFormQuestion = { id: string; title: string; type: JoinFormQuestionType; required: boolean; options?: string[] };
 
-/** Must match `servers.service` discovery thresholds. */
+/** Must match `server-discovery.constants` on backend. */
 const DISCOVERY_MIN_EVALUATE = 2;
-const DISCOVERY_MIN_MEMBERS = 1000;
-const DISCOVERY_MIN_AGE_WEEKS = 8;
+const DISCOVERY_MIN_MEMBERS = 3;
+const DISCOVERY_MIN_AGE_MINUTES = 3;
 
 function localizedDiscoveryCheck(
   check: serversApi.DiscoveryCheck,
@@ -86,14 +86,14 @@ function localizedDiscoveryCheck(
         return {
           label: t("chat.serverAccess.discoveryCheckAgePassTitle"),
           description: t("chat.serverAccess.discoveryCheckAgePassDesc", {
-            minAgeWeeks: DISCOVERY_MIN_AGE_WEEKS,
+            minAgeMinutes: DISCOVERY_MIN_AGE_MINUTES,
           }),
         };
       }
       return {
         label: t("chat.serverAccess.discoveryCheckAgeFailTitle"),
         description: t("chat.serverAccess.discoveryCheckAgeFailDesc", {
-          minAgeWeeks: DISCOVERY_MIN_AGE_WEEKS,
+          minAgeMinutes: DISCOVERY_MIN_AGE_MINUTES,
         }),
       };
     case "content":

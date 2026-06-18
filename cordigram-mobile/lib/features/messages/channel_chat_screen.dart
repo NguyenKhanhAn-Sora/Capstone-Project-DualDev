@@ -123,6 +123,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   final Set<String> _wavingWelcomeIds = {};
   ChannelMessage? _replyingTo;
   StreamSubscription<ChannelMessage>? _newMessageSub;
+  StreamSubscription<ChannelMessage>? _messageUpdatedSub;
   StreamSubscription<Map<String, dynamic>>? _reactionSub;
   StreamSubscription<Map<String, dynamic>>? _deletedSub;
   StreamSubscription<Map<String, dynamic>>? _interactionSettingsSub;
@@ -137,6 +138,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   @override
   void dispose() {
     _newMessageSub?.cancel();
+    _messageUpdatedSub?.cancel();
     _reactionSub?.cancel();
     _deletedSub?.cancel();
     _interactionSettingsSub?.cancel();
@@ -157,6 +159,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       await ChannelMessagesRealtimeService.connect();
       ChannelMessagesRealtimeService.joinChannel(widget.channel.id);
       _newMessageSub?.cancel();
+      _messageUpdatedSub?.cancel();
       _reactionSub?.cancel();
       _deletedSub?.cancel();
       _interactionSettingsSub?.cancel();
@@ -165,6 +168,17 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       ) {
         if (!mounted || incoming.channelId != widget.channel.id) return;
         _insertChannelMessage(incoming);
+      });
+      _messageUpdatedSub =
+          ChannelMessagesRealtimeService.messageUpdates.listen((updated) {
+        if (!mounted || updated.channelId != widget.channel.id) return;
+        final idx = _messages.indexWhere((m) => m.id == updated.id);
+        if (idx == -1) return;
+        setState(() {
+          final copied = [..._messages];
+          copied[idx] = updated;
+          _messages = copied;
+        });
       });
       _reactionSub = ChannelMessagesRealtimeService.reactions.listen((payload) {
         if (!mounted) return;
@@ -257,6 +271,25 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
 
   void _insertChannelMessage(ChannelMessage incoming) {
     if (_messages.any((m) => m.id == incoming.id)) return;
+
+    final me = (widget.currentUserId ?? '').trim();
+    if (me.isNotEmpty && incoming.senderId == me) {
+      final tempIdx = _messages.indexWhere(
+        (m) =>
+            m.id.startsWith('temp-') &&
+            m.content.trim() == incoming.content.trim(),
+      );
+      if (tempIdx != -1) {
+        setState(() {
+          final copied = [..._messages];
+          copied[tempIdx] = incoming;
+          _messages = _sortChannelMessagesAsc(copied);
+        });
+        _scrollToBottom();
+      }
+      return;
+    }
+
     setState(() {
       _messages = _sortChannelMessagesAsc([..._messages, incoming]);
     });
@@ -602,11 +635,34 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     String? replyTo,
   }) async {
     if (content.trim().isEmpty || _sending || _chatBlocked) return;
-    setState(() => _sending = true);
+
+    final trimmed = content.trim();
+    final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
+    final optimistic = ChannelMessage(
+      id: tempId,
+      channelId: widget.channel.id,
+      senderId: widget.currentUserId ?? '',
+      senderName: widget.participantName ?? 'Bạn',
+      content: trimmed,
+      createdAt: DateTime.now(),
+      type: type,
+      giphyId: giphyId,
+      customStickerUrl: customStickerUrl,
+      voiceUrl: voiceUrl,
+      voiceDurationSec: voiceDuration,
+      attachments: attachments ?? const [],
+    );
+
+    setState(() {
+      _sending = true;
+      _messages = _sortChannelMessagesAsc([..._messages, optimistic]);
+    });
+    _scrollToBottom();
+
     try {
       final sent = await ChannelMessagesService.sendChannelMessage(
         widget.channel.id,
-        content.trim(),
+        trimmed,
         type: type,
         giphyId: giphyId,
         customStickerUrl: customStickerUrl,
@@ -619,19 +675,26 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       );
       if (sent != null && mounted) {
         setState(() {
-          if (!_messages.any((m) => m.id == sent.id)) {
-            _messages = _sortChannelMessagesAsc([..._messages, sent]);
+          final withoutTemp =
+              _messages.where((m) => m.id != tempId).toList(growable: true);
+          if (!withoutTemp.any((m) => m.id == sent.id)) {
+            withoutTemp.add(sent);
           }
+          _messages = _sortChannelMessagesAsc(withoutTemp);
           _replyingTo = null;
         });
         _scrollToBottom();
       }
       await ChannelMessagesService.markChannelRead(widget.channel.id);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('messages.failedSend', {'error': e.toString()}))));
+      if (mounted) {
+        setState(() {
+          _messages = _messages.where((m) => m.id != tempId).toList();
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('messages.failedSend', {'error': e.toString()}))));
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }

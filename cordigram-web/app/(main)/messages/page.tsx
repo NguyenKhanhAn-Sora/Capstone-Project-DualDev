@@ -2340,6 +2340,7 @@ export default function MessagesPage() {
   /** Luôn là kênh đang chọn (tránh closure cũ sau await trong loadMessages). */
   const selectedChannelRef = useRef<string | null>(null);
   const loadMessagesSeqRef = useRef(0);
+  const lastLoadedMessagesChannelRef = useRef<string | null>(null);
   const loadChannelsSeqRef = useRef(0);
   /** Chọn kênh cụ thể ngay sau khi đổi server (tìm kiếm / deep link). */
   const pendingChannelSelectRef = useRef<{ serverId: string; channelId: string } | null>(
@@ -2407,6 +2408,7 @@ export default function MessagesPage() {
   const {
     isConnected: isChannelSocketConnected,
     newMessageChannel,
+    messageUpdatedChannel,
     reactionUpdateChannel,
     channelNotification,
     inboxForYouItem,
@@ -2414,6 +2416,7 @@ export default function MessagesPage() {
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,
+    clearMessageUpdatedChannel,
     clearChannelNotification,
     clearInboxForYouItem,
     clearServerDeleted,
@@ -2834,6 +2837,37 @@ export default function MessagesPage() {
     currentUserProfile?.username,
     isChatScrolledNearBottom,
   ]);
+
+  // Patch link previews (and other server-side enrichments) when they arrive async.
+  useEffect(() => {
+    if (!messageUpdatedChannel?.message || !selectedChannel) return;
+    const msg = messageUpdatedChannel.message as any;
+    const channelId =
+      typeof msg.channelId === "string"
+        ? msg.channelId
+        : msg.channelId?._id ?? msg.channelId;
+    if (channelId !== selectedChannel) {
+      clearMessageUpdatedChannel();
+      return;
+    }
+    const messageId = msg?._id != null ? String(msg._id) : "";
+    if (!messageId) {
+      clearMessageUpdatedChannel();
+      return;
+    }
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              text: msg.content ?? m.text,
+              linkPreviews: Array.isArray(msg.linkPreviews) ? msg.linkPreviews : m.linkPreviews,
+            }
+          : m,
+      ),
+    );
+    clearMessageUpdatedChannel();
+  }, [messageUpdatedChannel, selectedChannel, clearMessageUpdatedChannel]);
 
   // Cleanup typing timeout on unmount or friend change
   useEffect(() => {
@@ -4512,6 +4546,7 @@ export default function MessagesPage() {
     if (selectedServer) {
       setMessages([]);
       loadMessagesSeqRef.current += 1;
+      lastLoadedMessagesChannelRef.current = null;
       const prevCh = prevChannelRef.current;
       if (prevCh) {
         leaveChannel(prevCh);
@@ -5414,21 +5449,29 @@ export default function MessagesPage() {
 
     selectedChannelRef.current = selectedChannel;
 
-    if (!selectedChatTextChannel) {
-      setMessages([]);
-      loadMessagesSeqRef.current += 1;
-      return;
-    }
-
-    setReplyingTo(null);
-    prepareScrollToLatest();
-    setMessages([]);
-    loadMessagesSeqRef.current += 1;
-
     const prev = prevChannelRef.current;
     if (prev && prev !== selectedChannel) leaveChannel(prev);
     prevChannelRef.current = selectedChannel;
     joinChannel(selectedChannel);
+
+    if (!selectedChatTextChannel) {
+      if (lastLoadedMessagesChannelRef.current !== selectedChannel) {
+        setMessages([]);
+        loadMessagesSeqRef.current += 1;
+        lastLoadedMessagesChannelRef.current = null;
+      }
+      return;
+    }
+
+    if (lastLoadedMessagesChannelRef.current === selectedChannel) {
+      return;
+    }
+
+    lastLoadedMessagesChannelRef.current = selectedChannel;
+    setReplyingTo(null);
+    prepareScrollToLatest();
+    setMessages([]);
+    loadMessagesSeqRef.current += 1;
     loadMessages(selectedChannel);
   }, [selectedChannel, selectedChatTextChannel?._id, joinChannel, leaveChannel]);
 
@@ -6479,12 +6522,45 @@ export default function MessagesPage() {
     if (!messageText.trim() || !selectedChannel) return;
 
     const content = messageText.trim();
+    const tempId = `temp-send-${Date.now()}`;
+    const myServerNickname =
+      servers
+        .find((s) => s._id === selectedServer)
+        ?.members?.find((m) => String(m.userId) === String(currentUserId))
+        ?.nickname?.trim() ?? "";
+    const optimisticMessage: UIMessage = {
+      id: tempId,
+      text: content,
+      senderId: currentUserId,
+      senderEmail: "",
+      senderName: selfMessagingIdentity.chatUsername || "",
+      senderDisplayName: myServerNickname || selfMessagingIdentity.displayName || undefined,
+      senderAvatar: selfMessagingIdentity.avatar,
+      timestamp: new Date(),
+      isFromCurrentUser: true,
+      type: "server",
+      messageType: "text",
+      replyTo: replyingTo?.id,
+      replyToMessage: replyingTo
+        ? {
+            id: replyingTo.id,
+            senderId: replyingTo.senderId,
+            senderDisplayName: replyingTo.senderDisplayName,
+            senderName: replyingTo.senderName,
+            messageType: replyingTo.messageType ?? "text",
+            text: replyingTo.text,
+          }
+        : null,
+      reactions: [],
+      linkPreviews: [],
+    };
 
     try {
       setMessageText("");
       setMentionOpen(false);
       setMentionKeyword("");
       setMentionStartPos(-1);
+      setMessages((prev) => appendServerMessage(prev, optimisticMessage));
       prepareScrollToLatest();
 
       const newMessage = await serversApi.createMessage(
@@ -6494,11 +6570,6 @@ export default function MessagesPage() {
         replyingTo?.id,
       );
 
-      const myServerNickname =
-        servers
-          .find((s) => s._id === selectedServer)
-          ?.members?.find((m) => String(m.userId) === String(currentUserId))
-          ?.nickname?.trim() ?? "";
       const senderDisplayNameResolved =
         myServerNickname ||
         (typeof newMessage.senderId === "string"
@@ -6556,10 +6627,14 @@ export default function MessagesPage() {
         linkPreviews: Array.isArray((newMessage as any).linkPreviews) ? (newMessage as any).linkPreviews : [],
       };
 
-      setMessages((prev) => appendServerMessage(prev, uiMessage));
+      setMessages((prev) => {
+        const withoutTemp = prev.filter((m) => m.id !== tempId);
+        return appendServerMessage(withoutTemp, uiMessage);
+      });
       setReplyingTo(null);
       serversApi.markChannelAsRead(selectedChannel).catch(() => {});
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
       const msg = err instanceof Error ? err.message : "Không gửi được tin nhắn";
       const isSpamBlock =
         msg.includes("spam đề cập") ||

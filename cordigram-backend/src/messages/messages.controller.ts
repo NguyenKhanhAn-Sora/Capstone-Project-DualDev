@@ -56,6 +56,18 @@ export class MessagesController {
     );
     this.channelMessagesGateway.emitNewMessage(channelId, result);
 
+    const content = (createMessageDto.content ?? '').trim();
+    const messageId = (result as any)?._id?.toString?.() ?? '';
+    if (content && messageId) {
+      void this.messagesService
+        .enrichLinkPreviewsInBackground(channelId, messageId, content)
+        .then((updated) => {
+          if (updated) {
+            this.channelMessagesGateway.emitMessageUpdated(channelId, updated);
+          }
+        });
+    }
+
     const mentionIds: string[] = ((result as any).mentions ?? []).map(
       (id: any) => id?.toString?.() ?? id,
     );

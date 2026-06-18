@@ -25,6 +25,10 @@ export interface ChannelNewMessageEvent {
   message: ChannelMessagePayload;
 }
 
+export interface ChannelMessageUpdatedEvent {
+  message: ChannelMessagePayload;
+}
+
 export interface ChannelReactionUpdateEvent {
   messageId: string;
   reactions: any[];
@@ -129,6 +133,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   const lastJoinedChannelIdRef = useRef<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [newMessageChannel, setNewMessageChannel] = useState<ChannelNewMessageEvent | null>(null);
+  const [messageUpdatedChannel, setMessageUpdatedChannel] = useState<ChannelMessageUpdatedEvent | null>(null);
   const [reactionUpdateChannel, setReactionUpdateChannel] = useState<ChannelReactionUpdateEvent | null>(null);
   const [channelNotification, setChannelNotification] = useState<ChannelNotificationEvent | null>(null);
   const [serverDeleted, setServerDeleted] = useState<ServerDeletedEvent | null>(null);
@@ -169,6 +174,10 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
 
     socket.on("new-message", (data: ChannelNewMessageEvent) => {
       if (data?.message) setNewMessageChannel(data);
+    });
+
+    socket.on("message-updated", (data: ChannelMessageUpdatedEvent) => {
+      if (data?.message) setMessageUpdatedChannel(data);
     });
 
     socket.on("reaction-updated", (data: ChannelReactionUpdateEvent) => {
@@ -333,6 +342,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   }, []);
 
   const clearNewMessageChannel = useCallback(() => setNewMessageChannel(null), []);
+  const clearMessageUpdatedChannel = useCallback(() => setMessageUpdatedChannel(null), []);
   const clearChannelNotification = useCallback(() => setChannelNotification(null), []);
   const clearInboxForYouItem = useCallback(() => setInboxForYouItem(null), []);
   const clearServerDeleted = useCallback(() => setServerDeleted(null), []);
@@ -340,6 +350,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   return {
     isConnected,
     newMessageChannel,
+    messageUpdatedChannel,
     reactionUpdateChannel,
     channelNotification,
     inboxForYouItem,
@@ -352,6 +363,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,
+    clearMessageUpdatedChannel,
     clearChannelNotification,
     clearInboxForYouItem,
     clearServerDeleted,

@@ -95,8 +95,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
         return AlertDialog(
           backgroundColor: dui.card,
           title: Text(
-            _t('chat.serverSettings.deleteServer.title',
-                {'serverName': serverName}),
+            _t('chat.popups.deleteServer.title', {'serverName': serverName}),
             style: TextStyle(color: dui.text),
           ),
           content: Column(
@@ -104,25 +103,30 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                _t('chat.serverSettings.deleteServer.message',
-                    {'serverName': serverName}),
+                _t('chat.popups.deleteServer.message', {'serverName': serverName}),
                 style: TextStyle(color: dui.textMuted),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              Text(
+                _t('chat.popups.deleteServer.confirmLabel').toUpperCase(),
+                style: TextStyle(
+                  color: dui.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: nameCtrl,
                 style: TextStyle(color: dui.text),
-
-                decoration: dui.fieldDecoration(
-                  hintText: _t('chat.serverSettings.deleteServer.confirmLabel'),
-                ),
+                decoration: dui.fieldDecoration(hintText: serverName),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c, false),
-
               child: Text(
                 _t('common.cancel'),
                 style: TextStyle(color: dui.textMuted),
@@ -135,7 +139,7 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
                 }
               },
               child: Text(
-                _t('chat.serverSettings.sections.delete-server'),
+                _t('chat.popups.deleteServer.deleteBtn'),
                 style: const TextStyle(color: Color(0xFFFF6B7A)),
               ),
             ),

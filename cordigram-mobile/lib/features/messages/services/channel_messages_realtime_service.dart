@@ -18,6 +18,8 @@ class ChannelMessagesRealtimeService {
 
   static final StreamController<ChannelMessage> _messagesController =
       StreamController<ChannelMessage>.broadcast();
+  static final StreamController<ChannelMessage> _messageUpdatedController =
+      StreamController<ChannelMessage>.broadcast();
   static final StreamController<Map<String, dynamic>> _reactionController =
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<Map<String, dynamic>> _deletedController =
@@ -30,6 +32,8 @@ class ChannelMessagesRealtimeService {
       StreamController<Map<String, dynamic>>.broadcast();
 
   static Stream<ChannelMessage> get messages => _messagesController.stream;
+  static Stream<ChannelMessage> get messageUpdates =>
+      _messageUpdatedController.stream;
   static Stream<Map<String, dynamic>> get reactions => _reactionController.stream;
   static Stream<Map<String, dynamic>> get deleted => _deletedController.stream;
   /// Per-user pushes from the gateway (mentions, inbox-related) without joining a channel room.
@@ -63,6 +67,15 @@ class ChannelMessagesRealtimeService {
       final raw = payload['message'] ?? payload;
       if (raw is! Map) return;
       _messagesController.add(
+        ChannelMessage.fromJson(Map<String, dynamic>.from(raw)),
+      );
+    });
+
+    socket.on('message-updated', (payload) {
+      if (payload is! Map) return;
+      final raw = payload['message'] ?? payload;
+      if (raw is! Map) return;
+      _messageUpdatedController.add(
         ChannelMessage.fromJson(Map<String, dynamic>.from(raw)),
       );
     });
@@ -165,6 +178,7 @@ class ChannelMessagesRealtimeService {
     final socket = _socket;
     if (socket != null) {
       socket.off('new-message');
+      socket.off('message-updated');
       socket.off('reaction-updated');
       socket.off('message-deleted');
       socket.off('channel-notification');

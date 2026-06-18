@@ -783,8 +783,8 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
           Text(
             'Ngưỡng thành viên / tuổi máy chủ đồng bộ với web '
             '(${ServerAccessConstants.discoveryMinEvaluateMembers}, '
-            '${ServerAccessConstants.discoveryMinMembers}, '
-            '${ServerAccessConstants.discoveryMinAgeWeeks} tuần).',
+            '${ServerAccessConstants.discoveryMinMembers} thành viên, '
+            '${ServerAccessConstants.discoveryMinAgeMinutes} phút).',
             style: TextStyle(color: ui.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 8),

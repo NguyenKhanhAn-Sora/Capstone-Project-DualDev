@@ -877,12 +877,8 @@ export class MessagesService {
       resolvedServerStickerId = new Types.ObjectId(sid);
     }
 
-    // Pre-fetch link previews for plain-text messages only
-    const linkPreviews =
-      messageTypeResolved === 'text' && moderatedContent
-        ? await this.linkPreviewService.extractFromText(moderatedContent)
-        : [];
-
+    // Link previews are fetched asynchronously after save so sending URLs does
+    // not block the HTTP response for up to several seconds per URL.
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
       senderId: userObjectId,
@@ -899,7 +895,7 @@ export class MessagesService {
       serverStickerId: resolvedServerStickerId,
       voiceUrl: createMessageDto.voiceUrl || null,
       voiceDuration: createMessageDto.voiceDuration ?? null,
-      linkPreviews,
+      linkPreviews: [],
     });
 
     const savedMessage = await message.save();
@@ -911,6 +907,31 @@ export class MessagesService {
       savedMessage._id.toString(),
     );
     return enriched;
+  }
+
+  /**
+   * Fetch OG previews after the message is persisted & returned to clients.
+   * Returns the enriched message when previews were attached.
+   */
+  async enrichLinkPreviewsInBackground(
+    channelId: string,
+    messageId: string,
+    content: string,
+  ): Promise<Message | null> {
+    try {
+      const linkPreviews =
+        await this.linkPreviewService.extractFromText(content);
+      if (!linkPreviews.length) return null;
+
+      await this.messageModel.updateOne(
+        { _id: new Types.ObjectId(messageId) },
+        { $set: { linkPreviews } },
+      );
+
+      return this.getMessageByIdEnriched(messageId);
+    } catch {
+      return null;
+    }
   }
 
   async createWaveStickerMessage(
