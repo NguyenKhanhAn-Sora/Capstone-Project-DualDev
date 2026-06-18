@@ -819,10 +819,12 @@ export async function fetchUserReels(opts: {
   token?: string | null;
   userId: string;
   limit?: number;
+  page?: number;
 }): Promise<FeedItem[]> {
-  const { token, userId, limit = 30 } = opts;
+  const { token, userId, limit = 30, page } = opts;
   const params = new URLSearchParams();
   if (limit) params.set("limit", String(limit));
+  if (page && page > 1) params.set("page", String(page));
 
   return apiFetch<FeedItem[]>({
     path: `/reels/user/${userId}?${params.toString()}`,
@@ -868,13 +870,15 @@ export async function fetchSavedReels(opts: {
 export async function fetchReelsFeed(opts: {
   token?: string | null;
   limit?: number;
+  page?: number;
   authorId?: string;
   includeOwned?: boolean;
   scope?: "all" | "following";
 }): Promise<FeedItem[]> {
-  const { token, limit = 20, authorId, includeOwned, scope } = opts;
+  const { token, limit = 20, page, authorId, includeOwned, scope } = opts;
   const params = new URLSearchParams();
   params.set("limit", String(limit));
+  if (page && page > 1) params.set("page", String(page));
   if (authorId) params.set("authorId", authorId);
   if (includeOwned) params.set("includeOwned", "1");
   if (scope) params.set("scope", scope);

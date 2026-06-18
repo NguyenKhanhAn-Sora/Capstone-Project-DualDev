@@ -98,7 +98,7 @@ class _ServerJoinApplicationsScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Duyệt thất bại: $e')),
+        SnackBar(content: Text(LanguageController.instance.t('server.approveFailed'))),
       );
     } finally {
       if (mounted) setState(() => _quickBusyUserId = null);
@@ -110,7 +110,7 @@ class _ServerJoinApplicationsScreenState
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0E2247),
-        title: const Text('Từ chối đơn?', style: TextStyle(color: Colors.white)),
+        title: Text(LanguageController.instance.t('server.join.rejectApplicationDialog'), style: const TextStyle(color: Colors.white)),
         content: const Text(
           'Người này sẽ không được tham gia máy chủ qua đơn đăng ký này.',
           style: TextStyle(color: Color(0xFFAFC0E2)),
@@ -118,12 +118,12 @@ class _ServerJoinApplicationsScreenState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Huỷ'),
+            child: Text(LanguageController.instance.t('common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Từ chối',
+            child: Text(
+              LanguageController.instance.t('server.reject'),
               style: TextStyle(color: Color(0xFFFF6B6B)),
             ),
           ),
@@ -139,7 +139,7 @@ class _ServerJoinApplicationsScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Từ chối thất bại: $e')),
+        SnackBar(content: Text(LanguageController.instance.t('server.rejectFailed'))),
       );
     } finally {
       if (mounted) setState(() => _quickBusyUserId = null);
@@ -158,7 +158,7 @@ class _ServerJoinApplicationsScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không tải chi tiết: $e')),
+        SnackBar(content: Text(LanguageController.instance.t('server.loadDetailFailed'))),
       );
       return;
     }
@@ -271,7 +271,7 @@ class _ServerJoinApplicationsScreenState
                                   color: Color(0xFFFF6B6B),
                                 ),
                               ),
-                              child: const Text('Từ chối'),
+                              child: Text(LanguageController.instance.t('server.reject')),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -281,7 +281,7 @@ class _ServerJoinApplicationsScreenState
                                 Navigator.pop(ctx);
                                 await _quickApprove(userId);
                               },
-                              child: const Text('Duyệt'),
+                              child: Text(LanguageController.instance.t('server.approve')),
                             ),
                           ),
                         ],

@@ -285,6 +285,7 @@ export class BoostService {
       scope: status.scope,
       tier: status.tier,
       active: status.active,
+      unlocked: status.active,
       expiresAt: status.expiresAt,
       limits: status.limits,
     };

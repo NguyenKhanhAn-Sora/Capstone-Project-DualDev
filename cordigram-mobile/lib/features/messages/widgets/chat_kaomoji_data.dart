@@ -1,3 +1,5 @@
+import '../../../core/services/language_controller.dart';
+
 /// Kaomoji categories — parity `cordigram-web/components/ChatEmojiPicker/ChatEmojiPicker.tsx`.
 class ChatKaomojiCategory {
   const ChatKaomojiCategory({required this.label, required this.items});
@@ -6,9 +8,9 @@ class ChatKaomojiCategory {
   final List<String> items;
 }
 
-const chatKaomojiCategories = <ChatKaomojiCategory>[
+List<ChatKaomojiCategory> get chatKaomojiCategories => [
   ChatKaomojiCategory(
-    label: 'Vui / Phấn khích',
+    label: LanguageController.instance.t('messages.kaomoji.happy'),
     items: [
       '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧',
       '(*^▽^*)',
@@ -21,7 +23,7 @@ const chatKaomojiCategories = <ChatKaomojiCategory>[
     ],
   ),
   ChatKaomojiCategory(
-    label: 'Yêu thương',
+    label: LanguageController.instance.t('messages.kaomoji.love'),
     items: [
       '(♡˙︶˙♡)',
       '(ˆ ³ˆ)♥',
@@ -33,15 +35,15 @@ const chatKaomojiCategories = <ChatKaomojiCategory>[
     ],
   ),
   ChatKaomojiCategory(
-    label: 'Buồn / Khóc',
+    label: LanguageController.instance.t('messages.kaomoji.sad'),
     items: ['(╥_╥)', '(T_T)', '(；′⌒｀)', 'ಥ_ಥ', '(｡•́︿•̀｡)', '(╯︵╰,)'],
   ),
   ChatKaomojiCategory(
-    label: 'Hài hước',
+    label: LanguageController.instance.t('messages.kaomoji.funny'),
     items: ['( ͡° ͜ʖ ͡°)', '¯\\_(ツ)_/¯', 'ʕ•ᴥ•ʔ', '(งʼ̀-ʼ́)ง', '(ง •̀_•́)ง'],
   ),
   ChatKaomojiCategory(
-    label: 'Chào / Vẫy',
+    label: LanguageController.instance.t('messages.kaomoji.wave'),
     items: ['( ´ ▽ ` )ﾉ', '(*ﾟ▽ﾟ*)/', '(＾ゞ^)', 'ヾ(^∇^)', 'o(^▽^)o'],
   ),
 ];

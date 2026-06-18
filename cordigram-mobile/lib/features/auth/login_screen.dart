@@ -51,6 +51,22 @@ class _LoginScreenState extends State<LoginScreen> {
       _recentAccounts = items;
       _recentLoading = false;
     });
+    // Silently refresh from server so changes made on other devices/web are reflected.
+    unawaited(_refreshRecentAccountsFromServer());
+  }
+
+  Future<void> _refreshRecentAccountsFromServer() async {
+    final token = await _getActiveTokenForRecentSync();
+    if (token == null) return;
+    try {
+      final payload = await ApiService.get(
+        '/auth/recent-accounts',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      await _applyServerRecentAccounts(payload);
+    } catch (_) {
+      // Local cache remains the source of truth on error.
+    }
   }
 
   Future<void> _clearRecentAccounts() async {

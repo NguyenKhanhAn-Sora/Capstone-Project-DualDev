@@ -94,6 +94,31 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
 
   void _onServerRealtimeEvent(Map<String, dynamic> payload) {
     final event = (payload['event'] ?? '').toString();
+    if (event == 'server-deleted') {
+      final sid = (payload['serverId'] ?? '').toString();
+      if (sid.isEmpty) return;
+      final session = VoiceChannelSessionController.instance;
+      if (session.active && session.serverId == sid) {
+        unawaited(session.leave());
+      }
+      _scheduleServerListRefresh();
+      final name = (payload['serverName'] ?? '').toString().trim();
+      final label = name.isNotEmpty ? name : 'Server';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              LanguageController.instance.t(
+                'chat.popups.inbox.serverDeletedToast',
+                {'server': label},
+              ),
+            ),
+          ),
+        );
+        unawaited(_messagesController.refreshInboxCount());
+      }
+      return;
+    }
     if (event != 'server-updated' && event != 'server-membership-updated') {
       return;
     }
@@ -321,7 +346,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     final username = (_messagesController.myUsername ?? '').trim();
     final participantName = displayName.isNotEmpty
         ? displayName
-        : (username.isNotEmpty ? username : 'Người dùng');
+        : (username.isNotEmpty ? username : LanguageController.instance.t('messages.call.user'));
     final hubResult = await context.pushMessages<dynamic>(
       ServerDetailScreen(
         server: server,
@@ -331,11 +356,11 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
       ),
     );
     if (!mounted) return;
-    if (hubResult == 'deleted' ||
-        hubResult == 'left' ||
+    await _serverListController.loadServers();
+    if (hubResult == 'left' ||
         hubResult == 'join_rejected' ||
         hubResult == 'apply_withdrawn') {
-      unawaited(_serverListController.loadServers());
+      // list already refreshed above
     }
   }
 
@@ -473,7 +498,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Upload ảnh thất bại: $e'),
+                                  content: Text(LanguageController.instance.t('messages.imageUploadFailed', {'error': e.toString()})),
                                 ),
                               );
                             } finally {
@@ -507,18 +532,18 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                     controller: nameController,
                     autofocus: true,
                     style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Tên server',
-                      labelStyle: TextStyle(color: Color(0xFFAFC0E2)),
+                    decoration: InputDecoration(
+                      labelText: LanguageController.instance.t('server.settings.serverNameLabel'),
+                      labelStyle: const TextStyle(color: Color(0xFFAFC0E2)),
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: descController,
                     style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Mô tả (tuỳ chọn)',
-                      labelStyle: TextStyle(color: Color(0xFFAFC0E2)),
+                    decoration: InputDecoration(
+                      labelText: LanguageController.instance.t('server.settings.descriptionLabel'),
+                      labelStyle: const TextStyle(color: Color(0xFFAFC0E2)),
                     ),
                   ),
                 ],
@@ -582,7 +607,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Không tạo được server: $e'),
+                                content: Text(LanguageController.instance.t('messages.failedCreateServer', {'error': e.toString()})),
                               ),
                             );
                           } finally {
@@ -637,7 +662,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     final username = (_messagesController.myUsername ?? '').trim();
     return displayName.isNotEmpty
         ? displayName
-        : (username.isNotEmpty ? username : 'Người dùng');
+        : (username.isNotEmpty ? username : LanguageController.instance.t('messages.call.user'));
   }
 
   Future<void> _openGlobalMessageSearch() async {
@@ -771,7 +796,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
               child: ElevatedButton.icon(
                 onPressed: _createServerDialog,
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Tạo server mới'),
+                label: Text(LanguageController.instance.t('messages.createNewServer')),
               ),
             ),
           ),

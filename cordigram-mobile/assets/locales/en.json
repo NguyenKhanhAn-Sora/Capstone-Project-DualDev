@@ -24,7 +24,14 @@
     "send": "Send",
     "updating": "Updating...",
     "clear": "Clear",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "update": {
+      "newVersion": "New version v{version} available",
+      "later": "Later",
+      "now": "Update now",
+      "releaseNotes": "Release notes:",
+      "instructions": "Tap \"Update now\" to download the APK.\nAfter downloading, open the file and tap Install."
+    }
   },
   "settings": {
     "common": {
@@ -560,7 +567,8 @@
       "shortBio": "Short bio (optional)",
       "chooseFromGallery": "Choose from gallery",
       "continueWithGoogle": "Continue with Google",
-      "googleSignInFailed": "Google sign-in failed. Please try again."
+      "googleSignInFailed": "Google sign-in failed. Please try again.",
+      "otpCode": "OTP code"
     },
     "forgotPassword": {
       "email": "Email",
@@ -789,6 +797,7 @@
       "date": "Date",
       "time": "Time",
       "allowComments": "Allow comments",
+      "allowMultipleAnswers": "Allow multiple answers",
       "allowDownload": "Allow download",
       "hideLikeCount": "Hide like count",
       "pollQuestionHint": "Ask a question…",
@@ -906,6 +915,16 @@
     "likesSheet": {
       "search": "Search username",
       "noLikes": "No likes yet"
+    },
+    "poll": {
+      "votes": "Votes",
+      "noUsers": "No users found",
+      "noVotes": "No votes yet",
+      "you": "You",
+      "ended": "Ended",
+      "minutesLeft": "{m} minutes left",
+      "hoursLeft": "{h}h left",
+      "hoursMinutesLeft": "{h}h {m}m left"
     }
   },
   "reels": {
@@ -1224,6 +1243,11 @@
     "failedSend": "Unable to send message: {error}",
     "failedSendVoice": "Unable to send voice message: {error}",
     "fileTooLarge": "File too large (max 25MB)",
+    "onlyImageVideoAudioAllowed": "Only image, video, or audio files are allowed",
+    "uploadFailed": "Could not upload file",
+    "uploadLimitFree": "File exceeds the 100MB limit. Upgrade Boost to upload up to 300MB or 600MB.",
+    "uploadLimitBasic": "File exceeds the 300MB limit (Basic Boost). Upgrade to Boost to upload up to 600MB.",
+    "uploadLimitMax": "File exceeds the 600MB limit.",
     "addOption": "Add option",
     "hours": "{h} hours",
     "cancel": "Cancel",
@@ -1248,11 +1272,133 @@
     "voiceChannel": "Voice channel",
     "voiceMessage": "Voice message",
     "messageRecalled": "Message has been recalled",
+    "messagePinned": "Message pinned",
+    "cannotPinMessage": "Cannot pin message",
+    "cannotDeleteMessage": "Cannot delete message",
+    "messageNotInSegment": "Message not found in loading segment",
+    "done": "Done",
+    "viewAll": "View all",
+    "pollQuestion": "Question",
+    "pollOption": "Option {index}",
+    "pollDuration": "Duration",
+    "userSettingsLoadFailed": "Cannot load settings",
+    "userSettingsSaved": "Message settings saved",
+    "userSettingsSaveFailed": "Save failed",
+    "userSettingsEveryone": "Everyone",
+    "userSettingsFollowingOnly": "Followed users only",
+    "reportFailed": "Report failed",
+    "sendReport": "Send report",
+    "giphyMissingKey": "Missing Giphy API key",
+    "whoCanMessage": "Who can message you",
+    "whoCanCall": "Who can call you",
+    "replyHint": "Reply…",
+    "searchUserHint": "Search username",
+    "reportDescriptionHint": "Describe in detail...",
+    "kaomoji": {
+      "happy": "Happy / Excited",
+      "love": "Love",
+      "sad": "Sad / Crying",
+      "funny": "Funny",
+      "wave": "Greeting / Wave"
+    },
     "call": {
       "reject": "Reject",
       "leaveAndAccept": "Leave channel and accept",
-      "close": "Close"
-    }
+      "close": "Close",
+      "leaveRoom": "Leave room",
+      "incomingCall": "Incoming call",
+      "accept": "Accept",
+      "calling": "Calling...",
+      "callRejected": "Call rejected",
+      "noAnswer": "No answer",
+      "cancel": "Cancel",
+      "inVoiceChannel": "In server voice channel",
+      "inVoiceChannelLeave": "You are in voice channel {channel}. Leave voice channel before accepting DM call.",
+      "waiting": "Waiting...",
+      "share": "Share",
+      "sharing": "Sharing",
+      "connecting": "Connecting...",
+      "connectedCall": "In call",
+      "minimize": "Minimize call",
+      "end": "End",
+      "enableVideo": "Enable video",
+      "disableCamera": "Disable camera",
+      "enableCamera": "Enable camera",
+      "muteMic": "Mute microphone",
+      "unmuteMic": "Unmute microphone",
+      "disableSpeaker": "Disable speaker",
+      "enableSpeaker": "Enable speaker",
+      "stopScreenShare": "Stop screen share",
+      "startScreenShare": "Screen share",
+      "voiceChannel": "Voice channel",
+      "callNotConnectable": "Cannot continue call on this device.",
+      "callOpenFailed": "Cannot open call: {error}",
+      "callJoinFailed": "Cannot join call: {error}",
+      "userBusy": "This user is on another call.",
+      "callNotAllowed": "Cannot call this user.",
+      "callStartFailed": "Cannot start call. Please try again.",
+      "micPermRequired": "Microphone permission required for calls",
+      "cameraPermRequired": "Camera permission required for video calls",
+      "cameraEnableFailed": "Cannot enable camera: {error}",
+      "cameraSwitchFailed": "Cannot switch camera: {error}",
+      "cameraPermissionRequired": "Camera permission required to enable video",
+      "screenShareTitle": "Cordigram is sharing screen",
+      "screenShareText": "Tap to return to call",
+      "mobileScreenShareNote": "Mobile only supports screen/app sharing, not per-tab sharing like web.",
+      "screenSharePermDenied": "Screen share permission denied",
+      "screenShareServiceFailed": "Cannot start screen share foreground service",
+      "screenShareFailed": "Cannot start screen share: {error}",
+      "screenSharing": "Sharing screen",
+      "screenSharingNote": "Open the app or content you want to share. The call window is hidden to prevent infinite loop.",
+      "user": "User",
+      "you": "You"
+    },
+    "justNow": "Just now",
+    "minutesAgo": "{n} minutes ago",
+    "hoursAgo": "{n} hours ago",
+    "blockedReasonRules": "You need to read and agree to the server rules.",
+    "blockedReasonApplicationPending": "Your join application is pending review.",
+    "blockedReasonApplicationRejected": "Your join application was rejected.",
+    "blockedReasonVerification": "Your account doesn't meet the verification requirements to chat.",
+    "blockedReasonAgeUnder18": "Server age-restricted — you are under 18.",
+    "blockedReasonAgeAck": "You need to acknowledge the server's age warning.",
+    "blockedBannerGate": "You need to complete a few more steps before you can chat in this server",
+    "blockedBannerReason": "You cannot chat in this channel ({reason}).",
+    "blockedBanner": "You cannot chat in this channel.",
+    "member": "Member",
+    "welcomeGreeting": "Great to meet you, {name}!",
+    "waveSending": "Sending...",
+    "waveButton": "👋 Wave to {name}!",
+    "createPoll": "Create poll",
+    "allowMultipleAnswers": "Allow multiple answers",
+    "searchStickerHint": "Search sticker...",
+    "searchGifHint": "Search GIF...",
+    "messageActions": "Message actions",
+    "replyAction": "Reply to message",
+    "pickEmoji": "Pick another emoji",
+    "pinMessage": "Pin message",
+    "deleteForMe": "Delete for me",
+    "recallForAll": "Recall for everyone",
+    "voiceMessageContent": "🔊 Voice message",
+    "noMessages": "No messages yet",
+    "replying": "Replying",
+    "channelRestricted": "Channel is restricted",
+    "chatHint": "Chat in #{name}",
+    "recordingStatus": "Recording... {s}s",
+    "loadingPoll": "Loading poll...",
+    "poll": {
+      "selectOne": "Choose one option",
+      "selectMany": "Choose one or more options",
+      "showResults": "Show results",
+      "voted": "Voted",
+      "votesHours": "{votes} votes • {hours} hours left",
+      "voteError": "Failed to submit vote",
+      "needQuestion": "Please enter a question",
+      "need2Options": "At least 2 options are required"
+    },
+    "deleteMsg": "Delete message",
+    "message": "Message",
+    "searchMessages": "Search messages"
   },
   "notifications": {
     "tabs": {
@@ -2021,10 +2167,20 @@
       "videoCall": "Video call",
       "replyGif": "GIF",
       "replySticker": "Sticker",
+      "replyImage": "Image",
+      "replyVideo": "Video",
+      "replyFile": "File",
+      "replyEmoji": "Emoji",
+      "replyServerInvite": "Server invite",
       "replyVoice": "Voice message",
       "replyWelcomeFallback": "Welcome",
-      "plusUploadFile": "Upload file",
-      "plusCreatePoll": "Create poll"
+      "plusUploadFile": "Upload media",
+      "plusCreatePoll": "Create poll",
+      "onlyImageVideoAudioAllowed": "Only image, video, or audio files are allowed",
+      "uploadFailed": "Could not upload file",
+      "uploadLimitFree": "File exceeds the 100MB limit. Upgrade Boost to upload up to 300MB or 600MB.",
+      "uploadLimitBasic": "File exceeds the 300MB limit (Basic Boost). Upgrade to Boost to upload up to 600MB.",
+      "uploadLimitMax": "File exceeds the 600MB limit."
     },
     "createPoll": {
       "title": "Create poll",
@@ -2206,7 +2362,9 @@
       "groups": {
         "expressions": "EXPRESSIONS",
         "people": "PEOPLE",
-        "moderation": "MODERATION"
+        "moderation": "MODERATION",
+        "community": "COMMUNITY",
+        "danger": "DANGER ZONE"
       },
       "sections": {
         "profile": "Server Profile",
@@ -3932,7 +4090,8 @@
     "toolBg": "Background",
     "toolSwap": "Swap",
     "toolTrim": "Trim",
-    "editText": "Edit text"
+    "editText": "Edit text",
+    "textInputHint": "Enter text..."
   },
   "server": {
     "iconUpdated": "Icon updated (tap Save to apply)",
@@ -3953,7 +4112,134 @@
       "days30": "30 days",
       "allRoles": "All roles",
       "noRole": "No role",
-      "memberRole": "Member"
+      "memberRole": "Member",
+      "days90": "90 days",
+      "kicked": "Member kicked.",
+      "banned": "Member banned.",
+      "timeoutApplied": "Timeout applied.",
+      "timeoutRemoved": "Timeout removed.",
+      "ownershipTransferred": "Ownership transferred.",
+      "pruned": "Removed {count} members.",
+      "reason": "Reason (optional)",
+      "deleteMessages": "Delete messages (days, 0–7)",
+      "searchPlaceholder": "Search by name or @username",
+      "retry": "Retry",
+      "kickDialog": "Kick member?",
+      "banDialog": "Ban member",
+      "kick": "Kick",
+      "ban": "Ban",
+      "removeTimeout": "Remove timeout",
+      "close": "Close",
+      "membersTitle": "Members"
+    },
+    "role": {
+      "membersUpdated": "Role members updated",
+      "membersAdded": "Added {count} members to role",
+      "reset": "Reset",
+      "saveChanges": "Save changes",
+      "savePermissions": "Save permissions",
+      "addMember": "Add member",
+      "deselect": "Deselect",
+      "quickSelect": "Quick select",
+      "quickSelecting": "Quick selecting",
+      "searchMember": "Search members",
+      "deleteRoleDialog": "Delete role?"
+    },
+    "access": {
+      "addOption": "Add option",
+      "addRule": "Add rule",
+      "addQuestion": "+ Add question",
+      "questionHint": "Question content",
+      "optionHint": "Option {index}",
+      "ruleHint": "Enter rule content",
+      "changesSaved": "Changes saved",
+      "done": "Done",
+      "editRule": "Edit rule",
+      "deleteRule": "Delete rule?",
+      "accessTitle": "Access",
+      "rulesTitle": "Rules"
+    },
+    "automod": {
+      "saved": "AutoMod settings saved",
+      "addRole": "+ Role",
+      "addChannel": "+ Channel",
+      "saveSettings": "Save settings",
+      "mentionLimit": "Mention limit / message",
+      "restrictionTime": "Restriction time (hours)",
+      "customMessage": "Custom message (optional)"
+    },
+    "bans": {
+      "unbanned": "Unbanned",
+      "mentionRestrictionRemoved": "Mention restriction removed",
+      "searchPlaceholder": "Search by name or user ID"
+    },
+    "community": {
+      "enabled": "Community enabled",
+      "overviewSaved": "Community overview saved",
+      "activate": "Activate Community",
+      "saveOverview": "Save overview",
+      "descriptionLabel": "Community description",
+      "languageLabel": "Primary language",
+      "rulesChannelLabel": "Rules channel"
+    },
+    "emoji": {
+      "maxReached": "Maximum emoji slots used",
+      "added": "Emoji added",
+      "upload": "Upload"
+    },
+    "interaction": {
+      "enterTitleContent": "Please enter title and content",
+      "selectRole": "Select a role to receive notification",
+      "notificationSent": "Notification sent",
+      "everyone": "Everyone",
+      "byRole": "By role",
+      "sendNotification": "Send notification",
+      "titleHint": "Title",
+      "contentHint": "Content"
+    },
+    "sticker": {
+      "boostUpdated": "Boost sticker updated",
+      "slotsMax": "Maximum sticker slots used",
+      "upload": "Upload",
+      "basic": "Basic tier",
+      "fullBoost": "Full boost",
+      "unassign": "Unassign"
+    },
+    "settings": {
+      "failedSave": "Could not save",
+      "changeIcon": "Change server icon",
+      "removeIcon": "Remove icon",
+      "uploadBanner": "Upload banner image",
+      "removeBanner": "Remove banner image",
+      "serverNameHint": "Server name",
+      "serverNameLabel": "Server name",
+      "descriptionLabel": "Description (optional)"
+    },
+    "join": {
+      "agree": "Agree",
+      "submitApplication": "Submit application",
+      "understood": "I understand",
+      "back": "Back",
+      "continue": "Continue",
+      "toMessages": "Go to Messages",
+      "agreedRules": "You have agreed to the server rules.",
+      "alreadyMember": "You are already a member of this server.",
+      "joined": "Joined server.",
+      "rejectApplicationDialog": "Reject application?"
+    },
+    "channel": {
+      "copiedLink": "Channel link copied",
+      "cannotEdit": "Cannot edit",
+      "cannotDelete": "Cannot delete",
+      "gate": {
+        "loadFailed": "Cannot load server status",
+        "confirmRules": "Please confirm you have read the rules",
+        "otpHint": "6-digit code"
+      }
+    },
+    "call": {
+      "leaveRoom": "Leave room",
+      "minimize": "Minimize"
     }
   }
 }

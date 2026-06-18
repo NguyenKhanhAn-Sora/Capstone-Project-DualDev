@@ -24,7 +24,14 @@
     "send": "发送",
     "updating": "更新中...",
     "clear": "清除",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "update": {
+      "newVersion": "新版本 v{version} 可用",
+      "later": "稍后",
+      "now": "立即更新",
+      "releaseNotes": "更新说明:",
+      "instructions": "点击\"立即更新\"下载APK文件。\n下载完成后，打开文件并点击安装。"
+    }
   },
   "settings": {
     "common": {
@@ -803,6 +810,7 @@
       "date": "日期",
       "time": "时间",
       "allowComments": "允许评论",
+      "allowMultipleAnswers": "允许多选",
       "allowDownload": "允许下载",
       "hideLikeCount": "隐藏点赞数",
       "pollQuestionHint": "提问…",
@@ -920,6 +928,16 @@
     "likesSheet": {
       "search": "搜索用户名",
       "noLikes": "暂无点赞"
+    },
+    "poll": {
+      "votes": "投票",
+      "noUsers": "未找到用户",
+      "noVotes": "暂无投票",
+      "you": "你",
+      "ended": "已结束",
+      "minutesLeft": "还剩{m}分钟",
+      "hoursLeft": "还剩{h}小时",
+      "hoursMinutesLeft": "还剩{h}小时{m}分钟"
     }
   },
   "reels": {
@@ -1233,6 +1251,11 @@
     "failedSend": "无法发送消息: {error}",
     "failedSendVoice": "无法发送语音消息: {error}",
     "fileTooLarge": "文件太大（最大25MB）",
+    "onlyImageVideoAudioAllowed": "仅允许上传图片、视频或音频文件",
+    "uploadFailed": "无法上传文件",
+    "uploadLimitFree": "文件超过 100MB 限制。升级 Boost 后可上传最多 300MB 或 600MB。",
+    "uploadLimitBasic": "文件超过 300MB 限制（Basic Boost）。升级 Boost 后可上传最多 600MB。",
+    "uploadLimitMax": "文件超过 600MB 限制。",
     "addOption": "添加选项",
     "hours": "{h}小时",
     "cancel": "取消",
@@ -1261,11 +1284,129 @@
     "cannotPinMessage": "无法固定消息",
     "cannotDeleteMessage": "无法删除消息",
     "messageNotInSegment": "消息不在加载段中",
+    "done": "完成",
+    "viewAll": "查看全部",
+    "pollQuestion": "问题",
+    "pollOption": "选项 {index}",
+    "pollDuration": "持续时间",
+    "userSettingsLoadFailed": "无法加载设置",
+    "userSettingsSaved": "消息设置已保存",
+    "userSettingsSaveFailed": "保存失败",
+    "userSettingsEveryone": "所有人",
+    "userSettingsFollowingOnly": "仅关注者",
+    "reportFailed": "报告失败",
+    "sendReport": "发送报告",
+    "giphyMissingKey": "缺少Giphy API密钥",
+    "whoCanMessage": "谁可以给你发消息",
+    "whoCanCall": "谁可以给你打电话",
+    "replyHint": "回复…",
+    "searchUserHint": "搜索用户名",
+    "reportDescriptionHint": "详细描述...",
+    "kaomoji": {
+      "happy": "开心 / 兴奋",
+      "love": "爱",
+      "sad": "悲伤 / 哭泣",
+      "funny": "有趣",
+      "wave": "问候 / 挥手"
+    },
     "call": {
       "reject": "拒绝",
       "leaveAndAccept": "离开频道并接听",
-      "close": "关闭"
-    }
+      "close": "关闭",
+      "leaveRoom": "离开房间",
+      "incomingCall": "来电",
+      "accept": "接受",
+      "calling": "呼叫中...",
+      "callRejected": "通话被拒绝",
+      "noAnswer": "无响应",
+      "cancel": "取消",
+      "inVoiceChannel": "正在服务器语音频道中",
+      "inVoiceChannelLeave": "您正在{channel}频道中。接受DM通话前请先退出语音频道。",
+      "waiting": "等待中…",
+      "share": "分享",
+      "sharing": "分享中",
+      "connecting": "连接中...",
+      "connectedCall": "通话中",
+      "minimize": "最小化通话",
+      "end": "结束",
+      "enableVideo": "开启视频",
+      "disableCamera": "关闭摄像头",
+      "enableCamera": "开启摄像头",
+      "muteMic": "静音麦克风",
+      "unmuteMic": "开启麦克风",
+      "disableSpeaker": "关闭扬声器",
+      "enableSpeaker": "开启扬声器",
+      "stopScreenShare": "停止屏幕共享",
+      "startScreenShare": "屏幕共享",
+      "voiceChannel": "语音频道",
+      "callNotConnectable": "无法在此设备上继续通话。",
+      "callOpenFailed": "无法打开通话: {error}",
+      "callJoinFailed": "无法加入通话: {error}",
+      "userBusy": "该用户正在通话中。",
+      "callNotAllowed": "无法呼叫此用户。",
+      "callStartFailed": "无法开始通话，请重试。",
+      "micPermRequired": "通话需要麦克风权限",
+      "cameraPermRequired": "视频通话需要摄像头权限",
+      "cameraEnableFailed": "无法开启摄像头: {error}",
+      "cameraSwitchFailed": "无法切换摄像头: {error}",
+      "cameraPermissionRequired": "开启视频需要摄像头权限",
+      "screenShareTitle": "Cordigram正在共享屏幕",
+      "screenShareText": "点击返回通话",
+      "mobileScreenShareNote": "移动端仅支持屏幕/应用共享，不支持按标签页共享。",
+      "screenSharePermDenied": "屏幕共享权限被拒绝",
+      "screenShareServiceFailed": "无法启动前台服务",
+      "screenShareFailed": "无法开始屏幕共享: {error}",
+      "screenSharing": "正在共享屏幕",
+      "screenSharingNote": "打开要共享的应用或内容。通话窗口已隐藏以防止无限循环。",
+      "user": "用户",
+      "you": "你"
+    },
+    "justNow": "刚刚",
+    "minutesAgo": "{n}分钟前",
+    "hoursAgo": "{n}小时前",
+    "blockedReasonRules": "您需要阅读并同意服务器规则。",
+    "blockedReasonApplicationPending": "加入申请正在审核中。",
+    "blockedReasonApplicationRejected": "加入申请已被拒绝。",
+    "blockedReasonVerification": "您的账户不符合聊天的验证要求。",
+    "blockedReasonAgeUnder18": "服务器有年龄限制 — 您未满18岁。",
+    "blockedReasonAgeAck": "您需要确认服务器的年龄警告。",
+    "blockedBannerGate": "您需要完成更多步骤才能在此服务器中聊天",
+    "blockedBannerReason": "您无法在此频道聊天（{reason}）。",
+    "blockedBanner": "您无法在此频道聊天。",
+    "member": "成员",
+    "welcomeGreeting": "很高兴认识你，{name}！",
+    "waveSending": "发送中...",
+    "waveButton": "👋 向{name}挥手！",
+    "createPoll": "创建投票",
+    "allowMultipleAnswers": "允许多选",
+    "searchStickerHint": "搜索贴纸...",
+    "searchGifHint": "搜索GIF...",
+    "messageActions": "消息操作",
+    "replyAction": "回复消息",
+    "pickEmoji": "选择其他表情",
+    "pinMessage": "置顶消息",
+    "deleteForMe": "仅删除我的",
+    "recallForAll": "为所有人撤回",
+    "voiceMessageContent": "🔊 语音消息",
+    "noMessages": "暂无消息",
+    "replying": "回复中",
+    "channelRestricted": "频道受到限制",
+    "chatHint": "在#{name}中发送消息",
+    "recordingStatus": "录制中... {s}秒",
+    "loadingPoll": "正在加载投票...",
+    "poll": {
+      "selectOne": "选择一个选项",
+      "selectMany": "选择一个或多个选项",
+      "showResults": "查看结果",
+      "voted": "已投票",
+      "votesHours": "{votes}票 • 剩余{hours}小时",
+      "voteError": "提交投票失败",
+      "needQuestion": "请输入问题",
+      "need2Options": "至少需要2个选项"
+    },
+    "deleteMsg": "删除消息",
+    "message": "消息",
+    "searchMessages": "搜索消息"
   },
   "notifications": {
     "tabs": {
@@ -2034,10 +2175,20 @@
       "videoCall": "视频通话",
       "replyGif": "GIF",
       "replySticker": "贴纸",
+      "replyImage": "图片",
+      "replyVideo": "视频",
+      "replyFile": "文件",
+      "replyEmoji": "表情",
+      "replyServerInvite": "服务器邀请",
       "replyVoice": "语音消息",
       "replyWelcomeFallback": "欢迎",
-      "plusUploadFile": "上传文件",
-      "plusCreatePoll": "创建投票"
+      "plusUploadFile": "上传媒体",
+      "plusCreatePoll": "创建投票",
+      "onlyImageVideoAudioAllowed": "仅允许上传图片、视频或音频文件",
+      "uploadFailed": "无法上传文件",
+      "uploadLimitFree": "文件超过 100MB 限制。升级 Boost 后可上传最多 300MB 或 600MB。",
+      "uploadLimitBasic": "文件超过 300MB 限制（Basic Boost）。升级 Boost 后可上传最多 600MB。",
+      "uploadLimitMax": "文件超过 600MB 限制。"
     },
     "createPoll": {
       "title": "创建投票",
@@ -2219,7 +2370,9 @@
       "groups": {
         "expressions": "表情",
         "people": "成员",
-        "moderation": "管理"
+        "moderation": "管理",
+        "community": "社区",
+        "danger": "危险操作"
       },
       "sections": {
         "profile": "服务器资料",
@@ -3960,7 +4113,8 @@
     "toolBg": "背景",
     "toolSwap": "更换",
     "toolTrim": "修剪",
-    "editText": "编辑文字"
+    "editText": "编辑文字",
+    "textInputHint": "输入内容..."
   },
   "server": {
     "iconUpdated": "图标已更新（点击保存以应用）",
@@ -3981,7 +4135,134 @@
       "days30": "30天",
       "allRoles": "所有角色",
       "noRole": "无角色",
-      "memberRole": "成员"
+      "memberRole": "成员",
+      "days90": "90天",
+      "kicked": "已踢出成员。",
+      "banned": "已封禁成员。",
+      "timeoutApplied": "已应用超时。",
+      "timeoutRemoved": "已解除超时。",
+      "ownershipTransferred": "已转让所有权。",
+      "pruned": "已删除{count}名成员。",
+      "reason": "原因（可选）",
+      "deleteMessages": "删除消息（天数，0–7）",
+      "searchPlaceholder": "按名称或@用户名搜索",
+      "retry": "重试",
+      "kickDialog": "踢出成员？",
+      "banDialog": "封禁成员",
+      "kick": "踢出",
+      "ban": "封禁",
+      "removeTimeout": "解除超时",
+      "close": "关闭",
+      "membersTitle": "成员"
+    },
+    "role": {
+      "membersUpdated": "已更新角色成员",
+      "membersAdded": "已将{count}名成员添加到角色",
+      "reset": "重置",
+      "saveChanges": "保存更改",
+      "savePermissions": "保存权限",
+      "addMember": "添加成员",
+      "deselect": "取消选择",
+      "quickSelect": "快速选择",
+      "quickSelecting": "快速选择中",
+      "searchMember": "搜索成员",
+      "deleteRoleDialog": "删除角色？"
+    },
+    "access": {
+      "addOption": "添加选项",
+      "addRule": "添加规则",
+      "addQuestion": "+ 添加问题",
+      "questionHint": "问题内容",
+      "optionHint": "选项 {index}",
+      "ruleHint": "输入规则内容",
+      "changesSaved": "更改已保存",
+      "done": "完成",
+      "editRule": "编辑规则",
+      "deleteRule": "删除规则？",
+      "accessTitle": "访问",
+      "rulesTitle": "规则"
+    },
+    "automod": {
+      "saved": "AutoMod设置已保存",
+      "addRole": "+ 角色",
+      "addChannel": "+ 频道",
+      "saveSettings": "保存设置",
+      "mentionLimit": "@提及上限 / 消息",
+      "restrictionTime": "限制时间（小时）",
+      "customMessage": "自定义消息（可选）"
+    },
+    "bans": {
+      "unbanned": "已解除封禁",
+      "mentionRestrictionRemoved": "已移除@提及限制",
+      "searchPlaceholder": "按名称或用户ID搜索"
+    },
+    "community": {
+      "enabled": "社区已启用",
+      "overviewSaved": "社区概览已保存",
+      "activate": "启用社区",
+      "saveOverview": "保存概览",
+      "descriptionLabel": "社区描述",
+      "languageLabel": "主要语言",
+      "rulesChannelLabel": "规则频道"
+    },
+    "emoji": {
+      "maxReached": "表情包槽位已满",
+      "added": "表情包已添加",
+      "upload": "上传"
+    },
+    "interaction": {
+      "enterTitleContent": "请输入标题和内容",
+      "selectRole": "请选择接收通知的角色",
+      "notificationSent": "通知已发送",
+      "everyone": "所有人",
+      "byRole": "按角色",
+      "sendNotification": "发送通知",
+      "titleHint": "标题",
+      "contentHint": "内容"
+    },
+    "sticker": {
+      "boostUpdated": "Boost贴纸已更新",
+      "slotsMax": "贴纸槽位已满",
+      "upload": "上传",
+      "basic": "基础版",
+      "fullBoost": "完整Boost",
+      "unassign": "取消分配"
+    },
+    "settings": {
+      "failedSave": "无法保存",
+      "changeIcon": "更改服务器图标",
+      "removeIcon": "删除图标",
+      "uploadBanner": "上传横幅图片",
+      "removeBanner": "删除横幅图片",
+      "serverNameHint": "服务器名称",
+      "serverNameLabel": "服务器名称",
+      "descriptionLabel": "描述（可选）"
+    },
+    "join": {
+      "agree": "同意",
+      "submitApplication": "提交申请",
+      "understood": "我明白了",
+      "back": "返回",
+      "continue": "继续",
+      "toMessages": "返回消息页",
+      "agreedRules": "您已同意服务器规则。",
+      "alreadyMember": "您已是此服务器成员。",
+      "joined": "已加入服务器。",
+      "rejectApplicationDialog": "拒绝申请？"
+    },
+    "channel": {
+      "copiedLink": "频道链接已复制",
+      "cannotEdit": "无法编辑",
+      "cannotDelete": "无法删除",
+      "gate": {
+        "loadFailed": "无法加载服务器状态",
+        "confirmRules": "请确认您已阅读规则",
+        "otpHint": "6位验证码"
+      }
+    },
+    "call": {
+      "leaveRoom": "离开房间",
+      "minimize": "最小化"
     }
   }
 }

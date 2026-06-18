@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../models/server_models.dart';
 import '../models/server_role_models.dart';
 import '../services/servers_service.dart';
@@ -112,14 +113,14 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
     final c = _notifBody.text.trim();
     if (t.isEmpty || c.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nhập tiêu đề và nội dung thông báo')),
+        SnackBar(content: Text(LanguageController.instance.t('server.interaction.enterTitleContent'))),
       );
       return;
     }
     if (_notifTarget == 'role' &&
         (_notifRoleId == null || _notifRoleId!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chọn vai trò nhận thông báo')),
+        SnackBar(content: Text(LanguageController.instance.t('server.interaction.selectRole'))),
       );
       return;
     }
@@ -133,7 +134,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã gửi thông báo')),
+        SnackBar(content: Text(LanguageController.instance.t('server.interaction.notificationSent'))),
       );
       _notifTitle.clear();
       _notifBody.clear();
@@ -168,7 +169,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(color: ui.textMuted),
                         ),
-                        TextButton(onPressed: _load, child: const Text('Thử lại')),
+                        TextButton(onPressed: _load, child: Text(LanguageController.instance.t('common.retry'))),
                       ],
                     ),
                   ),
@@ -328,7 +329,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                               controller: _notifTitle,
                               enabled: _canEdit,
                               style: TextStyle(color: ui.text),
-                              decoration: ui.fieldDecoration(hintText: 'Tiêu đề'),
+                              decoration: ui.fieldDecoration(hintText: LanguageController.instance.t('server.interaction.titleHint')),
                             ),
                             const SizedBox(height: 10),
                             TextField(
@@ -337,18 +338,18 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                               minLines: 2,
                               maxLines: 5,
                               style: TextStyle(color: ui.text),
-                              decoration: ui.fieldDecoration(hintText: 'Nội dung'),
+                              decoration: ui.fieldDecoration(hintText: LanguageController.instance.t('server.interaction.contentHint')),
                             ),
                             const SizedBox(height: 12),
                             SegmentedButton<String>(
-                              segments: const [
+                              segments: [
                                 ButtonSegment(
                                   value: 'everyone',
-                                  label: Text('Mọi người'),
+                                  label: Text(LanguageController.instance.t('server.interaction.everyone')),
                                 ),
                                 ButtonSegment(
                                   value: 'role',
-                                  label: Text('Theo vai trò'),
+                                  label: Text(LanguageController.instance.t('server.interaction.byRole')),
                                 ),
                               ],
                               selected: {_notifTarget},
@@ -364,7 +365,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                                 decoration: _dropdownDec(ui),
                                 dropdownColor: ui.card,
                                 hint: Text(
-                                  'Chọn vai trò',
+                                  LanguageController.instance.t('server.interaction.selectRole'),
                                   style: TextStyle(color: ui.textMuted),
                                 ),
                                 style: TextStyle(color: ui.text),
@@ -393,7 +394,7 @@ class _ServerInteractionScreenState extends State<ServerInteractionScreen> {
                                 backgroundColor: ui.accent,
                                 foregroundColor: ui.onAccent,
                               ),
-                              child: const Text('Gửi thông báo'),
+                              child: Text(LanguageController.instance.t('server.interaction.sendNotification')),
                             ),
                           ],
                         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../models/server_role_models.dart';
 import '../services/servers_service.dart';
 import 'role_permission_sections.dart';
@@ -128,7 +129,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
       await _loadMembers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã cập nhật thành viên trong vai trò')),
+          SnackBar(content: Text(LanguageController.instance.t('server.role.membersUpdated'))),
         );
       }
     } catch (e) {
@@ -159,7 +160,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
       await _loadMembers();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã thêm $added thành viên vào vai trò')),
+        SnackBar(content: Text(LanguageController.instance.t('server.role.membersAdded', {'count': added.toString()}))),
       );
     } catch (e) {
       if (!mounted) return;
@@ -237,13 +238,13 @@ class _RoleEditScreenState extends State<RoleEditScreen>
         final dui = ServerSettingsUi.of(c);
         return AlertDialog(
           backgroundColor: dui.card,
-          title: Text('Xóa vai trò?', style: TextStyle(color: dui.text)),
+          title: Text(LanguageController.instance.t('server.role.deleteRoleDialog'), style: TextStyle(color: dui.text)),
           content: Text(
             'Xóa ${widget.initialRole.name}?',
             style: TextStyle(color: dui.textMuted),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LanguageController.instance.t('common.cancel'))),
             TextButton(
               onPressed: () => Navigator.pop(c, true),
               child: Text('Xóa', style: TextStyle(color: dui.destructive)),
@@ -447,7 +448,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _saving ? null : _resetDisplayChanges,
-                        child: const Text('Đặt lại'),
+                        child: Text(LanguageController.instance.t('server.role.reset')),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -465,7 +466,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                                 height: 22,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text('Lưu thay đổi'),
+                            : Text(LanguageController.instance.t('server.role.saveChanges')),
                       ),
                     ),
                   ],
@@ -566,7 +567,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                           onPressed: _saving
                               ? null
                               : () => setState(() => _perm = _initialPerm.copy()),
-                          child: const Text('Đặt lại'),
+                          child: Text(LanguageController.instance.t('server.role.reset')),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -585,7 +586,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                                   height: 22,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Text('Lưu quyền'),
+                              : Text(LanguageController.instance.t('server.role.savePermissions')),
                         ),
                       ),
                     ],
@@ -632,7 +633,7 @@ class _RoleEditScreenState extends State<RoleEditScreen>
                               onPressed: _saving
                                   ? null
                                   : () => _openAddMembersScreen(availableMembers),
-                              child: const Text('Thêm thành viên'),
+                              child: Text(LanguageController.instance.t('server.role.addMember')),
                             ),
                           );
                         }
@@ -700,7 +701,7 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
     return Scaffold(
       backgroundColor: ui.bg,
       appBar: ui.buildAppBar(
-        title: 'Thêm thành viên',
+        title: LanguageController.instance.t('server.role.addMember'),
         actions: [
           TextButton(
             onPressed: _selected.isEmpty
@@ -721,7 +722,7 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
               controller: _searchCtrl,
               onChanged: (_) => setState(() {}),
               style: TextStyle(color: ui.text),
-              decoration: ui.fieldDecoration(hintText: 'Tìm kiếm thành viên'),
+              decoration: ui.fieldDecoration(hintText: LanguageController.instance.t('server.role.searchMember')),
             ),
           ),
           Padding(
@@ -733,7 +734,7 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
                   icon: Icon(
                     _quickSelect ? Icons.check_circle : Icons.radio_button_unchecked,
                   ),
-                  label: Text(_quickSelect ? 'Đang chọn nhanh' : 'Lựa chọn nhanh'),
+                  label: Text(_quickSelect ? LanguageController.instance.t('server.role.quickSelecting') : LanguageController.instance.t('server.role.quickSelect')),
                 ),
                 const SizedBox(width: 10),
                 if (_quickSelect)
@@ -741,7 +742,7 @@ class _RoleMemberPickerScreenState extends State<_RoleMemberPickerScreen> {
                     onPressed: _selected.isEmpty
                         ? null
                         : () => setState(() => _selected.clear()),
-                    child: const Text('Bỏ chọn'),
+                    child: Text(LanguageController.instance.t('server.role.deselect')),
                   ),
               ],
             ),

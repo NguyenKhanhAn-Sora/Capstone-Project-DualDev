@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../services/servers_service.dart';
 import 'server_settings_ui.dart';
 
@@ -86,7 +87,7 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
             style: TextStyle(color: dui.textMuted),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LanguageController.instance.t('common.cancel'))),
             TextButton(
               onPressed: () => Navigator.pop(c, true),
               child: Text('Gỡ cấm', style: TextStyle(color: ui.accent)),
@@ -101,7 +102,7 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã gỡ cấm')),
+          SnackBar(content: Text(LanguageController.instance.t('server.bans.unbanned'))),
         );
       }
     } catch (e) {
@@ -117,7 +118,7 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã gỡ hạn chế đề cập')),
+          SnackBar(content: Text(LanguageController.instance.t('server.bans.mentionRestrictionRemoved'))),
         );
       }
     } catch (e) {
@@ -212,7 +213,7 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
                   onChanged: (_) => setState(() {}),
                   style: TextStyle(color: ui.text),
                   decoration: ui.fieldDecoration(
-                    hintText: 'Tìm theo tên hoặc user ID',
+                    hintText: LanguageController.instance.t('server.bans.searchPlaceholder'),
                     prefixIcon: Icon(Icons.search, color: ui.textMuted),
                   ),
                 ),

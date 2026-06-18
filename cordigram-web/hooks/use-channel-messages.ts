@@ -231,6 +231,17 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
       setTimeout(() => setBoostEntitlementUpdated(null), 500);
     });
 
+    socket.on("user-settings-updated", (data: Record<string, unknown>) => {
+      if (!data || typeof data !== "object") return;
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-user-settings-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+    });
+
     socket.on("join-application-updated", (data: JoinApplicationUpdatedEvent) => {
       if (!data?.serverId || !data?.userId) return;
       try {

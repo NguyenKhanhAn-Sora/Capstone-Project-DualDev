@@ -38,10 +38,20 @@
       "videoCall": "视频通话",
       "replyGif": "GIF",
       "replySticker": "贴纸",
+      "replyImage": "图片",
+      "replyVideo": "视频",
+      "replyFile": "文件",
+      "replyEmoji": "表情",
+      "replyServerInvite": "服务器邀请",
       "replyVoice": "语音消息",
       "replyWelcomeFallback": "欢迎",
-      "plusUploadFile": "上传文件",
-      "plusCreatePoll": "创建投票"
+      "plusUploadFile": "上传媒体",
+      "plusCreatePoll": "创建投票",
+      "onlyImageVideoAudioAllowed": "仅允许上传图片、视频或音频文件",
+      "uploadFailed": "无法上传文件",
+      "uploadLimitFree": "文件超过 100MB 限制。升级 Boost 后可上传最多 300MB 或 600MB。",
+      "uploadLimitBasic": "文件超过 300MB 限制（Basic Boost）。升级 Boost 后可上传最多 600MB。",
+      "uploadLimitMax": "文件超过 600MB 限制。"
     },
     "createPoll": {
       "title": "创建投票",

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../services/servers_service.dart';
 
 /// Cổng chat trong kênh: cảnh báo tuổi + quy định + xác minh email/thời gian (cùng contract `GET access/my-status` với web).
@@ -117,7 +118,7 @@ class _ChannelChatGateSheetBodyState extends State<_ChannelChatGateSheetBody> {
     } catch (_) {
       if (!silent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không tải được trạng thái máy chủ')),
+          SnackBar(content: Text(LanguageController.instance.t('server.channel.gate.loadFailed'))),
         );
       }
     }
@@ -203,7 +204,7 @@ class _ChannelChatGateSheetBodyState extends State<_ChannelChatGateSheetBody> {
   Future<void> _onAcceptRules() async {
     if (!_rulesChecked) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng tick xác nhận đã đọc quy định')),
+        SnackBar(content: Text(LanguageController.instance.t('server.channel.gate.confirmRules'))),
       );
       return;
     }
@@ -309,7 +310,7 @@ class _ChannelChatGateSheetBodyState extends State<_ChannelChatGateSheetBody> {
             const SizedBox(height: 12),
             FilledButton(
               onPressed: () => unawaited(_loadAll()),
-              child: const Text('Thử lại'),
+              child: Text(LanguageController.instance.t('common.retry')),
             ),
           ],
         ),
@@ -421,7 +422,7 @@ class _ChannelChatGateSheetBodyState extends State<_ChannelChatGateSheetBody> {
                               onPressed: _submittingAge
                                   ? null
                                   : () => Navigator.pop(context),
-                              child: const Text('Quay lại'),
+                              child: Text(LanguageController.instance.t('common.back')),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -437,7 +438,7 @@ class _ChannelChatGateSheetBodyState extends State<_ChannelChatGateSheetBody> {
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Text('Tiếp tục'),
+                                  : Text(LanguageController.instance.t('server.join.continue')),
                             ),
                           ),
                         ],
@@ -530,7 +531,7 @@ class _ChannelChatGateSheetBodyState extends State<_ChannelChatGateSheetBody> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Gửi'),
+                              : Text(LanguageController.instance.t('messages.send')),
                         ),
                       ),
                       const SizedBox(height: 22),
@@ -568,9 +569,9 @@ class _ChannelChatGateSheetBodyState extends State<_ChannelChatGateSheetBody> {
                                 controller: _otpCtrl,
                                 keyboardType: TextInputType.number,
                                 style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                  hintText: 'Mã 6 số',
-                                  hintStyle: TextStyle(
+                                decoration: InputDecoration(
+                                  hintText: LanguageController.instance.t('server.channel.gate.otpHint'),
+                                  hintStyle: const TextStyle(
                                     color: Color(0xFF8A98B8),
                                   ),
                                 ),

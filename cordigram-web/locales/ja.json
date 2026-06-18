@@ -38,10 +38,20 @@
       "videoCall": "ビデオ通話",
       "replyGif": "GIF",
       "replySticker": "スタンプ",
+      "replyImage": "画像",
+      "replyVideo": "動画",
+      "replyFile": "ファイル",
+      "replyEmoji": "絵文字",
+      "replyServerInvite": "サーバー招待",
       "replyVoice": "ボイスメッセージ",
       "replyWelcomeFallback": "ウェルカム",
-      "plusUploadFile": "ファイルをアップロード",
-      "plusCreatePoll": "アンケートを作成"
+      "plusUploadFile": "メディアをアップロード",
+      "plusCreatePoll": "アンケートを作成",
+      "onlyImageVideoAudioAllowed": "画像、動画、または音声ファイルのみアップロードできます",
+      "uploadFailed": "ファイルをアップロードできませんでした",
+      "uploadLimitFree": "ファイルは100MBの上限を超えています。Boostをアップグレードすると最大300MBまたは600MBまでアップロードできます。",
+      "uploadLimitBasic": "ファイルは300MBの上限（Basic Boost）を超えています。Boostにアップグレードすると最大600MBまでアップロードできます。",
+      "uploadLimitMax": "ファイルは600MBの上限を超えています。"
     },
     "createPoll": {
       "title": "アンケートを作成",

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../services/direct_messages_service.dart';
 
 /// DM message report — aligned with web `ReportMessageDialog` reason keys.
@@ -99,7 +100,7 @@ Future<bool> showReportDmMessageSheet({
                       maxLines: 3,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Mô tả chi tiết...',
+                        hintText: LanguageController.instance.t('messages.reportDescriptionHint'),
                         hintStyle: const TextStyle(color: Color(0xFF6B7FA8)),
                         filled: true,
                         fillColor: const Color(0xFF1D2E52),
@@ -129,11 +130,11 @@ Future<bool> showReportDmMessageSheet({
                                 } catch (e) {
                                   if (!ctx.mounted) return;
                                   ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(content: Text('Báo cáo thất bại: $e')),
+                                    SnackBar(content: Text(LanguageController.instance.t('messages.reportFailed'))),
                                   );
                                 }
                               },
-                        child: const Text('Gửi báo cáo'),
+                        child: Text(LanguageController.instance.t('messages.sendReport')),
                       ),
                     ),
                   ],

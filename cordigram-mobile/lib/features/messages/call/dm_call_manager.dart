@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/services/cordigram_notification_sounds.dart';
 import '../../../core/services/auth_storage.dart';
+import '../../../core/services/language_controller.dart';
 import '../services/channel_messages_realtime_service.dart';
 import '../services/direct_messages_realtime_service.dart';
 import '../services/direct_messages_service.dart';
@@ -176,7 +177,7 @@ class DmCallManager extends ChangeNotifier {
         callerInfo: <String, dynamic>{
           if (dn.isNotEmpty) 'displayName': dn,
           if (un.isNotEmpty) 'username': un,
-          if (dn.isEmpty && un.isEmpty) 'username': 'Người dùng',
+          if (dn.isEmpty && un.isEmpty) 'username': LanguageController.instance.t('messages.call.user'),
           if (avatarUrl != null && avatarUrl.trim().isNotEmpty)
             'avatar': avatarUrl.trim(),
         },
@@ -460,7 +461,7 @@ class DmCallManager extends ChangeNotifier {
     final resolved = session ?? _findConnectedSession(peerUserId);
     final roomId = resolved?.roomId;
     if (roomId == null || roomId.isEmpty) {
-      _showSnack('Không thể tiếp tục cuộc gọi trên thiết bị này.');
+      _showSnack(LanguageController.instance.t('messages.call.callNotConnectable'));
       return;
     }
 
@@ -490,7 +491,7 @@ class DmCallManager extends ChangeNotifier {
         video: isVideo,
       );
     } catch (err) {
-      _showSnack('Không mở được cuộc gọi: $err');
+      _showSnack(LanguageController.instance.t('messages.call.callOpenFailed', {'error': err.toString()}));
       return;
     }
 
@@ -648,7 +649,7 @@ class DmCallManager extends ChangeNotifier {
         video: inc.video,
       );
     } catch (err) {
-      _showSnack('Không thể tham gia cuộc gọi: $err');
+      _showSnack(LanguageController.instance.t('messages.call.callJoinFailed', {'error': err.toString()}));
       rejectIncoming();
       return;
     }
@@ -872,7 +873,7 @@ class DmCallManager extends ChangeNotifier {
     final callId = event.payload?['callId']?.toString();
     _incoming = IncomingCallState(
       callerUserId: event.fromUserId,
-      callerName: (info['displayName'] ?? info['username'] ?? 'Người dùng')
+      callerName: (info['displayName'] ?? info['username'] ?? LanguageController.instance.t('messages.call.user'))
           .toString(),
       callerAvatarUrl: info['avatar']?.toString(),
       video: event.type == 'video',
@@ -902,20 +903,18 @@ class DmCallManager extends ChangeNotifier {
         unawaited(continueCallOnDevice(peerId, session: session));
         return;
       }
-      _showSnack(
-        'Bạn đang gọi người này từ thiết bị hoặc cửa sổ khác. Hãy dùng phiên đó hoặc kết thúc cuộc gọi trước.',
-      );
+      _showSnack(LanguageController.instance.t('messages.call.callNotConnectable'));
       return;
     }
     if (event.code == 'peer_busy') {
-      _showSnack('Người dùng này đang bận cuộc gọi khác.');
+      _showSnack(LanguageController.instance.t('messages.call.userBusy'));
       return;
     }
     if (event.code == 'blocked') {
-      _showSnack('Không thể gọi người dùng này.');
+      _showSnack(LanguageController.instance.t('messages.call.callNotAllowed'));
       return;
     }
-    _showSnack('Không thể bắt đầu cuộc gọi. Vui lòng thử lại.');
+    _showSnack(LanguageController.instance.t('messages.call.callStartFailed'));
   }
 
   void _onMediaTransferred(DmCallMediaTransferredEvent event) {
@@ -964,7 +963,7 @@ class DmCallManager extends ChangeNotifier {
         video: out.video,
       );
     } catch (err) {
-      _showSnack('Không mở được cuộc gọi: $err');
+      _showSnack(LanguageController.instance.t('messages.call.callOpenFailed', {'error': err.toString()}));
       _cancelOutgoingFor(event.fromUserId);
       return;
     }
@@ -1087,7 +1086,7 @@ class DmCallManager extends ChangeNotifier {
             builder: (_) => NativeCallScreen(
               session: act.session,
               peerUserId: peerUserId,
-              title: act.peerName.isNotEmpty ? act.peerName : 'Cuộc gọi',
+              title: act.peerName.isNotEmpty ? act.peerName : LanguageController.instance.t('messages.call.voiceChannel'),
               peerAvatarUrl: act.peerAvatarUrl,
               localDisplayName: _myName,
               onHangup: () => hangupActive(peerUserId),
@@ -1145,12 +1144,12 @@ class DmCallManager extends ChangeNotifier {
   Future<void> _ensurePermissions({required bool video}) async {
     final mic = await Permission.microphone.request();
     if (!mic.isGranted) {
-      throw Exception('Cần cấp quyền micro để thực hiện cuộc gọi');
+      throw Exception(LanguageController.instance.t('messages.call.micPermRequired'));
     }
     if (video) {
       final cam = await Permission.camera.request();
       if (!cam.isGranted) {
-        throw Exception('Cần cấp quyền camera cho video call');
+        throw Exception(LanguageController.instance.t('messages.call.cameraPermRequired'));
       }
     }
   }
@@ -1169,14 +1168,14 @@ class DmCallManager extends ChangeNotifier {
   /// literal "Người dùng" (only as a last resort, never happy to show this).
   String _resolveMyName({String? preferred}) {
     final p = preferred?.trim() ?? '';
-    if (p.isNotEmpty && p != 'Người dùng') return p;
+    if (p.isNotEmpty && p != LanguageController.instance.t('messages.call.user')) return p;
     final cached = _myName?.trim() ?? '';
     if (cached.isNotEmpty) return cached;
     final uid = DirectMessagesService.currentUserId;
     if (uid != null && uid.isNotEmpty) {
       return uid.length > 6 ? 'user-${uid.substring(uid.length - 6)}' : uid;
     }
-    return 'Người dùng';
+    return LanguageController.instance.t('messages.call.user');
   }
 
   /// Best-effort user id lookup used by UI layers that want to filter.

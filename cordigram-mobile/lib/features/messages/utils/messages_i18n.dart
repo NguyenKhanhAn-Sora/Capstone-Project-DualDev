@@ -180,6 +180,16 @@ class MessagesI18n {
     }
     if (type == 'sticker') return t('chat.composer.replySticker');
     if (type == 'gif') return t('chat.composer.replyGif');
+    if (type == 'image' || _looksLikeImagePreview(raw)) {
+      return t('chat.composer.replyImage');
+    }
+    if (type == 'video' || _looksLikeVideoPreview(raw)) {
+      return t('chat.composer.replyVideo');
+    }
+    if (_looksLikeFilePreview(raw)) return t('chat.composer.replyFile');
+    if (_looksLikePollPreview(raw)) return t('chat.createPoll.title');
+    if (_looksLikeInvitePreview(raw)) return t('chat.composer.replyServerInvite');
+    if (_looksLikeEmojiToken(raw)) return t('chat.composer.replyEmoji');
     if (type == 'call' || _looksLikeCallPreview(raw)) {
       final parsed = type == 'call'
           ? _callPreviewFromMetadata(
@@ -361,10 +371,66 @@ class MessagesI18n {
         return t('chat.composer.replySticker');
       case 'gif':
         return t('chat.composer.replyGif');
+      case 'image':
+        return t('chat.composer.replyImage');
+      case 'video':
+        return t('chat.composer.replyVideo');
       default:
         final trimmed = message.content.trim();
+        if (_looksLikeImagePreview(trimmed)) {
+          return t('chat.composer.replyImage');
+        }
+        if (_looksLikeVideoPreview(trimmed)) {
+          return t('chat.composer.replyVideo');
+        }
+        if (_looksLikeFilePreview(trimmed)) {
+          return t('chat.composer.replyFile');
+        }
+        if (_looksLikePollPreview(trimmed)) {
+          return t('chat.createPoll.title');
+        }
+        if (_looksLikeInvitePreview(trimmed)) {
+          return t('chat.composer.replyServerInvite');
+        }
+        if ((message.customStickerUrl ?? '').isNotEmpty ||
+            _looksLikeEmojiToken(trimmed)) {
+          return t('chat.composer.replySticker');
+        }
         return trimmed;
     }
+  }
+
+  static bool _looksLikeImagePreview(String raw) {
+    final s = raw.trim();
+    return s.contains('📷 [Image]:') ||
+        RegExp(r'^https?://\S+\.(png|jpe?g|gif|webp)(\?|$)', caseSensitive: false)
+            .hasMatch(s);
+  }
+
+  static bool _looksLikeVideoPreview(String raw) {
+    final s = raw.trim();
+    return s.contains('🎬 [Video]:') ||
+        RegExp(r'^https?://\S+\.(mp4|mov|webm|m4v)(\?|$)', caseSensitive: false)
+            .hasMatch(s);
+  }
+
+  static bool _looksLikeFilePreview(String raw) =>
+      raw.trim().contains('📎 [File]:');
+
+  static bool _looksLikePollPreview(String raw) =>
+      RegExp(r'📊\s*\[Poll\]:', caseSensitive: false).hasMatch(raw.trim());
+
+  static bool _looksLikeInvitePreview(String raw) {
+    final s = raw.trim().toLowerCase();
+    return s.contains('/invite/server/') ||
+        s.contains('cordigram.com/invite/server');
+  }
+
+  static bool _looksLikeEmojiToken(String raw) {
+    final s = raw.trim();
+    if (s.length < 3 || !s.startsWith(':') || !s.endsWith(':')) return false;
+    final inner = s.substring(1, s.length - 1);
+    return inner.isNotEmpty && !inner.contains(' ');
   }
 
   static String dmListSent() => t('chat.dmList.sent');
@@ -437,8 +503,8 @@ class MessagesI18n {
       t('chat.channelUserProfile.mute.$key');
 
   static String mutualServersLabel() =>
-      t('chat.userProfile.mutualServersLabel');
+      t('chat.popups.userProfile.mutualServersLabel');
 
   static String memberSinceLabel() =>
-      t('chat.userProfile.memberSinceLabel');
+      t('chat.popups.userProfile.memberSinceLabel');
 }

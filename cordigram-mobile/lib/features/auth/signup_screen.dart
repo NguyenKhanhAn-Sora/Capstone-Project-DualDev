@@ -1031,7 +1031,7 @@ class _OtpField extends StatelessWidget {
         color: Color(0xFF0F172A),
       ),
       decoration: InputDecoration(
-        labelText: 'OTP code',
+        labelText: LanguageController.instance.t('auth.signup.otpCode'),
         hintText: LanguageController.instance.t('auth.signup.otpPlaceholder'),
         hintStyle: const TextStyle(
           letterSpacing: 8,

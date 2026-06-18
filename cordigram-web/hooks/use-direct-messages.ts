@@ -635,6 +635,18 @@ export const useDirectMessages = ({
       setTimeout(() => setBoostEntitlementUpdated(null), 500);
     });
 
+    socket.on("user-settings-updated", (data: Record<string, unknown>) => {
+      if (!data || typeof data !== "object") return;
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-user-settings-updated", { detail: data }),
+        );
+        window.dispatchEvent(new Event("cordigram-chat-settings"));
+      } catch {
+        // ignore
+      }
+    });
+
     socket.on("error", (error: { message: string }) => {
       console.error("Socket error:", error);
     });

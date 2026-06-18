@@ -50,6 +50,19 @@
 		<string>comgooglemaps</string>
 		<string>https</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.cordigram.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cordigram</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Cordigram needs camera access for livestream camera mode.</string>
 	<key>NSMicrophoneUsageDescription</key>

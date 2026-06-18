@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/services/language_controller.dart';
 import '../models/server_models.dart';
 import '../models/server_permissions.dart';
 import '../services/channel_messages_service.dart';
@@ -109,7 +110,7 @@ class _ChannelContextBodyState extends State<_ChannelContextBody> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e')),
+          SnackBar(content: Text('$e')),
         );
       }
     } finally {
@@ -131,7 +132,7 @@ class _ChannelContextBodyState extends State<_ChannelContextBody> {
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã sao chép link kênh')),
+      SnackBar(content: Text(LanguageController.instance.t('server.channel.copiedLink'))),
     );
   }
 
@@ -147,8 +148,8 @@ class _ChannelContextBodyState extends State<_ChannelContextBody> {
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Huỷ')),
-          TextButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('Lưu')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text(LanguageController.instance.t('common.cancel'))),
+          TextButton(onPressed: () => Navigator.pop(dCtx, true), child: Text(LanguageController.instance.t('common.save'))),
         ],
       ),
     );
@@ -168,7 +169,7 @@ class _ChannelContextBodyState extends State<_ChannelContextBody> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không sửa được: $e')),
+          SnackBar(content: Text(LanguageController.instance.t('server.channel.cannotEdit'))),
         );
       }
     } finally {
@@ -188,7 +189,7 @@ class _ChannelContextBodyState extends State<_ChannelContextBody> {
           style: const TextStyle(color: Color(0xFFB8C8E8)),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Huỷ')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text(LanguageController.instance.t('common.cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(dCtx, true),
             child: const Text('Xóa', style: TextStyle(color: Color(0xFFFF6B7A))),
@@ -205,7 +206,7 @@ class _ChannelContextBodyState extends State<_ChannelContextBody> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không xóa được: $e')),
+          SnackBar(content: Text(LanguageController.instance.t('server.channel.cannotDelete'))),
         );
       }
     } finally {

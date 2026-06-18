@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../services/messages_media_service.dart';
 import '../services/servers_service.dart';
 import 'server_settings_ui.dart';
@@ -57,7 +58,7 @@ class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
   Future<void> _add() async {
     if (_count >= _max) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã đủ số lượng emoji')),
+        SnackBar(content: Text(LanguageController.instance.t('server.emoji.maxReached'))),
       );
       return;
     }
@@ -87,7 +88,7 @@ class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã thêm emoji')),
+        SnackBar(content: Text(LanguageController.instance.t('server.emoji.added'))),
       );
       await _load();
     } catch (e) {
@@ -116,7 +117,7 @@ class _ServerEmojiScreenState extends State<ServerEmojiScreen> {
               backgroundColor: ui.accent,
               foregroundColor: ui.onAccent,
               icon: const Icon(Icons.add_photo_alternate_outlined),
-              label: const Text('Tải lên'),
+              label: Text(LanguageController.instance.t('server.emoji.upload')),
             ),
       body: _loading
           ? Center(child: CircularProgressIndicator(color: ui.accent))

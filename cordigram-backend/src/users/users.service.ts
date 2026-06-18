@@ -2544,7 +2544,17 @@ export class UsersService {
       gateway?.applySharePresenceSetting(params.userId, params.sharePresence);
     }
 
-    return this.getSettings(params.userId);
+    const settings = await this.getSettings(params.userId);
+    try {
+      const gateway = this.moduleRef.get(DirectMessagesGateway, {
+        strict: false,
+      });
+      gateway?.emitToUser?.(params.userId, 'user-settings-updated', settings);
+    } catch {
+      // ignore socket emit failures
+    }
+
+    return settings;
   }
 
   async createWithGoogle(params: {

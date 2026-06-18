@@ -135,12 +135,11 @@ export class CloudinaryService implements OnModuleInit {
         quality: 'auto',
         format: 'mp4',
       }));
-      // eager_async: false — block until all quality variants are generated.
-      // The upload API takes longer but quality URLs are ready by the time
-      // the post goes live, preventing the "duration grows from 0" issue.
-      options.eager_async = false;
-      // Allow up to 10 minutes for long videos (Cloudinary default is too short)
-      options.timeout = 600000;
+      // eager_async: true — Cloudinary generates quality variants in background
+      // after upload completes, so the upload API returns immediately.
+      // Quality URLs built by buildVideoQualityUrls() use on-demand transformation
+      // URLs (h_X,c_limit,q_auto) that work regardless of eager pre-generation.
+      options.eager_async = true;
     }
 
     const res = await new Promise<UploadApiResponse>((resolve, reject) => {

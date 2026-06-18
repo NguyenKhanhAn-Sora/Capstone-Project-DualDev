@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../services/messages_media_service.dart';
 import '../services/servers_service.dart';
 import 'server_settings_ui.dart';
@@ -67,7 +68,7 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã cập nhật Boost sticker')),
+          SnackBar(content: Text(LanguageController.instance.t('server.sticker.boostUpdated'))),
         );
       }
     } catch (e) {
@@ -82,7 +83,7 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
   Future<void> _add() async {
     if (_count >= _max) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã đủ ô sticker')),
+        SnackBar(content: Text(LanguageController.instance.t('server.sticker.slotsMax'))),
       );
       return;
     }
@@ -136,7 +137,7 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
               backgroundColor: ui.accent,
               foregroundColor: ui.onAccent,
               icon: const Icon(Icons.add_photo_alternate_outlined),
-              label: const Text('Tải lên'),
+              label: Text(LanguageController.instance.t('server.sticker.upload')),
             ),
       body: _loading
           ? Center(child: CircularProgressIndicator(color: ui.accent))
@@ -171,15 +172,15 @@ class _ServerStickerScreenState extends State<ServerStickerScreen> {
                               children: [
                                 OutlinedButton(
                                   onPressed: _busy ? null : () => _setBoost('basic'),
-                                  child: const Text('Mức cơ bản'),
+                                  child: Text(LanguageController.instance.t('server.sticker.basic')),
                                 ),
                                 OutlinedButton(
                                   onPressed: _busy ? null : () => _setBoost('boost'),
-                                  child: const Text('Boost đầy đủ'),
+                                  child: Text(LanguageController.instance.t('server.sticker.fullBoost')),
                                 ),
                                 OutlinedButton(
                                   onPressed: _busy ? null : () => _setBoost(null),
-                                  child: const Text('Gỡ gán'),
+                                  child: Text(LanguageController.instance.t('server.sticker.unassign')),
                                 ),
                               ],
                             ),

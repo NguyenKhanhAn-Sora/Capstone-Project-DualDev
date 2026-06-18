@@ -61,6 +61,8 @@ class DmMessage {
     this.callStatus,
     this.callDurationSec,
     this.callInitiatorId,
+    this.customStickerUrl,
+    this.serverStickerId,
   });
 
   final String id;
@@ -89,6 +91,8 @@ class DmMessage {
   final String? callStatus;
   final int? callDurationSec;
   final String? callInitiatorId;
+  final String? customStickerUrl;
+  final String? serverStickerId;
 
   bool get isCallMessage => type == 'call';
 
@@ -196,6 +200,8 @@ class DmMessage {
           ? (json['callDuration'] as num).toInt()
           : null,
       callInitiatorId: pickUserId(json['callInitiatorId']),
+      customStickerUrl: json['customStickerUrl']?.toString(),
+      serverStickerId: json['serverStickerId']?.toString(),
     );
   }
 }

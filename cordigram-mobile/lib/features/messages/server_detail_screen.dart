@@ -94,6 +94,14 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
     if (sid.isEmpty || sid != widget.server.id) return;
     final event = (payload['event'] ?? '').toString();
 
+    if (event == 'server-deleted') {
+      if (_didAutoPopByRealtime || !mounted) return;
+      _didAutoPopByRealtime = true;
+      unawaited(_leaveVoiceIfInCurrentServer());
+      unawaited(exitMessagesAfterServerDeleted(widget.server.id));
+      return;
+    }
+
     if (event == 'server-updated') {
       final rawServer = payload['server'];
       if (rawServer is Map) {
@@ -354,10 +362,6 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
           ),
         ).then((result) {
           if (!mounted) return;
-          if (result == 'deleted') {
-            Navigator.of(context).pop('deleted');
-            return;
-          }
           if (result is ServerSummary) {
             setState(() => _serverOverride = result);
           }
@@ -675,9 +679,9 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                     if (_displayTextChannels
                         .where((c) => c.categoryId == null)
                         .isNotEmpty) ...[
-                      const _SectionHeader(
+                      _SectionHeader(
                         icon: Icons.tag_rounded,
-                        title: 'Kênh chat',
+                        title: LanguageController.instance.t('messages.chatChannel'),
                       ),
                       ..._displayTextChannels
                           .where((c) => c.categoryId == null)
@@ -698,9 +702,9 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                         .where((c) => c.categoryId == null)
                         .isNotEmpty) ...[
                       Divider(height: 22, color: chrome.border),
-                      const _SectionHeader(
+                      _SectionHeader(
                         icon: Icons.volume_up_rounded,
-                        title: 'Kênh đàm thoại',
+                        title: LanguageController.instance.t('messages.voiceChannel'),
                       ),
                       ..._displayVoiceChannels
                           .where((c) => c.categoryId == null)

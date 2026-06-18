@@ -282,7 +282,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không lưu được: $e')),
+          SnackBar(content: Text(LanguageController.instance.t('server.settings.failedSave'))),
         );
       }
     } finally {
@@ -452,14 +452,14 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 children: [
                                   _primaryButton(
                                     ui: ui,
-                                    label: 'Thay đổi biểu tượng máy chủ',
+                                    label: LanguageController.instance.t('server.settings.changeIcon'),
                                     onPressed: _canEdit ? _pickAvatar : null,
                                     loading: _uploadingAvatar,
                                   ),
                                   const SizedBox(height: 10),
                                   _dangerButton(
                                     ui: ui,
-                                    label: 'Xóa biểu tượng',
+                                    label: LanguageController.instance.t('server.settings.removeIcon'),
                                     onPressed: _canEdit && _avatarUrl.isNotEmpty
                                         ? _removeAvatar
                                         : null,
@@ -472,7 +472,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 Expanded(
                                   child: _primaryButton(
                                     ui: ui,
-                                    label: 'Thay đổi biểu tượng máy chủ',
+                                    label: LanguageController.instance.t('server.settings.changeIcon'),
                                     onPressed: _canEdit ? _pickAvatar : null,
                                     loading: _uploadingAvatar,
                                   ),
@@ -481,7 +481,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 Expanded(
                                   child: _dangerButton(
                                     ui: ui,
-                                    label: 'Xóa biểu tượng',
+                                    label: LanguageController.instance.t('server.settings.removeIcon'),
                                     onPressed: _canEdit && _avatarUrl.isNotEmpty
                                         ? _removeAvatar
                                         : null,
@@ -512,14 +512,14 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 children: [
                                   _primaryButton(
                                     ui: ui,
-                                    label: 'Tải ảnh biểu ngữ',
+                                    label: LanguageController.instance.t('server.settings.uploadBanner'),
                                     onPressed: _canEdit ? _pickBanner : null,
                                     loading: _uploadingBanner,
                                   ),
                                   const SizedBox(height: 10),
                                   _dangerButton(
                                     ui: ui,
-                                    label: 'Xóa ảnh biểu ngữ',
+                                    label: LanguageController.instance.t('server.settings.removeBanner'),
                                     onPressed: _canEdit &&
                                             _bannerImageUrl.isNotEmpty
                                         ? _removeBanner
@@ -533,7 +533,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 Expanded(
                                   child: _primaryButton(
                                     ui: ui,
-                                    label: 'Tải ảnh biểu ngữ',
+                                    label: LanguageController.instance.t('server.settings.uploadBanner'),
                                     onPressed: _canEdit ? _pickBanner : null,
                                     loading: _uploadingBanner,
                                   ),
@@ -542,7 +542,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                                 Expanded(
                                   child: _dangerButton(
                                     ui: ui,
-                                    label: 'Xóa ảnh biểu ngữ',
+                                    label: LanguageController.instance.t('server.settings.removeBanner'),
                                     onPressed: _canEdit &&
                                             _bannerImageUrl.isNotEmpty
                                         ? _removeBanner

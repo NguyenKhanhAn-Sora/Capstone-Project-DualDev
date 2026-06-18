@@ -2113,6 +2113,29 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // ── Recent accounts sync ─────────────────────────────────────────────────
+
+  Future<void> _syncAvatarToRecentAccounts(String username, String avatarUrl) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) return;
+    final email = await AuthStorage.syncProfileByUsername(
+      username,
+      newAvatarUrl: avatarUrl.isNotEmpty ? avatarUrl : null,
+    );
+    if (email == null || email.isEmpty) return;
+    try {
+      await ApiService.post(
+        '/auth/recent-accounts',
+        body: {
+          'email': email,
+          'username': username,
+          if (avatarUrl.isNotEmpty) 'avatarUrl': avatarUrl,
+        },
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+    } catch (_) {}
+  }
+
   // ── Pick + crop + upload ──────────────────────────────────────────────────
 
   Future<void> _pickAndUploadAvatar() async {
@@ -2175,8 +2198,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (newUrl.isNotEmpty) imageCache.evict(NetworkImage(newUrl));
       UserNotifier.avatarUrl.value = newUrl.isNotEmpty ? newUrl : null;
       final username = _profile?.username ?? '';
-      if (username.isNotEmpty && newUrl.isNotEmpty) {
-        AuthStorage.syncAvatarByUsername(username, newUrl);
+      if (username.isNotEmpty) {
+        _syncAvatarToRecentAccounts(username, newUrl);
       }
     } catch (e) {
       if (!mounted) return;
@@ -2241,7 +2264,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       UserNotifier.avatarUrl.value = newUrl.isNotEmpty ? newUrl : null;
       final username = _profile?.username ?? '';
       if (username.isNotEmpty) {
-        AuthStorage.syncAvatarByUsername(username, newUrl);
+        _syncAvatarToRecentAccounts(username, newUrl);
       }
     } catch (e) {
       if (!mounted) return;
