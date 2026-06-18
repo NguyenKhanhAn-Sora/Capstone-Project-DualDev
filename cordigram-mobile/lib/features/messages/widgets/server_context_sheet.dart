@@ -301,7 +301,14 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
     try {
       await ServersService.leaveServer(_sid);
       if (mounted) Navigator.pop(context);
-      await widget.onLeaveSuccess();
+      // Defer the parent-screen navigation to the next frame so the sheet's
+      // own route removal is fully processed first. Removing two routes in the
+      // same synchronous sequence can cause _dependents.isEmpty assertions when
+      // InheritedWidgets inside the sheet are deactivated out-of-order relative
+      // to elements from the parent screen.
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => widget.onLeaveSuccess(),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

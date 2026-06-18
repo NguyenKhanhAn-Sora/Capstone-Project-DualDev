@@ -2234,7 +2234,9 @@
       "groups": {
         "expressions": "表現",
         "people": "メンバー",
-        "moderation": "管理"
+        "moderation": "管理",
+        "community": "コミュニティ",
+        "danger": "危険操作"
       },
       "sections": {
         "profile": "サーバープロフィール",

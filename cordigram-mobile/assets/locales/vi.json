@@ -2246,7 +2246,9 @@
       "groups": {
         "expressions": "BIỂU CẢM",
         "people": "MỌI NGƯỜI",
-        "moderation": "ĐIỀU CHỈNH"
+        "moderation": "ĐIỀU CHỈNH",
+        "community": "CỘNG ĐỒNG",
+        "danger": "NGUY HIỂM"
       },
       "sections": {
         "profile": "Hồ sơ máy chủ",

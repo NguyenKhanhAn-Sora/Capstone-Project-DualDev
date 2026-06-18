@@ -2234,7 +2234,9 @@
       "groups": {
         "expressions": "表情",
         "people": "成员",
-        "moderation": "管理"
+        "moderation": "管理",
+        "community": "社区",
+        "danger": "危险操作"
       },
       "sections": {
         "profile": "服务器资料",

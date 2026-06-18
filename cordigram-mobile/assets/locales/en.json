@@ -2221,7 +2221,9 @@
       "groups": {
         "expressions": "EXPRESSIONS",
         "people": "PEOPLE",
-        "moderation": "MODERATION"
+        "moderation": "MODERATION",
+        "community": "COMMUNITY",
+        "danger": "DANGER ZONE"
       },
       "sections": {
         "profile": "Server Profile",
