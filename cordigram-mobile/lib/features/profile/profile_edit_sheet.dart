@@ -577,6 +577,33 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     return null;
   }
 
+  // -- Recent accounts sync ---------------------------------------------------
+
+  Future<void> _syncRecentAccountAfterProfileUpdate(ProfileDetail updated) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) return;
+    final email = await AuthStorage.syncProfileByUsername(
+      updated.username,
+      newDisplayName: updated.displayName.isNotEmpty ? updated.displayName : null,
+      newAvatarUrl: updated.avatarUrl.isNotEmpty ? updated.avatarUrl : null,
+    );
+    if (email == null || email.isEmpty) return;
+    try {
+      await ApiService.post(
+        '/auth/recent-accounts',
+        body: {
+          'email': email,
+          'username': updated.username,
+          if (updated.displayName.isNotEmpty) 'displayName': updated.displayName,
+          if (updated.avatarUrl.isNotEmpty) 'avatarUrl': updated.avatarUrl,
+        },
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+    } catch (_) {
+      // local update is enough if server call fails
+    }
+  }
+
   // -- Save -------------------------------------------------------------------
 
   Future<void> _save() async {
@@ -620,6 +647,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
 
       final updated = await ProfileService.updateProfile(payload);
       if (!mounted) return;
+      unawaited(_syncRecentAccountAfterProfileUpdate(updated));
       widget.onSaved(updated);
       Navigator.of(context).pop();
     } catch (e) {

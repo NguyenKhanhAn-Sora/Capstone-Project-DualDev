@@ -1231,22 +1231,11 @@ export default function ReelPage({
         : params.id
       : undefined;
 
-    if (fromPath) return fromPath;
-
-    if (typeof window !== "undefined" && viewerId) {
-      try {
-        const raw = localStorage.getItem("lastOwnedReelId");
-        if (raw) {
-          const parsed = JSON.parse(raw) as { id?: string; ownerId?: string };
-          if (parsed?.id && parsed.ownerId === viewerId) return parsed.id;
-        }
-      } catch {
-        /* ignore stored parse errors */
-      }
-    }
-
-    return undefined;
-  }, [params, viewerId]);
+    return fromPath;
+    // Note: lastOwnedReelId is no longer read here. The backend now pins the
+    // viewer's own unviewed reels to the top of page 1, so client-side injection
+    // via requestedReelId is no longer needed and caused a prepend jank on entry.
+  }, [params]);
   const singleMode = useMemo(
     () => searchParams?.get("single") === "1",
     [searchParams],
@@ -1656,7 +1645,7 @@ export default function ReelPage({
       else setLoadingMore(true);
 
       try {
-        const limit = nextPage * REELS_PAGE_SIZE;
+        const limit = REELS_PAGE_SIZE;
 
         let base: ReelItem[] = [];
         if (profileMode && profileModeUserId) {
@@ -1665,10 +1654,11 @@ export default function ReelPage({
               token,
               userId: profileModeUserId,
               limit,
+              page: nextPage,
             })) || []
           ).map(coerceReelKind);
         } else {
-          base = ((await fetchReelsFeed({ token, limit, scope })) || []).map(
+          base = ((await fetchReelsFeed({ token, limit, page: nextPage, scope })) || []).map(
             coerceReelKind,
           );
         }
@@ -1727,16 +1717,21 @@ export default function ReelPage({
 
         nextItems = applyBlockedFilter(nextItems.slice(0, limit));
 
-        setItems(nextItems);
-        setHasMore(nextHasMore);
-        setPage(nextPage);
-
         if (isInitial) {
+          setItems(nextItems);
           const initialIndex = requestedReelId
             ? nextItems.findIndex((it) => it.id === requestedReelId)
             : 0;
           setActiveIndex(initialIndex >= 0 ? initialIndex : 0);
+        } else {
+          setItems((prev) => {
+            const existingIds = new Set(prev.map((it) => it.id));
+            const newOnly = nextItems.filter((it) => !existingIds.has(it.id));
+            return newOnly.length ? [...prev, ...newOnly] : prev;
+          });
         }
+        setHasMore(nextHasMore);
+        setPage(nextPage);
 
         setError("");
       } catch (err) {
@@ -1767,10 +1762,20 @@ export default function ReelPage({
     void loadPage(page + 1);
   }, [hasMore, loadPage, loading, loadingMore, page, singleMode]);
 
+  // Keep a stable ref to loadPage so the initial-load effect can call the latest
+  // version without adding loadPage to its semantic dependency list.
+  const loadPageRef = useRef(loadPage);
+  useEffect(() => { loadPageRef.current = loadPage; }, [loadPage]);
+
   useEffect(() => {
+    // Wait until auth is settled so we only ever fire ONE initial load per mount.
+    // Previously this depended on `loadPage` (a useCallback) which changed every
+    // time token/viewerId changed, causing the initial load to fire 2-3 times and
+    // show different content each time — which looked like a prepend jank.
+    if (!tokenLoaded) return;
     if (singleMode && requestedReelId) return;
-    void loadPage(1, { initial: true });
-  }, [loadPage, requestedReelId, singleMode, viewerId]);
+    void loadPageRef.current(1, { initial: true });
+  }, [tokenLoaded, singleMode, requestedReelId, scope]);
 
   useEffect(() => {
     if (!loadingMore) autoLoadLockRef.current = false;
@@ -1872,46 +1877,11 @@ export default function ReelPage({
     };
   }, [blockedIds, leaveBlockedContent, originReelId, requestedReelId, singleMode, token, tokenLoaded]);
 
-  useEffect(() => {
-    if (!token || !viewerId) return;
-    const ownedPresent = items.some((it) => it.authorId === viewerId);
-    if (ownedPresent) return;
-
-    try {
-      const raw = localStorage.getItem("lastOwnedReelId");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as { id?: string; ownerId?: string };
-      if (!parsed?.id || parsed.ownerId !== viewerId) return;
-      const reelId = parsed.id;
-      if (items.some((it) => it.id === reelId)) return;
-      if (missingDetailRef.current.has(reelId)) return;
-
-      missingDetailRef.current.add(reelId);
-      let cancelled = false;
-
-      fetchReelDetail({ token, reelId })
-        .then((detail) => {
-          if (cancelled || !detail) return;
-          setItems((prev) => {
-            if (prev.some((it) => it.id === detail.id)) return prev;
-            const next = applyBlockedFilter([detail as ReelItem, ...prev]);
-            return next;
-          });
-          setActiveIndex((prev) => 0);
-        })
-        .catch(() => undefined);
-
-      return () => {
-        cancelled = true;
-      };
-    } catch {
-      /* ignore storage parse errors */
-    }
-  }, [applyBlockedFilter, items, token, viewerId]);
+  // lastOwnedReelId injection removed: backend now pins the viewer's own unviewed
+  // reels to the top of page 1, so client-side prepending is no longer needed.
 
   useEffect(() => {
     if (!token || !requestedReelId) return;
-    if (items.some((it) => it.id === requestedReelId)) return;
     if (missingDetailRef.current.has(requestedReelId)) return;
 
     missingDetailRef.current.add(requestedReelId);
@@ -1921,6 +1891,7 @@ export default function ReelPage({
       .then((detail) => {
         if (cancelled || !detail) return;
         setItems((prev) => {
+          // If the reel arrived via the normal feed load, don't prepend it again
           if (prev.some((it) => it.id === detail.id)) return prev;
           return applyBlockedFilter([detail as ReelItem, ...prev]);
         });
@@ -1936,7 +1907,10 @@ export default function ReelPage({
     return () => {
       cancelled = true;
     };
-  }, [applyBlockedFilter, items, requestedReelId, token]);
+  // Intentionally excludes `items` — the setItems callback handles idempotency.
+  // Including items would re-run this on every loadMore append.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyBlockedFilter, requestedReelId, token]);
 
   useEffect(() => {
     if (!singleMode) return;

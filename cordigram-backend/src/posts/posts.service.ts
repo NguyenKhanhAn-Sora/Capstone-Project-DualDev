@@ -1808,34 +1808,41 @@ export class PostsService {
     // Cloudinary handles audio under resource_type "video" by default.
     const resourceType = isVideo || isAudio ? 'video' : 'image';
 
-    const moderation = isAudio
-      ? {
+    const folder = this.buildUploadFolder(authorId);
+
+    const moderationPromise = isAudio
+      ? Promise.resolve({
           decision: 'approve' as const,
           reasons: ['audio upload - moderation skipped'],
           provider: 'skipped',
           scores: {},
-        }
+        })
       : resourceType === 'image'
-        ? await this.mediaModerationService.moderateImage({
+        ? this.mediaModerationService.moderateImage({
             buffer: file.buffer,
             filename: file.originalname,
             mimetype: file.mimetype,
           })
-        : await this.mediaModerationService.moderateVideo({
+        : this.mediaModerationService.moderateVideo({
             buffer: file.buffer,
             filename: file.originalname,
             mimetype: file.mimetype,
           });
 
-    const folder = this.buildUploadFolder(authorId);
-
-    const upload = await this.cloudinary.uploadBuffer({
+    const uploadPromise = this.cloudinary.uploadBuffer({
       buffer: file.buffer,
       folder,
       resourceType,
       overwrite: false,
       eagerQualityHeights: isVideo ? [240, 360, 480, 720, 1080] : undefined,
     });
+
+    // Run moderation and Cloudinary upload in parallel — both only need the
+    // file buffer and are independent of each other.
+    const [moderation, upload] = await Promise.all([
+      moderationPromise,
+      uploadPromise,
+    ]);
 
     const secureUrl =
       moderation.decision === 'blur'
@@ -2425,7 +2432,22 @@ export class PostsService {
     }
 
     // Enforce author diversity across the ranked pool (max 2 posts per author)
-    const diversified = this.applyAuthorDiversity(prioritized);
+    let diversified = this.applyAuthorDiversity(prioritized);
+
+    // For page 1: always pin the viewer's own unviewed reels to the front so
+    // newly posted content is immediately visible regardless of engagement score.
+    if (safePage === 1 && userId) {
+      const ownUnviewed = diversified.filter(
+        (item) =>
+          item.post.authorId?.toString() === userId &&
+          !viewedIds.has(item.post._id?.toString() ?? ''),
+      );
+      if (ownUnviewed.length) {
+        const ownIds = new Set(ownUnviewed.map((item) => item.post._id?.toString() ?? ''));
+        const rest = diversified.filter((item) => !ownIds.has(item.post._id?.toString() ?? ''));
+        diversified = [...ownUnviewed, ...rest];
+      }
+    }
 
     const pagePosts = diversified
       .slice(sliceStart, sliceEnd)

@@ -215,22 +215,34 @@ class AuthStorage {
     String username,
     String newAvatarUrl,
   ) async {
-    if (username.isEmpty) return;
+    await syncProfileByUsername(username, newAvatarUrl: newAvatarUrl);
+  }
+
+  /// Updates displayName and/or avatarUrl for the account matching [username].
+  /// Returns the matched email so callers can also sync the change to the server.
+  static Future<String?> syncProfileByUsername(
+    String username, {
+    String? newDisplayName,
+    String? newAvatarUrl,
+  }) async {
+    if (username.isEmpty) return null;
     final current = await loadRecentAccounts();
-    final updated = current
-        .map(
-          (e) => e.username == username
-              ? RecentAccountEntry(
-                  email: e.email,
-                  username: e.username,
-                  displayName: e.displayName,
-                  avatarUrl: newAvatarUrl,
-                  lastUsed: e.lastUsed,
-                )
-              : e,
-        )
-        .toList(growable: false);
+    String? matchedEmail;
+    final updated = current.map((e) {
+      if (e.username == username) {
+        matchedEmail = e.email;
+        return RecentAccountEntry(
+          email: e.email,
+          username: e.username,
+          displayName: newDisplayName ?? e.displayName,
+          avatarUrl: newAvatarUrl ?? e.avatarUrl,
+          lastUsed: e.lastUsed,
+        );
+      }
+      return e;
+    }).toList(growable: false);
     await _saveRecentAccounts(updated);
+    return matchedEmail;
   }
 
   static Future<void> _saveRecentAccounts(
