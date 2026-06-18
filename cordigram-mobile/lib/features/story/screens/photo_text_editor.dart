@@ -516,7 +516,7 @@ class _TextInputOverlay extends StatelessWidget {
                 ),
                 decoration: InputDecoration(
                   border: InputBorder.none,
-                  hintText: 'Nhập nội dung...',
+                  hintText: LanguageController.instance.t('story.textInputHint'),
                   hintStyle: TextStyle(
                     color: Colors.white.withValues(alpha: 0.45),
                     fontSize: fontSize,

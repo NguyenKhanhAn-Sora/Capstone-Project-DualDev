@@ -157,10 +157,10 @@ class _GlobalCallFloatingOverlayState extends State<_GlobalCallFloatingOverlay> 
                       child: _CallPopupCard(
                         title: incoming.callerName,
                         subtitle: incoming.video ? 'Video call' : 'Voice call',
-                        statusText: 'Cuộc gọi đến',
+                        statusText: LanguageController.instance.t('messages.call.incomingCall'),
                         avatarUrl: incoming.callerAvatarUrl,
-                        acceptLabel: 'Chấp nhận',
-                        rejectLabel: 'Từ chối',
+                        acceptLabel: LanguageController.instance.t('messages.call.accept'),
+                        rejectLabel: LanguageController.instance.t('messages.call.reject'),
                         onAccept: () => _acceptIncomingDmCall(mgr),
                         onReject: mgr.rejectIncoming,
                       ),
@@ -193,15 +193,15 @@ class _GlobalCallFloatingOverlayState extends State<_GlobalCallFloatingOverlay> 
                                       : 'Voice call',
                                   statusText: switch (outgoing.status) {
                                     OutgoingCallStatus.calling =>
-                                      'Đang gọi...',
+                                      LanguageController.instance.t('messages.call.calling'),
                                     OutgoingCallStatus.rejected =>
-                                      'Cuộc gọi bị từ chối',
+                                      LanguageController.instance.t('messages.call.callRejected'),
                                     OutgoingCallStatus.noAnswer =>
-                                      'Không có phản hồi',
+                                      LanguageController.instance.t('messages.call.noAnswer'),
                                   },
                                   avatarUrl: outgoing.peerAvatarUrl,
                                   acceptLabel: null,
-                                  rejectLabel: 'Hủy',
+                                  rejectLabel: LanguageController.instance.t('messages.call.cancel'),
                                   onAccept: null,
                                   onReject: () => mgr.cancelOutgoingFor(
                                     outgoing.peerUserId,
@@ -240,13 +240,12 @@ Future<void> _acceptIncomingDmCall(DmCallManager mgr) async {
     builder: (dialogContext) {
       return AlertDialog(
         backgroundColor: const Color(0xFF0E2247),
-        title: const Text(
-          'Đang ở kênh thoại server',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        title: Text(
+          LanguageController.instance.t('messages.call.inVoiceChannel'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         content: Text(
-          'Bạn đang trong kênh ${voiceSession.channelName ?? 'thoại'}. '
-          'Bạn cần rời kênh thoại trước khi nhận cuộc gọi DM.',
+          LanguageController.instance.t('messages.call.inVoiceChannelLeave', {'channel': voiceSession.channelName ?? ''}),
           style: const TextStyle(color: Color(0xFFAFC0E2)),
         ),
         actions: [
@@ -292,7 +291,7 @@ Future<void> _openVoiceRoomFromGlobalPip() async {
         channel: channel,
         participantName: v.joinedParticipantName.trim().isNotEmpty
             ? v.joinedParticipantName.trim()
-            : 'Người dùng',
+            : LanguageController.instance.t('messages.call.user'),
       ),
     ),
   );
@@ -687,7 +686,7 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
 
     final title = (v.channelName ?? '').trim().isNotEmpty
         ? v.channelName!.trim()
-        : 'Kênh thoại';
+        : LanguageController.instance.t('messages.call.voiceChannel');
     final subtitle = (v.serverName ?? '').trim();
     final micOn = v.micEnabled;
     final mainName = layout.mainParticipant != null
@@ -756,7 +755,7 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
                               ),
                             ),
                             Semantics(
-                              label: 'Rời phòng',
+                              label: LanguageController.instance.t('server.call.leaveRoom'),
                               button: true,
                               child: Material(
                                 color: Colors.transparent,
@@ -776,7 +775,7 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
                               ),
                             ),
                             Semantics(
-                              label: 'Thu nhỏ góc',
+                              label: LanguageController.instance.t('server.call.minimize'),
                               button: true,
                               child: Material(
                                 color: Colors.white.withValues(alpha: 0.2),
@@ -824,7 +823,7 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
                                 else
                                   Center(
                                     child: Text(
-                                      mainName.isNotEmpty ? mainName : 'Đang chờ…',
+                                      mainName.isNotEmpty ? mainName : LanguageController.instance.t('messages.call.waiting'),
                                       style: const TextStyle(
                                         color: Color(0xFF8EA3CC),
                                         fontSize: 12,
@@ -841,22 +840,22 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
                                         color: Colors.black.withValues(alpha: 0.55),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: const Padding(
-                                        padding: EdgeInsets.symmetric(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
                                           horizontal: 6,
                                           vertical: 3,
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(
+                                            const Icon(
                                               Icons.screen_share_rounded,
                                               color: Colors.white,
                                               size: 12,
                                             ),
-                                            SizedBox(width: 4),
+                                            const SizedBox(width: 4),
                                             Text(
-                                              'Chia sẻ',
+                                              LanguageController.instance.t('messages.call.share'),
                                               style: TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 10,
@@ -906,7 +905,7 @@ class _VoiceChannelMinimizedCardState extends State<_VoiceChannelMinimizedCard> 
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                subtitle.isNotEmpty ? subtitle : 'Kênh thoại',
+                                subtitle.isNotEmpty ? subtitle : LanguageController.instance.t('messages.call.voiceChannel'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -1150,7 +1149,7 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
           .clamp(8.0 + pad.top, double.infinity),
     );
 
-    final title = act.peerName.isNotEmpty ? act.peerName : 'Cuộc gọi';
+    final title = act.peerName.isNotEmpty ? act.peerName : LanguageController.instance.t('messages.call.voiceChannel');
     final remoteTrack = widget.mgr.minimizedRemoteMainTrack;
     final pipTrack = widget.mgr.minimizedPipTrack;
     final pipSharing = widget.mgr.minimizedPipIsSharingPlaceholder;
@@ -1159,7 +1158,7 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
     final isVideo = act.video;
     final avatarUrl = act.peerAvatarUrl;
     final myInitial = () {
-      final n = (widget.mgr.myDisplayName ?? 'Bạn').trim();
+      final n = (widget.mgr.myDisplayName ?? LanguageController.instance.t('messages.call.you')).trim();
       if (n.isEmpty) return 'B';
       return n.substring(0, 1).toUpperCase();
     }();
@@ -1314,23 +1313,23 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
                               color: Colors.black.withValues(alpha: 0.55),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
                                 vertical: 3,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.screen_share_rounded,
                                     color: Colors.white,
                                     size: 12,
                                   ),
-                                  SizedBox(width: 4),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'Chia sẻ',
-                                    style: TextStyle(
+                                    LanguageController.instance.t('messages.call.share'),
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
@@ -1353,22 +1352,22 @@ class _MessengerMinimizedCallCardState extends State<_MessengerMinimizedCallCard
                             clipBehavior: Clip.antiAlias,
                             color: Colors.black,
                             child: pipSharing
-                                ? const ColoredBox(
-                                    color: Color(0xFF1B2A4A),
+                                ? ColoredBox(
+                                    color: const Color(0xFF1B2A4A),
                                     child: Center(
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.screen_share_rounded,
                                             color: Colors.white,
                                             size: 20,
                                           ),
-                                          SizedBox(height: 4),
+                                          const SizedBox(height: 4),
                                           Text(
-                                            'Đang chia sẻ',
+                                            LanguageController.instance.t('messages.call.sharing'),
                                             textAlign: TextAlign.center,
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 9,
                                               fontWeight: FontWeight.w600,

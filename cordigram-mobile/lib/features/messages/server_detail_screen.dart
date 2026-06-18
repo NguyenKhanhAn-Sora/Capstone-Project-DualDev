@@ -675,9 +675,9 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                     if (_displayTextChannels
                         .where((c) => c.categoryId == null)
                         .isNotEmpty) ...[
-                      const _SectionHeader(
+                      _SectionHeader(
                         icon: Icons.tag_rounded,
-                        title: 'Kênh chat',
+                        title: LanguageController.instance.t('messages.chatChannel'),
                       ),
                       ..._displayTextChannels
                           .where((c) => c.categoryId == null)
@@ -698,9 +698,9 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                         .where((c) => c.categoryId == null)
                         .isNotEmpty) ...[
                       Divider(height: 22, color: chrome.border),
-                      const _SectionHeader(
+                      _SectionHeader(
                         icon: Icons.volume_up_rounded,
-                        title: 'Kênh đàm thoại',
+                        title: LanguageController.instance.t('messages.voiceChannel'),
                       ),
                       ..._displayVoiceChannels
                           .where((c) => c.categoryId == null)

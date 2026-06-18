@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../models/server_models.dart';
 import '../models/server_role_models.dart';
 import '../services/servers_service.dart';
@@ -128,7 +129,7 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
             jsonDecode(jsonEncode(saved)) as Map,
           ));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu AutoMod')),
+        SnackBar(content: Text(LanguageController.instance.t('server.automod.saved'))),
       );
     } catch (e) {
       if (mounted) {
@@ -217,7 +218,7 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                       keyboardType: TextInputType.number,
                       style: TextStyle(color: ui.text),
                       decoration: ui.fieldDecoration(
-                        labelText: 'Giới hạn đề cập / tin',
+                        labelText: LanguageController.instance.t('server.automod.mentionLimit'),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -287,7 +288,7 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                       keyboardType: TextInputType.number,
                       style: TextStyle(color: ui.text),
                       decoration: ui.fieldDecoration(
-                        labelText: 'Thời gian hạn chế (giờ)',
+                        labelText: LanguageController.instance.t('server.automod.restrictionTime'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -297,7 +298,7 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                       maxLines: 2,
                       style: TextStyle(color: ui.text),
                       decoration: ui.fieldDecoration(
-                        labelText: 'Thông báo tùy chỉnh (tuỳ chọn)',
+                        labelText: LanguageController.instance.t('server.automod.customMessage'),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -334,7 +335,7 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                         }),
                         if (widget.canManage)
                           ActionChip(
-                            label: const Text('+ Vai trò'),
+                            label: Text(LanguageController.instance.t('server.automod.addRole')),
                             onPressed: () async {
                               final picked = await showModalBottomSheet<String>(
                                 context: context,
@@ -399,7 +400,7 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                         }),
                         if (widget.canManage)
                           ActionChip(
-                            label: const Text('+ Kênh'),
+                            label: Text(LanguageController.instance.t('server.automod.addChannel')),
                             onPressed: () async {
                               final picked = await showModalBottomSheet<String>(
                                 context: context,
@@ -444,7 +445,7 @@ class _ServerAutomodScreenState extends State<ServerAutomodScreen> {
                         foregroundColor: ui.onAccent,
                         minimumSize: const Size(double.infinity, 48),
                       ),
-                      child: const Text('Lưu cài đặt'),
+                      child: Text(LanguageController.instance.t('server.automod.saveSettings')),
                     ),
                   ],
                 ),

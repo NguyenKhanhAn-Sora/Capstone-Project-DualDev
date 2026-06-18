@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/language_controller.dart';
 import '../services/servers_service.dart';
 
 enum _InviteCustomizeKind { cancelled, backToMessages, join }
@@ -277,11 +278,11 @@ class ServerJoinFlow {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Hủy'),
+              child: Text(LanguageController.instance.t('common.cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Đồng ý'),
+              child: Text(LanguageController.instance.t('server.join.agree')),
             ),
           ],
         );
@@ -568,9 +569,9 @@ class ServerJoinFlow {
                                           style: const TextStyle(
                                             color: Colors.white,
                                           ),
-                                          decoration: const InputDecoration(
-                                            hintText: 'Trả lời…',
-                                            hintStyle: TextStyle(
+                                          decoration: InputDecoration(
+                                            hintText: LanguageController.instance.t('messages.replyHint'),
+                                            hintStyle: const TextStyle(
                                               color: Color(0xFF8A98B8),
                                             ),
                                           ),
@@ -618,7 +619,7 @@ class ServerJoinFlow {
                             }
                             Navigator.pop(ctx, out);
                           },
-                          child: const Text('Gửi đơn'),
+                          child: Text(LanguageController.instance.t('server.join.submitApplication')),
                         ),
                       ),
                     ],
@@ -710,7 +711,7 @@ class ServerJoinFlow {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Đã hiểu'),
+              child: Text(LanguageController.instance.t('server.join.understood')),
             ),
           ],
         ),
@@ -735,7 +736,7 @@ class ServerJoinFlow {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Đóng'),
+              child: Text(LanguageController.instance.t('common.close')),
             ),
           ],
         ),
@@ -760,11 +761,11 @@ class ServerJoinFlow {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Quay lại'),
+            child: Text(LanguageController.instance.t('server.join.back')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Tiếp tục'),
+            child: Text(LanguageController.instance.t('server.join.continue')),
           ),
         ],
       ),
@@ -1036,7 +1037,7 @@ class ServerJoinFlow {
                               ctx,
                               InviteCustomizeResult.backToMessages(),
                             ),
-                            child: const Text('Về trang Tin nhắn'),
+                            child: Text(LanguageController.instance.t('server.join.toMessages')),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -1181,14 +1182,14 @@ class ServerJoinFlow {
           closeLoad();
           if (!context.mounted) return false;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Đã đồng ý quy định máy chủ.')),
+            SnackBar(content: Text(LanguageController.instance.t('server.join.agreedRules'))),
           );
           await onOpenServerInApp?.call(serverId, channelId: initialChannelId);
           return true;
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bạn đã là thành viên máy chủ này.')),
+          SnackBar(content: Text(LanguageController.instance.t('server.join.alreadyMember'))),
         );
         await onOpenServerInApp?.call(serverId, channelId: initialChannelId);
         return true;
@@ -1365,7 +1366,7 @@ class ServerJoinFlow {
       if (!context.mounted) return false;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Đã tham gia máy chủ.')));
+      ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('server.join.joined'))));
       await onOpenServerInApp?.call(serverId, channelId: initialChannelId);
       return true;
     } on ApiException catch (e) {

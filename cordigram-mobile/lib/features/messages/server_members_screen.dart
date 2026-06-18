@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/language_controller.dart';
 import 'models/server_role_models.dart';
 import 'services/servers_service.dart';
 
@@ -81,16 +82,16 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
       context: context,
       builder: (c) => AlertDialog(
         backgroundColor: const Color(0xFF152A52),
-        title: const Text('Đuổi thành viên?', style: TextStyle(color: Colors.white)),
+        title: Text(LanguageController.instance.t('server.members.kickDialog'), style: const TextStyle(color: Colors.white)),
         content: Text(
           '${m.displayName} sẽ bị đuổi khỏi máy chủ.',
           style: const TextStyle(color: Color(0xFFB8C8E8)),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LanguageController.instance.t('common.cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Đuổi', style: TextStyle(color: Color(0xFFFF6B7A))),
+            child: Text(LanguageController.instance.t('server.members.kick'), style: const TextStyle(color: Color(0xFFFF6B7A))),
           ),
         ],
       ),
@@ -100,7 +101,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
       await ServersService.kickMember(widget.serverId, m.userId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã đuổi thành viên.')),
+        SnackBar(content: Text(LanguageController.instance.t('server.members.kicked'))),
       );
       await _load();
     } catch (e) {
@@ -117,7 +118,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
       context: context,
       builder: (c) => AlertDialog(
         backgroundColor: const Color(0xFF152A52),
-        title: const Text('Cấm thành viên', style: TextStyle(color: Colors.white)),
+        title: Text(LanguageController.instance.t('server.members.banDialog'), style: const TextStyle(color: Colors.white)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -131,9 +132,9 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
               TextField(
                 controller: reasonCtrl,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Lý do (tuỳ chọn)',
-                  labelStyle: TextStyle(color: Color(0xFF8EA3CC)),
+                decoration: InputDecoration(
+                  labelText: LanguageController.instance.t('server.members.reason'),
+                  labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
                 ),
               ),
               const SizedBox(height: 8),
@@ -141,19 +142,19 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
                 controller: daysCtrl,
                 keyboardType: TextInputType.number,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Xóa tin nhắn (ngày, 0–7)',
-                  labelStyle: TextStyle(color: Color(0xFF8EA3CC)),
+                decoration: InputDecoration(
+                  labelText: LanguageController.instance.t('server.members.deleteMessages'),
+                  labelStyle: const TextStyle(color: Color(0xFF8EA3CC)),
                 ),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LanguageController.instance.t('common.cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Cấm', style: TextStyle(color: Color(0xFFFF6B7A))),
+            child: Text(LanguageController.instance.t('server.members.ban'), style: const TextStyle(color: Color(0xFFFF6B7A))),
           ),
         ],
       ),
@@ -175,7 +176,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã cấm thành viên.')),
+        SnackBar(content: Text(LanguageController.instance.t('server.members.banned'))),
       );
       await _load();
     } catch (e) {
@@ -236,7 +237,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
       await ServersService.timeoutMember(widget.serverId, m.userId, dur);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã áp dụng timeout.')),
+        SnackBar(content: Text(LanguageController.instance.t('server.members.timeoutApplied'))),
       );
       await _load();
     } catch (e) {
@@ -251,7 +252,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
       await ServersService.removeTimeout(widget.serverId, m.userId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã gỡ timeout.')),
+        SnackBar(content: Text(LanguageController.instance.t('server.members.timeoutRemoved'))),
       );
       await _load();
     } catch (e) {
@@ -275,7 +276,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
           style: const TextStyle(color: Color(0xFFB8C8E8)),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LanguageController.instance.t('common.cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
             child: const Text(
@@ -291,7 +292,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
       await ServersService.transferServerOwnership(widget.serverId, m.userId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã chuyển quyền sở hữu.')),
+        SnackBar(content: Text(LanguageController.instance.t('server.members.ownershipTransferred'))),
       );
       Navigator.of(context).pop();
     } catch (e) {
@@ -349,10 +350,10 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
                       value: days,
                       dropdownColor: const Color(0xFF0E1F45),
                       style: const TextStyle(color: Colors.white),
-                      items: const [
-                        DropdownMenuItem(value: 7, child: Text('7 ngày')),
-                        DropdownMenuItem(value: 30, child: Text('30 ngày')),
-                        DropdownMenuItem(value: 90, child: Text('90 ngày')),
+                      items: [
+                        DropdownMenuItem(value: 7, child: Text(LanguageController.instance.t('server.members.days7'))),
+                        DropdownMenuItem(value: 30, child: Text(LanguageController.instance.t('server.members.days30'))),
+                        DropdownMenuItem(value: 90, child: Text(LanguageController.instance.t('server.members.days90'))),
                       ],
                       onChanged: (v) {
                         if (v == null) return;
@@ -366,10 +367,10 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
                       value: role,
                       dropdownColor: const Color(0xFF0E1F45),
                       style: const TextStyle(color: Colors.white),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('Mọi vai trò')),
-                        DropdownMenuItem(value: 'none', child: Text('Không có vai trò')),
-                        DropdownMenuItem(value: 'member', child: Text('Thành viên')),
+                      items: [
+                        DropdownMenuItem(value: 'all', child: Text(LanguageController.instance.t('server.members.allRoles'))),
+                        DropdownMenuItem(value: 'none', child: Text(LanguageController.instance.t('server.members.noRole'))),
+                        DropdownMenuItem(value: 'member', child: Text(LanguageController.instance.t('server.members.memberRole'))),
                       ],
                       onChanged: (v) {
                         if (v == null) return;
@@ -399,7 +400,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Huỷ'),
+                  child: Text(LanguageController.instance.t('common.cancel')),
                 ),
                 TextButton(
                   onPressed: () async {
@@ -412,7 +413,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
                       );
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Đã lược bỏ $removed thành viên.')),
+                        SnackBar(content: Text(LanguageController.instance.t('server.members.pruned', {'count': removed.toString()}))),
                       );
                       await _load();
                     } catch (e) {
@@ -461,7 +462,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
             if (ctx.canKick)
               ListTile(
                 leading: const Icon(Icons.exit_to_app_rounded, color: Color(0xFFFFB4B4)),
-                title: const Text('Đuổi', style: TextStyle(color: Colors.white)),
+                title: Text(LanguageController.instance.t('server.members.kick'), style: const TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(c);
                   _kick(m);
@@ -470,7 +471,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
             if (ctx.canBan)
               ListTile(
                 leading: const Icon(Icons.block_rounded, color: Color(0xFFFF8A8A)),
-                title: const Text('Cấm', style: TextStyle(color: Colors.white)),
+                title: Text(LanguageController.instance.t('server.members.ban'), style: const TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(c);
                   _ban(m);
@@ -488,7 +489,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
             if (ctx.canTimeout && m.isTimedOut)
               ListTile(
                 leading: const Icon(Icons.timer_off_outlined, color: Color(0xFF7FB6FF)),
-                title: const Text('Gỡ timeout', style: TextStyle(color: Colors.white)),
+                title: Text(LanguageController.instance.t('server.members.removeTimeout'), style: const TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(c);
                   _removeTimeout(m);
@@ -507,7 +508,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
                 },
               ),
             ListTile(
-              title: const Text('Đóng', style: TextStyle(color: Color(0xFF8EA3CC))),
+              title: Text(LanguageController.instance.t('server.members.close'), style: const TextStyle(color: Color(0xFF8EA3CC))),
               onTap: () => Navigator.pop(c),
             ),
           ],
@@ -526,7 +527,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
       backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: _bg,
-        title: const Text('Thành viên', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(LanguageController.instance.t('server.members.membersTitle'), style: const TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           if (widget.isOwner)
             IconButton(
@@ -554,7 +555,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: _load,
-                          child: const Text('Thử lại'),
+                          child: Text(LanguageController.instance.t('server.members.retry')),
                         ),
                       ],
                     ),
@@ -574,7 +575,7 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
                             onChanged: (_) => setState(() {}),
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
-                              hintText: 'Tìm theo tên hoặc @username',
+                              hintText: LanguageController.instance.t('server.members.searchPlaceholder'),
                               hintStyle: const TextStyle(color: Color(0xFF6B7A99)),
                               filled: true,
                               fillColor: _card,

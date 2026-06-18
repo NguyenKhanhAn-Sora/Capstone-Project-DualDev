@@ -107,7 +107,6 @@ class _MessageChatScreenState extends State<MessageChatScreen>
   final Map<String, String> _serverEmojiMap = {};
   final Map<String, GlobalKey> _messageKeys = {};
   String? _highlightMessageId;
-  String _lang = 'vi';
 
   GlobalKey _keyForMessage(String id) =>
       _messageKeys.putIfAbsent(id, () => GlobalKey());
@@ -157,7 +156,6 @@ class _MessageChatScreenState extends State<MessageChatScreen>
     widget.controller.addListener(_onControllerChanged);
     _inputController.addListener(_onInputChanged);
     _loadConversation();
-    _loadLanguage();
     unawaited(MessagesMediaService.refreshBoostStatus());
     unawaited(widget.controller.refreshDmBlockStateFromApi());
     widget.controller.setActiveConversationPeer(widget.thread.id);
@@ -226,65 +224,38 @@ class _MessageChatScreenState extends State<MessageChatScreen>
     }
   }
 
-  Future<void> _loadLanguage() async {
-    try {
-      final code = await DirectMessagesService.getCurrentLanguageCode();
-      if (!mounted) return;
-      setState(() => _lang = code);
-    } catch (_) {}
-  }
-
   String _t(String key) {
-    const vi = <String, String>{
-      'poll.loading': 'Đang tải khảo sát...',
-      'poll.selectOne': 'Chọn một phương án',
-      'poll.selectMany': 'Chọn một hoặc nhiều phương án',
-      'poll.showResults': 'Xem kết quả',
-      'poll.vote': 'Bình chọn',
-      'poll.voted': 'Đã bình chọn',
-      'poll.votesHours': '{votes} lượt • còn {hours} giờ',
-      'poll.voteError': 'Không gửi được bình chọn',
-      'poll.createTitle': 'Tạo khảo sát',
-      'poll.question': 'Câu hỏi',
-      'poll.option': 'Phương án',
-      'poll.addOption': 'Thêm phương án',
-      'poll.duration': 'Thời hạn',
-      'poll.multi': 'Cho phép chọn nhiều đáp án',
-      'poll.cancel': 'Hủy',
-      'poll.create': 'Tạo',
-      'poll.needQuestion': 'Vui lòng nhập câu hỏi',
-      'poll.need2Options': 'Cần ít nhất 2 phương án trả lời',
+    final map = <String, String>{
+      'poll.loading': 'messages.loadingPoll',
+      'poll.selectOne': 'messages.poll.selectOne',
+      'poll.selectMany': 'messages.poll.selectMany',
+      'poll.showResults': 'messages.poll.showResults',
+      'poll.vote': 'messages.vote',
+      'poll.voted': 'messages.poll.voted',
+      'poll.voteError': 'messages.poll.voteError',
+      'poll.createTitle': 'messages.createPoll',
+      'poll.question': 'messages.pollQuestion',
+      'poll.option': 'messages.pollOption',
+      'poll.addOption': 'messages.addOption',
+      'poll.duration': 'messages.pollDuration',
+      'poll.multi': 'messages.allowMultipleAnswers',
+      'poll.cancel': 'messages.cancel',
+      'poll.create': 'messages.create',
+      'poll.needQuestion': 'messages.poll.needQuestion',
+      'poll.need2Options': 'messages.poll.need2Options',
     };
-    const en = <String, String>{
-      'poll.loading': 'Loading poll...',
-      'poll.selectOne': 'Choose one option',
-      'poll.selectMany': 'Choose one or more options',
-      'poll.showResults': 'Show results',
-      'poll.vote': 'Vote',
-      'poll.voted': 'Voted',
-      'poll.votesHours': '{votes} votes • {hours} hours left',
-      'poll.voteError': 'Failed to submit vote',
-      'poll.createTitle': 'Create poll',
-      'poll.question': 'Question',
-      'poll.option': 'Option',
-      'poll.addOption': 'Add option',
-      'poll.duration': 'Duration',
-      'poll.multi': 'Allow multiple answers',
-      'poll.cancel': 'Cancel',
-      'poll.create': 'Create',
-      'poll.needQuestion': 'Please enter a question',
-      'poll.need2Options': 'At least 2 options are required',
-    };
-    final dict = _lang == 'en' ? en : vi;
-    return dict[key] ?? key;
+    final lcKey = map[key];
+    if (lcKey == null) return key;
+    return LanguageController.instance.t(lcKey);
   }
 
   String _tf(String key, Map<String, String> vars) {
-    var v = _t(key);
-    vars.forEach((k, value) {
-      v = v.replaceAll('{$k}', value);
-    });
-    return v;
+    final map = <String, String>{
+      'poll.votesHours': 'messages.poll.votesHours',
+    };
+    final lcKey = map[key];
+    if (lcKey == null) return _t(key);
+    return LanguageController.instance.t(lcKey, vars);
   }
 
   void _onControllerChanged() {
@@ -348,16 +319,15 @@ class _MessageChatScreenState extends State<MessageChatScreen>
         builder: (dialogContext) {
           return AlertDialog(
             backgroundColor: const Color(0xFF0E2247),
-            title: const Text(
-              'Đang ở kênh thoại server',
-              style: TextStyle(
+            title: Text(
+              LanguageController.instance.t('messages.call.inVoiceChannel'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
               ),
             ),
             content: Text(
-              'Bạn đang trong kênh ${voiceSession.channelName ?? 'thoại'}. '
-              'Bạn cần rời kênh thoại trước khi gọi DM.',
+              LanguageController.instance.t('messages.call.inVoiceChannelLeave', {'channel': voiceSession.channelName ?? LanguageController.instance.t('messages.voiceChannel')}),
               style: const TextStyle(color: Color(0xFFAFC0E2)),
             ),
             actions: [
@@ -380,7 +350,7 @@ class _MessageChatScreenState extends State<MessageChatScreen>
         ? widget.controller.myUsername!
         : (widget.controller.myDisplayName?.isNotEmpty == true
               ? widget.controller.myDisplayName!
-              : 'Người dùng');
+              : LanguageController.instance.t('messages.call.user'));
     await DmCallManager.instance.startCall(
       peerUserId: widget.thread.id,
       peerName: widget.thread.name,
@@ -1658,7 +1628,7 @@ class _MessageChatScreenState extends State<MessageChatScreen>
         SnackBar(
           content: Text(LanguageController.instance.t('messages.messagePinned')),
           action: SnackBarAction(
-            label: 'Xem tất cả',
+            label: LanguageController.instance.t('messages.viewAll'),
             onPressed: () async {
               final pickedId = await Navigator.of(context).push<String>(
                 MaterialPageRoute(

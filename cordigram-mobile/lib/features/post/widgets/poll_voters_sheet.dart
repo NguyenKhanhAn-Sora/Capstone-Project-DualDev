@@ -127,7 +127,7 @@ class _PollVotersSheetState extends State<PollVotersSheet> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Lượt bình chọn',
+                        LanguageController.instance.t('post.poll.votes'),
                         style: TextStyle(
                           color: scheme.onSurface,
                           fontSize: 16,
@@ -151,7 +151,7 @@ class _PollVotersSheetState extends State<PollVotersSheet> {
                   controller: _searchCtrl,
                   style: TextStyle(color: scheme.onSurface, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'Tìm tên người dùng',
+                    hintText: LanguageController.instance.t('messages.searchUserHint'),
                     hintStyle: TextStyle(
                       color: scheme.onSurfaceVariant,
                       fontSize: 14,
@@ -203,8 +203,8 @@ class _PollVotersSheetState extends State<PollVotersSheet> {
                     ? Center(
                         child: Text(
                           _searchQuery.isNotEmpty
-                              ? 'Không tìm thấy người dùng'
-                              : 'Chưa có lượt bình chọn',
+                              ? LanguageController.instance.t('post.poll.noUsers')
+                              : LanguageController.instance.t('post.poll.noVotes'),
                           style: TextStyle(
                             color: scheme.onSurfaceVariant,
                             fontSize: 15,
@@ -324,7 +324,7 @@ class _VoterRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                'Bạn',
+                LanguageController.instance.t('post.poll.you'),
                 style: TextStyle(
                   color: scheme.onPrimary,
                   fontSize: 13,

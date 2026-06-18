@@ -2,6 +2,7 @@ import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/services/language_controller.dart';
 import '../../../core/theme/messages_chrome_palette.dart';
 import '../services/giphy_search_service.dart';
 import '../services/server_media_service.dart';
@@ -310,7 +311,7 @@ class _ChannelGiphyExpressionsBodyState extends State<_ChannelGiphyExpressionsBo
     if (AppConfig.giphyApiKey.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thiếu Giphy API key')),
+          SnackBar(content: Text(LanguageController.instance.t('messages.giphyMissingKey'))),
         );
       });
     }

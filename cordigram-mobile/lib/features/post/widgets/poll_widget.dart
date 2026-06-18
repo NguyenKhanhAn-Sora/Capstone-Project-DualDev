@@ -66,24 +66,24 @@ class _PollWidgetState extends State<PollWidget> {
   }
 
   String _computeCountdown() {
-    if (_poll.isExpired) return 'Đã kết thúc';
+    if (_poll.isExpired) return LanguageController.instance.t('post.poll.ended');
     final expiresAt = DateTime.tryParse(_poll.expiresAt);
     if (expiresAt == null) {
       final h = _poll.hoursLeft;
-      if (h <= 0) return 'Đã kết thúc';
-      if (h < 1) return 'Còn ${(h * 60).round()} phút';
+      if (h <= 0) return LanguageController.instance.t('post.poll.ended');
+      if (h < 1) return LanguageController.instance.t('post.poll.minutesLeft', {'m': (h * 60).round()});
       final hInt = h.floor();
       final mInt = ((h - hInt) * 60).round();
-      if (mInt == 0) return 'Còn ${hInt}g';
-      return 'Còn ${hInt}g ${mInt}p';
+      if (mInt == 0) return LanguageController.instance.t('post.poll.hoursLeft', {'h': hInt});
+      return LanguageController.instance.t('post.poll.hoursMinutesLeft', {'h': hInt, 'm': mInt});
     }
     final ms = expiresAt.difference(DateTime.now()).inMilliseconds;
-    if (ms <= 0) return 'Đã kết thúc';
+    if (ms <= 0) return LanguageController.instance.t('post.poll.ended');
     final totalSecs = ms ~/ 1000;
     final h = totalSecs ~/ 3600;
     final m = (totalSecs % 3600) ~/ 60;
-    if (h > 0) return 'Còn ${h}g ${m}p';
-    return 'Còn $m phút';
+    if (h > 0) return LanguageController.instance.t('post.poll.hoursMinutesLeft', {'h': h, 'm': m});
+    return LanguageController.instance.t('post.poll.minutesLeft', {'m': m});
   }
 
   bool get _isExpiredNow {
@@ -247,8 +247,8 @@ class _PollWidgetState extends State<PollWidget> {
                 onTap: _poll.totalVotes > 0 ? () => _openVoters() : null,
                 child: Text(
                   _poll.uniqueVoters == 0
-                      ? 'Chưa có lượt bình chọn'
-                      : '${_poll.uniqueVoters} lượt bình chọn',
+                      ? LanguageController.instance.t('post.poll.noVotes')
+                      : '${_poll.uniqueVoters} ${LanguageController.instance.t('post.poll.votes')}',
                   style: TextStyle(
                     color: _poll.totalVotes > 0
                         ? scheme.primary

@@ -98,14 +98,14 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
               TextField(
                 controller: nameCtrl,
                 style: TextStyle(color: dui.text),
-                decoration: dui.fieldDecoration(hintText: 'Tên máy chủ'),
+                decoration: dui.fieldDecoration(hintText: LanguageController.instance.t('server.settings.serverNameHint')),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('Huỷ'),
+              child: Text(LanguageController.instance.t('common.cancel')),
             ),
             TextButton(
               onPressed: () {
@@ -284,8 +284,8 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
             () {
               if (!canExpr) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Bạn không có quyền quản lý biểu cảm.'),
+                  SnackBar(
+                    content: Text(LanguageController.instance.t('server.noPermissionManageEmoji')),
                   ),
                 );
                 return;
@@ -299,8 +299,8 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
             () {
               if (!canExpr) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Bạn không có quyền quản lý biểu cảm.'),
+                  SnackBar(
+                    content: Text(LanguageController.instance.t('server.noPermissionManageEmoji')),
                   ),
                 );
                 return;

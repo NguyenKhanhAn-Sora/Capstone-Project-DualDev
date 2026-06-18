@@ -1217,7 +1217,7 @@ class _CreatePollPostScreenState extends State<CreatePollPostScreen> {
             isTop: true,
           ),
           _ToggleRow(
-            label: 'Allow multiple answers',
+            label: LanguageController.instance.t('post.create.allowMultipleAnswers'),
             value: _allowMultiple,
             onChanged: (v) => setState(() => _allowMultiple = v),
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/language_controller.dart';
 import 'models/server_role_models.dart';
 import 'server_settings/role_edit_screen.dart';
 import 'services/servers_service.dart';
@@ -146,7 +147,7 @@ class _ServerRolesScreenState extends State<ServerRolesScreen> {
               onPressed: _createRole,
               backgroundColor: const Color(0xFF5865F2),
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Tạo vai trò'),
+              label: Text(LanguageController.instance.t('server.createRole')),
             )
           : null,
       body: RefreshIndicator(
@@ -166,7 +167,7 @@ class _ServerRolesScreenState extends State<ServerRolesScreen> {
                     padding: EdgeInsets.all(pad.bottom + 24),
                     children: [
                       Text(_error!, style: const TextStyle(color: Colors.white70)),
-                      TextButton(onPressed: _load, child: const Text('Thử lại')),
+                      TextButton(onPressed: _load, child: Text(LanguageController.instance.t('common.retry'))),
                     ],
                   )
                 : ListView(
@@ -201,7 +202,7 @@ class _ServerRolesScreenState extends State<ServerRolesScreen> {
                                 style: FilledButton.styleFrom(
                                   backgroundColor: const Color(0xFF5865F2),
                                 ),
-                                child: const Text('Tạo vai trò'),
+                                child: Text(LanguageController.instance.t('server.createRole')),
                               ),
                             ],
                           ],

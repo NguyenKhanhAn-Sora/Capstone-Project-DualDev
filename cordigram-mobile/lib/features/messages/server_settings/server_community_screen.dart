@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../models/server_models.dart';
 import '../services/servers_service.dart';
 import 'server_settings_ui.dart';
@@ -84,7 +85,7 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã bật Community')),
+          SnackBar(content: Text(LanguageController.instance.t('server.community.enabled'))),
         );
       }
     } catch (e) {
@@ -109,7 +110,7 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã lưu tổng quan Community')),
+          SnackBar(content: Text(LanguageController.instance.t('server.community.overviewSaved'))),
         );
       }
     } catch (e) {
@@ -173,7 +174,7 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                               color: ui.onAccent,
                             ),
                           )
-                        : const Text('Kích hoạt Community'),
+                        : Text(LanguageController.instance.t('server.community.activate')),
                   ),
                 ],
                 if (enabled) ...[
@@ -192,7 +193,7 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                     maxLines: 4,
                     style: TextStyle(color: ui.text),
                     decoration: ui.fieldDecoration(
-                      labelText: 'Mô tả cộng đồng',
+                      labelText: LanguageController.instance.t('server.community.descriptionLabel'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -201,7 +202,7 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                     dropdownColor: ui.card,
                     style: TextStyle(color: ui.text),
                     decoration: ui.fieldDecoration(
-                      labelText: 'Ngôn ngữ chính',
+                      labelText: LanguageController.instance.t('server.community.languageLabel'),
                     ),
                     items: [
                       DropdownMenuItem(
@@ -223,7 +224,7 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                     dropdownColor: ui.card,
                     style: TextStyle(color: ui.text),
                     decoration: ui.fieldDecoration(
-                      labelText: 'Kênh quy định',
+                      labelText: LanguageController.instance.t('server.community.rulesChannelLabel'),
                     ),
                     items: [
                       DropdownMenuItem(
@@ -272,7 +273,7 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                                 color: ui.onAccent,
                               ),
                             )
-                          : const Text('Lưu tổng quan'),
+                          : Text(LanguageController.instance.t('server.community.saveOverview')),
                     ),
                   ],
                 ],

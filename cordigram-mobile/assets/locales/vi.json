@@ -24,7 +24,14 @@
     "send": "Gửi",
     "updating": "Đang cập nhật...",
     "clear": "Xóa",
-    "loading": "Đang tải..."
+    "loading": "Đang tải...",
+    "update": {
+      "newVersion": "Phiên bản mới v{version} có sẵn",
+      "later": "Để sau",
+      "now": "Cập nhật ngay",
+      "releaseNotes": "Nội dung cập nhật:",
+      "instructions": "Nhấn \"Cập nhật ngay\" để tải file APK về.\nSau khi tải xong, mở file đó và nhấn Cài đặt."
+    }
   },
   "settings": {
     "common": {
@@ -574,6 +581,7 @@
       "finishing": "Đang hoàn thành...",
       "finish": "Hoàn thành",
       "otpPlaceholder": "• • • • • •",
+      "otpCode": "Mã OTP",
       "sendingOtp": "Đang gửi...",
       "verifying": "Đang xác minh..."
     },
@@ -810,6 +818,7 @@
       "date": "Ngày",
       "time": "Giờ",
       "allowComments": "Cho phép bình luận",
+      "allowMultipleAnswers": "Cho phép nhiều câu trả lời",
       "allowDownload": "Cho phép tải xuống",
       "hideLikeCount": "Ẩn số lượt thích",
       "pollQuestionHint": "Đặt câu hỏi…",
@@ -927,6 +936,16 @@
     "likesSheet": {
       "search": "Tìm kiếm tên đăng nhập",
       "noLikes": "Chưa có lượt thích"
+    },
+    "poll": {
+      "votes": "Lượt bình chọn",
+      "noUsers": "Không tìm thấy người dùng",
+      "noVotes": "Chưa có lượt bình chọn",
+      "you": "Bạn",
+      "ended": "Đã kết thúc",
+      "minutesLeft": "Còn {m} phút",
+      "hoursLeft": "Còn {h}g",
+      "hoursMinutesLeft": "Còn {h}g {m}p"
     }
   },
   "reels": {
@@ -1273,11 +1292,129 @@
     "cannotPinMessage": "Không thể ghim tin nhắn",
     "cannotDeleteMessage": "Không thể xóa tin nhắn",
     "messageNotInSegment": "Tin nhắn không có trong đoạn đang tải",
+    "done": "Hoàn thành",
+    "viewAll": "Xem tất cả",
+    "pollQuestion": "Câu hỏi",
+    "pollOption": "Phương án {index}",
+    "pollDuration": "Thời hạn",
+    "userSettingsLoadFailed": "Không tải được cài đặt",
+    "userSettingsSaved": "Đã lưu cài đặt tin nhắn",
+    "userSettingsSaveFailed": "Lưu thất bại",
+    "userSettingsEveryone": "Mọi người",
+    "userSettingsFollowingOnly": "Chỉ người bạn theo dõi",
+    "reportFailed": "Báo cáo thất bại",
+    "sendReport": "Gửi báo cáo",
+    "giphyMissingKey": "Thiếu Giphy API key",
+    "whoCanMessage": "Ai có thể nhắn bạn",
+    "whoCanCall": "Ai có thể gọi bạn",
+    "replyHint": "Trả lời…",
+    "searchUserHint": "Tìm tên người dùng",
+    "reportDescriptionHint": "Mô tả chi tiết...",
+    "kaomoji": {
+      "happy": "Vui / Phấn khích",
+      "love": "Yêu thương",
+      "sad": "Buồn / Khóc",
+      "funny": "Hài hước",
+      "wave": "Chào / Vẫy"
+    },
     "call": {
       "reject": "Từ chối",
       "leaveAndAccept": "Rời kênh và nhận",
-      "close": "Đóng"
-    }
+      "close": "Đóng",
+      "leaveRoom": "Rời phòng",
+      "incomingCall": "Cuộc gọi đến",
+      "accept": "Chấp nhận",
+      "calling": "Đang gọi...",
+      "callRejected": "Cuộc gọi bị từ chối",
+      "noAnswer": "Không có phản hồi",
+      "cancel": "Hủy",
+      "inVoiceChannel": "Đang ở kênh thoại server",
+      "inVoiceChannelLeave": "Bạn đang trong kênh {channel}. Bạn cần rời kênh thoại trước khi nhận cuộc gọi DM.",
+      "waiting": "Đang chờ…",
+      "share": "Chia sẻ",
+      "sharing": "Đang chia sẻ",
+      "connecting": "Đang kết nối...",
+      "connectedCall": "Đang trong cuộc gọi",
+      "minimize": "Thu nhỏ cuộc gọi",
+      "end": "Kết thúc",
+      "enableVideo": "Bật video",
+      "disableCamera": "Tắt camera",
+      "enableCamera": "Bật camera",
+      "muteMic": "Tắt micro",
+      "unmuteMic": "Bật micro",
+      "disableSpeaker": "Tắt âm thanh",
+      "enableSpeaker": "Bật âm thanh",
+      "stopScreenShare": "Dừng chia sẻ màn hình",
+      "startScreenShare": "Chia sẻ màn hình",
+      "voiceChannel": "Kênh thoại",
+      "callNotConnectable": "Không thể tiếp tục cuộc gọi trên thiết bị này.",
+      "callOpenFailed": "Không mở được cuộc gọi: {error}",
+      "callJoinFailed": "Không thể tham gia cuộc gọi: {error}",
+      "userBusy": "Người dùng này đang bận cuộc gọi khác.",
+      "callNotAllowed": "Không thể gọi người dùng này.",
+      "callStartFailed": "Không thể bắt đầu cuộc gọi. Vui lòng thử lại.",
+      "micPermRequired": "Cần cấp quyền micro để thực hiện cuộc gọi",
+      "cameraPermRequired": "Cần cấp quyền camera cho video call",
+      "cameraEnableFailed": "Không bật được camera: {error}",
+      "cameraSwitchFailed": "Không đổi được camera: {error}",
+      "cameraPermissionRequired": "Cần cấp quyền camera để bật video",
+      "screenShareTitle": "Cordigram đang chia sẻ màn hình",
+      "screenShareText": "Nhấn để quay lại cuộc gọi",
+      "mobileScreenShareNote": "Trên mobile chỉ hỗ trợ chia sẻ màn hình/app, không hỗ trợ chia sẻ theo từng tab như web.",
+      "screenSharePermDenied": "Bạn chưa cấp quyền chia sẻ màn hình",
+      "screenShareServiceFailed": "Không thể khởi tạo foreground service cho chia sẻ màn hình",
+      "screenShareFailed": "Không chia sẻ màn hình được: {error}",
+      "screenSharing": "Đang chia sẻ màn hình",
+      "screenSharingNote": "Mở ứng dụng hoặc nội dung bạn muốn gửi. Khung cuộc gọi được ẩn để tránh hình lặp vô hạn khi đối phương xem.",
+      "user": "Người dùng",
+      "you": "Bạn"
+    },
+    "justNow": "Vừa xong",
+    "minutesAgo": "{n} phút trước",
+    "hoursAgo": "{n} giờ trước",
+    "blockedReasonRules": "Bạn cần đọc và đồng ý quy định của máy chủ.",
+    "blockedReasonApplicationPending": "Đơn đăng ký tham gia đang chờ duyệt.",
+    "blockedReasonApplicationRejected": "Đơn đăng ký tham gia đã bị từ chối.",
+    "blockedReasonVerification": "Tài khoản chưa đủ điều kiện xác minh để chat.",
+    "blockedReasonAgeUnder18": "Máy chủ giới hạn độ tuổi — bạn chưa đủ 18 tuổi.",
+    "blockedReasonAgeAck": "Cần xác nhận cảnh báo độ tuổi của máy chủ.",
+    "blockedBannerGate": "Bạn phải hoàn thành thêm một vài bước nữa trước khi có thể trò chuyện trong máy chủ này",
+    "blockedBannerReason": "Bạn chưa thể chat trong kênh này ({reason}).",
+    "blockedBanner": "Bạn chưa thể chat trong kênh này.",
+    "member": "Thành viên",
+    "welcomeGreeting": "Rất vui được gặp bạn, {name}!",
+    "waveSending": "Đang gửi…",
+    "waveButton": "👋 Vẫy tay chào {name}!",
+    "createPoll": "Tạo khảo sát",
+    "allowMultipleAnswers": "Cho phép chọn nhiều đáp án",
+    "searchStickerHint": "Tìm sticker…",
+    "searchGifHint": "Tìm GIF…",
+    "messageActions": "Hành động tin nhắn",
+    "replyAction": "Trả lời tin nhắn",
+    "pickEmoji": "Chọn emoji khác",
+    "pinMessage": "Ghim tin nhắn",
+    "deleteForMe": "Xóa ở phía tôi",
+    "recallForAll": "Thu hồi cho mọi người",
+    "voiceMessageContent": "🔊 Tin nhắn thoại",
+    "noMessages": "Chưa có tin nhắn nào",
+    "replying": "Đang trả lời",
+    "channelRestricted": "Kênh đang bị giới hạn chat",
+    "chatHint": "Nhắn tin trong #{name}",
+    "recordingStatus": "Đang ghi… {s}s",
+    "loadingPoll": "Đang tải khảo sát...",
+    "poll": {
+      "selectOne": "Chọn một phương án",
+      "selectMany": "Chọn một hoặc nhiều phương án",
+      "showResults": "Xem kết quả",
+      "voted": "Đã bình chọn",
+      "votesHours": "{votes} lượt • còn {hours} giờ",
+      "voteError": "Không gửi được bình chọn",
+      "needQuestion": "Vui lòng nhập câu hỏi",
+      "need2Options": "Cần ít nhất 2 phương án trả lời"
+    },
+    "deleteMsg": "Xóa tin nhắn",
+    "message": "Tin nhắn",
+    "searchMessages": "Tìm tin nhắn"
   },
   "notifications": {
     "tabs": {
@@ -3972,7 +4109,8 @@
     "toolBg": "Màu nền",
     "toolSwap": "Đổi",
     "toolTrim": "Cắt",
-    "editText": "Chỉnh sửa chữ"
+    "editText": "Chỉnh sửa chữ",
+    "textInputHint": "Nhập nội dung..."
   },
   "server": {
     "iconUpdated": "Đã cập nhật biểu tượng (nhấn Lưu để gửi máy chủ)",
@@ -3993,7 +4131,134 @@
       "days30": "30 ngày",
       "allRoles": "Mọi vai trò",
       "noRole": "Không có vai trò",
-      "memberRole": "Thành viên"
+      "memberRole": "Thành viên",
+      "days90": "90 ngày",
+      "kicked": "Đã đuổi thành viên.",
+      "banned": "Đã cấm thành viên.",
+      "timeoutApplied": "Đã áp dụng timeout.",
+      "timeoutRemoved": "Đã gỡ timeout.",
+      "ownershipTransferred": "Đã chuyển quyền sở hữu.",
+      "pruned": "Đã lược bỏ {count} thành viên.",
+      "reason": "Lý do (tuỳ chọn)",
+      "deleteMessages": "Xóa tin nhắn (ngày, 0–7)",
+      "searchPlaceholder": "Tìm theo tên hoặc @username",
+      "retry": "Thử lại",
+      "kickDialog": "Đuổi thành viên?",
+      "banDialog": "Cấm thành viên",
+      "kick": "Đuổi",
+      "ban": "Cấm",
+      "removeTimeout": "Gỡ timeout",
+      "close": "Đóng",
+      "membersTitle": "Thành viên"
+    },
+    "role": {
+      "membersUpdated": "Đã cập nhật thành viên trong vai trò",
+      "membersAdded": "Đã thêm {count} thành viên vào vai trò",
+      "reset": "Đặt lại",
+      "saveChanges": "Lưu thay đổi",
+      "savePermissions": "Lưu quyền",
+      "addMember": "Thêm thành viên",
+      "deselect": "Bỏ chọn",
+      "quickSelect": "Lựa chọn nhanh",
+      "quickSelecting": "Đang chọn nhanh",
+      "searchMember": "Tìm kiếm thành viên",
+      "deleteRoleDialog": "Xóa vai trò?"
+    },
+    "access": {
+      "addOption": "Thêm lựa chọn",
+      "addRule": "Thêm quy định",
+      "addQuestion": "+ Thêm câu hỏi",
+      "questionHint": "Nội dung câu hỏi",
+      "optionHint": "Lựa chọn {index}",
+      "ruleHint": "Nhập nội dung quy định",
+      "changesSaved": "Đã lưu thay đổi",
+      "done": "Xong",
+      "editRule": "Sửa quy định",
+      "deleteRule": "Xóa quy định?",
+      "accessTitle": "Truy cập",
+      "rulesTitle": "Quy định"
+    },
+    "automod": {
+      "saved": "Đã lưu AutoMod",
+      "addRole": "+ Vai trò",
+      "addChannel": "+ Kênh",
+      "saveSettings": "Lưu cài đặt",
+      "mentionLimit": "Giới hạn đề cập / tin",
+      "restrictionTime": "Thời gian hạn chế (giờ)",
+      "customMessage": "Thông báo tùy chỉnh (tuỳ chọn)"
+    },
+    "bans": {
+      "unbanned": "Đã gỡ cấm",
+      "mentionRestrictionRemoved": "Đã gỡ hạn chế đề cập",
+      "searchPlaceholder": "Tìm theo tên hoặc user ID"
+    },
+    "community": {
+      "enabled": "Đã bật Community",
+      "overviewSaved": "Đã lưu tổng quan Community",
+      "activate": "Kích hoạt Community",
+      "saveOverview": "Lưu tổng quan",
+      "descriptionLabel": "Mô tả cộng đồng",
+      "languageLabel": "Ngôn ngữ chính",
+      "rulesChannelLabel": "Kênh quy định"
+    },
+    "emoji": {
+      "maxReached": "Đã đủ số lượng emoji",
+      "added": "Đã thêm emoji",
+      "upload": "Tải lên"
+    },
+    "interaction": {
+      "enterTitleContent": "Nhập tiêu đề và nội dung thông báo",
+      "selectRole": "Chọn vai trò nhận thông báo",
+      "notificationSent": "Đã gửi thông báo",
+      "everyone": "Mọi người",
+      "byRole": "Theo vai trò",
+      "sendNotification": "Gửi thông báo",
+      "titleHint": "Tiêu đề",
+      "contentHint": "Nội dung"
+    },
+    "sticker": {
+      "boostUpdated": "Đã cập nhật Boost sticker",
+      "slotsMax": "Đã đủ ô sticker",
+      "upload": "Tải lên",
+      "basic": "Mức cơ bản",
+      "fullBoost": "Boost đầy đủ",
+      "unassign": "Gỡ gán"
+    },
+    "settings": {
+      "failedSave": "Không lưu được",
+      "changeIcon": "Thay đổi biểu tượng máy chủ",
+      "removeIcon": "Xóa biểu tượng",
+      "uploadBanner": "Tải ảnh biểu ngữ",
+      "removeBanner": "Xóa ảnh biểu ngữ",
+      "serverNameHint": "Tên máy chủ",
+      "serverNameLabel": "Tên server",
+      "descriptionLabel": "Mô tả (tuỳ chọn)"
+    },
+    "join": {
+      "agree": "Đồng ý",
+      "submitApplication": "Gửi đơn",
+      "understood": "Đã hiểu",
+      "back": "Quay lại",
+      "continue": "Tiếp tục",
+      "toMessages": "Về trang Tin nhắn",
+      "agreedRules": "Đã đồng ý quy định máy chủ.",
+      "alreadyMember": "Bạn đã là thành viên máy chủ này.",
+      "joined": "Đã tham gia máy chủ.",
+      "rejectApplicationDialog": "Từ chối đơn?"
+    },
+    "channel": {
+      "copiedLink": "Đã sao chép link kênh",
+      "cannotEdit": "Không sửa được",
+      "cannotDelete": "Không xóa được",
+      "gate": {
+        "loadFailed": "Không tải được trạng thái máy chủ",
+        "confirmRules": "Vui lòng tick xác nhận đã đọc quy định",
+        "otpHint": "Mã 6 số"
+      }
+    },
+    "call": {
+      "leaveRoom": "Rời phòng",
+      "minimize": "Thu nhỏ góc"
     }
   }
 }

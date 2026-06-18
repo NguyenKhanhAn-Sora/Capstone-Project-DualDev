@@ -485,7 +485,7 @@ class MessagesController extends ChangeNotifier {
     }
     final sent = await DirectMessagesService.sendMessage(
       peerUserId,
-      content: 'Tin nhắn thoại',
+      content: LanguageController.instance.t('messages.voiceMessage'),
       type: 'voice',
       voiceUrl: voiceUrl,
       voiceDuration: durationSeconds,

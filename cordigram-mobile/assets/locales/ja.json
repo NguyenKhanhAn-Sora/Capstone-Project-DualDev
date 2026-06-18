@@ -24,7 +24,14 @@
     "send": "送信",
     "updating": "更新中...",
     "clear": "クリア",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "update": {
+      "newVersion": "新バージョン v{version} が利用可能",
+      "later": "後で",
+      "now": "今すぐ更新",
+      "releaseNotes": "リリースノート:",
+      "instructions": "「今すぐ更新」をタップしてAPKをダウンロードします。\nダウンロード後、ファイルを開いてインストールをタップします。"
+    }
   },
   "settings": {
     "common": {
@@ -803,6 +810,7 @@
       "date": "日付",
       "time": "時刻",
       "allowComments": "コメントを許可",
+      "allowMultipleAnswers": "複数回答を許可",
       "allowDownload": "ダウンロードを許可",
       "hideLikeCount": "いいね数を非表示",
       "pollQuestionHint": "質問を入力…",
@@ -920,6 +928,16 @@
     "likesSheet": {
       "search": "ユーザー名で検索",
       "noLikes": "まだいいねはありません"
+    },
+    "poll": {
+      "votes": "票",
+      "noUsers": "ユーザーが見つかりません",
+      "noVotes": "まだ投票がありません",
+      "you": "あなた",
+      "ended": "終了",
+      "minutesLeft": "残り{m}分",
+      "hoursLeft": "残り{h}時間",
+      "hoursMinutesLeft": "残り{h}時間{m}分"
     }
   },
   "reels": {
@@ -1261,11 +1279,129 @@
     "cannotPinMessage": "メッセージをピン留めできません",
     "cannotDeleteMessage": "メッセージを削除できません",
     "messageNotInSegment": "読み込み中のセグメントにメッセージが見つかりません",
+    "done": "完了",
+    "viewAll": "すべて表示",
+    "pollQuestion": "質問",
+    "pollOption": "選択肢 {index}",
+    "pollDuration": "期限",
+    "userSettingsLoadFailed": "設定を読み込めません",
+    "userSettingsSaved": "メッセージ設定を保存しました",
+    "userSettingsSaveFailed": "保存に失敗しました",
+    "userSettingsEveryone": "全員",
+    "userSettingsFollowingOnly": "フォロー中のみ",
+    "reportFailed": "報告に失敗しました",
+    "sendReport": "報告を送信",
+    "giphyMissingKey": "Giphy APIキーがありません",
+    "whoCanMessage": "メッセージを送れる人",
+    "whoCanCall": "通話できる人",
+    "replyHint": "返信…",
+    "searchUserHint": "ユーザー名を検索",
+    "reportDescriptionHint": "詳しく説明してください...",
+    "kaomoji": {
+      "happy": "ハッピー / 興奮",
+      "love": "愛",
+      "sad": "悲しい / 泣く",
+      "funny": "面白い",
+      "wave": "挨拶 / 手を振る"
+    },
     "call": {
       "reject": "拒否",
       "leaveAndAccept": "チャンネルを退出して受信",
-      "close": "閉じる"
-    }
+      "close": "閉じる",
+      "leaveRoom": "ルームを退出",
+      "incomingCall": "着信",
+      "accept": "受ける",
+      "calling": "発信中...",
+      "callRejected": "通話を拒否されました",
+      "noAnswer": "応答なし",
+      "cancel": "キャンセル",
+      "inVoiceChannel": "サーバーのボイスチャンネルにいます",
+      "inVoiceChannelLeave": "{channel}チャンネルにいます。DMコールを受ける前にボイスチャンネルから退出してください。",
+      "waiting": "待機中…",
+      "share": "共有",
+      "sharing": "共有中",
+      "connecting": "接続中...",
+      "connectedCall": "通話中",
+      "minimize": "通話を最小化",
+      "end": "終了",
+      "enableVideo": "ビデオを有効化",
+      "disableCamera": "カメラをオフ",
+      "enableCamera": "カメラをオン",
+      "muteMic": "マイクをミュート",
+      "unmuteMic": "マイクをオン",
+      "disableSpeaker": "スピーカーをオフ",
+      "enableSpeaker": "スピーカーをオン",
+      "stopScreenShare": "画面共有を停止",
+      "startScreenShare": "画面を共有",
+      "voiceChannel": "ボイスチャンネル",
+      "callNotConnectable": "このデバイスでは通話を続行できません。",
+      "callOpenFailed": "通話を開けません: {error}",
+      "callJoinFailed": "通話に参加できません: {error}",
+      "userBusy": "このユーザーは別の通話中です。",
+      "callNotAllowed": "このユーザーに電話できません。",
+      "callStartFailed": "通話を開始できません。もう一度お試しください。",
+      "micPermRequired": "通話にはマイク権限が必要です",
+      "cameraPermRequired": "ビデオ通話にはカメラ権限が必要です",
+      "cameraEnableFailed": "カメラを有効化できません: {error}",
+      "cameraSwitchFailed": "カメラを切り替えられません: {error}",
+      "cameraPermissionRequired": "ビデオを有効にするにはカメラ権限が必要です",
+      "screenShareTitle": "Cordigramが画面を共有しています",
+      "screenShareText": "タップして通話に戻る",
+      "mobileScreenShareNote": "モバイルではタブ単位の共有は非対応です。画面/アプリの共有のみ対応しています。",
+      "screenSharePermDenied": "画面共有の権限が拒否されました",
+      "screenShareServiceFailed": "フォアグラウンドサービスを起動できません",
+      "screenShareFailed": "画面共有を開始できません: {error}",
+      "screenSharing": "画面共有中",
+      "screenSharingNote": "共有するアプリを開いてください。通話ウィンドウは無限ループを防ぐために非表示になっています。",
+      "user": "ユーザー",
+      "you": "あなた"
+    },
+    "justNow": "たった今",
+    "minutesAgo": "{n}分前",
+    "hoursAgo": "{n}時間前",
+    "blockedReasonRules": "サーバールールを読んで同意する必要があります。",
+    "blockedReasonApplicationPending": "参加申請は審査中です。",
+    "blockedReasonApplicationRejected": "参加申請が却下されました。",
+    "blockedReasonVerification": "チャットの認証条件を満たしていません。",
+    "blockedReasonAgeUnder18": "年齢制限サーバー — 18歳未満です。",
+    "blockedReasonAgeAck": "サーバーの年齢警告を確認する必要があります。",
+    "blockedBannerGate": "このサーバーでチャットするには、さらにいくつかの手順を完了する必要があります",
+    "blockedBannerReason": "このチャンネルでチャットできません（{reason}）。",
+    "blockedBanner": "このチャンネルではチャットできません。",
+    "member": "メンバー",
+    "welcomeGreeting": "はじめまして、{name}！",
+    "waveSending": "送信中...",
+    "waveButton": "👋 {name}に手を振る！",
+    "createPoll": "投票を作成",
+    "allowMultipleAnswers": "複数回答を許可",
+    "searchStickerHint": "スタンプを検索...",
+    "searchGifHint": "GIFを検索...",
+    "messageActions": "メッセージアクション",
+    "replyAction": "メッセージに返信",
+    "pickEmoji": "別の絵文字を選択",
+    "pinMessage": "メッセージをピン留め",
+    "deleteForMe": "自分のみ削除",
+    "recallForAll": "全員から取り消す",
+    "voiceMessageContent": "🔊 ボイスメッセージ",
+    "noMessages": "まだメッセージはありません",
+    "replying": "返信中",
+    "channelRestricted": "チャンネルが制限されています",
+    "chatHint": "#{name}でメッセージを送信",
+    "recordingStatus": "録音中... {s}秒",
+    "loadingPoll": "投票を読み込み中...",
+    "poll": {
+      "selectOne": "1つのオプションを選択",
+      "selectMany": "1つ以上のオプションを選択",
+      "showResults": "結果を表示",
+      "voted": "投票済み",
+      "votesHours": "{votes}票 • 残り{hours}時間",
+      "voteError": "投票の送信に失敗しました",
+      "needQuestion": "質問を入力してください",
+      "need2Options": "少なくとも2つの選択肢が必要です"
+    },
+    "deleteMsg": "メッセージを削除",
+    "message": "メッセージ",
+    "searchMessages": "メッセージを検索"
   },
   "notifications": {
     "tabs": {
@@ -3960,7 +4096,8 @@
     "toolBg": "背景",
     "toolSwap": "変更",
     "toolTrim": "トリム",
-    "editText": "テキストを編集"
+    "editText": "テキストを編集",
+    "textInputHint": "テキストを入力..."
   },
   "server": {
     "iconUpdated": "アイコンを更新しました（保存を押して適用）",
@@ -3981,7 +4118,134 @@
       "days30": "30日間",
       "allRoles": "すべてのロール",
       "noRole": "ロールなし",
-      "memberRole": "メンバー"
+      "memberRole": "メンバー",
+      "days90": "90日間",
+      "kicked": "メンバーをキックしました。",
+      "banned": "メンバーをBANしました。",
+      "timeoutApplied": "タイムアウトを適用しました。",
+      "timeoutRemoved": "タイムアウトを解除しました。",
+      "ownershipTransferred": "所有権を譲渡しました。",
+      "pruned": "{count}人のメンバーを削除しました。",
+      "reason": "理由（任意）",
+      "deleteMessages": "メッセージを削除（日数、0〜7）",
+      "searchPlaceholder": "名前または@ユーザー名で検索",
+      "retry": "再試行",
+      "kickDialog": "メンバーをキック？",
+      "banDialog": "メンバーをBAN",
+      "kick": "キック",
+      "ban": "BAN",
+      "removeTimeout": "タイムアウト解除",
+      "close": "閉じる",
+      "membersTitle": "メンバー"
+    },
+    "role": {
+      "membersUpdated": "ロールのメンバーを更新しました",
+      "membersAdded": "{count}人のメンバーをロールに追加しました",
+      "reset": "リセット",
+      "saveChanges": "変更を保存",
+      "savePermissions": "権限を保存",
+      "addMember": "メンバーを追加",
+      "deselect": "選択解除",
+      "quickSelect": "クイック選択",
+      "quickSelecting": "クイック選択中",
+      "searchMember": "メンバーを検索",
+      "deleteRoleDialog": "ロールを削除しますか？"
+    },
+    "access": {
+      "addOption": "選択肢を追加",
+      "addRule": "ルールを追加",
+      "addQuestion": "+ 質問を追加",
+      "questionHint": "質問内容",
+      "optionHint": "選択肢 {index}",
+      "ruleHint": "ルール内容を入力",
+      "changesSaved": "変更を保存しました",
+      "done": "完了",
+      "editRule": "ルールを編集",
+      "deleteRule": "ルールを削除しますか？",
+      "accessTitle": "アクセス",
+      "rulesTitle": "ルール"
+    },
+    "automod": {
+      "saved": "AutoMod設定を保存しました",
+      "addRole": "+ ロール",
+      "addChannel": "+ チャンネル",
+      "saveSettings": "設定を保存",
+      "mentionLimit": "メンション上限 / メッセージ",
+      "restrictionTime": "制限時間（時間）",
+      "customMessage": "カスタムメッセージ（任意）"
+    },
+    "bans": {
+      "unbanned": "BANを解除しました",
+      "mentionRestrictionRemoved": "メンション制限を解除しました",
+      "searchPlaceholder": "名前またはユーザーIDで検索"
+    },
+    "community": {
+      "enabled": "コミュニティを有効にしました",
+      "overviewSaved": "コミュニティ概要を保存しました",
+      "activate": "コミュニティを有効化",
+      "saveOverview": "概要を保存",
+      "descriptionLabel": "コミュニティの説明",
+      "languageLabel": "メイン言語",
+      "rulesChannelLabel": "ルールチャンネル"
+    },
+    "emoji": {
+      "maxReached": "絵文字スロットが上限に達しました",
+      "added": "絵文字を追加しました",
+      "upload": "アップロード"
+    },
+    "interaction": {
+      "enterTitleContent": "タイトルと内容を入力してください",
+      "selectRole": "通知を受け取るロールを選択してください",
+      "notificationSent": "通知を送信しました",
+      "everyone": "全員",
+      "byRole": "ロール別",
+      "sendNotification": "通知を送信",
+      "titleHint": "タイトル",
+      "contentHint": "内容"
+    },
+    "sticker": {
+      "boostUpdated": "ブーストステッカーを更新しました",
+      "slotsMax": "ステッカースロットが上限に達しました",
+      "upload": "アップロード",
+      "basic": "ベーシックプラン",
+      "fullBoost": "フルブースト",
+      "unassign": "割り当て解除"
+    },
+    "settings": {
+      "failedSave": "保存できませんでした",
+      "changeIcon": "サーバーアイコンを変更",
+      "removeIcon": "アイコンを削除",
+      "uploadBanner": "バナー画像をアップロード",
+      "removeBanner": "バナー画像を削除",
+      "serverNameHint": "サーバー名",
+      "serverNameLabel": "サーバー名",
+      "descriptionLabel": "説明（任意）"
+    },
+    "join": {
+      "agree": "同意する",
+      "submitApplication": "申請を提出",
+      "understood": "わかりました",
+      "back": "戻る",
+      "continue": "続ける",
+      "toMessages": "メッセージに戻る",
+      "agreedRules": "サーバーのルールに同意しました。",
+      "alreadyMember": "すでにこのサーバーのメンバーです。",
+      "joined": "サーバーに参加しました。",
+      "rejectApplicationDialog": "申請を拒否しますか？"
+    },
+    "channel": {
+      "copiedLink": "チャンネルリンクをコピーしました",
+      "cannotEdit": "編集できません",
+      "cannotDelete": "削除できません",
+      "gate": {
+        "loadFailed": "サーバーの状態を読み込めません",
+        "confirmRules": "ルールを読んだことを確認してください",
+        "otpHint": "6桁のコード"
+      }
+    },
+    "call": {
+      "leaveRoom": "ルームを退出",
+      "minimize": "最小化"
     }
   }
 }

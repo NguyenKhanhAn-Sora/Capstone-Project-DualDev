@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
@@ -183,7 +183,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       if (!mounted) return;
       setState(() {
         _connecting = false;
-        _fatalError = 'Không thể kết nối cuộc gọi: $err';
+        _fatalError = LanguageController.instance.t('messages.call.callOpenFailed', {'error': err.toString()});
       });
     }
   }
@@ -309,7 +309,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     if (!_isVideoCall) {
       final cam = await Permission.camera.request();
       if (!cam.isGranted) {
-        _showSnack('Cần cấp quyền camera để bật video');
+        _showSnack(LanguageController.instance.t('messages.call.cameraPermissionRequired'));
         return;
       }
       try {
@@ -321,7 +321,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
           });
         }
       } catch (err) {
-        _showSnack('Không bật được camera: $err');
+        _showSnack(LanguageController.instance.t('messages.call.cameraEnableFailed', {'error': err.toString()}));
       }
       return;
     }
@@ -353,7 +353,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       await track.setCameraPosition(next);
       if (mounted) setState(() => _frontCamera = !_frontCamera);
     } catch (err) {
-      _showSnack('Không đổi được camera: $err');
+      _showSnack(LanguageController.instance.t('messages.call.cameraSwitchFailed', {'error': err.toString()}));
     }
   }
 
@@ -395,8 +395,8 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     if (!Platform.isAndroid) return true;
     try {
       final androidConfig = FlutterBackgroundAndroidConfig(
-        notificationTitle: 'Cordigram đang chia sẻ màn hình',
-        notificationText: 'Nhấn để quay lại cuộc gọi',
+        notificationTitle: LanguageController.instance.t('messages.call.screenShareTitle'),
+        notificationText: LanguageController.instance.t('messages.call.screenShareText'),
         notificationImportance: AndroidNotificationImportance.normal,
         notificationIcon: const AndroidResource(
           name: 'ic_launcher',
@@ -428,21 +428,19 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       if (next && Platform.isAndroid) {
         if (!_shownShareScopeHint) {
           _shownShareScopeHint = true;
-          _showSnack(
-            'Trên mobile chỉ hỗ trợ chia sẻ màn hình/app, không hỗ trợ chia sẻ theo từng tab như web.',
-          );
+          _showSnack(LanguageController.instance.t('messages.call.mobileScreenShareNote'));
         }
         // API 34+: MediaProjection intent must run before the mediaProjection
         // foreground service starts, then LiveKit may begin capture (see
         // livekit/client-sdk-flutter#542).
         final allowed = await webrtc.Helper.requestCapturePermission();
         if (allowed != true) {
-          _showSnack('Bạn chưa cấp quyền chia sẻ màn hình');
+          _showSnack(LanguageController.instance.t('messages.call.screenSharePermDenied'));
           return;
         }
         final fgReady = await _ensureAndroidScreenShareForegroundService();
         if (!fgReady) {
-          _showSnack('Không thể khởi tạo foreground service cho chia sẻ màn hình');
+          _showSnack(LanguageController.instance.t('messages.call.screenShareServiceFailed'));
           return;
         }
       }
@@ -464,7 +462,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
         _screenShareEnabled = next;
       }
     } catch (err) {
-      _showSnack('Không chia sẻ màn hình được: $err');
+      _showSnack(LanguageController.instance.t('messages.call.screenShareFailed', {'error': err.toString()}));
     } finally {
       if (mounted) {
         setState(() => _screenShareBusy = false);
@@ -689,15 +687,15 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
 
   Widget _buildBody() {
     if (_connecting) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 12),
+            const CircularProgressIndicator(color: Colors.white),
+            const SizedBox(height: 12),
             Text(
-              'Đang kết nối cuộc gọi...',
-              style: TextStyle(color: Colors.white),
+              LanguageController.instance.t('messages.call.connecting'),
+              style: const TextStyle(color: Colors.white),
             ),
           ],
         ),
@@ -765,7 +763,7 @@ class _CallHeader extends StatelessWidget {
         IconButton(
           onPressed: () => onMinimize(),
           icon: const Icon(Icons.open_in_full_rounded, color: Colors.white),
-          tooltip: 'Thu nhỏ cuộc gọi',
+          tooltip: LanguageController.instance.t('messages.call.minimize'),
         ),
         Expanded(
           child: Text(
@@ -797,7 +795,7 @@ class _RemoteCallPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final trimmed = name.trim();
-    final display = trimmed.isNotEmpty ? trimmed : 'Cuộc gọi';
+    final display = trimmed.isNotEmpty ? trimmed : LanguageController.instance.t('messages.call.voiceChannel');
     final initial =
         display.isNotEmpty ? display.substring(0, 1).toUpperCase() : '?';
     final url = avatarUrl?.trim();
@@ -838,9 +836,9 @@ class _RemoteCallPlaceholder extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Đang kết nối...',
-            style: TextStyle(color: Color(0xFFB6C2DC)),
+          Text(
+            LanguageController.instance.t('messages.call.connecting'),
+            style: const TextStyle(color: Color(0xFFB6C2DC)),
           ),
         ],
       ),
@@ -981,7 +979,7 @@ class _CompactSelfPip extends StatelessWidget {
         ? fromRoom
         : identity.isNotEmpty
             ? identity
-            : (nameHint?.trim().isNotEmpty == true ? nameHint!.trim() : 'Bạn');
+            : (nameHint?.trim().isNotEmpty == true ? nameHint!.trim() : LanguageController.instance.t('messages.call.you'));
     final initial =
         name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
 
@@ -1067,7 +1065,7 @@ class _LocalShareGuardView extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Đang chia sẻ màn hình',
+                    LanguageController.instance.t('messages.call.screenSharing'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
@@ -1077,7 +1075,7 @@ class _LocalShareGuardView extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Mở ứng dụng hoặc nội dung bạn muốn gửi. Khung cuộc gọi được ẩn để tránh hình lặp vô hạn khi đối phương xem.',
+                    LanguageController.instance.t('messages.call.screenSharingNote'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: const Color(0xFFB6C2DC),
@@ -1141,7 +1139,7 @@ class _AudioCallBody extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            connected ? 'Đang trong cuộc gọi' : 'Đang kết nối...',
+            connected ? LanguageController.instance.t('messages.call.connectedCall') : LanguageController.instance.t('messages.call.connecting'),
             style: const TextStyle(color: Color(0xFFB6C2DC)),
           ),
         ],
@@ -1336,8 +1334,8 @@ class _CallControls extends StatelessWidget {
         ? Icons.videocam_outlined
         : (camEnabled ? Icons.videocam_rounded : Icons.videocam_off_rounded);
     final cameraTooltip = !isVideo
-        ? 'Bật video'
-        : (camEnabled ? 'Tắt camera' : 'Bật camera');
+        ? LanguageController.instance.t('messages.call.enableVideo')
+        : (camEnabled ? LanguageController.instance.t('messages.call.disableCamera') : LanguageController.instance.t('messages.call.enableCamera'));
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1353,7 +1351,7 @@ class _CallControls extends StatelessWidget {
             icon: micEnabled ? Icons.mic_rounded : Icons.mic_off_rounded,
             active: micEnabled,
             onTap: onToggleMic,
-            tooltip: micEnabled ? 'Tắt micro' : 'Bật micro',
+            tooltip: micEnabled ? LanguageController.instance.t('messages.call.muteMic') : LanguageController.instance.t('messages.call.unmuteMic'),
           ),
           _ControlButton(
             icon: speakerOn
@@ -1361,15 +1359,15 @@ class _CallControls extends StatelessWidget {
                 : Icons.volume_off_rounded,
             active: speakerOn,
             onTap: onToggleSpeaker,
-            tooltip: speakerOn ? 'Tắt âm thanh' : 'Bật âm thanh',
+            tooltip: speakerOn ? LanguageController.instance.t('messages.call.disableSpeaker') : LanguageController.instance.t('messages.call.enableSpeaker'),
           ),
           _ControlButton(
             icon: Icons.screen_share_rounded,
             active: screenShareEnabled,
             onTap: onToggleScreenShare,
             tooltip: screenShareEnabled
-                ? 'Dừng chia sẻ màn hình'
-                : 'Chia sẻ màn hình',
+                ? LanguageController.instance.t('messages.call.stopScreenShare')
+                : LanguageController.instance.t('messages.call.startScreenShare'),
           ),
           _ControlButton(
             icon: cameraIcon,
@@ -1382,7 +1380,7 @@ class _CallControls extends StatelessWidget {
             active: true,
             color: const Color(0xFFED4245),
             onTap: onHangup,
-            tooltip: 'Kết thúc',
+            tooltip: LanguageController.instance.t('messages.call.end'),
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../server_access_constants.dart';
 import '../services/servers_service.dart';
 import 'server_settings_ui.dart';
@@ -194,7 +195,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Đã lưu thay đổi')));
+      ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('server.access.changesSaved'))));
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -226,17 +227,17 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
         final dui = ServerSettingsUi.of(c);
         return AlertDialog(
           backgroundColor: dui.card,
-          title: Text('Sửa quy định', style: TextStyle(color: dui.text)),
+          title: Text(LanguageController.instance.t('server.access.editRule'), style: TextStyle(color: dui.text)),
           content: TextField(
             controller: ctrl,
             style: TextStyle(color: dui.text),
             maxLines: 4,
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LanguageController.instance.t('common.cancel'))),
             TextButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('Lưu'),
+              child: Text(LanguageController.instance.t('common.save')),
             ),
           ],
         );
@@ -265,9 +266,9 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
         final dui = ServerSettingsUi.of(c);
         return AlertDialog(
           backgroundColor: dui.card,
-          title: Text('Xóa quy định?', style: TextStyle(color: dui.text)),
+          title: Text(LanguageController.instance.t('server.access.deleteRule'), style: TextStyle(color: dui.text)),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Huỷ')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LanguageController.instance.t('common.cancel'))),
             TextButton(
               onPressed: () => Navigator.pop(c, true),
               child: Text('Xóa', style: TextStyle(color: dui.destructive)),
@@ -361,7 +362,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                       controller: titleCtrl,
                       style: TextStyle(color: dui.text),
                       decoration: dui.fieldDecoration(
-                        hintText: 'Nội dung câu hỏi',
+                        hintText: LanguageController.instance.t('server.access.questionHint'),
                       ),
                     ),
                     if (type == 'multiple_choice') ...[
@@ -374,7 +375,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                                 controller: opts[i],
                                 style: TextStyle(color: dui.text),
                                 decoration: dui.fieldDecoration(
-                                  hintText: 'Lựa chọn ${i + 1}',
+                                  hintText: LanguageController.instance.t('server.access.optionHint', {'index': (i + 1).toString()}),
                                 ),
                               ),
                             ),
@@ -396,7 +397,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                       onPressed: () => setLocal(() {
                         opts.add(TextEditingController());
                       }),
-                      child: const Text('Thêm lựa chọn'),
+                      child: Text(LanguageController.instance.t('server.access.addOption')),
                     ),
                   ],
                 ],
@@ -405,11 +406,11 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Hủy'),
+                child: Text(LanguageController.instance.t('common.cancel')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Xong'),
+                child: Text(LanguageController.instance.t('server.access.done')),
               ),
             ],
           );
@@ -461,7 +462,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
     return Scaffold(
       backgroundColor: ui.bg,
       appBar: ui.buildAppBar(
-        title: 'Truy cập',
+        title: LanguageController.instance.t('server.access.accessTitle'),
         actions: [
           TextButton(
             onPressed: widget.canManage && _dirty && !_saving ? _saveAll : null,
@@ -474,7 +475,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                       color: ui.accent,
                     ),
                   )
-                : Text('Lưu', style: TextStyle(color: ui.accent)),
+                : Text(LanguageController.instance.t('common.save'), style: TextStyle(color: ui.accent)),
           ),
         ],
       ),
@@ -529,7 +530,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                   const SizedBox(height: 12),
                   _sectionCard(
                     ui,
-                    title: 'Quy định',
+                    title: LanguageController.instance.t('server.access.rulesTitle'),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -587,7 +588,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                             controller: _ruleDraft,
                             style: TextStyle(color: ui.text),
                             decoration: ui.fieldDecoration(
-                              hintText: 'Nhập nội dung quy định',
+                              hintText: LanguageController.instance.t('server.access.ruleHint'),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -611,7 +612,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                             alignment: Alignment.centerRight,
                             child: FilledButton(
                               onPressed: () => _addRuleLocally(_ruleDraft.text),
-                              child: const Text('Thêm quy định'),
+                              child: Text(LanguageController.instance.t('server.access.addRule')),
                             ),
                           ),
                         ],
@@ -732,7 +733,7 @@ class _ServerAccessScreenState extends State<ServerAccessScreen> {
                           const SizedBox(height: 8),
                           FilledButton(
                             onPressed: _openAddQuestionDialog,
-                            child: const Text('+ Thêm câu hỏi'),
+                            child: Text(LanguageController.instance.t('server.access.addQuestion')),
                           ),
                         ],
                       ],

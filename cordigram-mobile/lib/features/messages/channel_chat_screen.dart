@@ -245,26 +245,26 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   String _formatWelcomeTimestamp(DateTime at) {
     final now = DateTime.now();
     final diff = now.difference(at);
-    if (diff.inSeconds < 45) return 'Vừa xong';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
-    if (diff.inHours < 24) return '${diff.inHours} giờ trước';
+    if (diff.inSeconds < 45) return LanguageController.instance.t('messages.justNow');
+    if (diff.inMinutes < 60) return LanguageController.instance.t('messages.minutesAgo', {'n': diff.inMinutes.toString()});
+    if (diff.inHours < 24) return LanguageController.instance.t('messages.hoursAgo', {'n': diff.inHours.toString()});
     return '${at.day}/${at.month}/${at.year}';
   }
 
   String _blockedReasonLabel(String? reason) {
     switch (reason) {
       case 'rules':
-        return 'Bạn cần đọc và đồng ý quy định của máy chủ.';
+        return LanguageController.instance.t('messages.blockedReasonRules');
       case 'application_pending':
-        return 'Đơn đăng ký tham gia đang chờ duyệt.';
+        return LanguageController.instance.t('messages.blockedReasonApplicationPending');
       case 'application_rejected':
-        return 'Đơn đăng ký tham gia đã bị từ chối.';
+        return LanguageController.instance.t('messages.blockedReasonApplicationRejected');
       case 'verification':
-        return 'Tài khoản chưa đủ điều kiện xác minh để chat.';
+        return LanguageController.instance.t('messages.blockedReasonVerification');
       case 'age_under_18':
-        return 'Máy chủ giới hạn độ tuổi — bạn chưa đủ 18 tuổi.';
+        return LanguageController.instance.t('messages.blockedReasonAgeUnder18');
       case 'age_ack':
-        return 'Cần xác nhận cảnh báo độ tuổi của máy chủ.';
+        return LanguageController.instance.t('messages.blockedReasonAgeAck');
       default:
         return '';
     }
@@ -361,20 +361,20 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
 
   String _chatBlockedBannerText() {
     if (_canCompleteGateStepsInChannel()) {
-      return 'Bạn phải hoàn thành thêm một vài bước nữa trước khi có thể trò chuyện trong máy chủ này';
+      return LanguageController.instance.t('messages.blockedBannerGate');
     }
     final hint = _blockedReasonLabel(_chatBlockReason);
     if (hint.isNotEmpty) return hint;
     final r = _chatBlockReason;
     if (r != null && r.isNotEmpty) {
-      return 'Bạn chưa thể chat trong kênh này ($r).';
+      return LanguageController.instance.t('messages.blockedBannerReason', {'reason': r});
     }
-    return 'Bạn chưa thể chat trong kênh này.';
+    return LanguageController.instance.t('messages.blockedBanner');
   }
 
   Widget _buildWelcomeSystemRow(ChannelMessage msg) {
     final displayName = msg.senderName.trim().isEmpty
-        ? 'Thành viên'
+        ? LanguageController.instance.t('messages.member')
         : msg.senderName.trim();
     final waving = _wavingWelcomeIds.contains(msg.id);
     final showWave =
@@ -407,7 +407,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         height: 1.35,
                       ),
                       children: [
-                        TextSpan(text: 'Rất vui được gặp bạn, $displayName!'),
+                        TextSpan(text: LanguageController.instance.t('messages.welcomeGreeting', {'name': displayName})),
                         TextSpan(
                           text: '  ${_formatWelcomeTimestamp(msg.createdAt)}',
                           style: const TextStyle(
@@ -447,8 +447,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               ],
                               Text(
                                 waving
-                                    ? 'Đang gửi…'
-                                    : '👋 Vẫy tay chào $displayName!',
+                                    ? LanguageController.instance.t('messages.waveSending')
+                                    : LanguageController.instance.t('messages.waveButton', {'name': displayName}),
                                 style: TextStyle(
                                   color: waving
                                       ? const Color(0xFF949BA4)
@@ -548,7 +548,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     setState(() => _sending = true);
     try {
       await _sendChannelMessage(
-        content: 'Tin nhắn thoại',
+        content: LanguageController.instance.t('messages.voiceMessage'),
         type: 'voice',
         voiceUrl: url,
         voiceDuration: durationSec,
@@ -670,9 +670,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           builder: (_, setLocal) {
             return AlertDialog(
               backgroundColor: const Color(0xFF0A1737),
-              title: const Text(
-                'Tạo khảo sát',
-                style: TextStyle(color: Colors.white),
+              title: Text(
+                LanguageController.instance.t('messages.createPoll'),
+                style: const TextStyle(color: Colors.white),
               ),
               content: SingleChildScrollView(
                 child: Column(
@@ -681,9 +681,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                     TextField(
                       controller: questionCtrl,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Câu hỏi',
-                        labelStyle: TextStyle(color: Color(0xFFB6C2DC)),
+                      decoration: InputDecoration(
+                        labelText: LanguageController.instance.t('messages.pollQuestion'),
+                        labelStyle: const TextStyle(color: Color(0xFFB6C2DC)),
                       ),
                     ),
                     ...List.generate(optionCtrls.length, (index) {
@@ -691,7 +691,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         controller: optionCtrls[index],
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
-                          labelText: 'Phương án ${index + 1}',
+                          labelText: LanguageController.instance.t('messages.pollOption', {'index': (index + 1).toString()}),
                           labelStyle: const TextStyle(color: Color(0xFFB6C2DC)),
                         ),
                       );
@@ -721,16 +721,16 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           )
                           .toList(),
                       onChanged: (v) => setLocal(() => durationHours = v ?? 24),
-                      decoration: const InputDecoration(
-                        labelText: 'Thời hạn',
-                        labelStyle: TextStyle(color: Color(0xFFB6C2DC)),
+                      decoration: InputDecoration(
+                        labelText: LanguageController.instance.t('messages.pollDuration'),
+                        labelStyle: const TextStyle(color: Color(0xFFB6C2DC)),
                       ),
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Cho phép chọn nhiều đáp án',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      title: Text(
+                        LanguageController.instance.t('messages.allowMultipleAnswers'),
+                        style: const TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       value: allowMulti,
                       onChanged: (v) => setLocal(() => allowMulti = v),
@@ -931,9 +931,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     if (AppConfig.giphyApiKey.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Thiếu Giphy API key. Cấu hình GIPHY_API_KEY hoặc NEXT_PUBLIC_GIPHY_API_KEY.',
+              LanguageController.instance.t('messages.giphyMissingKey'),
             ),
           ),
         );
@@ -978,8 +978,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
                                 hintText: stickers
-                                    ? 'Tìm sticker…'
-                                    : 'Tìm GIF…',
+                                    ? LanguageController.instance.t('messages.searchStickerHint')
+                                    : LanguageController.instance.t('messages.searchGifHint'),
                               ),
                               onSubmitted: (_) => runSearch(),
                             ),
@@ -1194,9 +1194,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 8),
-            const Text(
-              'Hành động tin nhắn',
-              style: TextStyle(
+            Text(
+              LanguageController.instance.t('messages.messageActions'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
                 fontSize: 15,
@@ -1205,9 +1205,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             const SizedBox(height: 10),
             ListTile(
               leading: const Icon(Icons.reply_rounded, color: Colors.white),
-              title: const Text(
-                'Trả lời tin nhắn',
-                style: TextStyle(color: Colors.white),
+              title: Text(
+                LanguageController.instance.t('messages.replyAction'),
+                style: const TextStyle(color: Colors.white),
               ),
               onTap: () {
                 Navigator.of(ctx).pop();
@@ -1219,9 +1219,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                 Icons.add_reaction_outlined,
                 color: Colors.white,
               ),
-              title: const Text(
-                'Chọn emoji khác',
-                style: TextStyle(color: Colors.white),
+              title: Text(
+                LanguageController.instance.t('messages.pickEmoji'),
+                style: const TextStyle(color: Colors.white),
               ),
               onTap: () {
                 Navigator.of(ctx).pop();
@@ -1230,9 +1230,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.push_pin_outlined, color: Colors.white),
-              title: const Text(
-                'Ghim tin nhắn',
-                style: TextStyle(color: Colors.white),
+              title: Text(
+                LanguageController.instance.t('messages.pinMessage'),
+                style: const TextStyle(color: Colors.white),
               ),
               onTap: () async {
                 Navigator.of(ctx).pop();
@@ -1244,9 +1244,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                 Icons.delete_outline,
                 color: Colors.redAccent,
               ),
-              title: const Text(
-                'Xóa tin nhắn',
-                style: TextStyle(color: Colors.redAccent),
+              title: Text(
+                LanguageController.instance.t('messages.deleteMsg'),
+                style: const TextStyle(color: Colors.redAccent),
               ),
               onTap: () async {
                 Navigator.of(ctx).pop();
@@ -1263,9 +1263,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               Icons.delete_outline,
                               color: Colors.white,
                             ),
-                            title: const Text(
-                              'Xóa ở phía tôi',
-                              style: TextStyle(color: Colors.white),
+                            title: Text(
+                              LanguageController.instance.t('messages.deleteForMe'),
+                              style: const TextStyle(color: Colors.white),
                             ),
                             onTap: () => Navigator.of(dCtx).pop('for-me'),
                           ),
@@ -1275,9 +1275,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 Icons.delete_forever_outlined,
                                 color: Colors.redAccent,
                               ),
-                              title: const Text(
-                                'Thu hồi cho mọi người',
-                                style: TextStyle(color: Colors.redAccent),
+                              title: Text(
+                                LanguageController.instance.t('messages.recallForAll'),
+                                style: const TextStyle(color: Colors.redAccent),
                               ),
                               onTap: () =>
                                   Navigator.of(dCtx).pop('for-everyone'),
@@ -1373,7 +1373,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         SnackBar(
           content: Text(LanguageController.instance.t('messages.messagePinned')),
           action: SnackBarAction(
-            label: 'Xem tất cả',
+            label: LanguageController.instance.t('messages.viewAll'),
             onPressed: () async {
               final pickedId = await Navigator.of(context).push<String>(
                 MaterialPageRoute(
@@ -1572,8 +1572,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   }
 
   String _replyPreviewText(ChannelReplyMessage reply) {
-    if ((reply.type ?? '') == 'voice') return '🔊 Tin nhắn thoại';
-    if (reply.content.trim().isEmpty) return 'Tin nhắn';
+    if ((reply.type ?? '') == 'voice') return LanguageController.instance.t('messages.voiceMessageContent');
+    if (reply.content.trim().isEmpty) return LanguageController.instance.t('messages.message');
     return reply.content.trim();
   }
 
@@ -1593,7 +1593,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         titleSpacing: 0,
         actions: [
           IconButton(
-            tooltip: 'Tìm tin nhắn',
+            tooltip: LanguageController.instance.t('messages.searchMessages'),
             onPressed: _openChannelMessageSearch,
             icon: const Icon(Icons.search_rounded, color: Colors.white),
           ),
@@ -1638,10 +1638,10 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                     ),
                   )
                 : _messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'Chưa có tin nhắn nào',
-                      style: TextStyle(
+                      LanguageController.instance.t('messages.noMessages'),
+                      style: const TextStyle(
                         color: Color(0xFFAFC0E2),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1710,7 +1710,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                         ),
                                         child: Text(
                                           msg.senderName.isEmpty
-                                              ? 'Thành viên'
+                                              ? LanguageController.instance.t('messages.member')
                                               : msg.senderName,
                                           style: const TextStyle(
                                             color: Color(0xFFC3D4F7),
@@ -1748,7 +1748,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                                           ?.isNotEmpty ==
                                                       true
                                                   ? msg.replyTo!.senderName!
-                                                  : 'Đang trả lời',
+                                                  : LanguageController.instance.t('messages.replying'),
                                               style: const TextStyle(
                                                 color: Color(0xFFB6C2DC),
                                                 fontSize: 11,
@@ -1876,9 +1876,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Đang trả lời',
-                                style: TextStyle(
+                              Text(
+                                LanguageController.instance.t('messages.replying'),
+                                style: const TextStyle(
                                   color: Color(0xFFB6C2DC),
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -1889,8 +1889,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 _replyingTo!.content.isNotEmpty
                                     ? _replyingTo!.content
                                     : (_replyingTo!.type == 'voice'
-                                          ? '🔊 Tin nhắn thoại'
-                                          : 'Tin nhắn'),
+                                          ? LanguageController.instance.t('messages.voiceMessageContent')
+                                          : LanguageController.instance.t('messages.voiceMessage')),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -1954,8 +1954,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 vertical: 10,
                               ),
                               hintText: _chatBlocked
-                                  ? 'Kênh đang bị giới hạn chat'
-                                  : 'Nhắn tin trong #${widget.channel.name}',
+                                  ? LanguageController.instance.t('messages.channelRestricted')
+                                  : LanguageController.instance.t('messages.chatHint', {'name': widget.channel.name}),
                               hintStyle: const TextStyle(
                                 color: Color(0xFF8A98B8),
                                 fontSize: 14,
@@ -2119,7 +2119,7 @@ class _VoiceRecordPanelState extends State<_VoiceRecordPanel> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            _recording ? 'Đang ghi… ${secs}s' : 'Tin nhắn thoại',
+            _recording ? LanguageController.instance.t('messages.recordingStatus', {'s': secs.toString()}) : LanguageController.instance.t('messages.voiceMessage'),
             style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
           const SizedBox(height: 16),
@@ -2236,9 +2236,9 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Tin nhắn thoại',
-                  style: TextStyle(
+                Text(
+                  LanguageController.instance.t('messages.voiceMessage'),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2321,9 +2321,9 @@ class _PollMessageCardState extends State<_PollMessageCard> {
   Widget build(BuildContext context) {
     final data = _pollData;
     if (data == null) {
-      return const Text(
-        'Đang tải khảo sát...',
-        style: TextStyle(color: Colors.white70),
+      return Text(
+        LanguageController.instance.t('messages.loadingPoll'),
+        style: const TextStyle(color: Colors.white70),
       );
     }
     final options = (data['options'] as List?)?.map((e) => '$e').toList() ?? [];

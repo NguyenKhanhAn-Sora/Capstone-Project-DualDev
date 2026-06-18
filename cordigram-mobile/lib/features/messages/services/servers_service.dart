@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
+import '../../../core/services/language_controller.dart';
 import '../models/server_models.dart';
 import '../models/server_permissions.dart';
 import '../models/server_role_models.dart';
@@ -147,9 +148,9 @@ class ServersService {
       final dn = (res['displayName'] ?? '').toString().trim();
       if (dn.isNotEmpty) return dn;
       final un = (res['username'] ?? '').toString().trim();
-      return un.isNotEmpty ? un : 'Người dùng';
+      return un.isNotEmpty ? un : LanguageController.instance.t('messages.call.user');
     } catch (_) {
-      return 'Người dùng';
+      return LanguageController.instance.t('messages.call.user');
     }
   }
 

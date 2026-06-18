@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import '../config/app_config.dart';
+import 'language_controller.dart';
 
 class AppUpdateService {
   static Future<void> checkForUpdate(BuildContext context) async {
@@ -69,23 +70,23 @@ class _UpdateDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Có bản cập nhật mới v$versionName'),
+      title: Text(LanguageController.instance.t('common.update.newVersion', {'version': versionName})),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (changelog.isNotEmpty) ...[
-            const Text(
-              'Nội dung cập nhật:',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            Text(
+              LanguageController.instance.t('common.update.releaseNotes'),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             Text(changelog),
             const SizedBox(height: 12),
           ],
-          const Text(
-            'Nhấn "Cập nhật ngay" để tải file APK về.\nSau khi tải xong, mở file đó và nhấn Cài đặt.',
-            style: TextStyle(fontSize: 13, color: Colors.grey),
+          Text(
+            LanguageController.instance.t('common.update.instructions'),
+            style: const TextStyle(fontSize: 13, color: Colors.grey),
           ),
         ],
       ),
@@ -93,11 +94,11 @@ class _UpdateDialog extends StatelessWidget {
         if (!forceUpdate)
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Để sau'),
+            child: Text(LanguageController.instance.t('common.update.later')),
           ),
         ElevatedButton(
           onPressed: () => _openDownload(context),
-          child: const Text('Cập nhật ngay'),
+          child: Text(LanguageController.instance.t('common.update.now')),
         ),
       ],
     );

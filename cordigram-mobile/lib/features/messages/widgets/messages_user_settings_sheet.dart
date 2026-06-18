@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/language_controller.dart';
 import '../services/direct_messages_service.dart';
 import '../utils/dm_sidebar_prefs.dart';
 
@@ -75,7 +76,7 @@ class _MessagesUserSettingsSheetState extends State<MessagesUserSettingsSheet> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không tải được cài đặt: $e')),
+        SnackBar(content: Text(LanguageController.instance.t('messages.userSettingsLoadFailed'))),
       );
     }
   }
@@ -100,12 +101,12 @@ class _MessagesUserSettingsSheetState extends State<MessagesUserSettingsSheet> {
       widget.onSaved();
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu cài đặt tin nhắn')),
+        SnackBar(content: Text(LanguageController.instance.t('messages.userSettingsSaved'))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lưu thất bại: $e')),
+        SnackBar(content: Text(LanguageController.instance.t('messages.userSettingsSaveFailed'))),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -212,12 +213,12 @@ class _MessagesUserSettingsSheetState extends State<MessagesUserSettingsSheet> {
                       ),
                     ),
                     _privacyDropdown(
-                      label: 'Ai có thể nhắn bạn',
+                      label: LanguageController.instance.t('messages.whoCanMessage'),
                       value: _dmListFrom,
                       onChanged: (v) => setState(() => _dmListFrom = v!),
                     ),
                     _privacyDropdown(
-                      label: 'Ai có thể gọi bạn',
+                      label: LanguageController.instance.t('messages.whoCanCall'),
                       value: _dmCallFrom,
                       onChanged: (v) => setState(() => _dmCallFrom = v!),
                     ),
@@ -232,7 +233,7 @@ class _MessagesUserSettingsSheetState extends State<MessagesUserSettingsSheet> {
                                 height: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text('Lưu'),
+                            : Text(LanguageController.instance.t('common.save')),
                       ),
                     ),
                   ],
@@ -285,14 +286,14 @@ class _MessagesUserSettingsSheetState extends State<MessagesUserSettingsSheet> {
             borderSide: BorderSide.none,
           ),
         ),
-        items: const [
+        items: [
           DropdownMenuItem(
             value: 'everyone',
-            child: Text('Mọi người'),
+            child: Text(LanguageController.instance.t('messages.userSettingsEveryone')),
           ),
           DropdownMenuItem(
             value: 'followers_only',
-            child: Text('Chỉ người bạn theo dõi'),
+            child: Text(LanguageController.instance.t('messages.userSettingsFollowingOnly')),
           ),
         ],
         onChanged: _saving ? null : onChanged,
