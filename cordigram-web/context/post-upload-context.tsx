@@ -18,7 +18,7 @@ import {
   type FeedItem,
 } from "@/lib/api";
 
-const REEL_MAX_DURATION_SECONDS = 90;
+const REEL_MAX_DURATION_SECONDS = 180;
 
 // 0–90 % = file uploads, 90–100 % = server creates the post record
 const FILE_UPLOAD_WEIGHT = 90;

@@ -95,6 +95,6 @@ export class CreateReelDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
-  @Max(90)
+  @Max(180)
   durationSeconds?: number;
 }

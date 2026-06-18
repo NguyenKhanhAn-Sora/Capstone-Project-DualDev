@@ -14,7 +14,7 @@ import '../../core/services/post_upload_controller.dart';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const _kReelMaxDurationSec = 90;
+const _kReelMaxDurationSec = 180;
 const _kReelMaxBytes = 50 * 1024 * 1024; // 50 MB
 
 // ── Audience enum (reused from post) ─────────────────────────────────────────
