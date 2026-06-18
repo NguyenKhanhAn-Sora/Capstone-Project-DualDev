@@ -1226,6 +1226,37 @@
   color: #6b7faa;
 }
 
+/* Light theme: channel hover/selection must stay readable (no galaxy glass bleed) */
+:global([data-messages-theme="light"]) .conversationItem:hover {
+  background: var(--color-panel-hover);
+  box-shadow: inset 3px 0 0 rgba(88, 101, 242, 0.5);
+}
+
+:global([data-messages-theme="light"]) .conversationItem.active {
+  background: var(--color-panel-active);
+  color: var(--color-panel-text);
+  box-shadow:
+    inset 3px 0 0 var(--color-panel-accent),
+    0 0 0 1px rgba(88, 101, 242, 0.14);
+}
+
+:global([data-messages-theme="light"]) .conversationItem.active:hover {
+  background: var(--color-panel-active);
+}
+
+:global([data-messages-theme="light"]) .conversationItem.active .userName {
+  color: var(--color-panel-text);
+  font-weight: 700;
+}
+
+:global([data-messages-theme="light"]) .conversationItem.active .userStatus {
+  color: var(--color-panel-text-muted);
+}
+
+:global([data-messages-theme="light"]) .channelDragItem:hover {
+  background: transparent;
+}
+
 .avatar {
   width: 42px;
   height: 42px;
@@ -3914,7 +3945,7 @@
 }
 
 .channelDragItem:hover {
-  background: var(--color-bg-hover);
+  background: var(--color-panel-hover);
   border-radius: 4px;
 }
 

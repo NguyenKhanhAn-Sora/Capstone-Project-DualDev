@@ -25,7 +25,8 @@ class MessagesBoostStoreScreen extends StatefulWidget {
       _MessagesBoostStoreScreenState();
 }
 
-class _MessagesBoostStoreScreenState extends State<MessagesBoostStoreScreen> {
+class _MessagesBoostStoreScreenState extends State<MessagesBoostStoreScreen>
+    with WidgetsBindingObserver {
   MessagesBoostStatus _status = MessagesBoostStatus.empty;
   bool _loading = true;
 
@@ -35,8 +36,22 @@ class _MessagesBoostStoreScreenState extends State<MessagesBoostStoreScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(MessagesBoostFormat.ensureInitialized());
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_load());
+    }
   }
 
   Future<void> _load() async {

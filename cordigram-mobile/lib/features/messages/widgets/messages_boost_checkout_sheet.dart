@@ -9,6 +9,7 @@ import '../../../core/services/language_controller.dart';
 import '../../../core/theme/messages_chrome_palette.dart';
 import '../messages_shell.dart';
 import '../services/messages_boost_service.dart';
+import '../services/messages_media_service.dart';
 import '../utils/messages_boost_format.dart';
 import '../utils/messages_navigator.dart';
 import 'messages_boost_payment_status_screen.dart';
@@ -210,28 +211,34 @@ class _MessagesBoostCheckoutSheetState extends State<MessagesBoostCheckoutSheet>
       if (url.isEmpty || session.id.isEmpty) {
         throw const ApiException('Checkout URL missing');
       }
+      final sessionId = session.id;
       final startedAt = DateTime.now().millisecondsSinceEpoch;
       final navContext =
           MessagesShell.navigatorKey.currentContext ?? context;
       if (!mounted) return;
       Navigator.of(context).pop();
 
-      final callbackUrl = await FlutterWebAuth2.authenticate(
-        url: url,
-        callbackUrlScheme: 'cordigram',
-      );
-      if (callbackUrl.isEmpty) return;
+      try {
+        await FlutterWebAuth2.authenticate(
+          url: url,
+          callbackUrlScheme: 'cordigram',
+        );
+      } catch (_) {
+        // Stripe may complete in split-screen / Custom Tab without a clean
+        // callback — still verify via checkout session polling.
+      }
       if (!navContext.mounted) return;
 
       final success = await navContext.pushMessages<bool>(
         MessagesBoostPaymentStatusScreen(
-          sessionId: session.id,
+          sessionId: sessionId,
           checkoutStartedAtMs: startedAt,
         ),
       );
       if (success == true) {
+        await MessagesMediaService.refreshBoostStatus(force: true);
         await AccentColorController.instance.enforceBoostPolicy(
-          boostUnlocked: true,
+          boostUnlocked: MessagesMediaService.isBoostMediaOptimizationEnabled,
         );
         widget.onCompleted();
       }

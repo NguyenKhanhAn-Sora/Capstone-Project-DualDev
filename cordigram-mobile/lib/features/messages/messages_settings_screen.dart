@@ -31,7 +31,7 @@ class MessagesSettingsScreen extends StatefulWidget {
   }) async {
     final saved = await context.pushMessages<bool>(
       MessagesSettingsScreen(initialSection: initialSection),
-      fullscreenDialog: true,
+      fullscreenDialog: false,
     );
     if (saved == true) onSaved?.call();
     return saved == true;
@@ -130,7 +130,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
       _sharePresence = settings['sharePresence'] != false;
       _dmListFrom = (settings['dmListFrom'] ?? 'everyone').toString();
       _dmCallFrom = (settings['dmCallFrom'] ?? 'everyone').toString();
-      _notifEnabled = settings['notificationsEnabled'] != false;
+      _notifEnabled = settings['chatDesktopNotificationsEnabled'] != false;
+      DirectMessagesService.applyUserSettings(settings);
       _soundEnabled = settings['chatSoundEnabled'] != false;
       await AccentColorController.instance.bindUser(
         DirectMessagesService.currentUserId,
@@ -159,7 +160,13 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
         dmCallFrom: _dmCallFrom,
         sharePresence: _sharePresence,
         chatSoundEnabled: _soundEnabled,
+        chatDesktopNotificationsEnabled: _notifEnabled,
         showCordigramMemberSince: _showMemberSince,
+      );
+      DirectMessagesService.applyChatPushNotificationsEnabled(_notifEnabled);
+      await ProfileService.updateNotificationSettings(
+        enabled: _notifEnabled,
+        mutedIndefinitely: !_notifEnabled,
       );
       await DmSidebarPrefs.setPeersMode(_peersMode);
       if (!mounted) return;

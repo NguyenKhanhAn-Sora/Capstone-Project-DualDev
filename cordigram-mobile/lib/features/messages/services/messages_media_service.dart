@@ -1,5 +1,6 @@
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
+import '../../../core/services/language_controller.dart';
 import 'messages_boost_service.dart';
 
 /// Mirrors web `uploadMedia` — `POST /posts/upload` with
@@ -8,6 +9,7 @@ class MessagesMediaService {
   MessagesMediaService._();
   static bool _boostStatusLoaded = false;
   static bool _boostActive = false;
+  static int _maxUploadBytes = 100 * 1024 * 1024;
 
   static const _messagesUploadHeader = {
     'x-cordigram-upload-context': 'messages',
@@ -58,6 +60,38 @@ class MessagesMediaService {
     return 'application/octet-stream';
   }
 
+  static bool isAllowedMessagingMediaType(String mimeType) {
+    final mime = mimeType.trim().toLowerCase();
+    return mime.startsWith('image/') ||
+        mime.startsWith('video/') ||
+        mime.startsWith('audio/');
+  }
+
+  static bool isAllowedMessagingMediaPath(String filePath) {
+    return isAllowedMessagingMediaType(
+      resolveUploadContentType(filePath: filePath),
+    );
+  }
+
+  static String formatMediaTypeNotAllowedError() {
+    return LanguageController.instance.t('messages.onlyImageVideoAudioAllowed');
+  }
+
+  static String mapUploadErrorMessage(String rawMessage) {
+    final msg = rawMessage.trim();
+    if (msg.isEmpty) {
+      return LanguageController.instance.t('messages.uploadFailed');
+    }
+    if (msg.contains('Only image, video, or audio') ||
+        msg.contains('Only image or video')) {
+      return formatMediaTypeNotAllowedError();
+    }
+    if (msg.contains('File too large')) {
+      return formatUploadLimitError();
+    }
+    return msg;
+  }
+
   static Future<Map<String, dynamic>> uploadFile({
     required String filePath,
     required String contentType,
@@ -75,9 +109,30 @@ class MessagesMediaService {
 
   static Future<void> refreshBoostStatus({bool force = false}) async {
     if (_boostStatusLoaded && !force) return;
-    _boostStatusLoaded = true;
     final status = await MessagesBoostService.fetchStatus();
+    applyBoostFromStatus(status);
+  }
+
+  static void applyBoostFromStatus(MessagesBoostStatus status) {
+    _boostStatusLoaded = true;
     _boostActive = status.isUnlocked;
+    if (status.maxUploadBytes != null && status.maxUploadBytes! > 0) {
+      _maxUploadBytes = status.maxUploadBytes!;
+    } else if (!status.isUnlocked) {
+      _maxUploadBytes = 100 * 1024 * 1024;
+    }
+  }
+
+  static void applyBoostEntitlement({
+    required bool active,
+    int? maxUploadBytes,
+    bool? unlocked,
+  }) {
+    _boostStatusLoaded = true;
+    _boostActive = unlocked ?? active;
+    if (maxUploadBytes != null && maxUploadBytes > 0) {
+      _maxUploadBytes = maxUploadBytes;
+    }
   }
 
   /// Chat thumbnail — WebP/JPEG auto format, capped width (never use video transforms).
@@ -136,6 +191,17 @@ class MessagesMediaService {
     return url;
   }
 
-  /// Max size aligned with web UX (25MB).
-  static int get maxUploadBytes => 25 * 1024 * 1024;
+  /// Max upload size from Boost tier (100MB free / 300MB basic / 600MB boost).
+  static int get maxUploadBytes => _maxUploadBytes;
+
+  static String formatUploadLimitError() {
+    final mb = (maxUploadBytes / (1024 * 1024)).round();
+    if (mb <= 100) {
+      return LanguageController.instance.t('messages.uploadLimitFree');
+    }
+    if (mb <= 300) {
+      return LanguageController.instance.t('messages.uploadLimitBasic');
+    }
+    return LanguageController.instance.t('messages.uploadLimitMax');
+  }
 }

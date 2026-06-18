@@ -2,6 +2,7 @@
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,6 +20,7 @@ import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
 import 'services/server_media_service.dart';
+import 'services/servers_service.dart';
 import 'search/message_search_sheet.dart';
 import 'widgets/channel_chat_gate_sheet.dart';
 import 'widgets/chat_link_preview.dart';
@@ -116,6 +118,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   bool _chatBlocked = false;
   String? _chatBlockReason;
   String? _error;
+  final Map<String, String> _nickByUserId = {};
+  int _bootstrapGeneration = 0;
   final Set<String> _wavingWelcomeIds = {};
   ChannelMessage? _replyingTo;
   StreamSubscription<ChannelMessage>? _newMessageSub;
@@ -143,20 +147,24 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   }
 
   Future<void> _bootstrap() async {
+    final generation = ++_bootstrapGeneration;
     setState(() {
       _loading = true;
       _error = null;
+      _messages = const [];
     });
     try {
       await ChannelMessagesRealtimeService.connect();
       ChannelMessagesRealtimeService.joinChannel(widget.channel.id);
+      _newMessageSub?.cancel();
+      _reactionSub?.cancel();
+      _deletedSub?.cancel();
+      _interactionSettingsSub?.cancel();
       _newMessageSub = ChannelMessagesRealtimeService.messages.listen((
         incoming,
       ) {
         if (!mounted || incoming.channelId != widget.channel.id) return;
-        if (_messages.any((m) => m.id == incoming.id)) return;
-        setState(() => _messages = [..._messages, incoming]);
-        _scrollToBottom();
+        _insertChannelMessage(incoming);
       });
       _reactionSub = ChannelMessagesRealtimeService.reactions.listen((payload) {
         if (!mounted) return;
@@ -184,13 +192,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       });
       _deletedSub = ChannelMessagesRealtimeService.deleted.listen((payload) {
         if (!mounted) return;
-        final channelId = (payload['channelId'] ?? '').toString();
-        if (channelId.isNotEmpty && channelId != widget.channel.id) return;
-        final messageId = (payload['messageId'] ?? '').toString();
-        if (messageId.isEmpty) return;
-        setState(() {
-          _messages = _messages.where((m) => m.id != messageId).toList();
-        });
+        _applyMessageDeleted(payload);
       });
       _interactionSettingsSub =
           ChannelMessagesRealtimeService.serverRealtime.listen((payload) {
@@ -219,15 +221,20 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         limit: 60,
         skip: 0,
       );
+      if (!mounted || generation != _bootstrapGeneration) return;
+      await _loadMemberNicknames();
+      if (!mounted || generation != _bootstrapGeneration) return;
       final entries =
           (envelope['messages'] ?? envelope['items'] ?? envelope['data'])
               as List?;
-      final loaded = (entries ?? const <dynamic>[])
-          .whereType<Map>()
-          .map((e) => ChannelMessage.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
+      final loaded = _sortChannelMessagesAsc(
+        (entries ?? const <dynamic>[])
+            .whereType<Map>()
+            .map((e) => ChannelMessage.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+      );
       await ChannelMessagesService.markChannelRead(widget.channel.id);
-      if (!mounted) return;
+      if (!mounted || generation != _bootstrapGeneration) return;
       setState(() {
         _messages = loaded;
         _chatBlocked = envelope['chatViewBlocked'] == true;
@@ -240,6 +247,100 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  List<ChannelMessage> _sortChannelMessagesAsc(List<ChannelMessage> items) {
+    final next = [...items];
+    next.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return next;
+  }
+
+  void _insertChannelMessage(ChannelMessage incoming) {
+    if (_messages.any((m) => m.id == incoming.id)) return;
+    setState(() {
+      _messages = _sortChannelMessagesAsc([..._messages, incoming]);
+    });
+    _scrollToBottom();
+  }
+
+  Future<void> _loadMemberNicknames() async {
+    try {
+      final map = <String, String>{};
+      final server = await ServersService.getServerById(widget.server.id);
+      final members = server['members'];
+      if (members is List) {
+        for (final raw in members) {
+          if (raw is! Map) continue;
+          final uid = (raw['userId'] ?? raw['_id'] ?? '').toString();
+          final nick = (raw['nickname'] ?? '').toString().trim();
+          if (uid.isNotEmpty && nick.isNotEmpty) map[uid] = nick;
+        }
+      }
+      if (map.isEmpty) {
+        final withRoles = await ServersService.getServerMembersWithRoles(
+          widget.server.id,
+        );
+        for (final m in withRoles.members) {
+          final nick = (m.nickname ?? '').trim();
+          if (m.userId.isNotEmpty && nick.isNotEmpty) {
+            map[m.userId] = nick;
+          }
+        }
+      }
+      if (!mounted) return;
+      setState(() => _nickByUserId
+        ..clear()
+        ..addAll(map));
+    } catch (_) {}
+  }
+
+  String _displayNameFor(ChannelMessage msg) {
+    final nick = _nickByUserId[msg.senderId]?.trim();
+    if (nick != null && nick.isNotEmpty) return nick;
+    final name = msg.senderName.trim();
+    return name.isEmpty ? 'Thành viên' : name;
+  }
+
+  String _displayNameForSenderId(String senderId, {String? fallback}) {
+    final nick = _nickByUserId[senderId]?.trim();
+    if (nick != null && nick.isNotEmpty) return nick;
+    final name = (fallback ?? '').trim();
+    return name.isEmpty ? 'Thành viên' : name;
+  }
+
+  void _applyMessageDeleted(Map<String, dynamic> payload) {
+    final channelId = (payload['channelId'] ?? '').toString();
+    if (channelId.isNotEmpty && channelId != widget.channel.id) return;
+    final messageId = (payload['messageId'] ?? '').toString();
+    if (messageId.isEmpty) return;
+    final deleteType = (payload['deleteType'] ?? '').toString();
+    if (deleteType == 'for-everyone') {
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == messageId);
+        if (idx == -1) return;
+        final curr = _messages[idx];
+        if (curr.isDeletedForEveryone) return;
+        final copied = [..._messages];
+        copied[idx] = curr.copyWith(
+          isDeletedForEveryone: true,
+          content: '',
+          attachments: const [],
+          giphyId: null,
+          customStickerUrl: null,
+          voiceUrl: null,
+          reactions: const [],
+          deletedAt: DateTime.tryParse(
+                (payload['deletedAt'] ?? '').toString(),
+              )?.toLocal() ??
+              DateTime.now(),
+        );
+        _messages = copied;
+      });
+      return;
+    }
+    setState(() {
+      _messages = _messages.where((m) => m.id != messageId).toList();
+    });
   }
 
   String _formatWelcomeTimestamp(DateTime at) {
@@ -286,7 +387,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           .toList();
       if (!mounted) return;
       setState(() {
-        _messages = loaded;
+        _messages = _sortChannelMessagesAsc(loaded);
         _chatBlocked = envelope['chatViewBlocked'] == true;
         _chatBlockReason = envelope['chatBlockReason']?.toString();
       });
@@ -342,7 +443,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                 )
                 .toList();
           }
-          _messages = next;
+          _messages = _sortChannelMessagesAsc(next);
         });
         _scrollToBottom();
       }
@@ -373,9 +474,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   }
 
   Widget _buildWelcomeSystemRow(ChannelMessage msg) {
-    final displayName = msg.senderName.trim().isEmpty
-        ? LanguageController.instance.t('messages.member')
-        : msg.senderName.trim();
+    final displayName = _displayNameFor(msg);
     final waving = _wavingWelcomeIds.contains(msg.id);
     final showWave =
         msg.stickerReplyWelcomeEnabled && !msg.welcomeWaveDismissedByMe;
@@ -521,7 +620,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (sent != null && mounted) {
         setState(() {
           if (!_messages.any((m) => m.id == sent.id)) {
-            _messages = [..._messages, sent];
+            _messages = _sortChannelMessagesAsc([..._messages, sent]);
           }
           _replyingTo = null;
         });
@@ -565,33 +664,74 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
 
   Future<void> _pickAndUploadMedia() async {
     if (_chatBlocked) return;
-    final picker = ImagePicker();
-    final files = await picker.pickMultipleMedia();
-    if (files.isEmpty) return;
-    for (final x in files) {
-      final len = await x.length();
+    await MessagesMediaService.refreshBoostStatus();
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const [
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'webp',
+        'heic',
+        'heif',
+        'mp4',
+        'mov',
+        'm4v',
+        'webm',
+        'mp3',
+        'm4a',
+        'aac',
+        'wav',
+        'ogg',
+      ],
+      allowMultiple: true,
+      withReadStream: false,
+    );
+    if (picked == null || picked.files.isEmpty) return;
+    for (final file in picked.files) {
+      final path = file.path;
+      if (path == null || path.isEmpty) continue;
+      if (!MessagesMediaService.isAllowedMessagingMediaPath(path)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(MessagesMediaService.formatMediaTypeNotAllowedError()),
+          ),
+        );
+        return;
+      }
+      final len = file.size;
       if (len > MessagesMediaService.maxUploadBytes) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(LanguageController.instance.t('messages.fileTooLarge'))),
+          SnackBar(content: Text(MessagesMediaService.formatUploadLimitError())),
         );
         return;
       }
     }
     if (!mounted) return;
+    BuildContext? loaderCtx;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (dialogCtx) {
+        loaderCtx = dialogCtx;
+        return const Center(child: CircularProgressIndicator());
+      },
     );
     try {
-      for (final x in files) {
+      for (final file in picked.files) {
+        final path = file.path;
+        if (path == null || path.isEmpty) continue;
         final mime = MessagesMediaService.resolveUploadContentType(
-          filePath: x.path,
-          hintedContentType: x.mimeType,
+          filePath: path,
         );
+        if (!MessagesMediaService.isAllowedMessagingMediaType(mime)) {
+          throw Exception(MessagesMediaService.formatMediaTypeNotAllowedError());
+        }
         final upload = await MessagesMediaService.uploadFile(
-          filePath: x.path,
+          filePath: path,
           contentType: mime,
         );
         final url = MessagesMediaService.pickDisplayUrl(upload);
@@ -599,14 +739,34 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         final rt = upload['resourceType']?.toString() ?? '';
         final isVideo =
             mime.startsWith('video/') || rt == 'video' || rt.contains('video');
-        final content = isVideo ? '🎬 [Video]: $url' : '📷 [Image]: $url';
+        final isImage = mime.startsWith('image/') || rt == 'image';
+        final isAudio = mime.startsWith('audio/');
+        final String content;
+        if (isVideo) {
+          content = '🎬 [Video]: $url';
+        } else if (isAudio) {
+          content = '🎵 [Audio]: $url';
+        } else if (isImage) {
+          content = '📷 [Image]: $url';
+        } else {
+          throw Exception(MessagesMediaService.formatMediaTypeNotAllowedError());
+        }
         await _sendChannelMessage(content: content, attachments: [url]);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            MessagesMediaService.mapUploadErrorMessage(e.toString()),
+          ),
+        ),
+      );
     } finally {
-      if (mounted) Navigator.of(context).pop();
+      final ctx = loaderCtx;
+      if (ctx != null && ctx.mounted) {
+        Navigator.of(ctx).pop();
+      }
     }
   }
 
@@ -627,9 +787,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                   Icons.upload_file_rounded,
                   color: Colors.white,
                 ),
-                title: const Text(
-                  'Upload file',
-                  style: TextStyle(color: Colors.white),
+                title: Text(
+                  LanguageController.instance.t('chat.composer.plusUploadFile'),
+                  style: const TextStyle(color: Colors.white),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -750,15 +910,33 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         .map((e) => e.text.trim())
                         .where((e) => e.isNotEmpty)
                         .toList();
-                    if (q.isEmpty || opts.length < 2) return;
+                    if (q.isEmpty) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(content: Text('Vui lòng nhập câu hỏi')),
+                      );
+                      return;
+                    }
+                    if (opts.length < 2) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('Cần ít nhất 2 phương án'),
+                        ),
+                      );
+                      return;
+                    }
                     Navigator.of(ctx).pop();
+                    BuildContext? loaderCtx;
                     try {
                       if (!context.mounted) return;
                       showDialog<void>(
                         context: context,
                         barrierDismissible: false,
-                        builder: (_) =>
-                            const Center(child: CircularProgressIndicator()),
+                        builder: (dialogCtx) {
+                          loaderCtx = dialogCtx;
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        },
                       );
                       final pollId = await PollsApiService.createPoll(
                         question: q,
@@ -767,9 +945,16 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         allowMultipleAnswers: allowMulti,
                       );
                       await _sendContentMessage('📊 [Poll]: $pollId');
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('$e')),
+                        );
+                      }
                     } finally {
-                      if (context.mounted && Navigator.of(context).canPop()) {
-                        Navigator.of(context).pop();
+                      final loader = loaderCtx;
+                      if (loader != null && loader.mounted) {
+                        Navigator.of(loader).pop();
                       }
                     }
                   },
@@ -1345,8 +1530,12 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         deleteType: deleteType,
       );
       if (!mounted) return;
-      setState(() {
-        _messages = _messages.where((m) => m.id != messageId).toList();
+      _applyMessageDeleted({
+        'channelId': widget.channel.id,
+        'messageId': messageId,
+        'deleteType': deleteType,
+        if (deleteType == 'for-everyone')
+          'deletedAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {
       if (!mounted) return;
@@ -1454,6 +1643,20 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   }
 
   Widget _buildMessageContent(ChannelMessage message) {
+    if (message.isDeletedForEveryone) {
+      final mine = _isMine(message);
+      final label = mine
+          ? 'Bạn đã xóa tin nhắn'
+          : '${_displayNameFor(message)} đã xóa tin nhắn';
+      return Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.55),
+          fontStyle: FontStyle.italic,
+          fontSize: 13,
+        ),
+      );
+    }
     final text = message.content.trim();
     if (message.type == 'gif' && (message.giphyId ?? '').isNotEmpty) {
       final gifUrl =
@@ -1709,9 +1912,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                           bottom: 4,
                                         ),
                                         child: Text(
-                                          msg.senderName.isEmpty
-                                              ? LanguageController.instance.t('messages.member')
-                                              : msg.senderName,
+
+                                          _displayNameFor(msg),
                                           style: const TextStyle(
                                             color: Color(0xFFC3D4F7),
                                             fontSize: 11,
@@ -1742,13 +1944,21 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              msg
-                                                          .replyTo
-                                                          ?.senderName
-                                                          ?.isNotEmpty ==
-                                                      true
-                                                  ? msg.replyTo!.senderName!
-                                                  : LanguageController.instance.t('messages.replying'),
+                                              msg.replyTo?.senderId != null &&
+                                                      msg.replyTo!.senderId
+                                                          .isNotEmpty
+                                                  ? _displayNameForSenderId(
+                                                      msg.replyTo!.senderId,
+                                                      fallback: msg
+                                                          .replyTo?.senderName,
+                                                    )
+                                                  : (msg
+                                                            .replyTo
+                                                            ?.senderName
+                                                            ?.isNotEmpty ==
+                                                        true
+                                                    ? msg.replyTo!.senderName!
+                                                    : 'Đang trả lời'),
                                               style: const TextStyle(
                                                 color: Color(0xFFB6C2DC),
                                                 fontSize: 11,
@@ -2279,6 +2489,7 @@ class _PollMessageCardState extends State<_PollMessageCard> {
   bool _hasVoted = false;
   bool _showResults = false;
   bool _submitting = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -2287,15 +2498,21 @@ class _PollMessageCardState extends State<_PollMessageCard> {
   }
 
   Future<void> _loadPoll() async {
-    final rs = await PollsApiService.getPollResults(widget.pollId);
-    final my = await PollsApiService.getMyVote(widget.pollId);
-    if (!mounted) return;
-    setState(() {
-      _pollData = rs;
-      _selectedOptions = my;
-      _hasVoted = my.isNotEmpty;
-      _showResults = my.isNotEmpty;
-    });
+    try {
+      final rs = await PollsApiService.getPollResults(widget.pollId);
+      final my = await PollsApiService.getMyVote(widget.pollId);
+      if (!mounted) return;
+      setState(() {
+        _pollData = rs;
+        _selectedOptions = my;
+        _hasVoted = my.isNotEmpty;
+        _showResults = my.isNotEmpty;
+        _loadError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadError = '$e');
+    }
   }
 
   Future<void> _vote() async {
@@ -2321,9 +2538,16 @@ class _PollMessageCardState extends State<_PollMessageCard> {
   Widget build(BuildContext context) {
     final data = _pollData;
     if (data == null) {
-      return Text(
-        LanguageController.instance.t('messages.loadingPoll'),
-        style: const TextStyle(color: Colors.white70),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _loadError ?? 'Đang tải khảo sát...',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          if (_loadError != null)
+            TextButton(onPressed: _loadPoll, child: const Text('Thử lại')),
+        ],
       );
     }
     final options = (data['options'] as List?)?.map((e) => '$e').toList() ?? [];

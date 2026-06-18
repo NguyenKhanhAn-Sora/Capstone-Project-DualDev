@@ -123,6 +123,13 @@ class ChannelMessagesRealtimeService {
       _serverRealtimeController.add(mapped);
     });
 
+    socket.on('server-deleted', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'server-deleted';
+      _serverRealtimeController.add(mapped);
+    });
+
     socket.on('connect', (_) {
       for (final id in _joinedChannelIds) {
         _emitJoinChannel(id);
@@ -166,6 +173,7 @@ class ChannelMessagesRealtimeService {
       socket.off('server-membership-updated');
       socket.off('join-application-updated');
       socket.off('interaction-settings-updated');
+      socket.off('server-deleted');
       socket.off('connect');
       socket.disconnect();
       socket.dispose();

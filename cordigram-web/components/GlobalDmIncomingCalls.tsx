@@ -102,6 +102,7 @@ export default function GlobalDmIncomingCalls() {
     callEvent,
     callEnded,
     callIncomingDismiss,
+    callSessionsSync,
     answerCall,
     rejectCall,
     endCall,
@@ -110,6 +111,36 @@ export default function GlobalDmIncomingCalls() {
     token: token || " ",
     enabled: socketEnabled,
   });
+
+  useEffect(() => {
+    if (!callSessionsSync?.sessions?.length) return;
+    for (const session of callSessionsSync.sessions) {
+      if (session.role !== "callee" || session.state !== "ringing") continue;
+      const peerId = String(session.peerId);
+      if (
+        currentUserIdRef.current &&
+        peerId === String(currentUserIdRef.current)
+      ) {
+        continue;
+      }
+      const activePeers = getActiveDmCallPeerIds();
+      if (activePeers.length > 0 && !activePeers.includes(peerId)) continue;
+      if (activePeers.includes(peerId)) continue;
+      setIncomingCall((prev) => {
+        if (prev?.from === peerId) return prev;
+        return {
+          from: peerId,
+          type: session.type,
+          callerInfo: {
+            userId: peerId,
+            username: peerId,
+            displayName: peerId,
+          },
+          status: "incoming",
+        };
+      });
+    }
+  }, [callSessionsSync]);
 
   useEffect(() => {
     if (!callEvent) return;

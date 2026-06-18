@@ -57,6 +57,35 @@ export class FcmPushService {
     );
   }
 
+  /** Respects Messages master notification toggle + global mute windows. */
+  private async canDeliverPushToUser(userId: string): Promise<boolean> {
+    const user = await this.userModel
+      .findById(userId)
+      .select(
+        'settings.chatDesktopNotificationsEnabled settings.notifications.mutedIndefinitely settings.notifications.mutedUntil',
+      )
+      .lean()
+      .exec();
+
+    if (user?.settings?.chatDesktopNotificationsEnabled === false) {
+      return false;
+    }
+
+    if (user?.settings?.notifications?.mutedIndefinitely) {
+      return false;
+    }
+
+    const mutedUntil = user?.settings?.notifications?.mutedUntil;
+    if (mutedUntil) {
+      const until = new Date(mutedUntil);
+      if (until.getTime() > Date.now()) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   private async clearInvalidTokens(
     userId: string,
     invalidTokens: string[],
@@ -87,6 +116,15 @@ export class FcmPushService {
     if (!this.app) {
       if (context) {
         this.logger.warn(`FCM skipped (${context}): service not initialized`);
+      }
+      return;
+    }
+
+    if (!(await this.canDeliverPushToUser(userId))) {
+      if (context) {
+        this.logger.debug(
+          `FCM skipped (${context}): notifications disabled for user ${userId}`,
+        );
       }
       return;
     }

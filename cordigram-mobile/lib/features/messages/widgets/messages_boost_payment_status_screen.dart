@@ -92,7 +92,8 @@ class _MessagesBoostPaymentStatusScreenState
       );
       if (!mounted) return;
       if (_isSuccess(result)) {
-        await MessagesMediaService.refreshBoostStatus(force: true);
+        final boostStatus = await MessagesBoostService.fetchStatus();
+        MessagesMediaService.applyBoostFromStatus(boostStatus);
         setState(() => _uiState = _BoostPaymentUiState.success);
         _finish(true);
       } else if (result.status == 'expired') {

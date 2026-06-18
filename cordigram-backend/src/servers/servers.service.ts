@@ -683,6 +683,16 @@ export class ServersService {
     // Create default @everyone role for the server
     await this.rolesService.createDefaultRole(savedServer._id.toString());
 
+    // Notify the owner's connected clients (mobile, other web tabs) so they
+    // refresh their server list without polling.  Mirrors addMemberToServer.
+    this.emitServerMembershipUpdated({
+      server: savedServer,
+      changedUserId: userId,
+      action: 'joined',
+      actorUserId: userId,
+      recipients: [userId],
+    });
+
     return savedServer;
   }
 
@@ -3903,7 +3913,7 @@ export class ServersService {
     const ageMinutes = Math.floor(ageMs / (60 * 1000));
 
     /** Đồng bộ với UI Truy cập / kích hoạt cộng đồng (Khám Phá). */
-    const minMembers = 1000;
+    const minMembers = 3;
     const minDiscoveryAgeWeeks = 8;
     const minDiscoveryAgeMs = minDiscoveryAgeWeeks * 7 * 24 * 60 * 60 * 1000;
     const minMembersToEvaluate = 2;
@@ -3973,6 +3983,7 @@ export class ServersService {
         'communitySettings.enabled': true,
         communityDiscoveryStatus: 'approved',
         isActive: true,
+        memberCount: { $gte: 3 },
       })
       .select(
         'name description avatarUrl bannerUrl bannerImageUrl bannerColor memberCount accessMode isPublic',

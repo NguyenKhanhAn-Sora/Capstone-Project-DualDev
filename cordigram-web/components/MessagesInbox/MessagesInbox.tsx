@@ -18,6 +18,7 @@ import { getApiBaseUrl } from "@/lib/api";
 import { markDmConversationRead } from "@/lib/api";
 import { acceptServerInvite, declineServerInvite, getServerAccessSettings, markChannelAsRead } from "@/lib/servers-api";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
+import { formatDmSidebarPreview } from "@/lib/dm-sidebar-preview";
 type TabKey = "for-you" | "unread" | "mentions";
 
 type UiUnreadItem = InboxUnreadItem & { read?: boolean };
@@ -651,7 +652,7 @@ export default function MessagesInbox({
                         </div>
                         <p className={styles.unreadPreview}>
                           {item.lastMessage?.trim()
-                            ? item.lastMessage
+                            ? formatDmSidebarPreview(item.lastMessage, t)
                             : t("chat.popups.inbox.newMessageFallback")}
                         </p>
                       </div>
@@ -691,7 +692,7 @@ export default function MessagesInbox({
                         </div>
                         <p className={styles.unreadPreview}>
                           {item.lastMessage?.trim()
-                            ? item.lastMessage
+                            ? formatDmSidebarPreview(item.lastMessage, t)
                             : t("chat.popups.inbox.newMessageFallback")}
                         </p>
                       </div>

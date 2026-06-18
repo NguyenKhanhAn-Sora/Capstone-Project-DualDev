@@ -167,6 +167,10 @@ class MessagesPushHandler {
       return true;
     }
 
+    if (!DirectMessagesService.chatPushNotificationsEnabled) {
+      return true;
+    }
+
     if (isDmMessage(type)) {
       final peerId = _readDmPeerId(data);
       if (peerId.isNotEmpty &&
@@ -204,6 +208,12 @@ class MessagesPushHandler {
       final callId = (data['callId'] ?? '').toString();
       if (callId.isNotEmpty) await local.cancel(callId.hashCode);
       return;
+    }
+
+    if (!isCallIncoming(type)) {
+      final pushEnabled =
+          await DirectMessagesService.loadPersistedChatPushNotificationsEnabled();
+      if (!pushEnabled) return;
     }
 
     final title = message.notification?.title ?? titleForData(data);

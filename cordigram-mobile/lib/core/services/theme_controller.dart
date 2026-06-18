@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/messages/services/direct_messages_service.dart';
+import 'auth_storage.dart';
+
 class ThemeController extends ChangeNotifier {
   ThemeController._();
 
@@ -31,6 +34,64 @@ class ThemeController extends ChangeNotifier {
     }
 
     notifyListeners();
+
+    try {
+      final token = AuthStorage.accessToken;
+      if (token != null && token.isNotEmpty) {
+        final settings = await DirectMessagesService.getUserSettings();
+        await applyFromServerSettings(settings, persistLocally: true);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> applyFromServerSettings(
+    Map<String, dynamic> settings, {
+    bool persistLocally = false,
+  }) async {
+    final preset = (settings['appearancePreset'] ?? '').toString();
+    final sync = settings['appearanceSync'] == true;
+    final theme = (settings['theme'] ?? '').toString();
+
+    if (preset == 'galaxy') {
+      await _applyLocal(galaxy: true, mode: ThemeMode.dark, persist: persistLocally);
+      return;
+    }
+
+    if (sync) {
+      final brightness =
+          WidgetsBinding.instance.platformDispatcher.platformBrightness;
+      await _applyLocal(
+        galaxy: false,
+        mode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+        persist: persistLocally,
+      );
+      return;
+    }
+
+    if (theme == 'light') {
+      await _applyLocal(galaxy: false, mode: ThemeMode.light, persist: persistLocally);
+    } else if (theme == 'dark') {
+      await _applyLocal(galaxy: false, mode: ThemeMode.dark, persist: persistLocally);
+    }
+  }
+
+  Future<void> _applyLocal({
+    required bool galaxy,
+    required ThemeMode mode,
+    required bool persist,
+  }) async {
+    final changed = _isGalaxyMode != galaxy || _themeMode != mode;
+    if (!changed) return;
+    _isGalaxyMode = galaxy;
+    _themeMode = mode;
+    notifyListeners();
+    if (!persist) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_galaxyKey, galaxy);
+    await prefs.setString(
+      _storageKey,
+      mode == ThemeMode.light ? 'light' : 'dark',
+    );
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -46,6 +107,17 @@ class ThemeController extends ChangeNotifier {
       mode == ThemeMode.light ? 'light' : 'dark',
     );
     await prefs.setBool(_galaxyKey, false);
+
+    try {
+      final token = AuthStorage.accessToken;
+      if (token != null && token.isNotEmpty) {
+        await DirectMessagesService.updateUserSettings(
+          theme: mode == ThemeMode.light ? 'light' : 'dark',
+          appearancePreset: 'default',
+          appearanceSync: false,
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> toggle() async {
@@ -61,6 +133,17 @@ class ThemeController extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_galaxyKey, enabled);
+
+    try {
+      final token = AuthStorage.accessToken;
+      if (token != null && token.isNotEmpty) {
+        await DirectMessagesService.updateUserSettings(
+          theme: 'dark',
+          appearancePreset: enabled ? 'galaxy' : 'default',
+          appearanceSync: false,
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> toggleGalaxy() async {

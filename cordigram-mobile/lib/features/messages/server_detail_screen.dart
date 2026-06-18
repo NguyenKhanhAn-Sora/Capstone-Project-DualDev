@@ -94,6 +94,14 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
     if (sid.isEmpty || sid != widget.server.id) return;
     final event = (payload['event'] ?? '').toString();
 
+    if (event == 'server-deleted') {
+      if (_didAutoPopByRealtime || !mounted) return;
+      _didAutoPopByRealtime = true;
+      unawaited(_leaveVoiceIfInCurrentServer());
+      unawaited(exitMessagesAfterServerDeleted(widget.server.id));
+      return;
+    }
+
     if (event == 'server-updated') {
       final rawServer = payload['server'];
       if (rawServer is Map) {
@@ -354,10 +362,6 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
           ),
         ).then((result) {
           if (!mounted) return;
-          if (result == 'deleted') {
-            Navigator.of(context).pop('deleted');
-            return;
-          }
           if (result is ServerSummary) {
             setState(() => _serverOverride = result);
           }

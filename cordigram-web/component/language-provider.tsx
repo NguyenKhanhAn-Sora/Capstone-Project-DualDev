@@ -153,8 +153,25 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     };
 
     load();
+    const onUserSettings = (e: Event) => {
+      const detail = (e as CustomEvent<{ language?: string }>).detail;
+      const next = isLanguageCode(detail?.language) ? detail.language : null;
+      if (!next) return;
+      setLanguageState((prev) => {
+        if (prev === next) return prev;
+        persistLocaleEverywhere(next);
+        queueMicrotask(() => router.refresh());
+        return next;
+      });
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("cordigram-user-settings-updated", onUserSettings as any);
+    }
     return () => {
       cancelled = true;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("cordigram-user-settings-updated", onUserSettings as any);
+      }
     };
   }, [router]);
 
