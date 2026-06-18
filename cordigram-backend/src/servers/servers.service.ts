@@ -683,6 +683,16 @@ export class ServersService {
     // Create default @everyone role for the server
     await this.rolesService.createDefaultRole(savedServer._id.toString());
 
+    // Notify the owner's connected clients (mobile, other web tabs) so they
+    // refresh their server list without polling.  Mirrors addMemberToServer.
+    this.emitServerMembershipUpdated({
+      server: savedServer,
+      changedUserId: userId,
+      action: 'joined',
+      actorUserId: userId,
+      recipients: [userId],
+    });
+
     return savedServer;
   }
 
