@@ -9,6 +9,10 @@ Route<T> messagesEntryRoute<T>(Widget child) {
 }
 
 /// Sau khi server bị xóa: rời voice (nếu đang trong server đó) và về Messages home.
+///
+/// Navigation được defer sang frame tiếp theo qua [addPostFrameCallback] để tránh
+/// assertion `_dependents.isEmpty` khi [InheritedWidget] (Theme/Chrome) cố notify
+/// các dependent đang bị deactivate đồng thời bởi `popUntil`.
 Future<void> exitMessagesAfterServerDeleted(String serverId) async {
   final session = VoiceChannelSessionController.instance;
   if (session.active && session.serverId == serverId) {
@@ -16,10 +20,9 @@ Future<void> exitMessagesAfterServerDeleted(String serverId) async {
       await session.leave();
     } catch (_) {}
   }
-  final nav = MessagesShell.navigatorKey.currentState;
-  if (nav != null) {
-    nav.popUntil((route) => route.isFirst);
-  }
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    MessagesShell.navigatorKey.currentState?.popUntil((route) => route.isFirst);
+  });
 }
 
 /// Push màn con trong Messages — phải gọi từ context bên trong [MessagesShell].

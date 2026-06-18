@@ -123,7 +123,9 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
     if (ok != true || !mounted) return;
     try {
       await ServersService.deleteServer(_server.id);
-      if (!mounted) return;
+      // Không guard bằng `!mounted` ở đây vì exitMessagesAfterServerDeleted
+      // dùng GlobalKey nên không cần context — luôn navigate về home dù widget
+      // đã bị deactivate bởi một luồng xử lý khác.
       await exitMessagesAfterServerDeleted(_server.id);
     } catch (e) {
       if (mounted) {
