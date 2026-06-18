@@ -49,7 +49,7 @@ class PostUploadController extends ChangeNotifier {
   static final instance = PostUploadController._();
 
   static const double _fileUploadWeight = 90.0;
-  static const int _reelMaxDurationSec = 90;
+  static const int _reelMaxDurationSec = 180;
 
   UploadStatus _status = UploadStatus.idle;
   UploadMode _mode = UploadMode.post;
