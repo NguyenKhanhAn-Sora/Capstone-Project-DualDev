@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/messages_chrome_palette.dart';
+import '../../profile/profile_screen.dart';
 import '../services/direct_messages_service.dart';
 import '../utils/messages_i18n.dart';
 import '../utils/messages_ui.dart';
+import '../utils/profile_theme.dart';
 import 'messages_chrome_builder.dart';
 
 /// Peer profile panel — mirrors web DM profile sidebar (`fetchMessagingProfileByUserId`).
@@ -66,6 +68,15 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
     }
   }
 
+  void _openSocialProfile() {
+    Navigator.of(context).pop();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProfileScreen(userId: widget.userId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MessagesChromeBuilder(
@@ -80,13 +91,23 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
                 ?.toString();
         final memberSince = (_profile?['cordigramMemberSince'] ?? '').toString();
         final mutualCount = _profile?['mutualServerCount'];
+        final themePrimary = ProfileTheme.parseHex(
+          _profile?['profileThemePrimaryHex']?.toString(),
+          ProfileTheme.defaultPrimary,
+        );
+        final themeAccent = ProfileTheme.parseHex(
+          _profile?['profileThemeAccentHex']?.toString(),
+          ProfileTheme.defaultAccent,
+        );
         final letter = displayName.isNotEmpty
             ? displayName.substring(0, 1).toUpperCase()
             : 'U';
 
         return Container(
-          decoration: BoxDecoration(
-            color: chrome.bg,
+          decoration: ProfileTheme.cardDecoration(
+            primary: themePrimary,
+            accent: themeAccent,
+          ).copyWith(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: SafeArea(
@@ -159,6 +180,18 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
                             MessagesI18n.memberSinceLabel(),
                             memberSince,
                           ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: _openSocialProfile,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: chrome.text,
+                              side: BorderSide(color: chrome.border),
+                            ),
+                            child: Text(MessagesI18n.viewSocialProfileLabel()),
+                          ),
+                        ),
                       ],
                     ),
             ),
@@ -174,7 +207,7 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: chrome.surface,
+        color: chrome.surface.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: chrome.border),
       ),

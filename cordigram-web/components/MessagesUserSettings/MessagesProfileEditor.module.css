@@ -842,3 +842,29 @@
   color: #c8d0e8;
   box-shadow: 0 4px 14px rgba(0,0,0,0.3), 0 0 12px rgba(88,101,242,0.15);
 }
+
+.themeSwatchRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.themeSwatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.themeSwatch:hover {
+  transform: scale(1.06);
+}
+
+.themeSwatchActive {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.65);
+}

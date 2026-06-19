@@ -2725,7 +2725,8 @@
         "activityEmpty": "{name} has no activity to share here yet.",
         "activityHint": "Activity will be added later.",
         "mutualFollowersEmpty": "Mutual followers will appear here.",
-        "mutualServersEmpty": "Mutual servers will appear here."
+        "mutualServersEmpty": "Mutual servers will appear here.",
+        "viewSocialProfile": "View social profile"
       },
       "messageSearch": {
         "title": "Search messages",
@@ -3311,6 +3312,9 @@
       "uploadBanner": "Upload banner image",
       "boostRequiredBanner": "Boost is required to upload a banner image on your main profile. Server profiles do not require Boost.",
       "removeBanner": "Remove banner image",
+      "themePrimaryLabel": "Profile background",
+      "themeAccentLabel": "Theme accent",
+      "themeHint": "Applies to the profile card background in Messages (main and per-server profiles).",
       "bioLabel": "About me",
       "bioHint": "You can use markdown and links if you want.",
       "insertEmojiAria": "Insert emoji",

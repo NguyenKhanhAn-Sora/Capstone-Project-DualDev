@@ -46,7 +46,7 @@ export default function MemberProfilePopup({
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [checkingFollow, setCheckingFollow] = useState(true);
-  const [activeTab, setActiveTab] = useState<"activity" | "followers">("activity");
+  const [activeTab, setActiveTab] = useState<"followers">("followers");
 
   const isSelf = member.userId === currentUserId;
 
@@ -202,14 +202,7 @@ export default function MemberProfilePopup({
         <div className={styles.tabs}>
           <button
             type="button"
-            className={activeTab === "activity" ? styles.tabActive : styles.tab}
-            onClick={() => setActiveTab("activity")}
-          >
-            {t("chat.popups.memberProfile.tabActivity")}
-          </button>
-          <button
-            type="button"
-            className={activeTab === "followers" ? styles.tabActive : styles.tab}
+            className={styles.tabActive}
             onClick={() => setActiveTab("followers")}
           >
             {t("chat.popups.memberProfile.tabFollowers")}
@@ -217,18 +210,6 @@ export default function MemberProfilePopup({
         </div>
 
         <div className={styles.tabContent}>
-          {activeTab === "activity" && (
-            <div className={styles.activityEmpty}>
-              <p>{t("chat.popups.memberProfile.activityEmpty", { name: displayName })}</p>
-              <p className={styles.activityHint}>{t("chat.popups.memberProfile.activityHint")}</p>
-              <button type="button" className={styles.btnMessage} onClick={onMessage}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                {t("chat.popups.memberProfile.message")}
-              </button>
-            </div>
-          )}
           {activeTab === "followers" && (
             <div className={styles.activityEmpty}>
               <p>{t("chat.popups.memberProfile.followersEmpty")}</p>

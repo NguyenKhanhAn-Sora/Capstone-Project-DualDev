@@ -608,7 +608,8 @@
         "activityEmpty": "{name} 还没有可在此分享的动态。",
         "activityHint": "动态功能稍后补充。",
         "mutualFollowersEmpty": "共同关注将显示在这里。",
-        "mutualServersEmpty": "共同服务器将显示在这里。"
+        "mutualServersEmpty": "共同服务器将显示在这里。",
+        "viewSocialProfile": "查看社交资料"
       },
       "messageSearch": {
         "title": "搜索消息",
@@ -1121,6 +1122,9 @@
       "uploadBanner": "上传横幅图片",
       "boostRequiredBanner": "主资料横幅需要 Boost。服务器资料不需要 Boost。",
       "removeBanner": "删除横幅图片",
+      "themePrimaryLabel": "资料背景色",
+      "themeAccentLabel": "主题强调色",
+      "themeHint": "应用于消息中的资料卡背景（主资料与各服务器资料）。",
       "bioLabel": "个人简介",
       "bioHint": "你可以使用 Markdown 和链接。",
       "insertEmojiAria": "插入表情",

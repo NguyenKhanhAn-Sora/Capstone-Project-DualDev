@@ -490,6 +490,7 @@
 /* ─── Action bar ─── */
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 20px;
   align-items: center;
@@ -580,6 +581,25 @@
   box-shadow:
     0 5px 18px rgba(88, 101, 242, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.socialProfileBtn {
+  flex: 1 1 100%;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #c8d0e8;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.socialProfileBtn:hover {
+  background: rgba(88, 101, 242, 0.14);
+  border-color: rgba(88, 101, 242, 0.35);
+  color: #eef1fb;
 }
 
 /* ─── Loading skeleton ─── */

@@ -52,6 +52,14 @@ export class MessagingProfile extends Document {
 
   @Prop({ type: String, default: null })
   displayNameAccentHex?: string | null;
+
+  /** Màu nền thẻ hồ sơ Messages (hex). */
+  @Prop({ type: String, default: null })
+  profileThemePrimaryHex?: string | null;
+
+  /** Màu chủ đề / điểm nhấn thẻ hồ sơ Messages (hex). */
+  @Prop({ type: String, default: null })
+  profileThemeAccentHex?: string | null;
 }
 
 export const MessagingProfileSchema =

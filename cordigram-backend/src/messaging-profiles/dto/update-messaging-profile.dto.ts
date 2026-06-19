@@ -54,4 +54,12 @@ export class UpdateMessagingProfileDto {
   @IsOptional()
   @IsString()
   displayNameAccentHex?: string | null;
+
+  @IsOptional()
+  @IsString()
+  profileThemePrimaryHex?: string | null;
+
+  @IsOptional()
+  @IsString()
+  profileThemeAccentHex?: string | null;
 }

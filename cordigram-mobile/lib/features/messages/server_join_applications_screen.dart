@@ -412,51 +412,62 @@ class _ServerJoinApplicationsScreenState
                             user.isNotEmpty ? '@$user' : '',
                             style: TextStyle(color: chrome.textMuted),
                           ),
-                          trailing: pending
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      tooltip: 'Duyệt',
-                                      onPressed: busy
-                                          ? null
-                                          : () => _quickApprove(userId),
-                                      icon: busy
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.check_rounded,
-                                              color: Color(0xFF7BED9F),
-                                            ),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Từ chối',
-                                      onPressed: busy
-                                          ? null
-                                          : () => _quickReject(userId),
-                                      icon: const Icon(
-                                        Icons.close_rounded,
-                                        color: Color(0xFFFF6B6B),
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Text(
-                                  status == 'accepted'
-                                      ? _t('chat.joinApplications.mobileTabApproved')
-                                      : status == 'rejected'
-                                      ? _t('chat.joinApplications.mobileTabRejected')
-                                      : status,
-                                  style: TextStyle(
-                                    color: chrome.textMuted,
-                                    fontSize: 12,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (pending) ...[
+                                IconButton(
+                                  tooltip: 'Duyệt',
+                                  onPressed: busy
+                                      ? null
+                                      : () => _quickApprove(userId),
+                                  icon: busy
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: chrome.accent,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.check_rounded,
+                                          color: Color(0xFF7BED9F),
+                                        ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Từ chối',
+                                  onPressed: busy
+                                      ? null
+                                      : () => _quickReject(userId),
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    color: Color(0xFFFF6B6B),
                                   ),
                                 ),
+                              ],
+                              PopupMenuButton<String>(
+                                icon: Icon(
+                                  Icons.more_vert_rounded,
+                                  color: chrome.text,
+                                ),
+                                tooltip: _t('chat.joinApplications.optionsBtn'),
+                                onSelected: (value) {
+                                  if (value == 'profile') {
+                                    _openDetail(row);
+                                  }
+                                },
+                                itemBuilder: (ctx) => [
+                                  PopupMenuItem(
+                                    value: 'profile',
+                                    child: Text(
+                                      _t('chat.joinApplications.menuProfile'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         );
                       },
                     ),

@@ -608,7 +608,8 @@
         "activityEmpty": "{name} はまだここに共有するアクティビティがありません。",
         "activityHint": "アクティビティは後で追加されます。",
         "mutualFollowersEmpty": "共通のフォロワーがここに表示されます。",
-        "mutualServersEmpty": "共通のサーバーがここに表示されます。"
+        "mutualServersEmpty": "共通のサーバーがここに表示されます。",
+        "viewSocialProfile": "ソーシャルプロフィールを見る"
       },
       "messageSearch": {
         "title": "メッセージを検索",
@@ -1121,6 +1122,9 @@
       "uploadBanner": "バナー画像をアップロード",
       "boostRequiredBanner": "メインプロフィールのバナー画像にはBoostが必要です。サーバープロフィールには不要です。",
       "removeBanner": "バナー画像を削除",
+      "themePrimaryLabel": "プロフィール背景",
+      "themeAccentLabel": "テーマアクセント",
+      "themeHint": "メッセージのプロフィールカード背景に適用されます（メイン・サーバー別）。",
       "bioLabel": "自己紹介",
       "bioHint": "マークダウンやリンクを使用できます。",
       "insertEmojiAria": "絵文字を挿入",

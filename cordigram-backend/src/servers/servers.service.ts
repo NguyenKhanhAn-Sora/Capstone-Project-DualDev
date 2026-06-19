@@ -1991,6 +1991,44 @@ export class ServersService {
     }
   }
 
+  /**
+   * Applicant rows stay in server.members for join-application admin lists,
+   * but must not appear as full members in settings / sidebar / role pickers.
+   */
+  private async getFullMemberUserIdSet(
+    serverId: string,
+    ownerId: string,
+    memberUserIds: string[],
+  ): Promise<Set<string>> {
+    if (memberUserIds.length === 0) return new Set();
+    const rows = await this.userServerModel
+      .find({
+        serverId: new Types.ObjectId(serverId),
+        userId: {
+          $in: memberUserIds.map((id) => new Types.ObjectId(id)),
+        },
+      })
+      .select('userId status')
+      .lean()
+      .exec();
+    const statusByUser = new Map<string, string>(
+      (rows as any[]).map((r) => [
+        r.userId.toString(),
+        String(r.status ?? 'accepted'),
+      ]),
+    );
+    const accepted = new Set<string>();
+    for (const uid of memberUserIds) {
+      if (uid === ownerId) {
+        accepted.add(uid);
+        continue;
+      }
+      const st = statusByUser.get(uid) ?? 'accepted';
+      if (st === 'accepted') accepted.add(uid);
+    }
+    return accepted;
+  }
+
   /** Danh sách thành viên máy chủ (chỉ chủ server). Trả về: tên, avatar, gia nhập server từ, đã tham gia Cordigram, cách gia nhập (link / mời bởi). */
   async getServerMembers(
     serverId: string,
@@ -2029,8 +2067,16 @@ export class ServersService {
       );
     }
 
+    const ownerIdStr = server.ownerId.toString();
     const memberIds = server.members.map((m) => m.userId.toString());
-    const userIds = server.members.map((m) => m.userId);
+    const fullMemberIds = await this.getFullMemberUserIdSet(
+      serverId,
+      ownerIdStr,
+      memberIds,
+    );
+    const userIds = server.members
+      .filter((m) => fullMemberIds.has(m.userId.toString()))
+      .map((m) => m.userId);
     const users = await this.userModel
       .find({ _id: { $in: userIds } })
       .select('_id createdAt')
@@ -2115,6 +2161,7 @@ export class ServersService {
 
     for (const m of server.members) {
       const uid = m.userId.toString();
+      if (!fullMemberIds.has(uid)) continue;
       const profile = profileByUserId.get(uid) as
         | { displayName: string; username: string; avatarUrl: string }
         | undefined;
@@ -2229,6 +2276,12 @@ export class ServersService {
 
     const memberObjectIds = server.members.map((m) => m.userId);
     const memberIdStrings = memberObjectIds.map((id) => id.toString());
+    const ownerIdStr = server.ownerId.toString();
+    const fullMemberIds = await this.getFullMemberUserIdSet(
+      serverId,
+      ownerIdStr,
+      memberIdStrings,
+    );
 
     // Lấy thông tin user (createdAt) để tính tuổi tài khoản
     const users = await this.userModel
@@ -2425,6 +2478,7 @@ export class ServersService {
 
     for (const m of server.members) {
       const uid = m.userId.toString();
+      if (!fullMemberIds.has(uid)) continue;
       const profile = profileByUserId.get(uid) as
         | { displayName: string; username: string; avatarUrl: string }
         | undefined;
@@ -3101,6 +3155,8 @@ export class ServersService {
       username: string;
       avatarUrl: string;
       coverUrl?: string | null;
+      profileThemePrimaryHex?: string | null;
+      profileThemeAccentHex?: string | null;
       joinedAt: Date;
       isOwner: boolean;
       serverMemberRole: 'owner' | 'moderator' | 'member';
@@ -3145,6 +3201,12 @@ export class ServersService {
     }
 
     const userIds = server.members.map((m) => m.userId);
+    const ownerIdStr = server.ownerId.toString();
+    const fullMemberIds = await this.getFullMemberUserIdSet(
+      serverId,
+      ownerIdStr,
+      userIds.map((id) => id.toString()),
+    );
 
     // Lấy profiles
     const profiles = await this.profileModel
@@ -3161,7 +3223,7 @@ export class ServersService {
         serverId: new Types.ObjectId(serverId),
         userId: { $in: userIds },
       })
-      .select('userId serverAvatarUrl serverCoverUrl')
+      .select('userId serverAvatarUrl serverCoverUrl serverProfileThemePrimaryHex serverProfileThemeAccentHex')
       .lean()
       .exec();
     const userServerByUserId = new Map(
@@ -3176,6 +3238,8 @@ export class ServersService {
       username: string;
       avatarUrl: string;
       coverUrl?: string | null;
+      profileThemePrimaryHex?: string | null;
+      profileThemeAccentHex?: string | null;
       joinedAt: Date;
       isOwner: boolean;
       serverMemberRole: 'owner' | 'moderator' | 'member';
@@ -3191,11 +3255,17 @@ export class ServersService {
 
     for (const m of server.members) {
       const uid = m.userId.toString();
+      if (!fullMemberIds.has(uid)) continue;
       const profile = profileByUserId.get(uid) as
         | { displayName: string; username: string; avatarUrl: string }
         | undefined;
       const us = userServerByUserId.get(uid) as
-        | { serverAvatarUrl?: string | null; serverCoverUrl?: string | null }
+        | {
+            serverAvatarUrl?: string | null;
+            serverCoverUrl?: string | null;
+            serverProfileThemePrimaryHex?: string | null;
+            serverProfileThemeAccentHex?: string | null;
+          }
         | undefined;
 
       // Lấy role info cho member này
@@ -3210,6 +3280,8 @@ export class ServersService {
           us?.serverAvatarUrl ||
           'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg',
         coverUrl: us?.serverCoverUrl ?? null,
+        profileThemePrimaryHex: us?.serverProfileThemePrimaryHex ?? null,
+        profileThemeAccentHex: us?.serverProfileThemeAccentHex ?? null,
         joinedAt:
           m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt),
         isOwner: server.ownerId.toString() === uid,

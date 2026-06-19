@@ -29,6 +29,8 @@ export type MessagingProfileCardDto = {
   displayNameEffectId: string | null;
   displayNamePrimaryHex: string | null;
   displayNameAccentHex: string | null;
+  profileThemePrimaryHex: string | null;
+  profileThemeAccentHex: string | null;
   cordigramMemberSince?: string;
   mutualServerCount: number;
   mutualServers: Array<{
@@ -99,6 +101,8 @@ export class MessagingProfilesService {
       displayNameEffectId: mp.displayNameEffectId ?? null,
       displayNamePrimaryHex: mp.displayNamePrimaryHex ?? null,
       displayNameAccentHex: mp.displayNameAccentHex ?? null,
+      profileThemePrimaryHex: (mp as any).profileThemePrimaryHex ?? null,
+      profileThemeAccentHex: (mp as any).profileThemeAccentHex ?? null,
       cordigramMemberSince: overlay.cordigramMemberSince,
       mutualServerCount: overlay.mutualServerCount,
       mutualServers: overlay.mutualServers,
@@ -209,6 +213,18 @@ export class MessagingProfilesService {
     }
     if (dto.displayNameAccentHex !== undefined) {
       mp.displayNameAccentHex = dto.displayNameAccentHex;
+    }
+    if (dto.profileThemePrimaryHex !== undefined) {
+      (mp as any).profileThemePrimaryHex =
+        dto.profileThemePrimaryHex == null
+          ? null
+          : String(dto.profileThemePrimaryHex).trim();
+    }
+    if (dto.profileThemeAccentHex !== undefined) {
+      (mp as any).profileThemeAccentHex =
+        dto.profileThemeAccentHex == null
+          ? null
+          : String(dto.profileThemeAccentHex).trim();
     }
 
     await mp.save();

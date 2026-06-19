@@ -26,6 +26,13 @@ import {
   parseUserCover,
 } from "@/lib/user-profile-cover";
 import {
+  buildProfileCardThemeStyle,
+  DEFAULT_PROFILE_THEME_ACCENT,
+  DEFAULT_PROFILE_THEME_PRIMARY,
+  normalizeProfileThemeHex,
+  PROFILE_THEME_PRESETS,
+} from "@/lib/profile-theme";
+import {
   getRecentProfileAvatars,
   pushRecentProfileAvatar,
 } from "@/lib/profile-recent-avatars";
@@ -106,10 +113,22 @@ export default function MessagesProfileEditor({
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR);
   const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(null);
   const [bannerSolidHex, setBannerSolidHex] = useState("#5865f2");
+  const [profileThemePrimaryHex, setProfileThemePrimaryHex] = useState(
+    DEFAULT_PROFILE_THEME_PRIMARY,
+  );
+  const [profileThemeAccentHex, setProfileThemeAccentHex] = useState(
+    DEFAULT_PROFILE_THEME_ACCENT,
+  );
 
   const [serverAvatarUrl, setServerAvatarUrl] = useState<string | null>(null);
   const [serverBannerImageUrl, setServerBannerImageUrl] = useState<string | null>(null);
   const [serverBannerSolidHex, setServerBannerSolidHex] = useState("#5865f2");
+  const [serverProfileThemePrimaryHex, setServerProfileThemePrimaryHex] = useState(
+    DEFAULT_PROFILE_THEME_PRIMARY,
+  );
+  const [serverProfileThemeAccentHex, setServerProfileThemeAccentHex] = useState(
+    DEFAULT_PROFILE_THEME_ACCENT,
+  );
   const [serverDisplayNameStyle, setServerDisplayNameStyle] = useState<DisplayNameStyleValue>({
     ...DEFAULT_DISPLAY_NAME_STYLE,
   });
@@ -205,6 +224,8 @@ export default function MessagesProfileEditor({
     (patch: {
       coverUrl?: string | null;
       avatarUrl?: string | null;
+      profileThemePrimaryHex?: string;
+      profileThemeAccentHex?: string;
       displayNameFontId?: string;
       displayNameEffectId?: string;
       displayNamePrimaryHex?: string;
@@ -263,6 +284,18 @@ export default function MessagesProfileEditor({
       const parsed = parseUserCover(detail.coverUrl);
       setBannerImageUrl(parsed.bannerImageUrl);
       setBannerSolidHex(parsed.bannerSolidHex);
+      setProfileThemePrimaryHex(
+        normalizeProfileThemeHex(
+          (detail as { profileThemePrimaryHex?: string | null }).profileThemePrimaryHex,
+          DEFAULT_PROFILE_THEME_PRIMARY,
+        ),
+      );
+      setProfileThemeAccentHex(
+        normalizeProfileThemeHex(
+          (detail as { profileThemeAccentHex?: string | null }).profileThemeAccentHex,
+          DEFAULT_PROFILE_THEME_ACCENT,
+        ),
+      );
       setDisplayNameStyle(mapProfileStyle(detail));
     } catch {
       onToastRef.current?.(t("chat.profileEditor.errorLoadProfile"));
@@ -283,6 +316,8 @@ export default function MessagesProfileEditor({
       setServerAvatarUrl(null);
       setServerBannerImageUrl(null);
       setServerBannerSolidHex("#5865f2");
+      setServerProfileThemePrimaryHex(DEFAULT_PROFILE_THEME_PRIMARY);
+      setServerProfileThemeAccentHex(DEFAULT_PROFILE_THEME_ACCENT);
       setServerDisplayNameStyle({ ...DEFAULT_DISPLAY_NAME_STYLE });
       return;
     }
@@ -308,6 +343,18 @@ export default function MessagesProfileEditor({
         const parsed = parseUserCover(res.coverUrl || "");
         setServerBannerImageUrl(parsed.bannerImageUrl);
         setServerBannerSolidHex(parsed.bannerSolidHex);
+        setServerProfileThemePrimaryHex(
+          normalizeProfileThemeHex(
+            (res as { profileThemePrimaryHex?: string | null }).profileThemePrimaryHex,
+            DEFAULT_PROFILE_THEME_PRIMARY,
+          ),
+        );
+        setServerProfileThemeAccentHex(
+          normalizeProfileThemeHex(
+            (res as { profileThemeAccentHex?: string | null }).profileThemeAccentHex,
+            DEFAULT_PROFILE_THEME_ACCENT,
+          ),
+        );
         setServerDisplayNameStyle(mapProfileStyle(res));
       } catch {
         if (cancelled) return;
@@ -352,6 +399,14 @@ export default function MessagesProfileEditor({
     tab === "server" && serverId ? serverBannerImageUrl : bannerImageUrl;
   const effectiveBannerSolidHex =
     tab === "server" && serverId ? serverBannerSolidHex : bannerSolidHex;
+  const effectiveThemePrimaryHex =
+    tab === "server" && serverId ? serverProfileThemePrimaryHex : profileThemePrimaryHex;
+  const effectiveThemeAccentHex =
+    tab === "server" && serverId ? serverProfileThemeAccentHex : profileThemeAccentHex;
+  const previewThemeStyle = useMemo(
+    () => buildProfileCardThemeStyle(effectiveThemePrimaryHex, effectiveThemeAccentHex),
+    [effectiveThemePrimaryHex, effectiveThemeAccentHex],
+  );
 
   const appliedDisplayNameStyle =
     tab === "server" && serverId ? serverDisplayNameStyle : displayNameStyle;
@@ -420,6 +475,8 @@ export default function MessagesProfileEditor({
           bio: bio.slice(0, BIO_MAX),
           pronouns: pronouns.trim().slice(0, PRONOUNS_MAX),
           coverUrl: coverUrl || undefined,
+          profileThemePrimaryHex: profileThemePrimaryHex,
+          profileThemeAccentHex: profileThemeAccentHex,
           ...(boostUnlocked
             ? ({
                 displayNameFontId: displayNameStyle.fontId,
@@ -449,6 +506,8 @@ export default function MessagesProfileEditor({
       });
       await serversApi.updateMyServerProfile(serverId, {
         coverUrl: coverUrl || null,
+        profileThemePrimaryHex: serverProfileThemePrimaryHex,
+        profileThemeAccentHex: serverProfileThemeAccentHex,
         ...(boostUnlocked
           ? {
               displayNameFontId: serverDisplayNameStyle.fontId,
@@ -460,6 +519,8 @@ export default function MessagesProfileEditor({
       });
       emitServerProfileUpdated({
         coverUrl: coverUrl || null,
+        profileThemePrimaryHex: serverProfileThemePrimaryHex,
+        profileThemeAccentHex: serverProfileThemeAccentHex,
         ...(boostUnlocked
           ? {
               displayNameFontId: serverDisplayNameStyle.fontId,
@@ -878,6 +939,49 @@ export default function MessagesProfileEditor({
 
             <hr className={styles.divider} />
 
+            <label className={styles.sectionTitle}>{t("chat.profileEditor.themePrimaryLabel")}</label>
+            <p className={styles.hint}>{t("chat.profileEditor.themeHint")}</p>
+            <div className={styles.themeSwatchRow}>
+              {PROFILE_THEME_PRESETS.map((hex) => {
+                const active = effectiveThemePrimaryHex.toLowerCase() === hex.toLowerCase();
+                return (
+                  <button
+                    key={`primary-${hex}`}
+                    type="button"
+                    className={`${styles.themeSwatch} ${active ? styles.themeSwatchActive : ""}`}
+                    style={{ background: hex }}
+                    aria-label={hex}
+                    onClick={() => {
+                      if (tab === "server" && serverId) setServerProfileThemePrimaryHex(hex);
+                      else setProfileThemePrimaryHex(hex);
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            <label className={styles.sectionTitle}>{t("chat.profileEditor.themeAccentLabel")}</label>
+            <div className={styles.themeSwatchRow}>
+              {PROFILE_THEME_PRESETS.map((hex) => {
+                const active = effectiveThemeAccentHex.toLowerCase() === hex.toLowerCase();
+                return (
+                  <button
+                    key={`accent-${hex}`}
+                    type="button"
+                    className={`${styles.themeSwatch} ${active ? styles.themeSwatchActive : ""}`}
+                    style={{ background: hex }}
+                    aria-label={hex}
+                    onClick={() => {
+                      if (tab === "server" && serverId) setServerProfileThemeAccentHex(hex);
+                      else setProfileThemeAccentHex(hex);
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            <hr className={styles.divider} />
+
             <label className={styles.sectionTitle}>
               {t("chat.profileEditor.displayNameStyleHeading")}
             </label>
@@ -956,7 +1060,7 @@ export default function MessagesProfileEditor({
             <div className={styles.previewTitle}>{t("chat.profileEditor.previewTitle")}</div>
             <div className={styles.previewCard}>
               <div className={styles.banner} style={bannerStyle} />
-              <div className={styles.bodyCard}>
+              <div className={styles.bodyCard} style={previewThemeStyle}>
                 <img
                   className={styles.avatar}
                   src={effectiveAvatarUrl || DEFAULT_AVATAR}

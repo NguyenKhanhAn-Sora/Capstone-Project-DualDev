@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./UserProfilePopup.module.css";
 import { useLanguage } from "@/component/language-provider";
 import {
@@ -12,6 +13,7 @@ import {
   type ProfileDetailResponse,
 } from "@/lib/api";
 import { parseUserCover } from "@/lib/user-profile-cover";
+import { buildProfileCardThemeStyle } from "@/lib/profile-theme";
 
 function getDisplayNameTextStyle(source?: {
   displayNameFontId?: string | null;
@@ -70,14 +72,16 @@ export default function UserProfilePopup({
   onMessage,
 }: Props) {
   const { t } = useLanguage();
+  const router = useRouter();
   const [detail, setDetail] = useState<ProfileDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"activity" | "mutualFollowers" | "mutualServers">(
-    "activity",
+  const [activeTab, setActiveTab] = useState<"mutualFollowers" | "mutualServers">(
+    "mutualFollowers",
   );
 
   const isSelf = userId === currentUserId;
+  const isMessaging = profileSource === "messaging";
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +116,14 @@ export default function UserProfilePopup({
   const cordigramMemberSince = detail?.cordigramMemberSince || "";
 
   const cover = useMemo(() => parseUserCover(detail?.coverUrl), [detail?.coverUrl]);
+  const cardThemeStyle = useMemo(
+    () =>
+      buildProfileCardThemeStyle(
+        detail?.profileThemePrimaryHex,
+        detail?.profileThemeAccentHex,
+      ),
+    [detail?.profileThemePrimaryHex, detail?.profileThemeAccentHex],
+  );
 
   const isFollowing = Boolean(detail?.isFollowing);
   const mutualFollowersCount = detail?.mutualFollowCount ?? 0;
@@ -137,6 +149,10 @@ export default function UserProfilePopup({
     }
   };
 
+  const openSocialProfile = () => {
+    onClose();
+    router.push(`/profile/${encodeURIComponent(userId)}`);
+  };
 
   return (
     <div
@@ -146,9 +162,8 @@ export default function UserProfilePopup({
       aria-modal
       aria-label={t("chat.popups.userProfile.aria")}
     >
-      <div className={styles.card}>
+      <div className={styles.card} style={cardThemeStyle}>
         <div onClick={(e) => e.stopPropagation()}>
-          {/* Close */}
           <button
             type="button"
             className={styles.close}
@@ -158,7 +173,6 @@ export default function UserProfilePopup({
             ×
           </button>
 
-          {/* Banner */}
           <div className={styles.banner}>
             {cover.bannerImageUrl ? (
               <div
@@ -176,9 +190,7 @@ export default function UserProfilePopup({
             <div className={styles.bannerFade} aria-hidden />
           </div>
 
-          {/* Body */}
           <div className={styles.body}>
-            {/* Avatar */}
             <div className={styles.avatarWrap}>
               {detail?.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -190,7 +202,6 @@ export default function UserProfilePopup({
               )}
             </div>
 
-            {/* Name row */}
             <div className={styles.headerRow}>
               <div>
                 <h2
@@ -212,7 +223,6 @@ export default function UserProfilePopup({
 
             <hr className={styles.divider} />
 
-            {/* Stats */}
             <div className={styles.metaGrid}>
               <div className={styles.metaCard}>
                 <div className={styles.metaLabel}>
@@ -228,20 +238,11 @@ export default function UserProfilePopup({
               </div>
             </div>
 
-            {/* Bio */}
             <div className={styles.bio}>
               {(detail?.bio || "").trim() || " "}
             </div>
 
-            {/* Tabs */}
             <div className={styles.tabs}>
-              <button
-                type="button"
-                className={activeTab === "activity" ? styles.tabActive : styles.tab}
-                onClick={() => setActiveTab("activity")}
-              >
-                {t("chat.popups.userProfile.tabActivity")}
-              </button>
               <button
                 type="button"
                 className={activeTab === "mutualFollowers" ? styles.tabActive : styles.tab}
@@ -258,15 +259,7 @@ export default function UserProfilePopup({
               </button>
             </div>
 
-            {/* Tab content */}
             <div className={styles.tabContent}>
-              {activeTab === "activity" ? (
-                <div className={styles.emptyState}>
-                  <p>{t("chat.popups.userProfile.activityEmpty", { name: displayName })}</p>
-                  <p>{t("chat.popups.userProfile.activityHint")}</p>
-                </div>
-              ) : null}
-
               {activeTab === "mutualFollowers" ? (
                 mutualFollowers.length ? (
                   <div>
@@ -343,7 +336,6 @@ export default function UserProfilePopup({
               ) : null}
             </div>
 
-            {/* Actions */}
             {!isSelf ? (
               <div className={styles.actions}>
                 <button
@@ -382,6 +374,17 @@ export default function UserProfilePopup({
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                 </button>
+
+                {isMessaging ? (
+                  <button
+                    type="button"
+                    onClick={openSocialProfile}
+                    className={styles.socialProfileBtn}
+                    title={t("chat.popups.userProfile.viewSocialProfile")}
+                  >
+                    {t("chat.popups.userProfile.viewSocialProfile")}
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

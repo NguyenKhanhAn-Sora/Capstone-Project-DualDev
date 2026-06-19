@@ -16,6 +16,7 @@ import { syncMessagesChromeVars } from "@/lib/messages-appearance-chrome";
 import styles from "./ChannelUserProfileRoot.module.css";
 import type { Friend } from "@/lib/servers-api";
 import { parseUserCover } from "@/lib/user-profile-cover";
+import { buildProfileCardThemeStyle } from "@/lib/profile-theme";
 import {
   createServerInvite,
   followUser,
@@ -281,9 +282,7 @@ export default function ChannelUserProfileRoot({
   );
   const messagesUiTone = useMessagesUiTone();
   const { t, language } = useLanguage();
-  const [fullTab, setFullTab] = useState<"activity" | "follow" | "servers">(
-    "activity",
-  );
+  const [fullTab, setFullTab] = useState<"follow" | "servers">("follow");
 
   const muteDurationOptions = useMemo(
     () =>
@@ -302,7 +301,7 @@ export default function ChannelUserProfileRoot({
     setFullMoreOpen(false);
     setMuteSubOpen(false);
     setInviteServerModalOpen(false);
-    setFullTab("activity");
+    setFullTab("follow");
     setLoadError(null);
     setProfile(null);
     setMemberRow(null);
@@ -348,6 +347,8 @@ export default function ChannelUserProfileRoot({
         userId?: string;
         avatarUrl?: string | null;
         coverUrl?: string | null;
+        profileThemePrimaryHex?: string | null;
+        profileThemeAccentHex?: string | null;
       };
       if (!d?.serverId || !d?.userId) return;
       if (d.serverId !== context.serverId) return;
@@ -359,6 +360,23 @@ export default function ChannelUserProfileRoot({
       }
       if ("coverUrl" in d) {
         setServerCoverOverride(d.coverUrl ?? null);
+      }
+      if ("profileThemePrimaryHex" in d || "profileThemeAccentHex" in d) {
+        setMemberRow((prev) =>
+          prev
+            ? ({
+                ...prev,
+                profileThemePrimaryHex:
+                  "profileThemePrimaryHex" in d
+                    ? (d.profileThemePrimaryHex ?? null)
+                    : prev.profileThemePrimaryHex,
+                profileThemeAccentHex:
+                  "profileThemeAccentHex" in d
+                    ? (d.profileThemeAccentHex ?? null)
+                    : prev.profileThemeAccentHex,
+              } as any)
+            : prev,
+        );
       }
     };
     window.addEventListener("cordigram-server-member-profile-updated", onUpdated as any);
@@ -544,6 +562,15 @@ export default function ChannelUserProfileRoot({
   const connectionStatus = useMemo(
     () => deriveConnectionStatus(memberRow),
     [memberRow],
+  );
+
+  const cardThemeStyle = useMemo(
+    () =>
+      buildProfileCardThemeStyle(
+        memberRow?.profileThemePrimaryHex,
+        memberRow?.profileThemeAccentHex,
+      ),
+    [memberRow?.profileThemePrimaryHex, memberRow?.profileThemeAccentHex],
   );
 
   const roleItems = useMemo(() => {
@@ -824,6 +851,7 @@ export default function ChannelUserProfileRoot({
       <div
         ref={popoverChromeRef}
         className={`${styles.fullModalCard} ${messagesUiTone === "light" ? styles.popoverLight : ""}`}
+        style={cardThemeStyle}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
@@ -964,17 +992,6 @@ export default function ChannelUserProfileRoot({
               <button
                 type="button"
                 className={
-                  fullTab === "activity"
-                    ? styles.fullTabActive
-                    : styles.fullTab
-                }
-                onClick={() => setFullTab("activity")}
-              >
-                {t("chat.channelUserProfile.tabActivity")}
-              </button>
-              <button
-                type="button"
-                className={
                   fullTab === "follow"
                     ? styles.fullTabActive
                     : styles.fullTab
@@ -998,27 +1015,7 @@ export default function ChannelUserProfileRoot({
               </button>
             </div>
             <div className={styles.fullTabPanel}>
-              {fullTab === "activity" ? (
-                <div className={styles.activityEmpty}>
-                  <h3 className={styles.activityEmptyTitle}>
-                    {t("chat.channelUserProfile.activityEmptyTitle", { name: displayName })}
-                  </h3>
-                  <p className={styles.activityEmptyDesc}>
-                    {t("chat.channelUserProfile.activityEmptyDesc")}
-                  </p>
-                  <button
-                    type="button"
-                    className={styles.activityEmptyBtn}
-                    onClick={() => {
-                      onOpenDirectMessage(friend, {});
-                      onClose();
-                    }}
-                  >
-                    <IconMessage />
-                    {t("chat.channelUserProfile.message")}
-                  </button>
-                </div>
-              ) : fullTab === "follow" ? (
+              {fullTab === "follow" ? (
                 mutualFollowCount === 0 ? (
                   <p className={styles.fullTabBody}>{t("chat.channelUserProfile.noMutualFollow")}</p>
                 ) : mutualFollowUsers.length > 0 ? (
@@ -1092,7 +1089,7 @@ export default function ChannelUserProfileRoot({
       <div
         ref={popoverChromeRef}
         className={`${styles.popoverWrap} ${styles.popoverMini} ${messagesUiTone === "light" ? styles.popoverLight : ""}`}
-        style={{ left: miniPos.left, top: miniPos.top, width: POPUP_MINI_W }}
+        style={{ left: miniPos.left, top: miniPos.top, width: POPUP_MINI_W, ...cardThemeStyle }}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDownCapture={(e) => {
           if (e.key === "Enter" && (e.target as HTMLElement)?.tagName === "TEXTAREA") {

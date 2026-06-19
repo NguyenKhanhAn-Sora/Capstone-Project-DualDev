@@ -2715,6 +2715,8 @@ export type ProfileDetailResponse = {
   displayNameEffectId?: string | null;
   displayNamePrimaryHex?: string | null;
   displayNameAccentHex?: string | null;
+  profileThemePrimaryHex?: string | null;
+  profileThemeAccentHex?: string | null;
   bio?: string;
   pronouns?: string;
   gender?: string;
@@ -2774,6 +2776,8 @@ export type MessagingProfileCardResponse = {
   displayNameEffectId: string | null;
   displayNamePrimaryHex: string | null;
   displayNameAccentHex: string | null;
+  profileThemePrimaryHex: string | null;
+  profileThemeAccentHex: string | null;
   cordigramMemberSince?: string;
   mutualServerCount: number;
   mutualServers: Array<{
@@ -2802,6 +2806,8 @@ export type UpdateMessagingProfilePayload = {
   displayNameEffectId?: string | null;
   displayNamePrimaryHex?: string | null;
   displayNameAccentHex?: string | null;
+  profileThemePrimaryHex?: string | null;
+  profileThemeAccentHex?: string | null;
 };
 
 /** Gắn dữ liệu messaging vào shape `ProfileDetailResponse` cho UI dùng chung (popup, v.v.). */
@@ -2820,6 +2826,8 @@ export function messagingProfileCardToDetail(
     displayNameEffectId: m.displayNameEffectId,
     displayNamePrimaryHex: m.displayNamePrimaryHex,
     displayNameAccentHex: m.displayNameAccentHex,
+    profileThemePrimaryHex: m.profileThemePrimaryHex,
+    profileThemeAccentHex: m.profileThemeAccentHex,
     bio: m.bio,
     pronouns: m.pronouns,
     stats: {

@@ -507,4 +507,7 @@ class MessagesI18n {
 
   static String memberSinceLabel() =>
       t('chat.popups.userProfile.memberSinceLabel');
+
+  static String viewSocialProfileLabel() =>
+      t('chat.popups.userProfile.viewSocialProfile');
 }

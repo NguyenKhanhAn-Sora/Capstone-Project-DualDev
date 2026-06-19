@@ -2746,7 +2746,8 @@
         "activityEmpty": "{name} không có hoạt động nào để chia sẻ ở đây.",
         "activityHint": "Phần hoạt động sẽ được bổ sung sau.",
         "mutualFollowersEmpty": "Follow chung sẽ hiển thị tại đây.",
-        "mutualServersEmpty": "Máy chủ chung sẽ hiển thị tại đây."
+        "mutualServersEmpty": "Máy chủ chung sẽ hiển thị tại đây.",
+        "viewSocialProfile": "Xem hồ sơ social"
       },
       "messageSearch": {
         "title": "Tìm kiếm tin nhắn",
@@ -3332,6 +3333,9 @@
       "uploadBanner": "Tải ảnh biểu ngữ",
       "boostRequiredBanner": "Cần Boost để tải ảnh biểu ngữ (hồ sơ chính). Hồ sơ máy chủ không cần Boost.",
       "removeBanner": "Xóa ảnh biểu ngữ",
+      "themePrimaryLabel": "Màu nền hồ sơ",
+      "themeAccentLabel": "Màu chủ đề",
+      "themeHint": "Áp dụng cho nền thẻ hồ sơ trong tin nhắn (hồ sơ chính và hồ sơ theo máy chủ).",
       "bioLabel": "Tiểu sử",
       "bioHint": "Bạn có thể sử dụng các mã đánh dấu và đường liên kết nếu muốn.",
       "insertEmojiAria": "Chèn emoji",

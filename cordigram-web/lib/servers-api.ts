@@ -988,6 +988,8 @@ export interface MemberWithRoles {
   avatarUrl: string;
   /** Cover/banner chỉ áp dụng trong server này (format như profile coverUrl). */
   coverUrl?: string | null;
+  profileThemePrimaryHex?: string | null;
+  profileThemeAccentHex?: string | null;
   joinedAt: string;
   isOwner: boolean;
   serverMemberRole: "owner" | "moderator" | "member";
@@ -2016,6 +2018,8 @@ export async function updateMyServerProfile(
   serverId: string,
   payload: {
     coverUrl?: string | null;
+    profileThemePrimaryHex?: string | null;
+    profileThemeAccentHex?: string | null;
     displayNameFontId?: string | null;
     displayNameEffectId?: string | null;
     displayNamePrimaryHex?: string | null;

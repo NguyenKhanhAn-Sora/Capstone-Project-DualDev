@@ -16,6 +16,7 @@ import '../services/direct_messages_service.dart';
 import '../services/messages_media_service.dart';
 import '../services/servers_service.dart';
 import '../utils/messaging_profile_cover.dart';
+import '../utils/profile_theme.dart';
 import 'display_name_styled_text.dart';
 import 'display_name_style_sheet.dart';
 import 'messages_boost_store_screen.dart';
@@ -57,6 +58,8 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
   String _avatarUrl = _defaultAvatar;
   String? _bannerImageUrl;
   String _bannerSolidHex = MessagingProfileCover.defaultBannerHex;
+  Color _themePrimary = ProfileTheme.defaultPrimary;
+  Color _themeAccent = ProfileTheme.defaultAccent;
   DisplayNameStyle _displayNameStyle = const DisplayNameStyle();
   final DisplayNameStyle _demoMainStyle = DisplayNameStyle.demo;
 
@@ -65,6 +68,8 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
   String? _serverAvatarUrl;
   String? _serverBannerImageUrl;
   String _serverBannerSolidHex = MessagingProfileCover.defaultBannerHex;
+  Color _serverThemePrimary = ProfileTheme.defaultPrimary;
+  Color _serverThemeAccent = ProfileTheme.defaultAccent;
   DisplayNameStyle _serverDisplayNameStyle = const DisplayNameStyle();
   final DisplayNameStyle _demoServerStyle = DisplayNameStyle.demo;
 
@@ -105,6 +110,14 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
         final cover = MessagingProfileCover.parse(profile['coverUrl']?.toString());
         _bannerImageUrl = cover.bannerImageUrl;
         _bannerSolidHex = cover.bannerSolidHex;
+        _themePrimary = ProfileTheme.parseHex(
+          profile['profileThemePrimaryHex']?.toString(),
+          ProfileTheme.defaultPrimary,
+        );
+        _themeAccent = ProfileTheme.parseHex(
+          profile['profileThemeAccentHex']?.toString(),
+          ProfileTheme.defaultAccent,
+        );
         _displayNameStyle = DisplayNameStyle.fromProfile(profile);
         _servers = servers;
         _loading = false;
@@ -135,6 +148,14 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
         _serverAvatarUrl = profile['avatarUrl']?.toString();
         _serverBannerImageUrl = cover.bannerImageUrl;
         _serverBannerSolidHex = cover.bannerSolidHex;
+        _serverThemePrimary = ProfileTheme.parseHex(
+          profile['profileThemePrimaryHex']?.toString(),
+          ProfileTheme.defaultPrimary,
+        );
+        _serverThemeAccent = ProfileTheme.parseHex(
+          profile['profileThemeAccentHex']?.toString(),
+          ProfileTheme.defaultAccent,
+        );
         _serverDisplayNameStyle = DisplayNameStyle.fromProfile(profile);
       });
     } catch (_) {}
@@ -280,6 +301,8 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
           bannerImageUrl: _bannerImageUrl,
           bannerSolidHex: _bannerSolidHex,
         ),
+        'profileThemePrimaryHex': ProfileTheme.toHex(_themePrimary),
+        'profileThemeAccentHex': ProfileTheme.toHex(_themeAccent),
       };
       if (_boostUnlocked) {
         payload.addAll(_displayNameStyle.toPayload());
@@ -303,6 +326,8 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
           bannerImageUrl: _serverBannerImageUrl,
           bannerSolidHex: _serverBannerSolidHex,
         ),
+        'profileThemePrimaryHex': ProfileTheme.toHex(_serverThemePrimary),
+        'profileThemeAccentHex': ProfileTheme.toHex(_serverThemeAccent),
         if (_boostUnlocked) ..._serverDisplayNameStyle.toPayload(),
       });
       _toast(_t('chat.profileEditor.savedProfile'));
@@ -507,6 +532,37 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
           const SizedBox(height: AppSpacing.lg),
           _sectionTitle(_t('chat.profileEditor.bannerColorLabel')),
           _bannerSwatch(context),
+          const SizedBox(height: AppSpacing.md),
+          _sectionTitle(_t('chat.profileEditor.themePrimaryLabel')),
+          Text(
+            _t('chat.profileEditor.themeHint'),
+            style: TextStyle(color: context.chrome.textMuted, fontSize: 12),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _themeSwatchRow(
+            context,
+            selected: _isServerTab ? _serverThemePrimary : _themePrimary,
+            onPick: (c) => setState(() {
+              if (_isServerTab && _serverId != null) {
+                _serverThemePrimary = c;
+              } else {
+                _themePrimary = c;
+              }
+            }),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _sectionTitle(_t('chat.profileEditor.themeAccentLabel')),
+          _themeSwatchRow(
+            context,
+            selected: _isServerTab ? _serverThemeAccent : _themeAccent,
+            onPick: (c) => setState(() {
+              if (_isServerTab && _serverId != null) {
+                _serverThemeAccent = c;
+              } else {
+                _themeAccent = c;
+              }
+            }),
+          ),
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
@@ -679,8 +735,10 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
       children: [
         _sectionTitle(_t('chat.profileEditor.previewTitle')),
         Container(
-          decoration: BoxDecoration(
-            color: c.surface,
+          decoration: ProfileTheme.cardDecoration(
+            primary: _isServerTab ? _serverThemePrimary : _themePrimary,
+            accent: _isServerTab ? _serverThemeAccent : _themeAccent,
+          ).copyWith(
             borderRadius: AppRadii.lgAll,
             border: Border.all(color: c.border),
           ),
@@ -733,6 +791,44 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _themeSwatchRow(
+    BuildContext context, {
+    required Color selected,
+    required ValueChanged<Color> onPick,
+  }) {
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: ProfileTheme.presets.map((color) {
+        final active = color.toARGB32() == selected.toARGB32();
+        return GestureDetector(
+          onTap: () => onPick(color),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: active ? Colors.white : Colors.transparent,
+                width: 2,
+              ),
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: context.chrome.accent.withValues(alpha: 0.55),
+                        blurRadius: 0,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
