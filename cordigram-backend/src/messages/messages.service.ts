@@ -37,6 +37,7 @@ import {
   type ParsedMessageSearch,
 } from './message-search-query.parser';
 import { LinkPreviewService } from '../comment/link-preview.service';
+import { ChannelMessagesGateway } from './channel-messages.gateway';
 
 @Injectable()
 export class MessagesService {
@@ -59,6 +60,8 @@ export class MessagesService {
     @Inject(forwardRef(() => BoostService))
     private readonly boostService: BoostService,
     private readonly linkPreviewService: LinkPreviewService,
+    @Inject(forwardRef(() => ChannelMessagesGateway))
+    private readonly channelMessagesGateway: ChannelMessagesGateway,
   ) {}
 
   private readonly defaultAvatarUrl =
@@ -130,6 +133,29 @@ export class MessagesService {
     return map;
   }
 
+  /** Biệt danh trong server.members — ưu tiên hơn displayName global khi hiển thị chat kênh. */
+  private async batchServerNicknames(
+    serverId: string,
+    userIds: string[],
+  ): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (!serverId || !userIds.length) return map;
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('members.userId members.nickname')
+      .lean()
+      .exec();
+    if (!server) return map;
+    const wanted = new Set(userIds.map((id) => String(id)));
+    for (const m of (server as { members?: { userId?: Types.ObjectId; nickname?: string | null }[] }).members ?? []) {
+      const uid = m.userId?.toString?.() ?? '';
+      if (!uid || !wanted.has(uid)) continue;
+      const nick = typeof m.nickname === 'string' ? m.nickname.trim() : '';
+      if (nick) map.set(uid, nick);
+    }
+    return map;
+  }
+
   private buildEnrichedSender(
     rawSender: any,
     profile:
@@ -138,6 +164,7 @@ export class MessagesService {
     userId: string,
     serverId: string | null,
     serverAvatarByUserId: Map<string, string>,
+    serverNicknameByUserId?: Map<string, string>,
   ) {
     const avatarUrl = serverId
       ? this.resolveAvatarForServerChannel(
@@ -146,11 +173,17 @@ export class MessagesService {
           profile?.avatarUrl,
         )
       : profile?.avatarUrl ?? undefined;
+    const serverNick =
+      serverId && userId
+        ? serverNicknameByUserId?.get(userId)?.trim()
+        : '';
+    const displayName =
+      serverNick || profile?.displayName || undefined;
     return {
       ...(typeof rawSender === 'object'
         ? rawSender
         : { _id: rawSender, email: '' }),
-      displayName: profile?.displayName ?? undefined,
+      displayName,
       username: profile?.username ?? undefined,
       avatarUrl,
     };
@@ -248,6 +281,55 @@ export class MessagesService {
       } catch {
         /* non-critical */
       }
+    }
+
+    if (responses.blockMessage || responses.restrictMember) {
+      await this.emitMentionRestrictionUpdated(serverId, userId);
+    }
+  }
+
+  private async emitMentionRestrictionUpdated(
+    serverId: string,
+    targetUserId: string,
+  ): Promise<void> {
+    try {
+      const server = await this.serverModel
+        .findById(serverId)
+        .select('ownerId members memberCount name avatarUrl bannerUrl bannerColor')
+        .lean()
+        .exec();
+      if (!server) return;
+      const recipients = new Set<string>();
+      const ownerId = (server as any).ownerId?.toString?.();
+      if (ownerId) recipients.add(ownerId);
+      for (const m of (server as any).members ?? []) {
+        const uid = m.userId?.toString?.();
+        if (uid) recipients.add(uid);
+      }
+      const payload = {
+        serverId: String(serverId),
+        userId: String(targetUserId),
+        action: 'restricted',
+        actorUserId: null,
+        server: {
+          _id: String(serverId),
+          name: (server as any).name ?? '',
+          avatarUrl: (server as any).avatarUrl ?? null,
+          bannerUrl: (server as any).bannerUrl ?? null,
+          bannerColor: (server as any).bannerColor ?? null,
+          memberCount: Number((server as any).memberCount ?? 0),
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      for (const uid of recipients) {
+        this.channelMessagesGateway.emitToUser(
+          uid,
+          'server-moderation-updated',
+          payload,
+        );
+      }
+    } catch {
+      /* non-critical */
     }
   }
 
@@ -1303,6 +1385,10 @@ export class MessagesService {
       serverId && senderUserIdStr
         ? await this.batchServerAvatars(serverId, [senderUserIdStr])
         : new Map<string, string>();
+    const serverNicknameByUserId =
+      serverId && senderUserIdStr
+        ? await this.batchServerNicknames(serverId, [senderUserIdStr])
+        : new Map<string, string>();
 
     const result: any = {
       ...msg,
@@ -1312,6 +1398,7 @@ export class MessagesService {
         senderUserIdStr,
         serverId,
         serverAvatarByUserId,
+        serverNicknameByUserId,
       ),
     };
 
@@ -1327,6 +1414,10 @@ export class MessagesService {
         serverId && rtUserIdStr
           ? await this.batchServerAvatars(serverId, [rtUserIdStr])
           : new Map<string, string>();
+      const rtServerNicknames =
+        serverId && rtUserIdStr
+          ? await this.batchServerNicknames(serverId, [rtUserIdStr])
+          : new Map<string, string>();
       result.replyTo = {
         ...replyToRaw,
         senderId: this.buildEnrichedSender(
@@ -1335,6 +1426,7 @@ export class MessagesService {
           rtUserIdStr,
           serverId,
           rtServerAvatars,
+          rtServerNicknames,
         ),
       };
     }
@@ -1454,6 +1546,9 @@ export class MessagesService {
     const serverAvatarByUserId = serverIdForAvatars
       ? await this.batchServerAvatars(serverIdForAvatars, uniqueSenderIds)
       : new Map<string, string>();
+    const serverNicknameByUserId = serverIdForAvatars
+      ? await this.batchServerNicknames(serverIdForAvatars, uniqueSenderIds)
+      : new Map<string, string>();
 
     const enriched = messages.map((msg: any) => {
       const senderId = msg.senderId?._id ?? msg.senderId;
@@ -1471,6 +1566,7 @@ export class MessagesService {
           senderUserIdStr,
           serverIdForAvatars,
           serverAvatarByUserId,
+          serverNicknameByUserId,
         ),
       };
 
@@ -1488,6 +1584,7 @@ export class MessagesService {
             rtUserIdStr,
             serverIdForAvatars,
             serverAvatarByUserId,
+            serverNicknameByUserId,
           ),
         };
       }
@@ -1816,6 +1913,9 @@ export class MessagesService {
     const serverAvatarByUserId = serverIdForAvatars
       ? await this.batchServerAvatars(serverIdForAvatars, uniqueSenderIds)
       : new Map<string, string>();
+    const serverNicknameByUserId = serverIdForAvatars
+      ? await this.batchServerNicknames(serverIdForAvatars, uniqueSenderIds)
+      : new Map<string, string>();
 
     const normalizeHttps = (url: string | null | undefined): string =>
       url && url.startsWith('http://') ? 'https://' + url.slice(7) : (url ?? '');
@@ -1845,6 +1945,7 @@ export class MessagesService {
           senderUserIdStr,
           serverIdForAvatars,
           serverAvatarByUserId,
+          serverNicknameByUserId,
         ),
       };
     });
@@ -2226,6 +2327,10 @@ export class MessagesService {
       enrichServerId && uniqueSenderIds.length
         ? await this.batchServerAvatars(enrichServerId, uniqueSenderIds)
         : new Map<string, string>();
+    const serverNicknameByUserId =
+      enrichServerId && uniqueSenderIds.length
+        ? await this.batchServerNicknames(enrichServerId, uniqueSenderIds)
+        : new Map<string, string>();
 
     const results = messages.map((msg: any) => {
       const sid = msg.senderId?._id ?? msg.senderId;
@@ -2242,6 +2347,7 @@ export class MessagesService {
           senderUserIdStr,
           enrichServerId ?? null,
           serverAvatarByUserId,
+          serverNicknameByUserId,
         ),
       };
     });

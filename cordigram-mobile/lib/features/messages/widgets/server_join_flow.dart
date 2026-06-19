@@ -724,13 +724,12 @@ class ServerJoinFlow {
         useRootNavigator: true,
         builder: (ctx) => AlertDialog(
           backgroundColor: const Color(0xFF2b2d31),
-          title: const Text(
-            'Không thể tham gia',
-            style: TextStyle(color: Color(0xFFF2F3F5)),
+          title: Text(
+            LanguageController.instance.t('chat.ageRestrict.title'),
+            style: const TextStyle(color: Color(0xFFF2F3F5)),
           ),
           content: Text(
-            'Bạn chưa đủ điều kiện về độ tuổi để tham gia máy chủ «$serverDisplayName» '
-            '(yêu cầu từ đủ 18 tuổi).',
+            LanguageController.instance.t('chat.ageRestrict.joinBlockedBody'),
             style: const TextStyle(color: Color(0xFFB5BAC1), height: 1.35),
           ),
           actions: [

@@ -1398,6 +1398,48 @@ export async function createServerInvite(
   return response.json();
 }
 
+/** Danh sách bạn có thể mời (follow/followers trừ thành viên server) — một request. */
+export async function getServerInviteCandidates(serverId: string): Promise<{
+  candidates: Friend[];
+  invitedUserIds: string[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/server-invites/candidates/${encodeURIComponent(serverId)}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({} as { message?: string | string[] }));
+    const raw = data?.message;
+    const message =
+      typeof raw === "string"
+        ? raw
+        : Array.isArray(raw) && raw.length > 0
+          ? String(raw[0])
+          : "Không tải được danh sách mời";
+    throw new Error(message);
+  }
+  const payload = (await response.json()) as {
+    candidates?: Array<{
+      _id: string;
+      displayName?: string;
+      username?: string;
+      avatarUrl?: string;
+    }>;
+    invitedUserIds?: string[];
+  };
+  const candidates: Friend[] = (payload.candidates ?? []).map((c) => ({
+    _id: c._id,
+    displayName: c.displayName ?? c.username ?? "",
+    username: c.username ?? "",
+    avatarUrl: c.avatarUrl ?? "",
+    email: "",
+  }));
+  return {
+    candidates,
+    invitedUserIds: payload.invitedUserIds ?? [],
+  };
+}
+
 /** Chấp nhận lời mời vào máy chủ (dùng khi vào từ link /invite/server/[serverId]). */
 export async function acceptServerInviteByServer(serverId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/server-invites/accept-by-server`, {

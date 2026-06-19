@@ -7811,11 +7811,10 @@ export class AdminService implements OnModuleInit {
         'communitySettings.enabled': true,
         ...statusFilter,
         ...qFilter,
-        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
       })
       .select(
         'name description avatarUrl ownerId members memberCount channels ' +
-          'safetySettings communitySettings accessMode createdAt communityDiscoveryStatus',
+          'safetySettings communitySettings accessMode createdAt communityDiscoveryStatus deletedAt',
       )
       .populate('ownerId', 'displayName username email')
       .sort(sortSpec as any)
@@ -7895,6 +7894,7 @@ export class AdminService implements OnModuleInit {
           avatarUrl: (server as any).avatarUrl,
           communityDiscoveryStatus:
             (server as any).communityDiscoveryStatus || 'pending',
+          serverDeleted: Boolean((server as any).deletedAt),
           owner: {
             id: String(owner._id || owner),
             displayName: owner.displayName || null,
@@ -8216,6 +8216,7 @@ export class AdminService implements OnModuleInit {
     }
     (server as any).deletedAt = null;
     (server as any).deletedByUserId = null;
+    (server as any).isActive = true;
     await server.save();
     return { ok: true, restored: true };
   }

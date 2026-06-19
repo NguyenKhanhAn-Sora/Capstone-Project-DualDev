@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect } from "react";
 import styles from "../InviteToVoiceChannelPopup/InviteToVoiceChannelPopup.module.css";
 import type { Friend } from "@/lib/servers-api";
 import { createServerInvite } from "@/lib/servers-api";
-import { sendDirectMessage } from "@/lib/api";
 import { useLanguage } from "@/component/language-provider";
 
 interface InviteToServerPopupProps {
@@ -14,6 +13,7 @@ interface InviteToServerPopupProps {
   serverName: string;
   friends: Friend[];
   canCreateInvite?: boolean;
+  initialInvitedIds?: string[];
   onInviteSent?: () => void;
 }
 
@@ -24,12 +24,12 @@ export default function InviteToServerPopup({
   serverName,
   friends,
   canCreateInvite = false,
+  initialInvitedIds = [],
   onInviteSent,
 }: InviteToServerPopupProps) {
   const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
-  const [sendingId, setSendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** API từ chối quyền mời — ẩn link sao chép dù prop ban đầu có thể sai. */
   const [inviteBlocked, setInviteBlocked] = useState(false);
@@ -65,12 +65,13 @@ export default function InviteToServerPopup({
       return;
     }
     setInviteBlocked(false);
+    setInvitedIds(new Set(initialInvitedIds));
     if (!canCreateInvite) {
       setError(noPermissionMessage);
     } else {
       setError(null);
     }
-  }, [isOpen, canCreateInvite, noPermissionMessage]);
+  }, [isOpen, canCreateInvite, noPermissionMessage, initialInvitedIds]);
 
   const isPermissionDeniedMessage = (msg: string): boolean =>
     msg.includes("quyền tạo lời mời") ||
@@ -117,30 +118,27 @@ export default function InviteToServerPopup({
   };
 
   const handleInviteFriend = async (friend: Friend) => {
-    if (!canInvite) {
-      setError(noPermissionMessage);
+    if (!canInvite || invitedIds.has(friend._id)) {
+      if (!canInvite) setError(noPermissionMessage);
       return;
     }
     setError(null);
-    setSendingId(friend._id);
+    setInvitedIds((prev) => new Set(prev).add(friend._id));
     try {
       await createServerInvite(serverId, friend._id);
-      try {
-        await sendDirectMessage(friend._id, { content: inviteLink });
-      } catch {
-        // DM send failure is non-critical
-      }
-      setInvitedIds((prev) => new Set(prev).add(friend._id));
       onInviteSent?.();
     } catch (e) {
+      setInvitedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(friend._id);
+        return next;
+      });
       const friendly = resolveInviteError(e);
       if (friendly === noPermissionMessage) {
         setInviteBlocked(true);
       }
       setError(friendly);
       console.error("Failed to send server invite", e);
-    } finally {
-      setSendingId(null);
     }
   };
 
@@ -250,13 +248,11 @@ export default function InviteToServerPopup({
                   type="button"
                   className={styles.inviteFriendBtn}
                   onClick={() => handleInviteFriend(friend)}
-                  disabled={!canInvite || sendingId === friend._id || invitedIds.has(friend._id)}
+                  disabled={!canInvite || invitedIds.has(friend._id)}
                 >
-                  {sendingId === friend._id
-                    ? t("chat.common.sending")
-                    : invitedIds.has(friend._id)
-                      ? t("chat.invite.invited")
-                      : t("chat.invite.invite")}
+                  {invitedIds.has(friend._id)
+                    ? t("chat.invite.invited")
+                    : t("chat.invite.invite")}
                 </button>
               </div>
             ))

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import * as serversApi from "@/lib/servers-api";
+import { assertAgeEligibleForServer } from "@/lib/server-age-gate";
 import { fetchCurrentProfile } from "@/lib/api";
 import ApplyToJoinQuestionsModal from "@/components/ApplyToJoinQuestionsModal/ApplyToJoinQuestionsModal";
 import ServerBannerStrip from "@/components/ServerBannerStrip/ServerBannerStrip";
@@ -97,9 +98,19 @@ export default function InviteServerPage() {
         return;
       }
 
+      const ageCheck = await assertAgeEligibleForServer(serverId);
+      if (!ageCheck.ok) {
+        setError(ageCheck.message);
+        return;
+      }
+
       await serversApi.joinServer(serverId, {
         nickname: serverNickname.trim() || undefined,
       });
+      const nick = serverNickname.trim();
+      if (nick && typeof window !== "undefined") {
+        sessionStorage.setItem(`cordigram:joinNick:${serverId}`, nick);
+      }
       router.replace(`/messages?server=${serverId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tham gia máy chủ");
@@ -129,6 +140,11 @@ export default function InviteServerPage() {
     setJoining(true);
     setError(null);
     try {
+      const ageCheck = await assertAgeEligibleForServer(serverId);
+      if (!ageCheck.ok) {
+        setError(ageCheck.message);
+        return;
+      }
       await serversApi.joinServer(serverId, {
         nickname: serverNickname.trim() || undefined,
         applicationAnswers: applyForm.questions.map((q) => {
@@ -140,6 +156,10 @@ export default function InviteServerPage() {
           };
         }),
       });
+      const nick = serverNickname.trim();
+      if (nick && typeof window !== "undefined") {
+        sessionStorage.setItem(`cordigram:joinNick:${serverId}`, nick);
+      }
       setApplyModalOpen(false);
       setApplySubmitted(true);
     } catch (e) {

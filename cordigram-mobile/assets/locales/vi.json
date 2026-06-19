@@ -3874,6 +3874,7 @@
       "bannerNotice": "Máy chủ này có nội dung được gắn nhãn giới hạn độ tuổi (18+). Hãy cư xử phù hợp.",
       "title": "Máy chủ giới hạn độ tuổi",
       "under18Body": "Máy chủ này yêu cầu từ đủ 18 tuổi. Tài khoản của bạn chưa đủ điều kiện hoặc chưa có ngày sinh trên hồ sơ, nên không thể xem tin nhắn trong các kênh.",
+      "joinBlockedBody": "Bạn chưa đủ điều kiện về độ tuổi đối với server này.",
       "goBack": "Quay lại",
       "ackBody": "Máy chủ này có chứa nội dung nhạy cảm dán nhãn giới hạn độ tuổi. Bạn có muốn tiếp tục không?",
       "processing": "Đang xử lý...",

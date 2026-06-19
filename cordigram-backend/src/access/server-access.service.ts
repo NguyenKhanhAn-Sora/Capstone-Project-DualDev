@@ -25,6 +25,7 @@ import {
   evaluateMemberRulesAndApplyGate,
   getVerificationWaitSeconds,
   normalizeServerVerificationLevel,
+  AGE_RESTRICTED_JOIN_MESSAGE,
   type ChatGateBlockReason,
   type ServerVerificationLevel,
 } from '../messages/channel-chat-gate.util';
@@ -1299,25 +1300,27 @@ export class ServerAccessService {
 
     const serverHasRules = Boolean((server as any).hasRules);
 
-    // Age restriction chặn ngay
+    // Age restriction — chặn tham gia (invite / khám phá / join), không thêm thành viên.
     if (statusOverride === 'rejected') {
-      await this.ensureMemberInServer(serverId, userId, 'member');
-      const updated = await this.userServerModel
-        .findOneAndUpdate(
-          {
-            userId: new Types.ObjectId(userId),
-            serverId: new Types.ObjectId(serverId),
-          },
-          { $set: { status: 'rejected', acceptedRules: false } },
-          { upsert: true, new: true },
-        )
-        .lean()
-        .exec();
-      return updated as any;
+      throw new ForbiddenException(AGE_RESTRICTED_JOIN_MESSAGE);
     }
 
-    // Đã là thành viên: luôn sync acceptedRules nếu client gửi đồng ý (invite đã mở nhưng chưa POST rules).
+    // Đã là thành viên: sync biệt danh + acceptedRules nếu client gửi.
     if (this.serversService.isMember(server as any, userId)) {
+      const nick = opts?.nickname?.trim();
+      if (nick) {
+        await this.serversService.setMemberNickname(serverId, userId, nick);
+        await this.userServerModel
+          .findOneAndUpdate(
+            {
+              userId: new Types.ObjectId(userId),
+              serverId: new Types.ObjectId(serverId),
+            },
+            { $set: { nickname: nick } },
+            { upsert: true },
+          )
+          .exec();
+      }
       const existing = await this.userServerModel
         .findOne({
           userId: new Types.ObjectId(userId),
@@ -1394,7 +1397,12 @@ export class ServerAccessService {
         .acceptByServer(serverId, userId)
         .catch(() => {});
     } else if (accessMode === 'discoverable') {
-      await this.ensureMemberInServer(serverId, userId, 'member');
+      await this.ensureMemberInServer(
+        serverId,
+        userId,
+        'member',
+        opts?.nickname?.trim() || undefined,
+      );
     } else {
       // fail-safe
       throw new BadRequestException(`Unknown accessMode: ${accessMode}`);
@@ -1694,13 +1702,24 @@ export class ServerAccessService {
     serverId: string,
     userId: string,
     role: 'member' | 'moderator' | 'owner' = 'member',
+    nickname?: string,
   ) {
     const server = await this.serversService.getServerById(serverId);
-    if (this.serversService.isMember(server as any, userId)) return;
+    if (this.serversService.isMember(server as any, userId)) {
+      if (nickname?.trim()) {
+        await this.serversService.setMemberNickname(
+          serverId,
+          userId,
+          nickname.trim(),
+        );
+      }
+      return;
+    }
     await this.serversService.addMemberToServer(
       serverId,
       userId,
       role === 'owner' ? 'member' : 'member',
+      nickname?.trim() || null,
     );
   }
 

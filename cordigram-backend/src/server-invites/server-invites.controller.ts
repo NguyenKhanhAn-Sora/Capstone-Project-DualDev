@@ -33,6 +33,17 @@ export class ServerInvitesController {
     return this.serverInvitesService.getPendingForUser(req.user.userId);
   }
 
+  @Get('candidates/:serverId')
+  async getInviteCandidates(
+    @Param('serverId') serverId: string,
+    @Request() req: { user: { userId: string } },
+  ) {
+    return this.serverInvitesService.getInviteCandidates(
+      req.user.userId,
+      serverId,
+    );
+  }
+
   @Post('accept-by-server')
   async acceptByServer(
     @Body() body: { serverId: string },

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 
 @WebSocketGateway({
@@ -26,6 +26,7 @@ export class ChannelMessagesGateway
 
   constructor(
     private readonly jwtService: JwtService,
+    @Inject(forwardRef(() => MessagesService))
     private readonly messagesService: MessagesService,
   ) {}
 

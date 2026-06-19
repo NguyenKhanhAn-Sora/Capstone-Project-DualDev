@@ -179,8 +179,13 @@ export default function ServerMembersSection({
       void fetchMembers();
     };
     window.addEventListener("cordigram-server-member-profile-updated", onUpdated as any);
-    return () =>
+    window.addEventListener("cordigram-server-membership-updated", onUpdated as any);
+    window.addEventListener("cordigram-server-moderation-updated", onUpdated as any);
+    return () => {
       window.removeEventListener("cordigram-server-member-profile-updated", onUpdated as any);
+      window.removeEventListener("cordigram-server-membership-updated", onUpdated as any);
+      window.removeEventListener("cordigram-server-moderation-updated", onUpdated as any);
+    };
   }, [fetchMembers, serverId]);
 
   useEffect(() => {

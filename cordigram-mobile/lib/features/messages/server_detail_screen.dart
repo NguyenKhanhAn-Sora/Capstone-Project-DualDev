@@ -157,15 +157,21 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
       return;
     }
 
-    if (event != 'server-membership-updated') return;
+    if (event != 'server-membership-updated' &&
+        event != 'server-moderation-updated') {
+      return;
+    }
     final action = (payload['action'] ?? '').toString();
     final changedUserId = (payload['userId'] ?? '').toString();
     final myUserId = (widget.currentUserId ?? '').trim();
 
-    // Nếu chính mình rời/bị kick khỏi server đang mở -> thoát màn ngay.
+    // Nếu chính mình rời/bị kick/bị ban khỏi server đang mở -> thoát màn ngay.
     if (myUserId.isNotEmpty &&
         changedUserId == myUserId &&
-        action == 'left' &&
+        (action == 'left' ||
+            action == 'kicked' ||
+            action == 'banned' ||
+            action == 'pruned') &&
         !_didAutoPopByRealtime &&
         mounted) {
       _didAutoPopByRealtime = true;

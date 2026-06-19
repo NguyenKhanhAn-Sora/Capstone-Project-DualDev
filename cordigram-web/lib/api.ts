@@ -1832,6 +1832,7 @@ export type CurrentProfileResponse = {
   displayName: string;
   username: string;
   avatarUrl: string;
+  birthdate?: string | null;
   displayNameFontId?: string | null;
   displayNameEffectId?: string | null;
   displayNamePrimaryHex?: string | null;

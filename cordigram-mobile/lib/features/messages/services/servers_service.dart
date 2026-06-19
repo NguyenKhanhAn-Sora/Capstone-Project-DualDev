@@ -303,6 +303,28 @@ class ServersService {
     return Map<String, dynamic>.from(res);
   }
 
+  /// GET `/server-invites/candidates/:serverId` — follow/followers minus members.
+  static Future<
+      ({List<Map<String, dynamic>> candidates, List<String> invitedUserIds})>
+      getServerInviteCandidates(String serverId) async {
+    final res = await ApiService.get(
+      '/server-invites/candidates/${Uri.encodeComponent(serverId)}',
+      extraHeaders: _authHeaders,
+    );
+    final rawCandidates = res['candidates'];
+    final candidates = rawCandidates is List
+        ? rawCandidates
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : <Map<String, dynamic>>[];
+    final rawInvited = res['invitedUserIds'];
+    final invitedUserIds = rawInvited is List
+        ? rawInvited.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
+        : <String>[];
+    return (candidates: candidates, invitedUserIds: invitedUserIds);
+  }
+
   /// GET join-applications list (status: all | pending | rejected | approved).
   static Future<({int pendingCount, List<Map<String, dynamic>> items})>
       listJoinApplications(

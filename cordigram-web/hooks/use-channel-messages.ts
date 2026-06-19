@@ -199,6 +199,13 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
 
     socket.on("server-deleted", (data: ServerDeletedEvent) => {
       if (data?.serverId) setServerDeleted({ serverId: data.serverId, serverName: data.serverName });
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-server-deleted", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
     });
 
     socket.on("server-member-profile-updated", (data: ServerMemberProfileUpdatedEvent) => {
@@ -306,6 +313,17 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
         // ignore
       }
       setTimeout(() => setServerMembershipUpdated(null), 500);
+    });
+
+    socket.on("server-moderation-updated", (data: ServerMembershipUpdatedEvent) => {
+      if (!data?.serverId || !data?.userId) return;
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-server-moderation-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
     });
 
     socket.on("message-deleted", (data: ChannelMessageDeletedEvent) => {
