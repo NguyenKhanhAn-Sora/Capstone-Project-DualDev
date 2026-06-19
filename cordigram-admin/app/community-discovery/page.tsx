@@ -39,6 +39,7 @@ type CommunityServer = {
   communityActivatedAt: string | null;
   safety: SafetyInfo;
   hasAbnormalActivity: boolean;
+  serverDeleted?: boolean;
   createdAt: string;
 };
 
