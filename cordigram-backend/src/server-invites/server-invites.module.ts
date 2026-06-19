@@ -5,6 +5,9 @@ import { ServerInvitesService } from './server-invites.service';
 import { ServerInvitesController } from './server-invites.controller';
 import { ServersModule } from '../servers/servers.module';
 import { RolesModule } from '../roles/roles.module';
+import { FollowsModule } from '../follows/follows.module';
+import { ProfilesModule } from '../profiles/profiles.module';
+import { MessagesModule } from '../messages/messages.module';
 
 @Module({
   imports: [
@@ -13,6 +16,9 @@ import { RolesModule } from '../roles/roles.module';
     ]),
     forwardRef(() => ServersModule),
     forwardRef(() => RolesModule),
+    forwardRef(() => FollowsModule),
+    forwardRef(() => ProfilesModule),
+    forwardRef(() => MessagesModule),
   ],
   providers: [ServerInvitesService],
   controllers: [ServerInvitesController],

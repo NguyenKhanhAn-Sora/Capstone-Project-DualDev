@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/services/language_controller.dart';
+import '../services/channel_messages_realtime_service.dart';
 import '../services/servers_service.dart';
 import 'server_settings_ui.dart';
 
@@ -24,9 +27,11 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
   bool _loading = true;
   String? _error;
   final _search = TextEditingController();
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
   @override
   void dispose() {
+    _realtimeSub?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -35,6 +40,21 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
   void initState() {
     super.initState();
     _load();
+    _realtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
+      _onServerRealtime,
+    );
+  }
+
+  void _onServerRealtime(Map<String, dynamic> payload) {
+    final event = (payload['event'] ?? '').toString();
+    if (event != 'server-membership-updated' &&
+        event != 'server-moderation-updated') {
+      return;
+    }
+    final sid = (payload['serverId'] ?? '').toString();
+    if (sid != widget.serverId) return;
+    if (!mounted) return;
+    unawaited(_load());
   }
 
   Future<void> _load() async {

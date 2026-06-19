@@ -41,6 +41,22 @@ export default function ServerBansSection({ serverId, canManageBans }: ServerBan
 
   useEffect(() => { loadBans(); loadRestricted(); }, [loadBans, loadRestricted]);
 
+  useEffect(() => {
+    const onUpdated = (e: Event) => {
+      const ce = e as CustomEvent;
+      const d = (ce?.detail ?? {}) as { serverId?: string };
+      if (!d?.serverId || d.serverId !== serverId) return;
+      void loadBans();
+      void loadRestricted();
+    };
+    window.addEventListener("cordigram-server-membership-updated", onUpdated as EventListener);
+    window.addEventListener("cordigram-server-moderation-updated", onUpdated as EventListener);
+    return () => {
+      window.removeEventListener("cordigram-server-membership-updated", onUpdated as EventListener);
+      window.removeEventListener("cordigram-server-moderation-updated", onUpdated as EventListener);
+    };
+  }, [loadBans, loadRestricted, serverId]);
+
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return bannedUsers;
     const q = searchQuery.toLowerCase().trim();

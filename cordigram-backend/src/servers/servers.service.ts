@@ -355,6 +355,23 @@ export class ServersService {
     for (const id of ids) {
       await this.cleanupAfterMemberRemoved(serverId, id);
     }
+    const recipientUserIds = this.memberUserIdsForRealtime(server);
+    for (const id of ids) {
+      this.emitServerMembershipUpdated({
+        server,
+        changedUserId: id,
+        action: 'left',
+        actorUserId: requesterUserId,
+        recipients: [...recipientUserIds, id],
+      });
+      this.emitServerModerationUpdated({
+        server,
+        targetUserId: id,
+        action: 'kicked',
+        actorUserId: requesterUserId,
+        recipients: recipientUserIds,
+      });
+    }
     return ids.length;
   }
 
@@ -913,6 +930,41 @@ export class ServersService {
     return server;
   }
 
+  /** Lightweight membership context for server invites (no channel populate). */
+  async getServerMembershipLean(serverId: string): Promise<{
+    ownerId: string;
+    members: { userId: string }[];
+    name: string;
+    avatarUrl: string | null;
+    isAgeRestricted: boolean;
+  }> {
+    const doc = await this.serverModel
+      .findOne({
+        _id: new Types.ObjectId(serverId),
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      })
+      .select('ownerId members.userId name avatarUrl isAgeRestricted')
+      .lean()
+      .exec();
+    if (!doc) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+    const members = ((doc as { members?: { userId?: Types.ObjectId }[] }).members ??
+      []) as { userId?: Types.ObjectId }[];
+    return {
+      ownerId: (doc as { ownerId: Types.ObjectId }).ownerId.toString(),
+      members: members
+        .map((m) => m.userId?.toString?.() ?? '')
+        .filter(Boolean)
+        .map((userId) => ({ userId })),
+      name: (doc as { name?: string }).name?.trim?.() ?? '',
+      avatarUrl: (doc as { avatarUrl?: string | null }).avatarUrl ?? null,
+      isAgeRestricted: Boolean(
+        (doc as { isAgeRestricted?: boolean }).isAgeRestricted,
+      ),
+    };
+  }
+
   async getServerProfileStats(serverId: string): Promise<{
     onlineCount: number;
     memberCount: number;
@@ -1139,6 +1191,39 @@ export class ServersService {
     }
   }
 
+  private emitServerModerationUpdated(params: {
+    server: any;
+    targetUserId: string;
+    action:
+      | 'kicked'
+      | 'banned'
+      | 'unbanned'
+      | 'timeout'
+      | 'timeout_removed'
+      | 'restricted'
+      | 'unrestricted'
+      | 'pruned';
+    actorUserId?: string | null;
+    recipients: string[];
+  }): void {
+    const payload = {
+      serverId: String(params.server?._id ?? ''),
+      userId: String(params.targetUserId),
+      action: params.action,
+      actorUserId: params.actorUserId ? String(params.actorUserId) : null,
+      server: this.serverRealtimeSnapshot(params.server),
+      updatedAt: new Date().toISOString(),
+    };
+    const dedup = new Set(params.recipients.map((x) => String(x)).filter(Boolean));
+    for (const uid of dedup) {
+      this.channelMessagesGateway.emitToUser(
+        uid,
+        'server-moderation-updated',
+        payload,
+      );
+    }
+  }
+
   async getServerSafetySettings(serverId: string, userId: string) {
     const server = await this.serverModel
       .findById(serverId)
@@ -1276,6 +1361,14 @@ export class ServersService {
         'server-deleted',
         socketPayload,
       );
+    }
+
+    // Remove from public discovery when owner deletes the server.
+    if ((server as any).communitySettings) {
+      (server as any).communitySettings.enabled = false;
+    }
+    if ((server as any).communityDiscoveryStatus === 'approved') {
+      (server as any).communityDiscoveryStatus = 'removed';
     }
 
     // Soft delete so admin can restore later (keeps owner + members + data).
@@ -1465,17 +1558,10 @@ export class ServersService {
       joinOpts,
     );
     const isPending = userServer?.status === 'pending';
+    const nick = joinOpts?.nickname?.trim();
 
-    if (joinOpts?.nickname?.trim() && !isPending) {
-      await this.serverModel
-        .updateOne(
-          {
-            _id: new Types.ObjectId(serverId),
-            'members.userId': new Types.ObjectId(userId),
-          },
-          { $set: { 'members.$.nickname': joinOpts.nickname.trim() } },
-        )
-        .exec();
+    if (nick && !isPending) {
+      await this.setMemberNickname(serverId, userId, nick);
     }
 
     this.serverInviteModel
@@ -2582,6 +2668,22 @@ export class ServersService {
     }
   }
 
+  /** Bans tab: view/manage ban list + mention-restricted members. */
+  private async assertCanViewBanModeration(
+    serverId: string,
+    userId: string,
+  ): Promise<void> {
+    const [canBan, canManage] = await Promise.all([
+      this.rolesService.hasPermission(serverId, userId, 'banMembers'),
+      this.canManageServer(serverId, userId),
+    ]);
+    if (!canBan && !canManage) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xem danh sách chặn hoặc hạn chế thành viên',
+      );
+    }
+  }
+
   async getInteractionSettings(
     serverId: string,
     requesterUserId: string,
@@ -3593,6 +3695,22 @@ export class ServersService {
 
     await this.cleanupAfterMemberRemoved(serverId, targetId);
 
+    const recipientUserIds = this.memberUserIdsForRealtime(server);
+    this.emitServerMembershipUpdated({
+      server,
+      changedUserId: targetId,
+      action: 'left',
+      actorUserId: actorId,
+      recipients: [...recipientUserIds, targetId],
+    });
+    this.emitServerModerationUpdated({
+      server,
+      targetUserId: targetId,
+      action: 'kicked',
+      actorUserId: actorId,
+      recipients: recipientUserIds,
+    });
+
     return {
       success: true,
       message: `Đã kick thành viên${reason ? `. Lý do: ${reason}` : ''}`,
@@ -3652,6 +3770,22 @@ export class ServersService {
 
     await this.cleanupAfterMemberRemoved(serverId, targetId);
 
+    const recipientUserIds = this.memberUserIdsForRealtime(server);
+    this.emitServerMembershipUpdated({
+      server,
+      changedUserId: targetId,
+      action: 'left',
+      actorUserId: actorId,
+      recipients: [...recipientUserIds, targetId],
+    });
+    this.emitServerModerationUpdated({
+      server,
+      targetUserId: targetId,
+      action: 'banned',
+      actorUserId: actorId,
+      recipients: recipientUserIds,
+    });
+
     return {
       success: true,
       message: `Đã ban thành viên${reason ? `. Lý do: ${reason}` : ''}`,
@@ -3694,6 +3828,15 @@ export class ServersService {
     server.members[memberIndex].timeoutUntil = timeoutUntil;
     await server.save();
 
+    const recipientUserIds = this.memberUserIdsForRealtime(server);
+    this.emitServerModerationUpdated({
+      server,
+      targetUserId: targetId,
+      action: 'timeout',
+      actorUserId: actorId,
+      recipients: recipientUserIds,
+    });
+
     return {
       success: true,
       message: `Đã tạm khóa thành viên${reason ? `. Lý do: ${reason}` : ''}`,
@@ -3731,6 +3874,15 @@ export class ServersService {
 
     server.members[memberIndex].timeoutUntil = null;
     await server.save();
+
+    const recipientUserIds = this.memberUserIdsForRealtime(server);
+    this.emitServerModerationUpdated({
+      server,
+      targetUserId: targetId,
+      action: 'timeout_removed',
+      actorUserId: actorId,
+      recipients: recipientUserIds,
+    });
 
     return {
       success: true,
@@ -3774,6 +3926,15 @@ export class ServersService {
 
     server.bannedUsers.splice(bannedIndex, 1);
     await server.save();
+
+    const recipientUserIds = this.memberUserIdsForRealtime(server);
+    this.emitServerModerationUpdated({
+      server,
+      targetUserId: targetId,
+      action: 'unbanned',
+      actorUserId: actorId,
+      recipients: recipientUserIds,
+    });
 
     return {
       success: true,
@@ -3905,7 +4066,7 @@ export class ServersService {
       mentionRestricted: boolean;
     }>
   > {
-    await this.assertCanManageServer(serverId, userId);
+    await this.assertCanViewBanModeration(serverId, userId);
     const server = await this.serverModel.findById(serverId).lean().exec();
     if (!server)
       throw new NotFoundException(`Server with id ${serverId} not found`);
@@ -3947,7 +4108,7 @@ export class ServersService {
     actorId: string,
     memberId: string,
   ): Promise<void> {
-    await this.assertCanManageServer(serverId, actorId);
+    await this.assertCanViewBanModeration(serverId, actorId);
     await this.serverModel.updateOne(
       {
         _id: new Types.ObjectId(serverId),
@@ -3960,6 +4121,16 @@ export class ServersService {
         },
       },
     );
+    const server = await this.serverModel.findById(serverId).exec();
+    if (server) {
+      this.emitServerModerationUpdated({
+        server,
+        targetUserId: memberId,
+        action: 'unrestricted',
+        actorUserId: actorId,
+        recipients: this.memberUserIdsForRealtime(server),
+      });
+    }
   }
 
   // =====================================================
@@ -4054,6 +4225,7 @@ export class ServersService {
         'communitySettings.enabled': true,
         communityDiscoveryStatus: 'approved',
         isActive: true,
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
       })
       .select(
         'name description avatarUrl bannerUrl bannerImageUrl bannerColor memberCount accessMode isPublic primaryLanguage communitySettings',

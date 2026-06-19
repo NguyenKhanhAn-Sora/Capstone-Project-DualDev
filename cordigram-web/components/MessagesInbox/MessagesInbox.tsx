@@ -17,6 +17,8 @@ import {
 import { getApiBaseUrl } from "@/lib/api";
 import { markDmConversationRead } from "@/lib/api";
 import { acceptServerInvite, declineServerInvite, getServerAccessSettings, markChannelAsRead } from "@/lib/servers-api";
+import { assertAgeEligibleForServer } from "@/lib/server-age-gate";
+import { appAlert } from "@/lib/app-dialog";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 import { formatDmSidebarPreview } from "@/lib/dm-sidebar-preview";
 type TabKey = "for-you" | "unread" | "mentions";
@@ -364,6 +366,12 @@ export default function MessagesInbox({
         }
       }
 
+      const ageCheck = await assertAgeEligibleForServer(item.serverId);
+      if (!ageCheck.ok) {
+        appAlert(t("chat.ageRestrict.joinBlockedBody"));
+        return;
+      }
+
       await acceptServerInvite(item._id);
       await markInboxSeen("server_invite", item._id);
       removeInviteFromList(item._id);
@@ -374,6 +382,9 @@ export default function MessagesInbox({
       }
       onClose();
     } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : "Không chấp nhận được lời mời";
+      appAlert(msg);
       console.error("Accept invite failed", e);
     }
   };

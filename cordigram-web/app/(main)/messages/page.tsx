@@ -46,6 +46,7 @@ import {
 } from "@/lib/dm-call-active-peers";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
+import { assertAgeEligibleForServer } from "@/lib/server-age-gate";
 import { translateCategoryName, translateChannelName, resolveServerDisplayLanguage, getServerLanguageOverride } from "@/lib/system-names";
 import { clampFloatingPosition } from "@/lib/floating-ui";
 import { DEFAULT_FREE_MAX_UPLOAD_BYTES, formatUploadLimitExceededMessage, isAllowedMessagingMediaFile, mapMessagingUploadErrorMessage } from "@/lib/upload-limits";
@@ -1843,6 +1844,7 @@ export default function MessagesPage() {
     canCreateInvite: boolean;
   } | null>(null);
   const [inviteToServerCandidates, setInviteToServerCandidates] = useState<serversApi.Friend[]>([]);
+  const [inviteToServerInitialInvitedIds, setInviteToServerInitialInvitedIds] = useState<string[]>([]);
   const [voiceChannelCallToken, setVoiceChannelCallToken] = useState<string | null>(null);
   const [voiceChannelCallServerUrl, setVoiceChannelCallServerUrl] = useState<string>("");
   const [voiceChannelCallError, setVoiceChannelCallError] = useState<string | null>(null);
@@ -4676,6 +4678,39 @@ export default function MessagesPage() {
       loadActiveEvents(selectedServer);
       setSelectedDirectMessageFriend(null); // Clear selected DM friend when selecting server
       setShowBoostUpgradeView(false);
+
+      if (
+        selectedServer &&
+        currentUserId &&
+        typeof window !== "undefined"
+      ) {
+        const pendingNick = sessionStorage
+          .getItem(`cordigram:joinNick:${selectedServer}`)
+          ?.trim();
+        if (pendingNick) {
+          setServers((prev) =>
+            prev.map((s) => {
+              if (s._id !== selectedServer) return s;
+              const members = [...(s.members || [])];
+              const idx = members.findIndex(
+                (m) => String(m.userId) === String(currentUserId),
+              );
+              if (idx >= 0) {
+                members[idx] = { ...members[idx], nickname: pendingNick };
+              } else {
+                members.push({
+                  userId: currentUserId,
+                  role: "member",
+                  joinedAt: new Date().toISOString(),
+                  nickname: pendingNick,
+                });
+              }
+              return { ...s, members };
+            }),
+          );
+          sessionStorage.removeItem(`cordigram:joinNick:${selectedServer}`);
+        }
+      }
       
       const isAdminViewedServer = Boolean(isAdminView && adminViewServerId && selectedServer === adminViewServerId);
       if (!isAdminViewedServer) {
@@ -4683,11 +4718,35 @@ export default function MessagesPage() {
         serversApi.getServerMembersWithRoles(selectedServer)
           .then((response) => {
             const colorMap: Record<string, string> = {};
+            const nickMap: Record<string, string> = {};
             response.members.forEach((member) => {
               if (member.displayColor && member.displayColor !== "#99AAB5") {
                 colorMap[member.userId] = member.displayColor;
               }
+              const nick = member.nickname?.trim();
+              if (nick) nickMap[member.userId] = nick;
             });
+            if (Object.keys(nickMap).length > 0) {
+              setServers((prev) =>
+                prev.map((s) => {
+                  if (s._id !== selectedServer) return s;
+                  const members = (s.members || []).map((m) => {
+                    const nick = nickMap[String(m.userId)];
+                    return nick ? { ...m, nickname: nick } : m;
+                  });
+                  for (const [uid, nick] of Object.entries(nickMap)) {
+                    if (members.some((m) => String(m.userId) === uid)) continue;
+                    members.push({
+                      userId: uid,
+                      role: "member",
+                      joinedAt: new Date().toISOString(),
+                      nickname: nick,
+                    });
+                  }
+                  return { ...s, members };
+                }),
+              );
+            }
             setMemberRoleColors(colorMap);
             setMembersForMessageSearch(
               response.members.map((m) => ({
@@ -5047,31 +5106,27 @@ export default function MessagesPage() {
     };
   }, [selectedServer, voiceChannels]);
 
-  // Khi mở popup mời vào server: load follow + followers (merge, bỏ trùng), loại ai đã tham gia server
+  // Khi mở popup mời vào server: một API gộp follow/followers + loại thành viên server
   useEffect(() => {
     if (!inviteToServerTarget) {
       setInviteToServerCandidates([]);
+      setInviteToServerInitialInvitedIds([]);
       return;
     }
     const { serverId: sid } = inviteToServerTarget;
     let cancelled = false;
-    Promise.all([
-      serversApi.getFollowing(),
-      serversApi.getMyFollowers(),
-      serversApi.getServer(sid),
-    ])
-      .then(([following, followers, server]) => {
+    serversApi
+      .getServerInviteCandidates(sid)
+      .then(({ candidates, invitedUserIds }) => {
         if (cancelled) return;
-        const memberIds = new Set(
-          (server.members || []).map((m) => (typeof m.userId === "string" ? m.userId : (m.userId as any)?.toString?.() ?? ""))
-        );
-        const byId = new Map<string, serversApi.Friend>();
-        [...following, ...followers].forEach((f) => byId.set(f._id, f));
-        const candidates = Array.from(byId.values()).filter((f) => !memberIds.has(f._id));
         setInviteToServerCandidates(candidates);
+        setInviteToServerInitialInvitedIds(invitedUserIds);
       })
       .catch(() => {
-        if (!cancelled) setInviteToServerCandidates([]);
+        if (!cancelled) {
+          setInviteToServerCandidates([]);
+          setInviteToServerInitialInvitedIds([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -6633,11 +6688,15 @@ export default function MessagesPage() {
 
     const content = messageText.trim();
     const tempId = `temp-send-${Date.now()}`;
+    const pendingJoinNick =
+      typeof window !== "undefined" && selectedServer
+        ? sessionStorage.getItem(`cordigram:joinNick:${selectedServer}`)?.trim() ?? ""
+        : "";
     const myServerNickname =
       servers
         .find((s) => s._id === selectedServer)
         ?.members?.find((m) => String(m.userId) === String(currentUserId))
-        ?.nickname?.trim() ?? "";
+        ?.nickname?.trim() ?? pendingJoinNick;
     const optimisticMessage: UIMessage = {
       id: tempId,
       text: content,
@@ -11103,6 +11162,11 @@ export default function MessagesPage() {
                   try {
                     const opened = await openApplyJoinModalIfNeeded(serverId);
                     if (opened) return;
+                    const ageCheck = await assertAgeEligibleForServer(serverId);
+                    if (!ageCheck.ok) {
+                      showNoticePopup(t("chat.ageRestrict.joinBlockedBody"));
+                      return;
+                    }
                     await serversApi.joinServer(serverId);
                     await loadServers();
                     setShowExploreView(false);
@@ -13986,6 +14050,7 @@ export default function MessagesPage() {
           serverId={inviteToServerTarget.serverId}
           serverName={inviteToServerTarget.serverName}
           friends={inviteToServerCandidates}
+          initialInvitedIds={inviteToServerInitialInvitedIds}
           canCreateInvite={
             inviteToServerTarget.serverId === selectedServer &&
             serverPermissionsReady
@@ -15341,24 +15406,36 @@ function ExploreServersView({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    serversApi
-      .listExploreServers()
-      .then((data) => {
-        if (cancelled) return;
-        setServers(Array.isArray(data) ? data : []);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : t("chat.explore.loadError"));
-        setServers([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const load = () =>
+      serversApi
+        .listExploreServers()
+        .then((data) => {
+          if (cancelled) return;
+          setServers(Array.isArray(data) ? data : []);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          setError(e instanceof Error ? e.message : t("chat.explore.loadError"));
+          setServers([]);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+
+    load();
+
+    const onServerDeleted = (e: Event) => {
+      const id = (e as CustomEvent<{ serverId?: string }>).detail?.serverId;
+      if (!id) return;
+      setServers((prev) => prev.filter((s) => s.id !== id));
+    };
+    window.addEventListener("cordigram-server-deleted", onServerDeleted as EventListener);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("cordigram-server-deleted", onServerDeleted as EventListener);
     };
-  }, []);
+  }, [t]);
 
   return (
     <div className={styles.explorePage}>

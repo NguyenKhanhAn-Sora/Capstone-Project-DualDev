@@ -413,7 +413,9 @@ export default function CommunityDiscoveryPage() {
 
                           {/* Activity */}
                           <td>
-                            {srv.hasAbnormalActivity ? (
+                            {srv.serverDeleted ? (
+                              <span className={styles.badgeDanger}>No longer exists</span>
+                            ) : srv.hasAbnormalActivity ? (
                               <span className={styles.badgeDanger}>Abnormal</span>
                             ) : (
                               <span className={styles.badgeOk}>Normal</span>

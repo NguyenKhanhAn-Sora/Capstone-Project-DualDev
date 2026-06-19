@@ -339,6 +339,58 @@ export class ProfilesService {
     return this.profileModel.findOne({ userId: objectId }).exec();
   }
 
+  /** Batch profile lookup for invite candidate lists (no N+1). */
+  async findSummariesByUserIds(userIds: string[]): Promise<
+    Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }>
+  > {
+    const ids = [
+      ...new Set(
+        userIds
+          .map((id) => String(id ?? '').trim())
+          .filter((id) => id && Types.ObjectId.isValid(id)),
+      ),
+    ];
+    if (!ids.length) return [];
+    const profiles = await this.profileModel
+      .find({ userId: { $in: ids.map((id) => new Types.ObjectId(id)) } })
+      .select('userId username displayName avatarUrl')
+      .lean()
+      .exec();
+    const byUserId = new Map<string, (typeof profiles)[0]>();
+    for (const p of profiles) {
+      const uid = (p as { userId?: Types.ObjectId }).userId?.toString?.();
+      if (uid) byUserId.set(uid, p);
+    }
+    return ids
+      .map((id) => {
+        const p = byUserId.get(id) as
+          | {
+              username?: string;
+              displayName?: string;
+              avatarUrl?: string;
+            }
+          | undefined;
+        if (!p) return null;
+        return {
+          userId: id,
+          username: p.username ?? '',
+          displayName: p.displayName ?? p.username ?? '',
+          avatarUrl: p.avatarUrl || this.DEFAULT_AVATAR_URL,
+        };
+      })
+      .filter(Boolean) as Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }>;
+  }
+
   async updateAvatarForUser(params: {
     userId: string;
     avatarUrl: string;

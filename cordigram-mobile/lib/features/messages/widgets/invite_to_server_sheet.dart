@@ -8,27 +8,7 @@ import '../../../core/services/language_controller.dart';
 import '../models/server_models.dart';
 import '../utils/messages_ui.dart';
 import 'messages_chrome_builder.dart';
-import '../services/direct_messages_service.dart';
 import '../services/servers_service.dart';
-
-Set<String> _memberUserIdsFromServerJson(Map<String, dynamic> server) {
-  final out = <String>{};
-  final members = server['members'];
-  if (members is! List) return out;
-  for (final m in members) {
-    if (m is! Map) continue;
-    final map = Map<String, dynamic>.from(m);
-    final uid = map['userId'];
-    if (uid is Map) {
-      final id = uid['_id'] ?? uid['id'];
-      if (id != null) out.add(id.toString());
-    } else if (uid != null) {
-      out.add(uid.toString());
-    }
-  }
-  out.removeWhere((e) => e.trim().isEmpty);
-  return out;
-}
 
 /// Mirrors cordigram-web `InviteToServerPopup`: copy link + mời bạn (follow/followers, trừ đã trong server).
 class InviteToServerSheet extends StatefulWidget {
@@ -66,7 +46,6 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
   String? _error;
   List<_InviteRow> _rows = const [];
   final Set<String> _invitedIds = {};
-  String? _sendingId;
   bool _inviteBlocked = false;
 
   String get _inviteLink =>
@@ -80,7 +59,6 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
   @override
   void initState() {
     super.initState();
-    _search.addListener(() => setState(() {}));
     if (!widget.canCreateInvite) {
       _error = _noPermissionMessage;
     }
@@ -101,42 +79,34 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
       _error = permissionError;
     });
     try {
-      final following =
-          await DirectMessagesService.getFollowingAsConversations();
-      final followers =
-          await DirectMessagesService.getFollowersAsConversations();
-      final serverMap = await ServersService.getServerById(widget.server.id);
-      final memberIds = _memberUserIdsFromServerJson(serverMap);
-
-      final byId = <String, _InviteRow>{};
-      for (final conv in following) {
-        final id = conv.userId;
-        if (id.isEmpty || memberIds.contains(id)) continue;
-        byId[id] = _InviteRow(
-          userId: id,
-          displayName: conv.displayName,
-          username: conv.username,
-          avatarUrl: conv.avatarUrl,
-        );
-      }
-      for (final conv in followers) {
-        final id = conv.userId;
-        if (id.isEmpty || memberIds.contains(id)) continue;
-        byId[id] ??= _InviteRow(
-          userId: id,
-          displayName: conv.displayName,
-          username: conv.username,
-          avatarUrl: conv.avatarUrl,
-        );
-      }
-      final rows = byId.values.toList()
+      final result =
+          await ServersService.getServerInviteCandidates(widget.server.id);
+      final rows = result.candidates
+          .map((c) {
+            final id = (c['_id'] ?? c['userId'] ?? '').toString();
+            if (id.isEmpty) return null;
+            return _InviteRow(
+              userId: id,
+              displayName: (c['displayName'] ?? c['username'] ?? '')
+                  .toString(),
+              username: (c['username'] ?? '').toString(),
+              avatarUrl: c['avatarUrl']?.toString(),
+            );
+          })
+          .whereType<_InviteRow>()
+          .toList()
         ..sort(
           (a, b) => a.displayName.toLowerCase().compareTo(
                 b.displayName.toLowerCase(),
               ),
         );
       if (!mounted) return;
-      setState(() => _rows = rows);
+      setState(() {
+        _rows = rows;
+        _invitedIds
+          ..clear()
+          ..addAll(result.invitedUserIds);
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -186,43 +156,34 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
   }
 
   Future<void> _inviteFriend(_InviteRow row) async {
-    if (!_canInvite) {
-      setState(() => _error = _noPermissionMessage);
+    if (!_canInvite || _invitedIds.contains(row.userId)) {
+      if (!_canInvite) setState(() => _error = _noPermissionMessage);
       return;
     }
     setState(() {
       _error = null;
-      _sendingId = row.userId;
+      _invitedIds.add(row.userId);
     });
     try {
       await ServersService.createServerInvite(widget.server.id, row.userId);
-      try {
-        await DirectMessagesService.sendMessage(
-          row.userId,
-          content: _inviteLink,
-        );
-      } catch (_) {}
-      if (!mounted) return;
-      setState(() => _invitedIds.add(row.userId));
     } catch (e) {
       if (!mounted) return;
       final friendly = _resolveInviteError(e);
       setState(() {
+        _invitedIds.remove(row.userId);
         _error = friendly;
         if (friendly == _noPermissionMessage) {
           _inviteBlocked = true;
         }
       });
-    } finally {
-      if (mounted) setState(() => _sendingId = null);
     }
   }
 
   String _t(String key, [Map<String, dynamic>? vars]) =>
       LanguageController.instance.t(key, vars);
 
-  List<_InviteRow> get _filtered {
-    final q = _search.text.trim().toLowerCase();
+  List<_InviteRow> _filterRows(String query) {
+    final q = query.trim().toLowerCase();
     if (q.isEmpty) return _rows;
     return _rows
         .where(
@@ -346,73 +307,72 @@ class _InviteToServerSheetState extends State<InviteToServerSheet> {
                         ? Center(
                             child: CircularProgressIndicator(color: chrome.accent),
                           )
-                        : _filtered.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                _t('chat.inviteToServerSheet.errorLoad'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: chrome.textMuted),
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _filtered.length,
-                            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-                            itemBuilder: (context, i) {
-                              final row = _filtered[i];
-                              final invited = _invitedIds.contains(row.userId);
-                              final sending = _sendingId == row.userId;
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: chrome.surfaceMuted,
-                                  backgroundImage:
-                                      (row.avatarUrl ?? '').startsWith('http')
-                                      ? NetworkImage(row.avatarUrl!)
-                                      : null,
-                                  child: (row.avatarUrl ?? '').startsWith('http')
-                                      ? null
-                                      : Text(
-                                          _initialLetter(
-                                            row.displayName,
-                                            row.username,
-                                          ),
-                                        ),
-                                ),
-                                title: Text(
-                                  row.displayName.isNotEmpty
-                                      ? row.displayName
-                                      : row.username,
-                                  style: TextStyle(
-                                    color: chrome.text,
-                                    fontWeight: FontWeight.w600,
+                        : ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _search,
+                            builder: (context, value, _) {
+                              final filtered = _filterRows(value.text);
+                              if (filtered.isEmpty) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text(
+                                      _rows.isEmpty
+                                          ? _t('chat.inviteToServerSheet.errorLoad')
+                                          : _t('chat.invite.empty.notFound'),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: chrome.textMuted),
+                                    ),
                                   ),
-                                ),
-                                subtitle: Text(
-                                  row.username,
-                                  style: TextStyle(color: chrome.textMuted),
-                                ),
-                                trailing: TextButton(
-                                  onPressed: !_canInvite ||
-                                          invited ||
-                                          sending
-                                      ? null
-                                      : () => _inviteFriend(row),
-                                  child: sending
-                                      ? SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: chrome.accent,
-                                          ),
-                                        )
-                                      : Text(
-                                          _t('chat.inviteToServerSheet.invite'),
-                                          style: TextStyle(color: chrome.accent),
-                                        ),
-                                ),
+                                );
+                              }
+                              return ListView.builder(
+                                itemCount: filtered.length,
+                                padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                                itemBuilder: (context, i) {
+                                  final row = filtered[i];
+                                  final invited = _invitedIds.contains(row.userId);
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: chrome.surfaceMuted,
+                                      backgroundImage:
+                                          (row.avatarUrl ?? '').startsWith('http')
+                                          ? NetworkImage(row.avatarUrl!)
+                                          : null,
+                                      child: (row.avatarUrl ?? '').startsWith('http')
+                                          ? null
+                                          : Text(
+                                              _initialLetter(
+                                                row.displayName,
+                                                row.username,
+                                              ),
+                                            ),
+                                    ),
+                                    title: Text(
+                                      row.displayName.isNotEmpty
+                                          ? row.displayName
+                                          : row.username,
+                                      style: TextStyle(
+                                        color: chrome.text,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      row.username,
+                                      style: TextStyle(color: chrome.textMuted),
+                                    ),
+                                    trailing: TextButton(
+                                      onPressed: !_canInvite || invited
+                                          ? null
+                                          : () => _inviteFriend(row),
+                                      child: Text(
+                                        invited
+                                            ? _t('chat.invite.invited')
+                                            : _t('chat.inviteToServerSheet.invite'),
+                                        style: TextStyle(color: chrome.accent),
+                                      ),
+                                    ),
+                                  );
+                                },
                               );
                             },
                           ),

@@ -117,6 +117,19 @@ export function calcAgeFromBirthdate(
   return age;
 }
 
+/** Shown when a user cannot join an age-restricted server (invite, explore, join). */
+export const AGE_RESTRICTED_JOIN_MESSAGE =
+  'Bạn chưa đủ điều kiện về độ tuổi đối với server này.';
+
+export function meetsAgeRequirementForRestrictedServer(
+  isAgeRestricted: boolean,
+  birthdate: Date | null | undefined,
+): boolean {
+  if (!isAgeRestricted) return true;
+  const age = calcAgeFromBirthdate(birthdate);
+  return age != null && age >= 18;
+}
+
 export function passesVerificationLevels(input: {
   verificationLevel: ServerVerificationLevel;
   isVerified: boolean;

@@ -646,11 +646,14 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
 
     final trimmed = content.trim();
     final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
+    final myNick = _nickByUserId[widget.currentUserId ?? '']?.trim();
     final optimistic = ChannelMessage(
       id: tempId,
       channelId: widget.channel.id,
       senderId: widget.currentUserId ?? '',
-      senderName: widget.participantName ?? 'Bạn',
+      senderName: (myNick != null && myNick.isNotEmpty)
+          ? myNick
+          : (widget.participantName ?? 'Bạn'),
       content: trimmed,
       createdAt: DateTime.now(),
       type: type,

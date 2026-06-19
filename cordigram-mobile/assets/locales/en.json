@@ -3863,6 +3863,7 @@
       "bannerNotice": "This server contains age-restricted content (18+). Please behave accordingly.",
       "title": "Age-Restricted Server",
       "under18Body": "This server requires users to be at least 18 years old. Your account does not meet the requirements or does not have a date of birth on your profile, so you cannot view messages in the channels.",
+      "joinBlockedBody": "You do not meet the age requirements for this server.",
       "goBack": "Go back",
       "ackBody": "This server contains sensitive content labeled as age-restricted. Do you want to continue?",
       "processing": "Processing...",

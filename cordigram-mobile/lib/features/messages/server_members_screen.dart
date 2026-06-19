@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/services/language_controller.dart';
 import 'models/server_role_models.dart';
+import 'services/channel_messages_realtime_service.dart';
 import 'services/servers_service.dart';
 
 /// Danh sách thành viên + kiểm duyệt (kick / ban / timeout) — cùng API web.
@@ -29,15 +32,32 @@ class _ServerMembersScreenState extends State<ServerMembersScreen> {
   bool _loading = true;
   String? _error;
   final _search = TextEditingController();
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _realtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
+      _onServerRealtime,
+    );
+  }
+
+  void _onServerRealtime(Map<String, dynamic> payload) {
+    final event = (payload['event'] ?? '').toString();
+    if (event != 'server-membership-updated' &&
+        event != 'server-moderation-updated') {
+      return;
+    }
+    final sid = (payload['serverId'] ?? '').toString();
+    if (sid != widget.serverId) return;
+    if (!mounted) return;
+    unawaited(_load());
   }
 
   @override
   void dispose() {
+    _realtimeSub?.cancel();
     _search.dispose();
     super.dispose();
   }

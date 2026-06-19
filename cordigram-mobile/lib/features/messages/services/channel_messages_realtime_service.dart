@@ -122,6 +122,13 @@ class ChannelMessagesRealtimeService {
       _serverRealtimeController.add(mapped);
     });
 
+    socket.on('server-moderation-updated', (payload) {
+      if (payload is! Map) return;
+      final mapped = Map<String, dynamic>.from(payload);
+      mapped['event'] = 'server-moderation-updated';
+      _serverRealtimeController.add(mapped);
+    });
+
     socket.on('join-application-updated', (payload) {
       if (payload is! Map) return;
       final mapped = Map<String, dynamic>.from(payload);
@@ -185,6 +192,7 @@ class ChannelMessagesRealtimeService {
       socket.off('inbox-for-you-item');
       socket.off('server-updated');
       socket.off('server-membership-updated');
+      socket.off('server-moderation-updated');
       socket.off('join-application-updated');
       socket.off('interaction-settings-updated');
       socket.off('server-deleted');
