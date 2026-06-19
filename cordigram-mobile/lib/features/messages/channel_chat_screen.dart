@@ -57,6 +57,13 @@ class ChannelChatScreen extends StatefulWidget {
 class _ChannelChatScreenState extends State<ChannelChatScreen> {
   MessagesChromePalette get _chrome => AccentColorController.instance.palette;
 
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.tForServer(
+        widget.server.primaryLanguage,
+        key,
+        vars,
+      );
+
   static final RegExp _pollRegExp = RegExp(r'📊 \[Poll\]:\s*([a-fA-F0-9]{24})');
   static final RegExp _serverEmojiTokenRegExp = RegExp(
     r':([a-zA-Z0-9_]{1,80}):',
@@ -86,7 +93,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(LanguageController.instance.t('messages.messageNotInSegment')),
+          content: Text(_t('messages.messageNotInSegment')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -379,26 +386,26 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   String _formatWelcomeTimestamp(DateTime at) {
     final now = DateTime.now();
     final diff = now.difference(at);
-    if (diff.inSeconds < 45) return LanguageController.instance.t('messages.justNow');
-    if (diff.inMinutes < 60) return LanguageController.instance.t('messages.minutesAgo', {'n': diff.inMinutes.toString()});
-    if (diff.inHours < 24) return LanguageController.instance.t('messages.hoursAgo', {'n': diff.inHours.toString()});
+    if (diff.inSeconds < 45) return _t('messages.justNow');
+    if (diff.inMinutes < 60) return _t('messages.minutesAgo', {'n': diff.inMinutes.toString()});
+    if (diff.inHours < 24) return _t('messages.hoursAgo', {'n': diff.inHours.toString()});
     return '${at.day}/${at.month}/${at.year}';
   }
 
   String _blockedReasonLabel(String? reason) {
     switch (reason) {
       case 'rules':
-        return LanguageController.instance.t('messages.blockedReasonRules');
+        return _t('messages.blockedReasonRules');
       case 'application_pending':
-        return LanguageController.instance.t('messages.blockedReasonApplicationPending');
+        return _t('messages.blockedReasonApplicationPending');
       case 'application_rejected':
-        return LanguageController.instance.t('messages.blockedReasonApplicationRejected');
+        return _t('messages.blockedReasonApplicationRejected');
       case 'verification':
-        return LanguageController.instance.t('messages.blockedReasonVerification');
+        return _t('messages.blockedReasonVerification');
       case 'age_under_18':
-        return LanguageController.instance.t('messages.blockedReasonAgeUnder18');
+        return _t('messages.blockedReasonAgeUnder18');
       case 'age_ack':
-        return LanguageController.instance.t('messages.blockedReasonAgeAck');
+        return _t('messages.blockedReasonAgeAck');
       default:
         return '';
     }
@@ -483,7 +490,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(LanguageController.instance.t('messages.failedSend', {'error': e.toString()}))),
+          SnackBar(content: Text(_t('messages.failedSend', {'error': e.toString()}))),
         );
       }
     } finally {
@@ -495,15 +502,15 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
 
   String _chatBlockedBannerText() {
     if (_canCompleteGateStepsInChannel()) {
-      return LanguageController.instance.t('messages.blockedBannerGate');
+      return _t('messages.blockedBannerGate');
     }
     final hint = _blockedReasonLabel(_chatBlockReason);
     if (hint.isNotEmpty) return hint;
     final r = _chatBlockReason;
     if (r != null && r.isNotEmpty) {
-      return LanguageController.instance.t('messages.blockedBannerReason', {'reason': r});
+      return _t('messages.blockedBannerReason', {'reason': r});
     }
-    return LanguageController.instance.t('messages.blockedBanner');
+    return _t('messages.blockedBanner');
   }
 
   Widget _buildWelcomeSystemRow(ChannelMessage msg) {
@@ -539,7 +546,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         height: 1.35,
                       ),
                       children: [
-                        TextSpan(text: LanguageController.instance.t('messages.welcomeGreeting', {'name': displayName})),
+                        TextSpan(text: _t('messages.welcomeGreeting', {'name': displayName})),
                         TextSpan(
                           text: '  ${_formatWelcomeTimestamp(msg.createdAt)}',
                           style: const TextStyle(
@@ -579,8 +586,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               ],
                               Text(
                                 waving
-                                    ? LanguageController.instance.t('messages.waveSending')
-                                    : LanguageController.instance.t('messages.waveButton', {'name': displayName}),
+                                    ? _t('messages.waveSending')
+                                    : _t('messages.waveButton', {'name': displayName}),
                                 style: TextStyle(
                                   color: waving
                                       ? const Color(0xFF949BA4)
@@ -693,7 +700,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         });
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('messages.failedSend', {'error': e.toString()}))));
+        ).showSnackBar(SnackBar(content: Text(_t('messages.failedSend', {'error': e.toString()}))));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -710,7 +717,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     setState(() => _sending = true);
     try {
       await _sendChannelMessage(
-        content: LanguageController.instance.t('messages.voiceMessage'),
+        content: _t('messages.voiceMessage'),
         type: 'voice',
         voiceUrl: url,
         voiceDuration: durationSec,
@@ -718,7 +725,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LanguageController.instance.t('messages.failedSendVoice', {'error': e.toString()}))),
+        SnackBar(content: Text(_t('messages.failedSendVoice', {'error': e.toString()}))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -851,7 +858,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                   color: Colors.white,
                 ),
                 title: Text(
-                  LanguageController.instance.t('chat.composer.plusUploadFile'),
+                  _t('chat.composer.plusUploadFile'),
                   style: const TextStyle(color: Colors.white),
                 ),
                 onTap: () {
@@ -894,7 +901,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             return AlertDialog(
               backgroundColor: const Color(0xFF0A1737),
               title: Text(
-                LanguageController.instance.t('messages.createPoll'),
+                _t('messages.createPoll'),
                 style: const TextStyle(color: Colors.white),
               ),
               content: SingleChildScrollView(
@@ -905,7 +912,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                       controller: questionCtrl,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        labelText: LanguageController.instance.t('messages.pollQuestion'),
+                        labelText: _t('messages.pollQuestion'),
                         labelStyle: const TextStyle(color: Color(0xFFB6C2DC)),
                       ),
                     ),
@@ -914,7 +921,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                         controller: optionCtrls[index],
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
-                          labelText: LanguageController.instance.t('messages.pollOption', {'index': (index + 1).toString()}),
+                          labelText: _t('messages.pollOption', {'index': (index + 1).toString()}),
                           labelStyle: const TextStyle(color: Color(0xFFB6C2DC)),
                         ),
                       );
@@ -928,7 +935,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 () => optionCtrls.add(TextEditingController()),
                               ),
                         icon: const Icon(Icons.add),
-                        label: Text(LanguageController.instance.t('messages.addOption')),
+                        label: Text(_t('messages.addOption')),
                       ),
                     ),
                     DropdownButtonFormField<int>(
@@ -939,20 +946,20 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                           .map(
                             (h) => DropdownMenuItem(
                               value: h,
-                              child: Text(LanguageController.instance.t('messages.hours', {'h': h.toString()})),
+                              child: Text(_t('messages.hours', {'h': h.toString()})),
                             ),
                           )
                           .toList(),
                       onChanged: (v) => setLocal(() => durationHours = v ?? 24),
                       decoration: InputDecoration(
-                        labelText: LanguageController.instance.t('messages.pollDuration'),
+                        labelText: _t('messages.pollDuration'),
                         labelStyle: const TextStyle(color: Color(0xFFB6C2DC)),
                       ),
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
-                        LanguageController.instance.t('messages.allowMultipleAnswers'),
+                        _t('messages.allowMultipleAnswers'),
                         style: const TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       value: allowMulti,
@@ -964,7 +971,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text(LanguageController.instance.t('messages.cancel')),
+                  child: Text(_t('messages.cancel')),
                 ),
                 TextButton(
                   onPressed: () async {
@@ -1021,7 +1028,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                       }
                     }
                   },
-                  child: Text(LanguageController.instance.t('messages.create')),
+                  child: Text(_t('messages.create')),
                 ),
               ],
             );
@@ -1181,7 +1188,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              LanguageController.instance.t('messages.giphyMissingKey'),
+              _t('messages.giphyMissingKey'),
             ),
           ),
         );
@@ -1226,8 +1233,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
                                 hintText: stickers
-                                    ? LanguageController.instance.t('messages.searchStickerHint')
-                                    : LanguageController.instance.t('messages.searchGifHint'),
+                                    ? _t('messages.searchStickerHint')
+                                    : _t('messages.searchGifHint'),
                               ),
                               onSubmitted: (_) => runSearch(),
                             ),
@@ -1443,7 +1450,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
           children: [
             const SizedBox(height: 8),
             Text(
-              LanguageController.instance.t('messages.messageActions'),
+              _t('messages.messageActions'),
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
@@ -1454,7 +1461,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             ListTile(
               leading: const Icon(Icons.reply_rounded, color: Colors.white),
               title: Text(
-                LanguageController.instance.t('messages.replyAction'),
+                _t('messages.replyAction'),
                 style: const TextStyle(color: Colors.white),
               ),
               onTap: () {
@@ -1468,7 +1475,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                 color: Colors.white,
               ),
               title: Text(
-                LanguageController.instance.t('messages.pickEmoji'),
+                _t('messages.pickEmoji'),
                 style: const TextStyle(color: Colors.white),
               ),
               onTap: () {
@@ -1479,7 +1486,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
             ListTile(
               leading: const Icon(Icons.push_pin_outlined, color: Colors.white),
               title: Text(
-                LanguageController.instance.t('messages.pinMessage'),
+                _t('messages.pinMessage'),
                 style: const TextStyle(color: Colors.white),
               ),
               onTap: () async {
@@ -1493,7 +1500,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                 color: Colors.redAccent,
               ),
               title: Text(
-                LanguageController.instance.t('messages.deleteMsg'),
+                _t('messages.deleteMsg'),
                 style: const TextStyle(color: Colors.redAccent),
               ),
               onTap: () async {
@@ -1512,7 +1519,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                               color: Colors.white,
                             ),
                             title: Text(
-                              LanguageController.instance.t('messages.deleteForMe'),
+                              _t('messages.deleteForMe'),
                               style: const TextStyle(color: Colors.white),
                             ),
                             onTap: () => Navigator.of(dCtx).pop('for-me'),
@@ -1524,7 +1531,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 color: Colors.redAccent,
                               ),
                               title: Text(
-                                LanguageController.instance.t('messages.recallForAll'),
+                                _t('messages.recallForAll'),
                                 style: const TextStyle(color: Colors.redAccent),
                               ),
                               onTap: () =>
@@ -1604,7 +1611,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('messages.cannotDeleteMessage'))));
+      ).showSnackBar(SnackBar(content: Text(_t('messages.cannotDeleteMessage'))));
     }
   }
 
@@ -1623,9 +1630,9 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(LanguageController.instance.t('messages.messagePinned')),
+          content: Text(_t('messages.messagePinned')),
           action: SnackBarAction(
-            label: LanguageController.instance.t('messages.viewAll'),
+            label: _t('messages.viewAll'),
             onPressed: () async {
               final pickedId = await Navigator.of(context).push<String>(
                 MaterialPageRoute(
@@ -1644,7 +1651,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(LanguageController.instance.t('messages.cannotPinMessage'))));
+      ).showSnackBar(SnackBar(content: Text(_t('messages.cannotPinMessage'))));
     }
   }
 
@@ -1838,8 +1845,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   }
 
   String _replyPreviewText(ChannelReplyMessage reply) {
-    if ((reply.type ?? '') == 'voice') return LanguageController.instance.t('messages.voiceMessageContent');
-    if (reply.content.trim().isEmpty) return LanguageController.instance.t('messages.message');
+    if ((reply.type ?? '') == 'voice') return _t('messages.voiceMessageContent');
+    if (reply.content.trim().isEmpty) return _t('messages.message');
     return reply.content.trim();
   }
 
@@ -1859,7 +1866,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
         titleSpacing: 0,
         actions: [
           IconButton(
-            tooltip: LanguageController.instance.t('messages.searchMessages'),
+            tooltip: _t('messages.searchMessages'),
             onPressed: _openChannelMessageSearch,
             icon: const Icon(Icons.search_rounded, color: Colors.white),
           ),
@@ -1906,7 +1913,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                 : _messages.isEmpty
                 ? Center(
                     child: Text(
-                      LanguageController.instance.t('messages.noMessages'),
+                      _t('messages.noMessages'),
                       style: const TextStyle(
                         color: Color(0xFFAFC0E2),
                         fontSize: 14,
@@ -2117,7 +2124,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: Text(LanguageController.instance.t('messages.done')),
+                          child: Text(_t('messages.done')),
                         ),
                       ],
                     ],
@@ -2150,7 +2157,7 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                LanguageController.instance.t('messages.replying'),
+                                _t('messages.replying'),
                                 style: const TextStyle(
                                   color: Color(0xFFB6C2DC),
                                   fontSize: 11,
@@ -2162,8 +2169,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 _replyingTo!.content.isNotEmpty
                                     ? _replyingTo!.content
                                     : (_replyingTo!.type == 'voice'
-                                          ? LanguageController.instance.t('messages.voiceMessageContent')
-                                          : LanguageController.instance.t('messages.voiceMessage')),
+                                          ? _t('messages.voiceMessageContent')
+                                          : _t('messages.voiceMessage')),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -2227,8 +2234,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
                                 vertical: 10,
                               ),
                               hintText: _chatBlocked
-                                  ? LanguageController.instance.t('messages.channelRestricted')
-                                  : LanguageController.instance.t('messages.chatHint', {'name': widget.channel.name}),
+                                  ? _t('messages.channelRestricted')
+                                  : _t('messages.chatHint', {'name': widget.channel.name}),
                               hintStyle: const TextStyle(
                                 color: Color(0xFF8A98B8),
                                 fontSize: 14,

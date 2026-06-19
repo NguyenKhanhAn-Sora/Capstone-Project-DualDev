@@ -16,6 +16,8 @@ function isLanguageCode(value: unknown): value is LanguageCode {
   return value === "vi" || value === "en" || value === "ja" || value === "zh";
 }
 
+export { isLanguageCode };
+
 /** BCP 47 locale for `toLocaleString` / `toLocaleDateString` */
 export function localeTagForLanguage(code: LanguageCode): string {
   switch (code) {
@@ -117,6 +119,19 @@ const persistLocaleEverywhere = (locale: LanguageCode) => {
 const pickInitialLocale = (): LanguageCode =>
   readCookieLocale() ?? readStoredLocale() ?? "vi";
 
+export function makeTranslator(lang: LanguageCode) {
+  const dict = DICTS[lang] ?? DICTS.vi;
+  return (key: string, vars?: Record<string, string | number>) => {
+    const hit = getByPath(dict, key);
+    if (typeof hit === "string") return formatVars(hit, vars);
+    const enFallback = getByPath(DICTS.en, key);
+    if (typeof enFallback === "string") return formatVars(enFallback, vars);
+    const viFallback = getByPath(DICTS.vi, key);
+    if (typeof viFallback === "string") return formatVars(viFallback, vars);
+    return key;
+  };
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [language, setLanguageState] = useState<LanguageCode>(() =>
@@ -196,18 +211,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     router.refresh();
   };
 
-  const t = useMemo(() => {
-    const dict = DICTS[language] ?? DICTS.vi;
-    return (key: string, vars?: Record<string, string | number>) => {
-      const hit = getByPath(dict, key);
-      if (typeof hit === "string") return formatVars(hit, vars);
-      const enFallback = getByPath(DICTS.en, key);
-      if (typeof enFallback === "string") return formatVars(enFallback, vars);
-      const viFallback = getByPath(DICTS.vi, key);
-      if (typeof viFallback === "string") return formatVars(viFallback, vars);
-      return key;
-    };
-  }, [language]);
+  const t = useMemo(() => makeTranslator(language), [language]);
 
   const value = useMemo(
     () => ({ language, setLanguage, t }),

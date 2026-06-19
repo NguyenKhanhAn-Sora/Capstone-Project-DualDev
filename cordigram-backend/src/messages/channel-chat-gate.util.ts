@@ -160,6 +160,8 @@ export function evaluateChannelChatGate(input: {
   accountCreatedAt: Date;
   memberJoinedAt: Date | null;
   isBypass: boolean;
+  /** Thành viên cũ không có UserServer — không áp dụng ngược mức xác minh. */
+  legacyMemberGrandfather?: boolean;
 }): { allowed: boolean; reason?: ChatGateBlockReason } {
   if (input.isBypass) return { allowed: true };
 
@@ -173,8 +175,7 @@ export function evaluateChannelChatGate(input: {
     }
   }
 
-  // Đã là thành viên máy chủ: mức xác minh chỉ áp dụng trước khi vào, không áp dụng ngược.
-  if (input.memberJoinedAt != null) {
+  if (input.legacyMemberGrandfather) {
     return { allowed: true };
   }
 

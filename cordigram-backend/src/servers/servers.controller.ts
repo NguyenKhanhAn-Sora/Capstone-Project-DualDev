@@ -1111,7 +1111,7 @@ export class ServersController {
     @Body()
     body: {
       rulesChannelId?: string | null;
-      primaryLanguage?: 'vi' | 'en';
+      primaryLanguage?: 'vi' | 'en' | 'ja' | 'zh';
       description?: string | null;
     },
     @Request() req: any,

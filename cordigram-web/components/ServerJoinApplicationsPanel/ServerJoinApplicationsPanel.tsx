@@ -1,8 +1,7 @@
 "use client";
 
-import { appAlert, appConfirm, appPrompt } from "@/lib/app-dialog";
+import { appAlert } from "@/lib/app-dialog";
 import React, { useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./ServerJoinApplicationsPanel.module.css";
 import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
@@ -12,23 +11,13 @@ type Tab = serversApi.JoinApplicationListStatus;
 export default function ServerJoinApplicationsPanel({
   serverId,
   serverName,
-  canBan,
-  canKick,
-  canTimeout,
   ownerId,
   onApplicationsChanged,
-  onViewProfile,
-  onSendMessage,
 }: {
   serverId: string;
   serverName: string;
-  canBan?: boolean;
-  canKick?: boolean;
-  canTimeout?: boolean;
   ownerId?: string;
   onApplicationsChanged?: () => void;
-  onViewProfile?: (userId: string) => void;
-  onSendMessage?: (userId: string) => void;
 }) {
   const { t, language } = useLanguage();
   const [tab, setTab] = useState<Tab>("pending");
@@ -42,7 +31,6 @@ export default function ServerJoinApplicationsPanel({
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const [menu, setMenu] = useState<{ userId: string; x: number; y: number } | null>(null);
   /** Hàng đang gọi API duyệt/từ chối nhanh */
   const [quickOperatingUserId, setQuickOperatingUserId] = useState<string | null>(null);
 
@@ -211,136 +199,6 @@ export default function ServerJoinApplicationsPanel({
     }
   };
 
-  const openKebab = (e: React.MouseEvent, userId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const menuWidth = 220;
-    const x = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
-    const y = Math.min(rect.bottom + 4, window.innerHeight - 8);
-    setMenu({ userId, x, y });
-  };
-
-  const renderContextMenu = () => {
-    if (!menu || typeof document === "undefined") return null;
-    return createPortal(
-      <>
-        <button
-          type="button"
-          className={styles.menuBackdrop}
-          aria-label={t("chat.joinApplications.closeMenu")}
-          onClick={() => setMenu(null)}
-        />
-        <div
-          className={styles.menu}
-          style={{ left: menu.x, top: menu.y }}
-          role="menu"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            className={styles.menuItem}
-            onClick={() => {
-              const uid = menu.userId;
-              setMenu(null);
-              onViewProfile?.(uid);
-            }}
-          >
-            {t("chat.joinApplications.menuProfile")}
-            <span aria-hidden>👤</span>
-          </button>
-          <button
-            type="button"
-            className={styles.menuItem}
-            onClick={() => {
-              const uid = menu.userId;
-              setMenu(null);
-              onSendMessage?.(uid);
-            }}
-          >
-            {t("chat.joinApplications.menuMessage")}
-            <span aria-hidden>💬</span>
-          </button>
-
-          {(canKick || canBan || canTimeout) && (
-            <>
-              <div className={styles.menuDivider} />
-              {canTimeout && (
-                <button
-                  type="button"
-                  className={styles.menuItem}
-                  onClick={async () => {
-                    const uid = menu.userId;
-                    setMenu(null);
-                    const minsRaw = await appPrompt(t("chat.joinApplications.menuTimeoutPrompt"), "10");
-                    if (!minsRaw) return;
-                    const mins = Math.max(1, Math.min(60 * 24 * 7, Number(minsRaw)));
-                    if (!Number.isFinite(mins)) return;
-                    const reason = await appPrompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
-                    try {
-                      await serversApi.timeoutMember(serverId, uid, mins * 60, reason);
-                      await refresh();
-                    } catch (e) {
-                      appAlert(e instanceof Error ? e.message : t("chat.joinApplications.menuTimeoutError"));
-                    }
-                  }}
-                >
-                  {t("chat.joinApplications.menuTimeout")}
-                  <span aria-hidden>⏳</span>
-                </button>
-              )}
-              {canKick && (
-                <button
-                  type="button"
-                  className={styles.menuItem}
-                  onClick={async () => {
-                    const uid = menu.userId;
-                    setMenu(null);
-                    const ok = await appConfirm(t("chat.joinApplications.menuKickConfirm"));
-                    if (!ok) return;
-                    const reason = await appPrompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
-                    try {
-                      await serversApi.kickMember(serverId, uid, reason);
-                      await refresh();
-                    } catch (e) {
-                      appAlert(e instanceof Error ? e.message : t("chat.joinApplications.menuKickError"));
-                    }
-                  }}
-                >
-                  {t("chat.joinApplications.menuKick")}
-                  <span aria-hidden>🚪</span>
-                </button>
-              )}
-              {canBan && (
-                <button
-                  type="button"
-                  className={styles.menuItem}
-                  onClick={async () => {
-                    const uid = menu.userId;
-                    setMenu(null);
-                    const ok = await appConfirm(t("chat.joinApplications.menuBanConfirm"));
-                    if (!ok) return;
-                    const reason = await appPrompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
-                    try {
-                      await serversApi.banMember(serverId, uid, reason);
-                      await refresh();
-                    } catch (e) {
-                      appAlert(e instanceof Error ? e.message : t("chat.joinApplications.menuBanError"));
-                    }
-                  }}
-                >
-                  {t("chat.joinApplications.menuBan")}
-                  <span aria-hidden>⛔</span>
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </>,
-      document.body,
-    );
-  };
-
   const tabLabel = (tabKey: Tab) => {
     if (tabKey === "all") return t("chat.joinApplications.tabAll");
     if (tabKey === "pending") return `${t("chat.joinApplications.tabPending")}${pendingCount > 0 ? ` (${pendingCount})` : ""}`;
@@ -440,19 +298,6 @@ export default function ServerJoinApplicationsPanel({
                               </button>
                             </div>
                           )}
-                          <button
-                            type="button"
-                            className={styles.kebab}
-                            aria-label={t("chat.joinApplications.optionsBtn")}
-                            aria-haspopup="menu"
-                            onClick={(e) => openKebab(e, row.userId)}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                              <circle cx="12" cy="6" r="1.5" />
-                              <circle cx="12" cy="12" r="1.5" />
-                              <circle cx="12" cy="18" r="1.5" />
-                            </svg>
-                          </button>
                         </div>
                       )}
                     </td>
@@ -463,8 +308,6 @@ export default function ServerJoinApplicationsPanel({
           </div>
         )}
       </div>
-
-      {renderContextMenu()}
 
       {selectedUserId && (
         <aside className={styles.detail}>

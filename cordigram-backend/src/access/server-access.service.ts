@@ -1100,7 +1100,7 @@ export class ServerAccessService {
       Boolean((doc as any)?.serverEmailVerified) ||
       Boolean((userRow as any)?.isVerified);
     const verificationChecks =
-      rawMemberJoinedAt != null && !isBypass
+      legacyMemberNoUserServerRow && !isBypass
         ? {
             emailVerified: true,
             accountOver5Min: true,
@@ -1112,7 +1112,7 @@ export class ServerAccessService {
             memberJoinedAt,
           });
     const verificationWait =
-      rawMemberJoinedAt != null && !isBypass
+      legacyMemberNoUserServerRow && !isBypass
         ? { waitAccountSec: null, waitMemberSec: null }
         : getVerificationWaitSeconds({
             level: verificationLevel,
@@ -1153,6 +1153,7 @@ export class ServerAccessService {
       accountCreatedAt,
       memberJoinedAt,
       isBypass,
+      legacyMemberGrandfather: legacyMemberNoUserServerRow,
     });
 
     const applyJoinAccepted =
@@ -1529,10 +1530,6 @@ export class ServerAccessService {
         .setMemberNickname(serverId, targetUserId, (target as any).nickname)
         .catch(() => {});
     }
-
-    this.serversService
-      .sendWelcomeMessagePublic(serverId, targetUserId)
-      .catch(() => {});
 
     // Notify applicant (Dành cho bạn)
     this.serversService

@@ -60,8 +60,11 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
         _data = m;
         _channels = results[1] as List<ServerChannel>;
         _descCtrl.text = (m['description'] ?? '').toString();
-        _primaryLanguage =
-            (m['primaryLanguage'] ?? 'vi').toString() == 'en' ? 'en' : 'vi';
+        _primaryLanguage = const {'vi', 'en', 'ja', 'zh'}.contains(
+              (m['primaryLanguage'] ?? 'vi').toString(),
+            )
+            ? (m['primaryLanguage'] ?? 'vi').toString()
+            : 'vi';
         _rulesChannelId = m['rulesChannelId']?.toString();
       });
     } catch (e) {
@@ -212,6 +215,14 @@ class _ServerCommunityScreenState extends State<ServerCommunityScreen> {
                       DropdownMenuItem(
                         value: 'en',
                         child: Text('English', style: TextStyle(color: ui.text)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'ja',
+                        child: Text('日本語', style: TextStyle(color: ui.text)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'zh',
+                        child: Text('中文', style: TextStyle(color: ui.text)),
                       ),
                     ],
                     onChanged: widget.isOwner

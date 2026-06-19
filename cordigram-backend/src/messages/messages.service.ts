@@ -512,6 +512,7 @@ export class MessagesService {
       accountCreatedAt: new Date((userRow as any)?.createdAt || Date.now()),
       memberJoinedAt,
       isBypass,
+      legacyMemberGrandfather: legacyMemberNoUserServerRow,
     });
 
     return gate;

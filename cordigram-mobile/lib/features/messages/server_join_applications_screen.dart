@@ -446,26 +446,6 @@ class _ServerJoinApplicationsScreenState
                                   ),
                                 ),
                               ],
-                              PopupMenuButton<String>(
-                                icon: Icon(
-                                  Icons.more_vert_rounded,
-                                  color: chrome.text,
-                                ),
-                                tooltip: _t('chat.joinApplications.optionsBtn'),
-                                onSelected: (value) {
-                                  if (value == 'profile') {
-                                    _openDetail(row);
-                                  }
-                                },
-                                itemBuilder: (ctx) => [
-                                  PopupMenuItem(
-                                    value: 'profile',
-                                    child: Text(
-                                      _t('chat.joinApplications.menuProfile'),
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ],
                           ),
                         );

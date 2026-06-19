@@ -13,6 +13,8 @@ class LanguageController extends ChangeNotifier {
   static const String _storageKey = 'cordigram-language';
   static const List<String> supported = ['vi', 'en', 'ja', 'zh'];
 
+  static final Map<String, Map<String, dynamic>> _dictCache = {};
+
   static const Map<String, String> _localeNames = {
     'vi': 'vi-VN',
     'en': 'en-US',
@@ -75,6 +77,7 @@ class LanguageController extends ChangeNotifier {
   Future<void> _apply(String code, {required bool saveToPrefs}) async {
     final raw = await rootBundle.loadString('assets/locales/$code.json');
     _dict = json.decode(raw) as Map<String, dynamic>;
+    _dictCache[code] = _dict;
 
     if (code != 'vi' && _fallbackDict.isEmpty) {
       final fallbackRaw = await rootBundle.loadString('assets/locales/vi.json');
@@ -89,6 +92,41 @@ class LanguageController extends ChangeNotifier {
       await prefs.setString(_storageKey, code);
     }
     notifyListeners();
+  }
+
+  Future<void> preloadAllLocales() async {
+    for (final code in supported) {
+      if (_dictCache.containsKey(code)) continue;
+      final raw = await rootBundle.loadString('assets/locales/$code.json');
+      _dictCache[code] = json.decode(raw) as Map<String, dynamic>;
+    }
+    if (_fallbackDict.isEmpty && _dictCache['vi'] != null) {
+      _fallbackDict = _dictCache['vi']!;
+    }
+  }
+
+  String tFor(String code, String key, [Map<String, dynamic>? vars]) {
+    final lang = supported.contains(code) ? code : 'vi';
+    final dict = _dictCache[lang] ?? _dict;
+    dynamic val = _getByPath(dict, key);
+    if (val == null && _fallbackDict.isNotEmpty) {
+      val = _getByPath(_fallbackDict, key);
+    }
+    if (val is! String) return key;
+    if (vars == null) return val;
+    return vars.entries.fold<String>(
+      val,
+      (s, e) => s.replaceAll('{${e.key}}', '${e.value}'),
+    );
+  }
+
+  String tForServer(String? serverLang, String key, [Map<String, dynamic>? vars]) {
+    if (serverLang != null &&
+        supported.contains(serverLang) &&
+        serverLang != _lang) {
+      return tFor(serverLang, key, vars);
+    }
+    return t(key, vars);
   }
 
   String t(String key, [Map<String, dynamic>? vars]) {

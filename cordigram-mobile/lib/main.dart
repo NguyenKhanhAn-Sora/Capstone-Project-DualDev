@@ -61,6 +61,7 @@ void main() async {
   await ThemeController.instance.load();
   await AppearancePresetController.instance.load();
   await LanguageController.instance.load();
+  await LanguageController.instance.preloadAllLocales();
   await MessagesShellThemeController.instance.load();
   await AccentColorController.instance.load();
   runApp(const MyApp());

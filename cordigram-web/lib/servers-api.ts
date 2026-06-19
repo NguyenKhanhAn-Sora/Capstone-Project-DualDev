@@ -44,7 +44,7 @@ export interface Server {
   _id: string;
   name: string;
   description?: string;
-  primaryLanguage?: "vi" | "en";
+  primaryLanguage?: "vi" | "en" | "ja" | "zh";
   avatarUrl?: string;
   bannerUrl?: string;
   /** Ảnh biểu ngữ (URL); màu nền dùng bannerColor. */
@@ -1536,14 +1536,14 @@ export async function activateCommunity(
 
 export type CommunityOverviewUpdate = {
   rulesChannelId?: string | null;
-  primaryLanguage?: "vi" | "en";
+  primaryLanguage?: "vi" | "en" | "ja" | "zh";
   description?: string | null;
 };
 
 export async function updateCommunityOverview(
   serverId: string,
   body: CommunityOverviewUpdate,
-): Promise<{ ok: true; description: string | null; primaryLanguage: "vi" | "en"; rulesChannelId: string | null }> {
+): Promise<{ ok: true; description: string | null; primaryLanguage: "vi" | "en" | "ja" | "zh"; rulesChannelId: string | null }> {
   const response = await fetch(
     `${API_BASE_URL}/servers/${serverId}/community/overview`,
     {
@@ -3014,6 +3014,7 @@ export type ExploreServer = {
   memberCount: number;
   accessMode: "invite_only" | "apply" | "discoverable";
   isPublic: boolean;
+  primaryLanguage?: "vi" | "en" | "ja" | "zh";
 };
 
 export async function listExploreServers(): Promise<ExploreServer[]> {

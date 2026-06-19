@@ -65,7 +65,11 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
       _serverOverride ?? widget.server;
 
   String _t(String key, [Map<String, dynamic>? vars]) =>
-      LanguageController.instance.t(key, vars);
+      LanguageController.instance.tForServer(
+        _effectiveServer.primaryLanguage,
+        key,
+        vars,
+      );
 
   @override
   void initState() {
@@ -120,6 +124,13 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
               unreadCount: _effectiveServer.unreadCount,
               ownerId: _effectiveServer.ownerId,
               communityEnabled: _effectiveServer.communityEnabled,
+              primaryLanguage: const {'vi', 'en', 'ja', 'zh'}.contains(
+                    (mapped['primaryLanguage'] ?? _effectiveServer.primaryLanguage)
+                        .toString(),
+                  )
+                  ? (mapped['primaryLanguage'] ?? _effectiveServer.primaryLanguage)
+                      .toString()
+                  : _effectiveServer.primaryLanguage,
             );
           });
         }

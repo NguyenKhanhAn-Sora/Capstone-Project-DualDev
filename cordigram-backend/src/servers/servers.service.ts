@@ -1478,12 +1478,6 @@ export class ServersService {
         .exec();
     }
 
-    if (!isPending) {
-      this.sendWelcomeMessage(serverId, userId).catch((err) => {
-        console.error('[sendWelcomeMessage] Failed:', err?.message || err);
-      });
-    }
-
     this.serverInviteModel
       .updateMany(
         {
@@ -4063,7 +4057,7 @@ export class ServersService {
         memberCount: { $gte: 3 },
       })
       .select(
-        'name description avatarUrl bannerUrl bannerImageUrl bannerColor memberCount accessMode isPublic',
+        'name description avatarUrl bannerUrl bannerImageUrl bannerColor memberCount accessMode isPublic primaryLanguage',
       )
       .lean()
       .exec();
@@ -4079,6 +4073,7 @@ export class ServersService {
       memberCount: s.memberCount ?? 0,
       accessMode: s.accessMode ?? 'discoverable',
       isPublic: Boolean(s.isPublic),
+      primaryLanguage: (s as any).primaryLanguage ?? 'vi',
     }));
   }
 
@@ -4253,7 +4248,7 @@ export class ServersService {
     userId: string,
     body: {
       rulesChannelId?: string | null;
-      primaryLanguage?: 'vi' | 'en';
+      primaryLanguage?: 'vi' | 'en' | 'ja' | 'zh';
       description?: string | null;
     },
   ) {
@@ -4273,7 +4268,7 @@ export class ServersService {
     }
     if (typeof body.primaryLanguage !== 'undefined') {
       const lang = body.primaryLanguage;
-      if (lang !== 'vi' && lang !== 'en') {
+      if (lang !== 'vi' && lang !== 'en' && lang !== 'ja' && lang !== 'zh') {
         throw new BadRequestException('Invalid primaryLanguage');
       }
       (server as any).primaryLanguage = lang;

@@ -19,7 +19,7 @@ export type CommunityDiscoveryStatus =
   | 'rejected'
   | 'removed';
 
-export type ServerPrimaryLanguage = 'vi' | 'en';
+export type ServerPrimaryLanguage = 'vi' | 'en' | 'ja' | 'zh';
 
 export type JoinFormQuestionType = 'short' | 'paragraph' | 'multiple_choice';
 

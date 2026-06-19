@@ -18,7 +18,6 @@ export type ServerSettingsSection =
   | "automod"
   | "community"
   | "community-overview"
-  | "community-onboarding"
   | "delete-server";
 
 interface SidebarEntry {
@@ -161,7 +160,6 @@ export default function ServerSettingsPanel({
               if (localCommunityEnabled) {
                 items = [
                   { id: "community-overview" as ServerSettingsSection },
-                  { id: "community-onboarding" as ServerSettingsSection },
                 ];
               }
             }

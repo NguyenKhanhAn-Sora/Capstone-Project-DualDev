@@ -19,7 +19,7 @@ import {
   type DmCallAnswerDetail,
   type DmCallSessionSyncItem,
 } from "@/lib/dm-call-session-sync";
-import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
+import { useLanguage, localeTagForLanguage, makeTranslator, isLanguageCode, type LanguageCode } from "@/component/language-provider";
 import { useTranslations } from "next-intl";
 import {
   useDirectMessages,
@@ -1484,16 +1484,13 @@ function mapCallFieldsToUiMessage(msg: any): Partial<UIMessage> {
   };
 }
 
-/** Đồng bộ logic gate xác minh — thành viên đã trong máy chủ không bị chặn ngược. */
+/** Đồng bộ logic gate xác minh với backend. */
 function isServerAccessVerificationSatisfied(
   s: serversApi.MyServerAccessStatus | null | undefined,
 ): boolean {
   if (!s) return false;
   const lvl = s.verificationLevel ?? "none";
   if (lvl === "none") return true;
-  if (s.chatBlockReason !== "verification" && s.chatViewBlocked !== true) {
-    return true;
-  }
   const c = s.verificationChecks;
   if (!c) return false;
   if (lvl === "low") return Boolean(c.emailVerified);
@@ -1507,7 +1504,7 @@ function isServerAccessVerificationSatisfied(
 export default function MessagesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { t, language } = useLanguage();
+  const { t: tUser, language: userLanguage } = useLanguage();
   const tMsg = useTranslations("messages");
 
   const isAdminView = searchParams.get("from") === "admin";
@@ -1549,6 +1546,18 @@ export default function MessagesPage() {
   serversRef.current = servers;
   const selectedServerRef = useRef(selectedServer);
   selectedServerRef.current = selectedServer;
+
+  const serverScopedLanguage = useMemo((): LanguageCode | null => {
+    if (!selectedServer) return null;
+    const row = servers.find((s) => s._id === selectedServer) as
+      | { primaryLanguage?: string }
+      | undefined;
+    const pl = row?.primaryLanguage;
+    return isLanguageCode(pl) ? pl : null;
+  }, [selectedServer, servers]);
+
+  const language = (serverScopedLanguage ?? userLanguage) as LanguageCode;
+  const t = useMemo(() => makeTranslator(language), [language]);
   /** Tránh dùng `currentServerPermissions` của server trước khi GET my-permissions xong (gây 403 join-applications + UI sai). */
   const prevSelectedServerForMyPermsRef = useRef<string | null>(null);
   const [infoChannels, setInfoChannels] = useState<serversApi.Channel[]>([]);
@@ -11873,45 +11882,8 @@ export default function MessagesPage() {
                 <ServerJoinApplicationsPanel
                   serverId={currentServer._id}
                   serverName={currentServer.name || "Máy chủ"}
-                  canBan={Boolean(currentServerPermissions?.canBan)}
-                  canKick={Boolean(currentServerPermissions?.canKick)}
-                  canTimeout={Boolean(currentServerPermissions?.canTimeout)}
                   ownerId={String((currentServer as any).ownerId?._id ?? (currentServer as any).ownerId ?? "")}
                   onApplicationsChanged={() => setJoinApplicationsRefreshTick((t) => t + 1)}
-                  onViewProfile={(userId) => {
-                    const existing = friends.find((f) => f._id === userId);
-                    const friend: serversApi.Friend = existing ?? {
-                      _id: userId,
-                      displayName: "",
-                      username: "",
-                      avatarUrl: "",
-                      email: "",
-                    };
-                    if (!existing) setFriends((prev) => (prev.some((f) => f._id === userId) ? prev : [...prev, friend]));
-                    prepareScrollToLatest();
-                    setSelectedDirectMessageFriend(friend);
-                    setSelectedServer(null);
-                    setSelectedChannel(null);
-                    void loadDirectMessages(userId);
-                    scheduleScrollToBottom();
-                  }}
-                  onSendMessage={(userId) => {
-                    const existing = friends.find((f) => f._id === userId);
-                    const friend: serversApi.Friend = existing ?? {
-                      _id: userId,
-                      displayName: "",
-                      username: "",
-                      avatarUrl: "",
-                      email: "",
-                    };
-                    if (!existing) setFriends((prev) => (prev.some((f) => f._id === userId) ? prev : [...prev, friend]));
-                    prepareScrollToLatest();
-                    setSelectedDirectMessageFriend(friend);
-                    setSelectedServer(null);
-                    setSelectedChannel(null);
-                    void loadDirectMessages(userId);
-                    scheduleScrollToBottom();
-                  }}
                 />
               </div>
             ) : (selectedChannel && currentServer) ||
@@ -14325,7 +14297,7 @@ export default function MessagesPage() {
         locale={
           ((serverSettingsTarget?.serverId
             ? (servers.find((s) => s._id === serverSettingsTarget.serverId) as any)?.primaryLanguage
-            : undefined) as "vi" | "en" | undefined) || "vi"
+            : undefined) as LanguageCode | undefined) || userLanguage
         }
         isOwner={
           !!(
@@ -14539,18 +14511,6 @@ export default function MessagesPage() {
                   );
                 }}
               />
-            );
-          }
-          if (section === "community-onboarding" && serverSettingsTarget?.serverId) {
-            return (
-              <div style={{ padding: 24, color: "var(--color-panel-text)" }}>
-                <h2 style={{ color: "var(--color-panel-text)", marginBottom: 8 }}>
-                  {t("chat.chatPage.communityOnboardingTitle")}
-                </h2>
-                <p style={{ margin: 0, color: "var(--color-panel-text-muted)", lineHeight: 1.5 }}>
-                  {t("chat.chatPage.communityOnboardingDesc")}
-                </p>
-              </div>
             );
           }
           if (section === "emoji" && serverSettingsTarget?.serverId && token) {
@@ -15260,7 +15220,8 @@ function ExploreServersView({
   onClose: () => void;
   onJoin: (serverId: string) => void | Promise<void>;
 }) {
-  const { t, language } = useLanguage();
+  const { t: tUser, language: userLanguage } = useLanguage();
+  const t = tUser;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [servers, setServers] = useState<ExploreServer[]>([]);
@@ -15310,6 +15271,11 @@ function ExploreServersView({
         <div className={styles.exploreGrid}>
           {servers.map((s) => {
             const b = normalizeServerBanner(s);
+            const cardLang = isLanguageCode(s.primaryLanguage)
+              ? s.primaryLanguage
+              : userLanguage;
+            const tCard = makeTranslator(cardLang);
+            const localeTag = localeTagForLanguage(cardLang);
             return (
             <div key={s.id} className={styles.exploreCard}>
               <div
@@ -15335,8 +15301,8 @@ function ExploreServersView({
                   <div style={{ minWidth: 0 }}>
                     <div className={styles.exploreCardName}>{s.name}</div>
                     <div className={styles.exploreCardMeta}>
-                      {t("chat.explore.members", { count: String(Number(s.memberCount || 0).toLocaleString(language === "vi" ? "vi-VN" : language === "ja" ? "ja-JP" : language === "zh" ? "zh-CN" : "en-US")) })}
-                      {s.accessMode === "apply" ? " • " + t("chat.explore.badgeApply") : s.accessMode === "invite_only" ? " • " + t("chat.explore.badgeInviteOnly") : ""}
+                      {tCard("chat.explore.members", { count: String(Number(s.memberCount || 0).toLocaleString(localeTag)) })}
+                      {s.accessMode === "apply" ? " • " + tCard("chat.explore.badgeApply") : s.accessMode === "invite_only" ? " • " + tCard("chat.explore.badgeInviteOnly") : ""}
                     </div>
                   </div>
                 </div>
@@ -15348,10 +15314,10 @@ function ExploreServersView({
                   className={styles.exploreJoinBtn}
                   onClick={() => onJoin(s.id)}
                   disabled={s.accessMode === "invite_only"}
-                  title={s.accessMode === "invite_only" ? t("chat.explore.inviteOnlyTitle") : t("chat.explore.join")}
+                  title={s.accessMode === "invite_only" ? tCard("chat.explore.inviteOnlyTitle") : tCard("chat.explore.join")}
                   style={s.accessMode === "invite_only" ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
                 >
-                  {s.accessMode === "invite_only" ? t("chat.explore.inviteOnly") : t("chat.explore.join")}
+                  {s.accessMode === "invite_only" ? tCard("chat.explore.inviteOnly") : tCard("chat.explore.join")}
                 </button>
               </div>
             </div>
@@ -15371,7 +15337,7 @@ function CommunityOverviewSection({
 }: {
   serverId: string;
   canManageSettings: boolean;
-  initialServer: (serversApi.Server & { primaryLanguage?: "vi" | "en" }) | null;
+  initialServer: (serversApi.Server & { primaryLanguage?: "vi" | "en" | "ja" | "zh" }) | null;
   onUpdated?: (patch: Partial<serversApi.Server>) => void;
 }) {
   const { t, language } = useLanguage();
@@ -15381,8 +15347,10 @@ function CommunityOverviewSection({
   const [error, setError] = useState<string | null>(null);
 
   const [rulesChannelId, setRulesChannelId] = useState<string | null>(null);
-  const [primaryLanguage, setPrimaryLanguage] = useState<"vi" | "en">(
-    (initialServer as any)?.primaryLanguage || "vi",
+  const [primaryLanguage, setPrimaryLanguage] = useState<"vi" | "en" | "ja" | "zh">(
+    (isLanguageCode((initialServer as any)?.primaryLanguage)
+      ? (initialServer as any).primaryLanguage
+      : "vi") as "vi" | "en" | "ja" | "zh",
   );
   const [description, setDescription] = useState<string>(
     (initialServer as any)?.description || "",
@@ -15482,6 +15450,8 @@ function CommunityOverviewSection({
               >
                 <option value="vi">{t("chat.communityOverview.langVi")}</option>
                 <option value="en">{t("chat.communityOverview.langEn")}</option>
+                <option value="ja">{t("chat.communityOverview.langJa")}</option>
+                <option value="zh">{t("chat.communityOverview.langZh")}</option>
               </select>
             </div>
 
