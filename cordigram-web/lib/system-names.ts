@@ -145,21 +145,45 @@ export function translateChannelName(name: string, lang: string): string {
   return CHANNEL_MAP[name]?.[lang as Lang] ?? name;
 }
 
+type ServerLangInput =
+  | {
+      primaryLanguage?: string | null;
+      primaryLanguageConfigured?: boolean;
+      communitySettings?: { primaryLanguageConfigured?: boolean } | null;
+    }
+  | null
+  | undefined;
+
+export function isServerPrimaryLanguageConfigured(
+  server: ServerLangInput,
+): boolean {
+  if (!server) return false;
+  if (server.communitySettings?.primaryLanguageConfigured === true) return true;
+  if (server.primaryLanguageConfigured === true) return true;
+  return false;
+}
+
 /** Resolve UI language for a server: only when primary language was saved in Community Overview. */
 export function resolveServerDisplayLanguage(
-  server:
-    | {
-        primaryLanguage?: string | null;
-        communitySettings?: { primaryLanguageConfigured?: boolean } | null;
-      }
-    | null
-    | undefined,
+  server: ServerLangInput,
   userLanguage: string,
 ): Lang {
-  const configured =
-    server?.communitySettings?.primaryLanguageConfigured === true;
-  if (!configured) return (userLanguage as Lang) || "vi";
+  if (!isServerPrimaryLanguageConfigured(server)) {
+    return (userLanguage as Lang) || "vi";
+  }
   const pl = server?.primaryLanguage;
   if (pl === "vi" || pl === "en" || pl === "ja" || pl === "zh") return pl;
   return (userLanguage as Lang) || "vi";
+}
+
+/** Whether server-scoped UI should override the user's global language. */
+export function getServerLanguageOverride(
+  server: ServerLangInput,
+  userLanguage: string,
+): { enabled: boolean; language: Lang } {
+  const enabled = isServerPrimaryLanguageConfigured(server);
+  return {
+    enabled,
+    language: resolveServerDisplayLanguage(server, userLanguage),
+  };
 }

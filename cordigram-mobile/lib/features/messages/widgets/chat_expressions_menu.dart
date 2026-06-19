@@ -19,7 +19,24 @@ class ChatExpressionsMenu {
   static const _routeServerSticker = '/expressions-server-sticker';
   static const _routeKaomoji = '/expressions-kaomoji';
 
-  static String t(String key) => LanguageController.instance.t(key);
+  static String Function(String key)? _tOverride;
+
+  static String t(String key) {
+    final override = _tOverride;
+    if (override != null) return override(key);
+    return LanguageController.instance.t(key);
+  }
+
+  static String Function(String key) _serverTranslator({
+    required bool configured,
+    required String serverLang,
+  }) {
+    return (key) => LanguageController.instance.tForServerIfConfigured(
+          configured: configured,
+          serverLang: serverLang,
+          key: key,
+        );
+  }
 
   /// Context của [showModalBottomSheet] — dùng để đóng sheet, không phải navigator chat.
   static BuildContext? _modalSheetContext;
@@ -80,8 +97,14 @@ class ChatExpressionsMenu {
     required BuildContext context,
     required MessagesChromePalette chrome,
     required ChatExpressionsHost host,
+    bool primaryLanguageConfigured = false,
+    String serverLang = 'vi',
   }) {
     final innerNavKey = GlobalKey<NavigatorState>();
+    _tOverride = _serverTranslator(
+      configured: primaryLanguageConfigured,
+      serverLang: serverLang,
+    );
 
     return showModalBottomSheet<void>(
       context: context,
@@ -159,6 +182,7 @@ class ChatExpressionsMenu {
       },
     ).whenComplete(() {
       _modalSheetContext = null;
+      _tOverride = null;
     });
   }
 

@@ -74,21 +74,57 @@
 .closeBtn {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-muted, #b5bac1);
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-button-x, var(--color-border, #828b9a)) !important;
+  background: var(--color-surface-muted, var(--color-chat-input, #f0f3f9)) !important;
+  color: var(--color-button-x, var(--color-text, #0f1629)) !important;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.closeBtn svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-button-x, var(--color-text, #0f1629)) !important;
+  stroke: currentColor;
 }
 
 .closeBtn:hover {
-  background: var(--color-surface-muted, #35373c);
-  color: var(--color-text, #f2f3f5);
+  background: var(--color-chat-hover, var(--color-panel-hover, #e8ecf5)) !important;
+  border-color: var(--color-border-button-x, var(--color-border)) !important;
+  color: var(--color-button-x, var(--color-text, #0f1629)) !important;
+}
+
+.modal[data-messages-theme="light"] .closeBtn {
+  background: var(--color-surface-muted, #eef2fb) !important;
+  border-color: var(--color-border-button-x, #828b9a) !important;
+}
+
+.modal[data-messages-theme="light"] .closeBtn svg {
+  color: var(--color-button-x, #1f2a3d) !important;
+}
+
+.modal[data-messages-theme="dark"] .closeBtn,
+.modal[data-messages-theme="galaxy"] .closeBtn {
+  background: rgba(88, 101, 242, 0.12) !important;
+  border-color: rgba(88, 101, 242, 0.22) !important;
+}
+
+.modal[data-messages-theme="dark"] .closeBtn svg,
+.modal[data-messages-theme="galaxy"] .closeBtn svg {
+  color: var(--color-button-x, #e5e7ef) !important;
+}
+
+.modal[data-messages-theme="dark"] .closeBtn:hover,
+.modal[data-messages-theme="galaxy"] .closeBtn:hover {
+  background: rgba(88, 101, 242, 0.2) !important;
+  border-color: rgba(88, 101, 242, 0.35) !important;
 }
 
 .suggestDropdown {

@@ -1415,6 +1415,8 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
       ChatExpressionsMenu.show(
         context: context,
         chrome: chrome,
+        primaryLanguageConfigured: widget.server.primaryLanguageConfigured,
+        serverLang: widget.server.primaryLanguage,
         host: ChannelChatExpressionsHost(
           inputController: _inputController,
           chrome: chrome,

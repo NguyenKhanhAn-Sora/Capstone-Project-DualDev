@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import styles from "./ServerSettingsPanel.module.css";
 import DeleteServerModal from "@/components/DeleteServerModal";
-import { useLanguage, type LanguageCode } from "@/component/language-provider";
+import { useLanguage } from "@/component/language-provider";
 
 export type ServerSettingsSection =
   | "profile"
@@ -33,7 +33,6 @@ export interface ServerSettingsPanelProps {
   serverId: string;
   /** Khi mở panel, nhảy thẳng tới mục này (ví dụ sticker / emoji). Không truyền thì mặc định Hồ sơ máy chủ. */
   initialSection?: ServerSettingsSection;
-  locale?: LanguageCode;
   /** Chỉ người tạo (chủ sở hữu) máy chủ mới xóa được. Khi false sẽ ẩn mục "Xóa máy chủ". */
   isOwner?: boolean;
   communityEnabled?: boolean;
@@ -50,16 +49,13 @@ export default function ServerSettingsPanel({
   serverName,
   serverId,
   initialSection,
-  locale,
   isOwner = true,
   communityEnabled = false,
   renderSection,
   onCommunityActivated,
   onDeleteServer,
 }: ServerSettingsPanelProps) {
-  const { t: tt, language } = useLanguage();
-  const t = tt;
-  const effectiveLocale = (locale ?? language) as LanguageCode;
+  const { t, language } = useLanguage();
   const [activeSection, setActiveSection] = useState<ServerSettingsSection>("profile");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [localCommunityEnabled, setLocalCommunityEnabled] = useState(communityEnabled);
@@ -145,7 +141,7 @@ export default function ServerSettingsPanel({
       role="dialog"
       aria-modal
       aria-label={t("chat.serverSettings.ariaLabel")}
-      data-locale={effectiveLocale}
+      data-locale={language}
     >
       <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
         <aside className={styles.sidebar}>

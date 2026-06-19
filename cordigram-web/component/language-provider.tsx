@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { fetchUserSettings, updateUserSettings } from "@/lib/api";
 
@@ -229,4 +229,38 @@ export function useLanguage(): LanguageContextValue {
   const ctx = useContext(LanguageContext);
   if (!ctx) throw new Error("useLanguage must be used within LanguageProvider");
   return ctx;
+}
+
+/**
+ * Overrides `useLanguage()` for a server subtree (chat, settings, context menus).
+ * Does not change the user's global language preference.
+ */
+export function ServerLanguageOverrideProvider({
+  enabled,
+  language,
+  children,
+}: {
+  enabled: boolean;
+  language: LanguageCode;
+  children: ReactNode;
+}) {
+  const parent = useContext(LanguageContext);
+  if (!parent) {
+    throw new Error(
+      "ServerLanguageOverrideProvider must be used within LanguageProvider",
+    );
+  }
+
+  const value = useMemo(() => {
+    if (!enabled) return parent;
+    return {
+      language,
+      setLanguage: parent.setLanguage,
+      t: makeTranslator(language),
+    };
+  }, [enabled, language, parent]);
+
+  return (
+    <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
+  );
 }

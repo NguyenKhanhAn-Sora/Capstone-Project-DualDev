@@ -19,7 +19,7 @@ import {
   type DmCallAnswerDetail,
   type DmCallSessionSyncItem,
 } from "@/lib/dm-call-session-sync";
-import { useLanguage, localeTagForLanguage, makeTranslator, isLanguageCode, type LanguageCode } from "@/component/language-provider";
+import { useLanguage, localeTagForLanguage, makeTranslator, isLanguageCode, ServerLanguageOverrideProvider, type LanguageCode } from "@/component/language-provider";
 import { useTranslations } from "next-intl";
 import {
   useDirectMessages,
@@ -46,7 +46,7 @@ import {
 } from "@/lib/dm-call-active-peers";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
-import { translateCategoryName, translateChannelName, resolveServerDisplayLanguage } from "@/lib/system-names";
+import { translateCategoryName, translateChannelName, resolveServerDisplayLanguage, getServerLanguageOverride } from "@/lib/system-names";
 import { clampFloatingPosition } from "@/lib/floating-ui";
 import { DEFAULT_FREE_MAX_UPLOAD_BYTES, formatUploadLimitExceededMessage, isAllowedMessagingMediaFile, mapMessagingUploadErrorMessage } from "@/lib/upload-limits";
 import { shouldPlayChannelMessageNotificationSound } from "@/lib/channel-notification-sound";
@@ -873,23 +873,34 @@ const MessageItem = memo(
       top: number;
       left: number;
     } | null>(null);
+    const reactionBarRef = useRef<HTMLDivElement>(null);
+    const [reactionBarSize, setReactionBarSize] = useState({ width: 420, height: 44 });
 
     const updateFixedPosition = useCallback(() => {
       const el = messageRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const fromRight = message.isFromCurrentUser && message.replyToMessage?.messageType !== "welcome";
-      const QUICK_BAR_W = 360;
-      const QUICK_BAR_H = 44;
+      const containerRect = scrollContainerRef?.current?.getBoundingClientRect() ?? null;
+      const measured = reactionBarRef.current?.getBoundingClientRect();
+      const barW = measured?.width || reactionBarSize.width;
+      const barH = measured?.height || reactionBarSize.height;
       const pos = clampFloatingPosition({
         anchorRect: rect,
-        width: QUICK_BAR_W,
-        height: QUICK_BAR_H,
+        width: barW,
+        height: barH,
         alignRight: fromRight,
         gap: 6,
+        containerRect,
       });
       setFixedReactionPosition(pos);
-    }, [message.isFromCurrentUser, message.replyToMessage?.messageType]);
+    }, [
+      message.isFromCurrentUser,
+      message.replyToMessage?.messageType,
+      scrollContainerRef,
+      reactionBarSize.width,
+      reactionBarSize.height,
+    ]);
 
     useLayoutEffect(() => {
       if (!scrollContainerRef?.current || (!isHovered && !showEmojiPicker && !showActionsMenu)) {
@@ -900,8 +911,37 @@ const MessageItem = memo(
       const container = scrollContainerRef.current;
       const onScroll = () => updateFixedPosition();
       container.addEventListener("scroll", onScroll, { passive: true });
-      return () => container.removeEventListener("scroll", onScroll);
+      window.addEventListener("resize", onScroll);
+      return () => {
+        container.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+      };
     }, [scrollContainerRef, isHovered, showEmojiPicker, showActionsMenu, updateFixedPosition]);
+
+    useLayoutEffect(() => {
+      if (!isHovered && !showEmojiPicker && !showActionsMenu) return;
+      const node = reactionBarRef.current;
+      if (!node) return;
+      const measure = () => {
+        const box = node.getBoundingClientRect();
+        if (box.width > 0 && box.height > 0) {
+          setReactionBarSize((prev) =>
+            prev.width === box.width && prev.height === box.height
+              ? prev
+              : { width: box.width, height: box.height },
+          );
+        }
+      };
+      measure();
+      const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+      ro?.observe(node);
+      return () => ro?.disconnect();
+    }, [isHovered, showEmojiPicker, showActionsMenu, fixedReactionPosition]);
+
+    useLayoutEffect(() => {
+      if (!isHovered && !showEmojiPicker && !showActionsMenu) return;
+      updateFixedPosition();
+    }, [reactionBarSize, isHovered, showEmojiPicker, showActionsMenu, updateFixedPosition]);
 
     // ✅ Setup Intersection Observer to detect when message is visible
     useEffect(() => {
@@ -1169,6 +1209,7 @@ const MessageItem = memo(
           (scrollContainerRef && fixedReactionPosition ? (
           createPortal(
             <div
+              ref={reactionBarRef}
               style={{
                 position: "fixed",
                 zIndex: 10005,
@@ -1209,11 +1250,13 @@ const MessageItem = memo(
                 ...(() => {
                   const PICKER_W = 340;
                   const PICKER_H = 420;
+                  const containerRect = scrollContainerRef?.current?.getBoundingClientRect() ?? null;
                   const below = clampFloatingPosition({
                     anchorRect: messageRef.current!.getBoundingClientRect(),
                     width: PICKER_W,
                     height: PICKER_H,
                     gap: 52,
+                    containerRect,
                   });
                   return { top: below.top, left: below.left };
                 })(),
@@ -1560,10 +1603,21 @@ export default function MessagesPage() {
   const serverScopedLanguage = useMemo((): LanguageCode | null => {
     if (!selectedServer) return null;
     const row = servers.find((s) => s._id === selectedServer);
-    const resolved = resolveServerDisplayLanguage(row, userLanguage);
-    if (resolved === userLanguage) return null;
-    return resolved;
+    const override = getServerLanguageOverride(row, userLanguage);
+    if (!override.enabled) return null;
+    if (override.language === userLanguage) return null;
+    return override.language;
   }, [selectedServer, servers, userLanguage]);
+
+  const selectedServerRow = useMemo(
+    () => (selectedServer ? servers.find((s) => s._id === selectedServer) ?? null : null),
+    [selectedServer, servers],
+  );
+
+  const activeServerLangOverride = useMemo(
+    () => getServerLanguageOverride(selectedServerRow, userLanguage),
+    [selectedServerRow, userLanguage],
+  );
 
   const language = (serverScopedLanguage ?? userLanguage) as LanguageCode;
   const t = useMemo(() => makeTranslator(language), [language]);
@@ -1725,6 +1779,42 @@ export default function MessagesPage() {
   const [friends, setFriends] = useState<serversApi.Friend[]>([]);
   const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] =
     useState<serversApi.Friend | null>(null);
+
+  const settingsServerRow = useMemo(
+    () =>
+      serverSettingsTarget?.serverId
+        ? servers.find((s) => s._id === serverSettingsTarget.serverId) ?? null
+        : null,
+    [serverSettingsTarget?.serverId, servers],
+  );
+
+  const settingsLangOverride = useMemo(
+    () => getServerLanguageOverride(settingsServerRow, userLanguage),
+    [settingsServerRow, userLanguage],
+  );
+
+  const contextMenuServerRow = useMemo(
+    () =>
+      serverContextMenu?.server._id
+        ? servers.find((s) => s._id === serverContextMenu.server._id) ??
+          serverContextMenu.server
+        : null,
+    [serverContextMenu, servers],
+  );
+
+  const contextMenuLangOverride = useMemo(
+    () => getServerLanguageOverride(contextMenuServerRow, userLanguage),
+    [contextMenuServerRow, userLanguage],
+  );
+
+  const serverChatLangOverrideActive =
+    activeServerLangOverride.enabled &&
+    Boolean(selectedServer) &&
+    !selectedDirectMessageFriend &&
+    !showExploreView &&
+    !showBoostUpgradeView &&
+    !showJoinApplicationsView;
+
   const autoOpenedDmUserRef = useRef<string | null>(null);
   // Access Control (server rules approval modal)
   const [myServerAccessStatus, setMyServerAccessStatus] =
@@ -9649,6 +9739,10 @@ export default function MessagesPage() {
   )?.nickname;
 
   return (
+    <ServerLanguageOverrideProvider
+      enabled={serverChatLangOverrideActive}
+      language={activeServerLangOverride.language}
+    >
     <div
       id="cordigram-messages-root"
       className={styles.container}
@@ -13949,6 +14043,10 @@ export default function MessagesPage() {
       )}
 
       {serverContextMenu && (
+        <ServerLanguageOverrideProvider
+          enabled={contextMenuLangOverride.enabled}
+          language={contextMenuLangOverride.language}
+        >
         <ServerContextMenu
           x={serverContextMenu.x}
           y={serverContextMenu.y}
@@ -14103,6 +14201,7 @@ export default function MessagesPage() {
               : false)
           }
         />
+        </ServerLanguageOverrideProvider>
       )}
 
       {dmContextMenu && (
@@ -14295,6 +14394,10 @@ export default function MessagesPage() {
         );
       })()}
 
+      <ServerLanguageOverrideProvider
+        enabled={settingsLangOverride.enabled}
+        language={settingsLangOverride.language}
+      >
       <ServerSettingsPanel
         isOpen={showServerSettingsPanel}
         onClose={() => {
@@ -14305,11 +14408,6 @@ export default function MessagesPage() {
         serverName={serverSettingsTarget?.serverName ?? ""}
         serverId={serverSettingsTarget?.serverId ?? ""}
         initialSection={serverSettingsTarget?.initialSection}
-        locale={
-          ((serverSettingsTarget?.serverId
-            ? (servers.find((s) => s._id === serverSettingsTarget.serverId) as any)?.primaryLanguage
-            : undefined) as LanguageCode | undefined) || userLanguage
-        }
         isOwner={
           !!(
             serverSettingsTarget?.serverId &&
@@ -14571,6 +14669,7 @@ export default function MessagesPage() {
           return undefined;
         }}
       />
+      </ServerLanguageOverrideProvider>
 
       {selectedServer && canManageEventsOnServer && (
         <CreateEventWizard
@@ -15221,6 +15320,7 @@ export default function MessagesPage() {
         />
       )}
     </div>
+    </ServerLanguageOverrideProvider>
   );
 }
 

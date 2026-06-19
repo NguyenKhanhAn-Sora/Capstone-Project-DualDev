@@ -84,7 +84,12 @@ class _ServerContextBodyState extends State<_ServerContextBody> {
   CurrentUserServerPermissions get _p => widget.permissions;
 
   String _t(String key, [Map<String, dynamic>? vars]) =>
-      LanguageController.instance.t(key, vars);
+      LanguageController.instance.tForServerIfConfigured(
+        configured: widget.server.primaryLanguageConfigured,
+        serverLang: widget.server.primaryLanguage,
+        key: key,
+        vars: vars,
+      );
 
   @override
   void initState() {

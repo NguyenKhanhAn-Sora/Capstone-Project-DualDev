@@ -186,6 +186,7 @@ export default function MessageSearchPanel({
 }: MessageSearchPanelProps) {
   const { t, language } = useLanguage();
   const [themeVars, setThemeVars] = useState<React.CSSProperties>({});
+  const [messagesTheme, setMessagesTheme] = useState<string | null>(null);
   const quickSwitchParseOpts = useMemo((): ParseQuickSwitchPrefixOpts => {
     if (mode === "dm" && dmConversationOnlySearch) {
       return { enableQuickSwitch: false };
@@ -325,6 +326,8 @@ export default function MessageSearchPanel({
       "--color-primary-strong",
       "--color-panel-accent",
       "--color-panel-success",
+      "--color-button-x",
+      "--color-border-button-x",
       "--color-chat-modal",
       "--color-chat-modal-border",
       "--color-chat-input",
@@ -342,6 +345,7 @@ export default function MessageSearchPanel({
         (next as Record<string, string>)[name] = value;
       }
     }
+    setMessagesTheme(source.getAttribute("data-messages-theme"));
     setThemeVars(next);
   }, [isOpen]);
 
@@ -570,6 +574,7 @@ export default function MessageSearchPanel({
       <div
         className={styles.modal}
         style={themeVars}
+        data-messages-theme={messagesTheme ?? undefined}
         role="dialog"
         aria-modal="true"
         aria-labelledby="message-search-title"

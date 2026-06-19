@@ -48,7 +48,12 @@ class _ServerSettingsHubScreenState extends State<ServerSettingsHubScreen> {
   late ServerSummary _server;
 
   String _t(String key, [Map<String, dynamic>? vars]) =>
-      LanguageController.instance.t(key, vars);
+      LanguageController.instance.tForServerIfConfigured(
+        configured: _server.primaryLanguageConfigured,
+        serverLang: _server.primaryLanguage,
+        key: key,
+        vars: vars,
+      );
 
   @override
   void initState() {
