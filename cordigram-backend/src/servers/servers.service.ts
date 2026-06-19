@@ -4053,6 +4053,59 @@ export class ServersService {
     return server;
   }
 
+  async getTimedOutMembers(
+    serverId: string,
+    userId: string,
+  ): Promise<
+    Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      timeoutUntil: string;
+      remainingSeconds: number;
+    }>
+  > {
+    await this.assertCanViewBanModeration(serverId, userId);
+    const server = await this.serverModel.findById(serverId).lean().exec();
+    if (!server)
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+
+    const now = Date.now();
+    const timedOut = ((server as any).members || []).filter((m: any) => {
+      if (!m?.timeoutUntil) return false;
+      const until = new Date(m.timeoutUntil);
+      return !Number.isNaN(until.getTime()) && until.getTime() > now;
+    });
+    if (!timedOut.length) return [];
+
+    const userIds = timedOut.map((m: any) => new Types.ObjectId(m.userId));
+    const profiles = await this.profileModel
+      .find({ userId: { $in: userIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+    const profileMap = new Map(
+      (profiles as any[]).map((p) => [p.userId.toString(), p]),
+    );
+
+    return timedOut.map((m: any) => {
+      const until = new Date(m.timeoutUntil);
+      const p = profileMap.get(m.userId.toString()) || {};
+      return {
+        userId: m.userId.toString(),
+        displayName: p.displayName || 'Người dùng',
+        username: p.username || '',
+        avatarUrl: p.avatarUrl || '',
+        timeoutUntil: until.toISOString(),
+        remainingSeconds: Math.max(
+          0,
+          Math.ceil((until.getTime() - now) / 1000),
+        ),
+      };
+    });
+  }
+
   async getMentionRestrictedMembers(
     serverId: string,
     userId: string,

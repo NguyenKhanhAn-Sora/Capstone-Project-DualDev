@@ -14622,6 +14622,11 @@ export default function MessagesPage() {
                   Boolean(serverSettingsPermissions?.isOwner) ||
                   Boolean(serverSettingsPermissions?.canBan)
                 }
+                canRemoveTimeout={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canTimeout) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
               />
             );
           }

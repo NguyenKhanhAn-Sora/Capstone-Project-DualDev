@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -24,13 +25,30 @@ class ServerBansScreen extends StatefulWidget {
 class _ServerBansScreenState extends State<ServerBansScreen> {
   List<Map<String, dynamic>> _rows = [];
   List<Map<String, dynamic>> _restricted = [];
+  List<Map<String, dynamic>> _timedOut = [];
   bool _loading = true;
   String? _error;
   final _search = TextEditingController();
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
+  Timer? _countdownTimer;
+
+  String _formatRemaining(int seconds) {
+    if (seconds <= 0) return '0s';
+    final d = seconds ~/ 86400;
+    final h = (seconds % 86400) ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    final s = seconds % 60;
+    final parts = <String>[];
+    if (d > 0) parts.add('${d}d');
+    if (h > 0) parts.add('${h}h');
+    if (m > 0) parts.add('${m}m');
+    if (s > 0 && parts.length < 2) parts.add('${s}s');
+    return parts.isEmpty ? '${s}s' : parts.join(' ');
+  }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _realtimeSub?.cancel();
     _search.dispose();
     super.dispose();
@@ -43,6 +61,29 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
     _realtimeSub = ChannelMessagesRealtimeService.serverRealtime.listen(
       _onServerRealtime,
     );
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _timedOut.isEmpty) return;
+      setState(() {
+        _timedOut = _timedOut
+            .map((r) {
+              final untilRaw = r['timeoutUntil']?.toString();
+              if (untilRaw == null || untilRaw.isEmpty) {
+                return {...r, 'remainingSeconds': 0};
+              }
+              final until = DateTime.tryParse(untilRaw);
+              if (until == null) return {...r, 'remainingSeconds': 0};
+              return {
+                ...r,
+                'remainingSeconds': math.max(
+                  0,
+                  until.difference(DateTime.now()).inSeconds,
+                ),
+              };
+            })
+            .where((r) => (r['remainingSeconds'] as int? ?? 0) > 0)
+            .toList();
+      });
+    });
   }
 
   void _onServerRealtime(Map<String, dynamic> payload) {
@@ -65,15 +106,18 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
     try {
       final banned = await ServersService.getBannedUsers(widget.serverId);
       List<Map<String, dynamic>> restricted = [];
+      List<Map<String, dynamic>> timedOut = [];
       if (widget.canUnban) {
         restricted = await ServersService.getMentionRestrictedMembers(
           widget.serverId,
         );
+        timedOut = await ServersService.getTimedOutMembers(widget.serverId);
       }
       if (!mounted) return;
       setState(() {
         _rows = banned;
         _restricted = restricted;
+        _timedOut = timedOut;
       });
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -123,6 +167,22 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(LanguageController.instance.t('server.bans.unbanned'))),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _removeTimeout(String userId) async {
+    try {
+      await ServersService.removeTimeout(widget.serverId, userId);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã gỡ hạn chế thành viên')),
         );
       }
     } catch (e) {
@@ -268,6 +328,40 @@ class _ServerBansScreenState extends State<ServerBansScreen> {
                       actionLabel: 'Gỡ cấm',
                     );
                   }),
+                if (widget.canUnban && _timedOut.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    'Hạn chế (tạm khóa)',
+                    style: TextStyle(
+                      color: ui.textMuted,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Thành viên không thể nhắn tin hoặc tham gia kênh thoại trong thời gian quy định.',
+                    style: TextStyle(color: ui.textMuted, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._timedOut.map((r) {
+                    final uid = (r['userId'] ?? '').toString();
+                    final name = (r['displayName'] ?? r['username'] ?? uid).toString();
+                    final remaining = r['remainingSeconds'] is num
+                        ? (r['remainingSeconds'] as num).toInt()
+                        : 0;
+                    return _userTile(
+                      ui,
+                      r: r,
+                      uid: uid,
+                      name: name,
+                      subtitle: 'Còn ${_formatRemaining(remaining)}',
+                      onAction: () => _removeTimeout(uid),
+                      actionLabel: LanguageController.instance.t('server.members.removeTimeout'),
+                    );
+                  }),
+                ],
                 if (widget.canUnban && _restricted.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   Text(

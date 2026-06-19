@@ -1,16 +1,31 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { getBannedUsers, unbanMember, getMentionRestrictedMembers, unrestrictMember, type BannedUser, type MentionRestrictedMember } from "@/lib/servers-api";
+import { getBannedUsers, unbanMember, getMentionRestrictedMembers, getTimedOutMembers, unrestrictMember, removeTimeout, type BannedUser, type MentionRestrictedMember, type TimedOutMember } from "@/lib/servers-api";
 import styles from "./ServerBansSection.module.css";
 import { useLanguage } from "@/component/language-provider";
 
 interface ServerBansSectionProps {
   serverId: string;
   canManageBans: boolean;
+  canRemoveTimeout?: boolean;
 }
 
-export default function ServerBansSection({ serverId, canManageBans }: ServerBansSectionProps) {
+function formatRemaining(seconds: number): string {
+  if (seconds <= 0) return "0s";
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const parts: string[] = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0 && parts.length < 2) parts.push(`${s}s`);
+  return parts.join(" ") || `${s}s`;
+}
+
+export default function ServerBansSection({ serverId, canManageBans, canRemoveTimeout = false }: ServerBansSectionProps) {
   const { t } = useLanguage();
   const [bannedUsers, setBannedUsers] = useState<BannedUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,11 +34,31 @@ export default function ServerBansSection({ serverId, canManageBans }: ServerBan
   const [confirmTarget, setConfirmTarget] = useState<BannedUser | null>(null);
   const [unbanLoading, setUnbanLoading] = useState(false);
   const [restricted, setRestricted] = useState<MentionRestrictedMember[]>([]);
+  const [timedOut, setTimedOut] = useState<TimedOutMember[]>([]);
+
+  const loadTimedOut = useCallback(async () => {
+    if (!canManageBans) return;
+    try {
+      const data = await getTimedOutMembers(serverId);
+      setTimedOut(data);
+    } catch {
+      /* ignore */
+    }
+  }, [serverId, canManageBans]);
 
   const loadRestricted = useCallback(async () => {
     if (!canManageBans) return;
     try { const data = await getMentionRestrictedMembers(serverId); setRestricted(data); } catch { /* */ }
   }, [serverId, canManageBans]);
+
+  const handleRemoveTimeout = async (memberId: string) => {
+    try {
+      await removeTimeout(serverId, memberId);
+      setTimedOut((prev) => prev.filter((r) => r.userId !== memberId));
+    } catch {
+      /* ignore */
+    }
+  };
 
   const handleUnrestrict = async (memberId: string) => {
     try { await unrestrictMember(serverId, memberId); setRestricted((prev) => prev.filter((r) => r.userId !== memberId)); } catch { /* */ }
@@ -39,7 +74,30 @@ export default function ServerBansSection({ serverId, canManageBans }: ServerBan
     } finally { setLoading(false); }
   }, [serverId, t]);
 
-  useEffect(() => { loadBans(); loadRestricted(); }, [loadBans, loadRestricted]);
+  useEffect(() => { loadBans(); loadRestricted(); loadTimedOut(); }, [loadBans, loadRestricted, loadTimedOut]);
+
+  useEffect(() => {
+    if (!canManageBans || timedOut.length === 0) return;
+    const tick = () => {
+      setTimedOut((prev) => {
+        const next = prev
+          .map((m) => ({
+            ...m,
+            remainingSeconds: Math.max(
+              0,
+              Math.ceil((new Date(m.timeoutUntil).getTime() - Date.now()) / 1000),
+            ),
+          }))
+          .filter((m) => m.remainingSeconds > 0);
+        return next.length === prev.length &&
+          next.every((m, i) => m.remainingSeconds === prev[i]?.remainingSeconds)
+          ? prev
+          : next;
+      });
+    };
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [canManageBans, timedOut.length]);
 
   useEffect(() => {
     const onUpdated = (e: Event) => {
@@ -48,6 +106,7 @@ export default function ServerBansSection({ serverId, canManageBans }: ServerBan
       if (!d?.serverId || d.serverId !== serverId) return;
       void loadBans();
       void loadRestricted();
+      void loadTimedOut();
     };
     window.addEventListener("cordigram-server-membership-updated", onUpdated as EventListener);
     window.addEventListener("cordigram-server-moderation-updated", onUpdated as EventListener);
@@ -55,7 +114,7 @@ export default function ServerBansSection({ serverId, canManageBans }: ServerBan
       window.removeEventListener("cordigram-server-membership-updated", onUpdated as EventListener);
       window.removeEventListener("cordigram-server-moderation-updated", onUpdated as EventListener);
     };
-  }, [loadBans, loadRestricted, serverId]);
+  }, [loadBans, loadRestricted, loadTimedOut, serverId]);
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return bannedUsers;
@@ -137,6 +196,36 @@ export default function ServerBansSection({ serverId, canManageBans }: ServerBan
           </>
         )}
       </div>
+
+      {canManageBans && (
+        <div className={styles.restrictedSection}>
+          <h4 className={styles.restrictedTitle}>{t("chat.serverBans.timedOutTitle")}</h4>
+          {timedOut.length === 0 ? (
+            <p className={styles.restrictedEmpty}>{t("chat.serverBans.timedOutEmpty")}</p>
+          ) : timedOut.map((m) => (
+            <div key={m.userId} className={styles.restrictedRow}>
+              {m.avatarUrl ? (
+                <img src={m.avatarUrl} alt="" className={styles.restrictedAvatar} />
+              ) : (
+                <div className={styles.restrictedAvatar}>{(m.displayName || "?")[0].toUpperCase()}</div>
+              )}
+              <div className={styles.restrictedInfo}>
+                <p className={styles.restrictedName}>{m.displayName} <span className={styles.restrictedUsername}>@{m.username}</span></p>
+                <p className={styles.restrictedMeta}>
+                  <span className={styles.restrictedStatus}>{t("chat.serverBans.statusTimedOut")}</span>
+                  {" · "}
+                  {t("chat.serverBans.remainingTime").replace("{time}", formatRemaining(m.remainingSeconds))}
+                </p>
+              </div>
+              {canRemoveTimeout && (
+                <button type="button" className={styles.unrestrictBtn} onClick={() => handleRemoveTimeout(m.userId)}>
+                  {t("chat.serverBans.removeTimeoutBtn")}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {canManageBans && (
         <div className={styles.restrictedSection}>
