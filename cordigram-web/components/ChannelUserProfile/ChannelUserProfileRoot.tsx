@@ -16,7 +16,7 @@ import { syncMessagesChromeVars } from "@/lib/messages-appearance-chrome";
 import styles from "./ChannelUserProfileRoot.module.css";
 import type { Friend } from "@/lib/servers-api";
 import { parseUserCover } from "@/lib/user-profile-cover";
-import { buildProfileCardThemeStyle } from "@/lib/profile-theme";
+import { buildProfileCardThemeVars } from "@/lib/profile-theme";
 import {
   createServerInvite,
   followUser,
@@ -566,7 +566,7 @@ export default function ChannelUserProfileRoot({
 
   const cardThemeStyle = useMemo(
     () =>
-      buildProfileCardThemeStyle(
+      buildProfileCardThemeVars(
         memberRow?.profileThemePrimaryHex,
         memberRow?.profileThemeAccentHex,
       ),
@@ -887,18 +887,17 @@ export default function ChannelUserProfileRoot({
                 aria-hidden
               />
             </div>
-            <h2
-              className={styles.fullDisplayName}
-              style={getDisplayNameTextStyle(profile)}
-            >
-              {displayName}
-            </h2>
-            <p className={styles.fullUsername}>@{usernameLabel}</p>
-            <div className={styles.fullActionRow}>
+            <div className={styles.fullNameRow}>
+              <h2
+                className={styles.fullDisplayName}
+                style={getDisplayNameTextStyle(profile)}
+              >
+                {displayName}
+              </h2>
               {profile.isFollowing ? (
                 <button
                   type="button"
-                  className={styles.followBtnSecondary}
+                  className={styles.followBtnCompactSecondary}
                   onClick={() => void handleUnfollow()}
                 >
                   {t("chat.channelUserProfile.unfollow")}
@@ -906,12 +905,15 @@ export default function ChannelUserProfileRoot({
               ) : (
                 <button
                   type="button"
-                  className={styles.followBtn}
+                  className={styles.followBtnCompact}
                   onClick={() => void handleFollow()}
                 >
                   {t("chat.channelUserProfile.follow")}
                 </button>
               )}
+            </div>
+            <p className={styles.fullUsername}>@{usernameLabel}</p>
+            <div className={styles.fullActionRow}>
               <button
                 type="button"
                 className={styles.fullIconActionBtn}

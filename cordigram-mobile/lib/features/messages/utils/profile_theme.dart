@@ -28,6 +28,20 @@ class ProfileTheme {
     return '#${v.toRadixString(16).padLeft(6, '0')}';
   }
 
+  static bool isLightColor(Color color) {
+    return (0.299 * color.r + 0.587 * color.g + 0.114 * color.b) > 0.55;
+  }
+
+  static Color textOnBackground(Color bg) =>
+      isLightColor(bg) ? const Color(0xFF0F1629) : const Color(0xFFEEF1FB);
+
+  static Color textMutedOnBackground(Color bg) =>
+      isLightColor(bg) ? const Color(0xFF5B6378) : const Color(0xFF8899BF);
+
+  static Color surfaceOnBackground(Color bg) => isLightColor(bg)
+      ? const Color(0x140F1629)
+      : const Color(0x14FFFFFF);
+
   static BoxDecoration cardDecoration({Color? primary, Color? accent}) {
     final p = primary ?? defaultPrimary;
     final a = accent ?? defaultAccent;

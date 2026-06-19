@@ -729,6 +729,9 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
     final un = _usernameCtrl.text.trim();
     final pr = _pronounsCtrl.text.trim();
     final sub = [if (un.isNotEmpty) un, if (pr.isNotEmpty) pr].join(' • ');
+    final previewPrimary = _isServerTab ? _serverThemePrimary : _themePrimary;
+    final previewAccent = _isServerTab ? _serverThemeAccent : _themeAccent;
+    final previewTextMuted = ProfileTheme.textMutedOnBackground(previewPrimary);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -736,8 +739,8 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
         _sectionTitle(_t('chat.profileEditor.previewTitle')),
         Container(
           decoration: ProfileTheme.cardDecoration(
-            primary: _isServerTab ? _serverThemePrimary : _themePrimary,
-            accent: _isServerTab ? _serverThemeAccent : _themeAccent,
+            primary: previewPrimary,
+            accent: previewAccent,
           ).copyWith(
             borderRadius: AppRadii.lgAll,
             border: Border.all(color: c.border),
@@ -777,7 +780,7 @@ class _MessagesProfileEditorState extends State<MessagesProfileEditor> {
                           if (sub.isNotEmpty)
                             Text(
                               sub,
-                              style: TextStyle(color: c.textMuted, fontSize: 12),
+                              style: TextStyle(color: previewTextMuted, fontSize: 12),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),

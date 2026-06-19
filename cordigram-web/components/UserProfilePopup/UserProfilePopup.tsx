@@ -13,7 +13,7 @@ import {
   type ProfileDetailResponse,
 } from "@/lib/api";
 import { parseUserCover } from "@/lib/user-profile-cover";
-import { buildProfileCardThemeStyle } from "@/lib/profile-theme";
+import { buildProfileCardThemeVars } from "@/lib/profile-theme";
 
 function getDisplayNameTextStyle(source?: {
   displayNameFontId?: string | null;
@@ -118,7 +118,7 @@ export default function UserProfilePopup({
   const cover = useMemo(() => parseUserCover(detail?.coverUrl), [detail?.coverUrl]);
   const cardThemeStyle = useMemo(
     () =>
-      buildProfileCardThemeStyle(
+      buildProfileCardThemeVars(
         detail?.profileThemePrimaryHex,
         detail?.profileThemeAccentHex,
       ),
@@ -203,13 +203,31 @@ export default function UserProfilePopup({
             </div>
 
             <div className={styles.headerRow}>
-              <div>
-                <h2
-                  className={styles.name}
-                  style={getDisplayNameTextStyle(detail ?? undefined)}
-                >
-                  {displayName}
-                </h2>
+              <div className={styles.identityBlock}>
+                <div className={styles.nameRow}>
+                  <h2
+                    className={styles.name}
+                    style={getDisplayNameTextStyle(detail ?? undefined)}
+                  >
+                    {displayName}
+                  </h2>
+                  {!isSelf ? (
+                    <button
+                      type="button"
+                      onClick={() => void toggleFollow()}
+                      disabled={followLoading || loading}
+                      className={`${styles.followBtnInline} ${isFollowing ? styles.followingBtnInline : ""}`}
+                    >
+                      {loading
+                        ? "..."
+                        : followLoading
+                          ? "..."
+                          : isFollowing
+                            ? t("chat.popups.memberProfile.following")
+                            : t("chat.popups.memberProfile.follow")}
+                    </button>
+                  ) : null}
+                </div>
                 <p className={styles.username}>{username}</p>
               </div>
 
@@ -338,21 +356,6 @@ export default function UserProfilePopup({
 
             {!isSelf ? (
               <div className={styles.actions}>
-                <button
-                  type="button"
-                  onClick={() => void toggleFollow()}
-                  disabled={followLoading || loading}
-                  className={`${styles.followBtn} ${isFollowing ? styles.followingBtn : ""}`}
-                >
-                  {loading
-                    ? "..."
-                    : followLoading
-                      ? "..."
-                      : isFollowing
-                        ? t("chat.popups.memberProfile.following")
-                        : t("chat.popups.memberProfile.follow")}
-                </button>
-
                 <button
                   type="button"
                   onClick={() => onMessage?.(userId)}

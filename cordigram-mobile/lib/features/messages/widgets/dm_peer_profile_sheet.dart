@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/messages_chrome_palette.dart';
 import '../../profile/profile_screen.dart';
 import '../services/direct_messages_service.dart';
 import '../utils/messages_i18n.dart';
@@ -99,6 +98,8 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
           _profile?['profileThemeAccentHex']?.toString(),
           ProfileTheme.defaultAccent,
         );
+        final themeText = ProfileTheme.textOnBackground(themePrimary);
+        final themeTextMuted = ProfileTheme.textMutedOnBackground(themePrimary);
         final letter = displayName.isNotEmpty
             ? displayName.substring(0, 1).toUpperCase()
             : 'U';
@@ -144,7 +145,7 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
                         Text(
                           displayName,
                           style: TextStyle(
-                            color: chrome.text,
+                            color: themeText,
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                           ),
@@ -153,7 +154,7 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
                           Text(
                             '@$username',
                             style: TextStyle(
-                              color: chrome.textMuted,
+                              color: themeTextMuted,
                               fontSize: 13,
                             ),
                           ),
@@ -163,20 +164,26 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
                             bio,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: chrome.textMuted,
+                              color: themeTextMuted,
                               fontSize: 14,
                             ),
                           ),
                         ],
                         const SizedBox(height: 16),
                         _metaTile(
-                          chrome,
+                          themePrimary,
+                          themeAccent,
+                          themeText,
+                          themeTextMuted,
                           MessagesI18n.mutualServersLabel(),
                           mutualCount is num ? '${mutualCount.toInt()}' : '0',
                         ),
                         if (memberSince.isNotEmpty)
                           _metaTile(
-                            chrome,
+                            themePrimary,
+                            themeAccent,
+                            themeText,
+                            themeTextMuted,
                             MessagesI18n.memberSinceLabel(),
                             memberSince,
                           ),
@@ -186,8 +193,10 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
                           child: OutlinedButton(
                             onPressed: _openSocialProfile,
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: chrome.text,
-                              side: BorderSide(color: chrome.border),
+                              foregroundColor: themeText,
+                              side: BorderSide(
+                                color: themeAccent.withValues(alpha: 0.45),
+                              ),
                             ),
                             child: Text(MessagesI18n.viewSocialProfileLabel()),
                           ),
@@ -201,28 +210,37 @@ class _DmPeerProfileSheetState extends State<DmPeerProfileSheet> {
     );
   }
 
-  Widget _metaTile(MessagesChromePalette chrome, String label, String value) {
+  Widget _metaTile(
+    Color themePrimary,
+    Color themeAccent,
+    Color themeText,
+    Color themeTextMuted,
+    String label,
+    String value,
+  ) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: chrome.surface.withValues(alpha: 0.72),
+        color: ProfileTheme.surfaceOnBackground(themePrimary),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: chrome.border),
+        border: Border.all(
+          color: themeAccent.withValues(alpha: 0.25),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: chrome.textMuted, fontSize: 12),
+              style: TextStyle(color: themeTextMuted, fontSize: 12),
             ),
           ),
           Text(
             value,
             style: TextStyle(
-              color: chrome.text,
+              color: themeText,
               fontWeight: FontWeight.w600,
             ),
           ),
