@@ -73,8 +73,12 @@ export default function ExplorePage() {
   const router = useRouter();
   const { showLoginOverlay } = useGuestAuth();
 
+  // token is resolved once on mount — never changes after that
   const [token, setToken] = useState<string | null>(null);
-  const [items, setItems] = useState<FeedItem[]>([]);
+  const [tokenResolved, setTokenResolved] = useState(false);
+
+  // raw items from the API (no blocked-author filtering yet)
+  const [rawItems, setRawItems] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -85,8 +89,11 @@ export default function ExplorePage() {
   const sentImpressionsRef = useRef<Set<string>>(new Set());
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
+  // Resolve token exactly once — avoids triggering a second fetch when token
+  // becomes available after the initial guest load.
   useEffect(() => {
     setToken(getToken());
+    setTokenResolved(true);
   }, []);
 
   useEffect(() => {
@@ -99,6 +106,8 @@ export default function ExplorePage() {
       .catch(() => undefined);
   }, [token]);
 
+  // blockedIds is applied client-side only — excluded from loadPage deps so that
+  // a blockedIds update re-filters rawItems without triggering a backend refetch.
   const loadPage = useCallback(
     async (nextPage: number) => {
       setLoading(true);
@@ -110,16 +119,18 @@ export default function ExplorePage() {
             limit: PAGE_SIZE,
             page: nextPage,
           })) || [];
+
+        // hasMore is determined by the raw response size before any client-side
+        // filtering — blocked-author removal must not prematurely stop pagination.
+        setHasMore(data.length >= PAGE_SIZE);
+
         const nonAd = data.filter((item) => !(item as any).sponsored);
-        const filtered = filterFeedItemsByBlockedAuthors(nonAd, blockedIds);
 
-        setHasMore(filtered.length >= PAGE_SIZE);
-
-        setItems((prev) => {
-          if (nextPage === 1) return filtered;
+        setRawItems((prev) => {
+          if (nextPage === 1) return nonAd;
           const seen = new Set(prev.map((it) => it.id));
           const merged = [...prev];
-          filtered.forEach((it) => {
+          nonAd.forEach((it) => {
             if (!seen.has(it.id)) {
               seen.add(it.id);
               merged.push(it);
@@ -139,12 +150,27 @@ export default function ExplorePage() {
         setLoading(false);
       }
     },
-    [blockedIds, token],
+    // blockedIds intentionally omitted — filtering is done in the `items` memo below
+    [token],
   );
 
+  const loadPageRef = useRef(loadPage);
   useEffect(() => {
-    void loadPage(1);
+    loadPageRef.current = loadPage;
   }, [loadPage]);
+
+  // Fire initial load exactly once, after token is resolved. Using a ref so that
+  // if token changes later (e.g. re-login) it won't re-fire the initial load.
+  useEffect(() => {
+    if (!tokenResolved) return;
+    void loadPageRef.current(1);
+  }, [tokenResolved]);
+
+  // Apply blocked-author filter as a derived value — no network request needed
+  const items = useMemo(
+    () => filterFeedItemsByBlockedAuthors(rawItems, blockedIds),
+    [rawItems, blockedIds],
+  );
 
   const handleLoadMore = useCallback(() => {
     if (loading || !hasMore) return;
@@ -170,10 +196,13 @@ export default function ExplorePage() {
     return () => observer.disconnect();
   }, [handleLoadMore, hasMore]);
 
-  // Impression tracking (true viewport impressions, de-duped per session).
+  // Impression tracking with a short dwell (500 ms) to avoid counting fast
+  // scrolls as real impressions — consistent with home feed's view-dwell pattern.
   useEffect(() => {
-    if (!token) return; // impressions only tracked for logged-in users
+    if (!token) return;
     if (typeof IntersectionObserver === "undefined") return;
+
+    const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
     const tiles = Array.from(
       document.querySelectorAll<HTMLElement>("[data-explore-tile='1']"),
@@ -182,28 +211,44 @@ export default function ExplorePage() {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
           const el = entry.target as HTMLElement;
           const postId = el.dataset.postId || "";
-          const pos = el.dataset.pos ? Number(el.dataset.pos) : null;
           if (!postId) return;
-          if (sentImpressionsRef.current.has(postId)) return;
-          sentImpressionsRef.current.add(postId);
 
-          void recordExploreImpression({
-            token,
-            postId,
-            sessionId: sessionIdRef.current,
-            position: typeof pos === "number" ? pos : null,
-            source: "explore-grid",
-          }).catch(() => undefined);
+          if (entry.isIntersecting) {
+            if (sentImpressionsRef.current.has(postId)) return;
+            const pos = el.dataset.pos ? Number(el.dataset.pos) : null;
+            timers.set(
+              postId,
+              setTimeout(() => {
+                if (sentImpressionsRef.current.has(postId)) return;
+                sentImpressionsRef.current.add(postId);
+                void recordExploreImpression({
+                  token,
+                  postId,
+                  sessionId: sessionIdRef.current,
+                  position: typeof pos === "number" ? pos : null,
+                  source: "explore-grid",
+                }).catch(() => undefined);
+              }, 500),
+            );
+          } else {
+            const t = timers.get(postId);
+            if (t !== undefined) {
+              clearTimeout(t);
+              timers.delete(postId);
+            }
+          }
         });
       },
-      { root: null, rootMargin: "500px 0px", threshold: 0.2 },
+      { root: null, rootMargin: "200px 0px", threshold: 0.2 },
     );
 
     tiles.forEach((t) => observer.observe(t));
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      timers.forEach(clearTimeout);
+    };
   }, [items.length, token]);
 
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {

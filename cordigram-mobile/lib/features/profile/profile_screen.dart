@@ -1380,9 +1380,11 @@ class _ProfileScreenState extends State<ProfileScreen>
             _MoreMenuItem(
               icon: Icons.link_rounded,
               label: LanguageController.instance.t('profile.menu.copyLink'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                _showToast(_t('profile.linkCopied'));
+                final url =
+                    '${AppConfig.webBaseUrl}/profile/${_profile?.userId ?? ''}';
+                await Clipboard.setData(ClipboardData(text: url));
               },
             ),
             const SizedBox(height: 8),
@@ -2427,7 +2429,6 @@ class _ProfileScreenState extends State<ProfileScreen>
             final url =
                 '${AppConfig.webBaseUrl}/profile/${p.userId}';
             await Clipboard.setData(ClipboardData(text: url));
-            _showToast(_t('profile.linkCopied'));
           },
         ),
       ],

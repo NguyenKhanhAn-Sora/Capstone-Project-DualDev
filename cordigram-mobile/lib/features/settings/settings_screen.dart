@@ -7127,6 +7127,8 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
 
   @override
   Widget build(BuildContext context) {
+    final isGalaxy =
+        Theme.of(context).scaffoldBackgroundColor == Colors.transparent;
     return WillPopScope(
       onWillPop: () async {
         if (_selectedTab != null) {
@@ -7150,9 +7152,9 @@ static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
         return true;
       },
       child: Scaffold(
-        backgroundColor: _bg,
+        backgroundColor: isGalaxy ? Colors.transparent : _bg,
         appBar: AppBar(
-          backgroundColor: _bg,
+          backgroundColor: isGalaxy ? Colors.transparent : _bg,
           elevation: 0,
           title: Text(
             _selectedTab == null ? 'Settings' : _sectionTitle(_selectedTab!),

@@ -422,6 +422,7 @@ body {
     height: auto !important;
     min-height: calc(100dvh - 56px - 44px);
     overflow-y: visible;
+    overflow-x: hidden;
     /* tab bar is now sticky at top — no bottom padding needed */
     padding-bottom: 24px;
   }
@@ -454,6 +455,41 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--color-scrollbar-thumb);
   border-radius: 8px;
+}
+
+/* ── Dark-appearance autofill override ──────────────────────────────
+   Chrome's -webkit-autofill ignores `background` completely.
+   The only way to set the fill color is via box-shadow inset.
+   Apply to every dark/galaxy appearance so inputs never go white.
+   ──────────────────────────────────────────────────────────────── */
+[data-appearance="galaxy"] input:-webkit-autofill,
+[data-appearance="galaxy"] input:-webkit-autofill:hover,
+[data-appearance="galaxy"] input:-webkit-autofill:focus,
+[data-appearance="galaxy"] input:-webkit-autofill:active,
+[data-appearance="graphite"] input:-webkit-autofill,
+[data-appearance="graphite"] input:-webkit-autofill:hover,
+[data-appearance="graphite"] input:-webkit-autofill:focus,
+[data-appearance="graphite"] input:-webkit-autofill:active,
+[data-appearance="charcoal"] input:-webkit-autofill,
+[data-appearance="charcoal"] input:-webkit-autofill:hover,
+[data-appearance="charcoal"] input:-webkit-autofill:focus,
+[data-appearance="charcoal"] input:-webkit-autofill:active,
+[data-appearance="indigo"] input:-webkit-autofill,
+[data-appearance="indigo"] input:-webkit-autofill:hover,
+[data-appearance="indigo"] input:-webkit-autofill:focus,
+[data-appearance="indigo"] input:-webkit-autofill:active,
+[data-appearance="social-dark"] input:-webkit-autofill,
+[data-appearance="social-dark"] input:-webkit-autofill:hover,
+[data-appearance="social-dark"] input:-webkit-autofill:focus,
+[data-appearance="social-dark"] input:-webkit-autofill:active,
+[data-theme="dark"] input:-webkit-autofill,
+[data-theme="dark"] input:-webkit-autofill:hover,
+[data-theme="dark"] input:-webkit-autofill:focus,
+[data-theme="dark"] input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgba(12, 18, 40, 0.96) inset !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  caret-color: #e2e8f0 !important;
+  transition: background-color 9999s ease-in-out 0s !important;
 }
 
 /* Ẩn scrollbar trên mobile — không cần thiết và chiếm UI */

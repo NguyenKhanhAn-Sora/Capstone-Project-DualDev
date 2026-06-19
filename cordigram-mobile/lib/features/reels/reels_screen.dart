@@ -17,6 +17,7 @@ import 'package:video_player/video_player.dart';
 import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/widgets/action_sheet.dart';
 import '../../core/widgets/comment_sheet_widgets.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
@@ -1121,113 +1122,57 @@ class _ReelPageState extends State<_ReelPage> {
 
   Future<void> _openReelMenu(BuildContext triggerContext) async {
     final reel = widget.state.post;
-    final theme = Theme.of(context);
-    final tokens =
-        theme.extension<AppSemanticColors>() ??
-        (theme.brightness == Brightness.dark
-            ? AppSemanticColors.dark
-            : AppSemanticColors.light);
     final isOwner =
         widget.viewerId != null &&
         widget.viewerId!.isNotEmpty &&
         (reel.authorId == widget.viewerId ||
             reel.author?.id == widget.viewerId);
 
-    final entries = <({String id, String label, bool danger})>[];
+    final entries = <ActionSheetItem>[];
     final canDownload = reel.allowDownload == true && reel.media.isNotEmpty;
     final lc = LanguageController.instance;
     if (isOwner) {
-      entries.add((id: 'editReel', label: lc.t('reels.menu.editReel'), danger: false));
-      entries.add((
-        id: 'editVisibility',
-        label: lc.t('reels.menu.editVisibility'),
-        danger: false,
-      ));
-      entries.add((
+      entries.add(ActionSheetItem(id: 'editReel', label: lc.t('reels.menu.editReel'), icon: Icons.edit_outlined));
+      entries.add(ActionSheetItem(id: 'editVisibility', label: lc.t('reels.menu.editVisibility'), icon: Icons.lock_outline_rounded));
+      entries.add(ActionSheetItem(
         id: 'toggleComments',
-        label: reel.allowComments == false
-            ? lc.t('reels.menu.commentsOn')
-            : lc.t('reels.menu.commentsOff'),
-        danger: false,
+        label: reel.allowComments == false ? lc.t('reels.menu.commentsOn') : lc.t('reels.menu.commentsOff'),
+        icon: reel.allowComments == false ? Icons.chat_bubble_outline_rounded : Icons.comments_disabled_outlined,
       ));
-      entries.add((
+      entries.add(ActionSheetItem(
         id: 'toggleHideLike',
         label: reel.hideLikeCount == true ? lc.t('reels.menu.showLike') : lc.t('reels.menu.hideLike'),
-        danger: false,
+        icon: reel.hideLikeCount == true ? Icons.favorite_rounded : Icons.favorite_border_rounded,
       ));
-      entries.add((id: 'muteReel', label: lc.t('reels.menu.muteReel'), danger: false));
+      entries.add(ActionSheetItem(id: 'muteReel', label: lc.t('reels.menu.muteReel'), icon: Icons.volume_off_outlined));
       if (canDownload) {
-        entries.add((
-          id: 'downloadReel',
-          label: lc.t('reels.menu.download'),
-          danger: false,
-        ));
+        entries.add(ActionSheetItem(id: 'downloadReel', label: lc.t('reels.menu.download'), icon: Icons.download_outlined));
       }
-      entries.add((id: 'copyLink', label: lc.t('reels.menu.copyLink'), danger: false));
-      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
-      entries.add((id: 'deleteReel', label: lc.t('reels.menu.deleteReel'), danger: true));
+      entries.add(ActionSheetItem(id: 'copyLink', label: lc.t('reels.menu.copyLink'), icon: Icons.link_rounded));
+      entries.add(ActionSheetItem(id: 'seeLikes', label: lc.t('post.menu.seeLikes'), icon: Icons.favorite_border_rounded));
+      entries.add(ActionSheetItem(id: 'deleteReel', label: lc.t('reels.menu.deleteReel'), icon: Icons.delete_outline_rounded, danger: true));
     } else {
       if (canDownload) {
-        entries.add((
-          id: 'downloadReel',
-          label: lc.t('reels.menu.download'),
-          danger: false,
-        ));
+        entries.add(ActionSheetItem(id: 'downloadReel', label: lc.t('reels.menu.download'), icon: Icons.download_outlined));
       }
-      entries.add((id: 'copyLink', label: lc.t('reels.menu.copyLink'), danger: false));
-      entries.add((
+      entries.add(ActionSheetItem(id: 'copyLink', label: lc.t('reels.menu.copyLink'), icon: Icons.link_rounded));
+      entries.add(ActionSheetItem(
         id: 'followToggle',
         label: widget.state.following ? lc.t('reels.menu.unfollow') : lc.t('reels.menu.follow'),
-        danger: false,
+        icon: widget.state.following ? Icons.person_remove_outlined : Icons.person_add_outlined,
       ));
-      entries.add((
+      entries.add(ActionSheetItem(
         id: 'saveToggle',
         label: widget.state.saved ? lc.t('reels.menu.unsaveReel') : lc.t('reels.menu.saveReel'),
-        danger: false,
+        icon: widget.state.saved ? Icons.bookmark_remove_outlined : Icons.bookmark_border_rounded,
       ));
-      entries.add((id: 'hideReel', label: lc.t('reels.menu.hideReel'), danger: false));
-      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
-      entries.add((id: 'reportReel', label: lc.t('reels.menu.report'), danger: false));
-      entries.add((
-        id: 'blockAccount',
-        label: lc.t('reels.menu.blockAccount'),
-        danger: true,
-      ));
+      entries.add(ActionSheetItem(id: 'hideReel', label: lc.t('reels.menu.hideReel'), icon: Icons.visibility_off_outlined));
+      entries.add(ActionSheetItem(id: 'seeLikes', label: lc.t('post.menu.seeLikes'), icon: Icons.favorite_border_rounded));
+      entries.add(ActionSheetItem(id: 'reportReel', label: lc.t('reels.menu.report'), icon: Icons.flag_outlined));
+      entries.add(ActionSheetItem(id: 'blockAccount', label: lc.t('reels.menu.blockAccount'), icon: Icons.block_rounded, danger: true));
     }
 
-    final overlay =
-        Overlay.of(triggerContext).context.findRenderObject() as RenderBox;
-    final box = triggerContext.findRenderObject() as RenderBox;
-    final rect = Rect.fromPoints(
-      box.localToGlobal(Offset.zero, ancestor: overlay),
-      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
-    );
-
-    final selected = await showMenu<String>(
-      context: context,
-      color: tokens.panel,
-      surfaceTintColor: Colors.transparent,
-      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: tokens.panelBorder),
-      ),
-      items: entries
-          .map(
-            (item) => PopupMenuItem<String>(
-              value: item.id,
-              child: Text(
-                item.label,
-                style: TextStyle(
-                  color: item.danger ? theme.colorScheme.error : tokens.text,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          )
-          .toList(),
-    );
+    final selected = await showActionSheet(context, items: entries);
 
     if (!mounted || selected == null) return;
     switch (selected) {
@@ -1252,6 +1197,13 @@ class _ReelPageState extends State<_ReelPage> {
       case 'saveToggle':
         return widget.onMenuAction(PostMenuAction.saveToggle);
       case 'hideReel':
+        final confirmed = await showHideConfirmSheet(
+          context,
+          titleKey: 'reels.hideConfirm.title',
+          messageKey: 'reels.hideConfirm.message',
+          buttonKey: 'reels.hideConfirm.button',
+        );
+        if (!mounted || confirmed != true) return;
         return widget.onMenuAction(PostMenuAction.hidePost);
       case 'reportReel':
         return widget.onMenuAction(PostMenuAction.reportPost);

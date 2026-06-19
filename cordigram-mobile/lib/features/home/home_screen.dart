@@ -1991,13 +1991,16 @@ class _HomeScreenState extends State<HomeScreen>
 
   PreferredSizeWidget _buildAppBar() {
     final scheme = Theme.of(context).colorScheme;
+    final isGalaxy = Theme.of(context).scaffoldBackgroundColor == Colors.transparent;
     final letter = (_displayName ?? _username ?? 'U')
         .trim()
         .substring(0, 1)
         .toUpperCase();
 
     return AppBar(
-      backgroundColor: scheme.surface,
+      backgroundColor: isGalaxy
+          ? const Color(0xFF060B1E).withValues(alpha: 0.95)
+          : scheme.surface,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
@@ -2009,21 +2012,58 @@ class _HomeScreenState extends State<HomeScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Image(
-              image: AssetImage('assets/images/cordigram-logo.png'),
-              width: 32,
-              height: 32,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'CORDIGRAM',
-              style: TextStyle(
-                color: scheme.onSurface,
-                fontWeight: FontWeight.w800,
-                fontSize: 17,
-                letterSpacing: 1.2,
+            if (isGalaxy)
+              Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x4422D3EE),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Image(
+                  image: AssetImage('assets/images/cordigram-logo.png'),
+                  width: 32,
+                  height: 32,
+                ),
+              )
+            else
+              const Image(
+                image: AssetImage('assets/images/cordigram-logo.png'),
+                width: 32,
+                height: 32,
               ),
-            ),
+            const SizedBox(width: 8),
+            if (isGalaxy)
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFF22D3EE), Color(0xFF818CF8)],
+                ).createShader(bounds),
+                child: const Text(
+                  'CORDIGRAM',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 17,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              )
+            else
+              Text(
+                'CORDIGRAM',
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 17,
+                  letterSpacing: 1.2,
+                ),
+              ),
           ],
         ),
       ),
@@ -2068,14 +2108,38 @@ class _HomeScreenState extends State<HomeScreen>
           child: Padding(
             padding: const EdgeInsets.only(left: 2, right: 12),
             child: _avatarUrl != null
-                ? CircleAvatar(
-                    radius: 16,
-                    backgroundImage: NetworkImage(_avatarUrl!),
-                    backgroundColor: scheme.surfaceContainerHighest,
-                  )
+                ? (isGalaxy
+                    ? Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFF22D3EE).withValues(alpha: 0.65),
+                            width: 1.5,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x3322D3EE),
+                              blurRadius: 6,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: CircleAvatar(
+                          radius: 16,
+                          backgroundImage: NetworkImage(_avatarUrl!),
+                          backgroundColor: scheme.surfaceContainerHighest,
+                        ),
+                      )
+                    : CircleAvatar(
+                        radius: 16,
+                        backgroundImage: NetworkImage(_avatarUrl!),
+                        backgroundColor: scheme.surfaceContainerHighest,
+                      ))
                 : CircleAvatar(
                     radius: 16,
-                    backgroundColor: const Color(0xFF3470A2),
+                    backgroundColor: isGalaxy
+                        ? const Color(0xFF0C4A6E)
+                        : const Color(0xFF3470A2),
                     child: Text(
                       letter,
                       style: const TextStyle(
@@ -2091,35 +2155,69 @@ class _HomeScreenState extends State<HomeScreen>
       // ── Tab bar below the action row ──────────────────────────────────────
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(44),
-        child: ColoredBox(
-          color: scheme.surface,
-          child: TabBar(
-            controller: _tabController,
-            onTap: _onTopTabTap,
-            isScrollable: false,
-            labelColor: scheme.onSurface,
-            unselectedLabelColor: scheme.onSurfaceVariant,
-            labelStyle: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-            unselectedLabelStyle: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w400,
-            ),
-            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-            indicatorColor: scheme.primary,
-            indicatorWeight: 2.5,
-            dividerColor: scheme.outline.withValues(alpha: 0.4),
-            tabs: const [
-              Tab(icon: Icon(Icons.home_rounded, size: 26)),
-              Tab(icon: Icon(Icons.how_to_reg_outlined, size: 26)),
-              Tab(icon: Icon(Icons.explore_outlined, size: 26)),
-              Tab(icon: Icon(Icons.smart_display_outlined, size: 26)),
-              Tab(icon: Icon(Icons.add_box_outlined, size: 26)),
-            ],
-          ),
-        ),
+        child: isGalaxy
+            ? Container(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFF1A2A6B), width: 0.5),
+                  ),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  onTap: _onTopTabTap,
+                  isScrollable: false,
+                  labelColor: const Color(0xFF22D3EE),
+                  unselectedLabelColor: const Color(0xFF3D4E6A),
+                  labelStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  indicatorColor: const Color(0xFF22D3EE),
+                  indicatorWeight: 2.5,
+                  dividerColor: Colors.transparent,
+                  tabs: const [
+                    Tab(icon: Icon(Icons.home_rounded, size: 26)),
+                    Tab(icon: Icon(Icons.how_to_reg_outlined, size: 26)),
+                    Tab(icon: Icon(Icons.explore_outlined, size: 26)),
+                    Tab(icon: Icon(Icons.smart_display_outlined, size: 26)),
+                    Tab(icon: Icon(Icons.add_box_outlined, size: 26)),
+                  ],
+                ),
+              )
+            : ColoredBox(
+                color: scheme.surface,
+                child: TabBar(
+                  controller: _tabController,
+                  onTap: _onTopTabTap,
+                  isScrollable: false,
+                  labelColor: scheme.onSurface,
+                  unselectedLabelColor: scheme.onSurfaceVariant,
+                  labelStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  indicatorColor: scheme.primary,
+                  indicatorWeight: 2.5,
+                  dividerColor: scheme.outline.withValues(alpha: 0.4),
+                  tabs: const [
+                    Tab(icon: Icon(Icons.home_rounded, size: 26)),
+                    Tab(icon: Icon(Icons.how_to_reg_outlined, size: 26)),
+                    Tab(icon: Icon(Icons.explore_outlined, size: 26)),
+                    Tab(icon: Icon(Icons.smart_display_outlined, size: 26)),
+                    Tab(icon: Icon(Icons.add_box_outlined, size: 26)),
+                  ],
+                ),
+              ),
       ),
     );
   }

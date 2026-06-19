@@ -174,8 +174,10 @@ class _PeopleYouMayKnowState extends State<PeopleYouMayKnow> {
     final textDim = tokens.textMuted;
     final divColor = tokens.panelBorder;
 
+    final isGalaxySection = Theme.of(context).scaffoldBackgroundColor == Colors.transparent;
+
     return ColoredBox(
-      color: bgPage,
+      color: isGalaxySection ? Colors.transparent : bgPage,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -350,51 +352,74 @@ class _SuggestionCard extends StatelessWidget {
 
     final name = item.displayName.isNotEmpty ? item.displayName : item.username;
     final letter = name.trim().substring(0, 1).toUpperCase();
+    final isGalaxy = Theme.of(context).scaffoldBackgroundColor == Colors.transparent;
+
+    final innerCard = Container(
+      width: 132,
+      decoration: BoxDecoration(
+        color: isGalaxy ? const Color(0xFF070C20).withValues(alpha: 0.52) : cardColor,
+        borderRadius: BorderRadius.circular(isGalaxy ? 15 : 16),
+        border: isGalaxy ? null : Border.all(color: borderCol, width: 1),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _Avatar(avatarUrl: item.avatarUrl, letter: letter),
+          const SizedBox(height: 8),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: textPrime,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '@${item.username}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: textSub, fontSize: 10.5, height: 1.3),
+          ),
+          const Spacer(),
+          _FollowButton(
+            isFollowing: isFollowing,
+            isPending: isPending,
+            onTap: onFollow,
+          ),
+        ],
+      ),
+    );
 
     return GestureDetector(
       onTap: onOpenProfile,
-      child: Container(
-        width: 132,
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderCol, width: 1),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _Avatar(avatarUrl: item.avatarUrl, letter: letter),
-            const SizedBox(height: 8),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: textPrime,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                height: 1.3,
+      child: isGalaxy
+          ? Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF22D3EE), Color(0xFF7C3AED)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x2022D3EE),
+                    blurRadius: 8,
+                    spreadRadius: 0,
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '@${item.username}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: textSub, fontSize: 10.5, height: 1.3),
-            ),
-            const Spacer(),
-            _FollowButton(
-              isFollowing: isFollowing,
-              isPending: isPending,
-              onTap: onFollow,
-            ),
-          ],
-        ),
-      ),
+              padding: const EdgeInsets.all(1),
+              child: innerCard,
+            )
+          : innerCard,
     );
   }
 }
@@ -476,6 +501,8 @@ class _FollowButton extends StatelessWidget {
       );
     }
 
+    final isGalaxy = Theme.of(context).scaffoldBackgroundColor == Colors.transparent;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -483,31 +510,48 @@ class _FollowButton extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         height: 30,
         width: double.infinity,
-        decoration: BoxDecoration(
-          color: isFollowing
-              ? Colors.transparent
-              : tokens.primary.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isFollowing
-                ? tokens.panelBorder
-                : tokens.primary.withValues(alpha: 0.5),
-            width: 1,
-          ),
-        ),
+        decoration: isGalaxy && !isFollowing
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF22D3EE), Color(0xFF7C3AED)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              )
+            : BoxDecoration(
+                color: isFollowing
+                    ? Colors.transparent
+                    : tokens.primary.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isFollowing
+                      ? tokens.panelBorder
+                      : tokens.primary.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
         alignment: Alignment.center,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!isFollowing) ...[
-              Icon(Icons.add, size: 12, color: tokens.primary),
+              Icon(
+                Icons.add,
+                size: 12,
+                color: isGalaxy ? Colors.white : tokens.primary,
+              ),
               const SizedBox(width: 3),
             ],
             Text(
-              isFollowing ? LanguageController.instance.t('home.suggestions.following') : LanguageController.instance.t('home.suggestions.follow'),
+              isFollowing
+                  ? LanguageController.instance.t('home.suggestions.following')
+                  : LanguageController.instance.t('home.suggestions.follow'),
               style: TextStyle(
-                color: isFollowing ? tokens.textMuted : tokens.primary,
+                color: isFollowing
+                    ? tokens.textMuted
+                    : (isGalaxy ? Colors.white : tokens.primary),
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),

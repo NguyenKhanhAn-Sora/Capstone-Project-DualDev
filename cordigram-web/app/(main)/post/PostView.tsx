@@ -4579,6 +4579,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               key={`${tag}-${start}`}
               href={`/hashtag/${encodeURIComponent(tag)}`}
               className={feedStyles.hashtagLink}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               {token}
             </a>,
@@ -5912,6 +5914,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               className={`${feedStyles.tag} ${
                                 feedStyles.tagLink
                               }`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                             >
                               #{tag}
                             </a>

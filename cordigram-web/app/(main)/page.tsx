@@ -17,6 +17,7 @@ import VisibilityPickerOverlay from "@/ui/visibility-picker-overlay/visibility-p
 import MutePickerOverlay from "@/ui/mute-picker-overlay/mute-picker-overlay";
 import {
   fetchFeed,
+  fetchAdsFeed,
   getAdsDashboard,
   hidePost,
   likePost,
@@ -284,9 +285,11 @@ const isAdLikeFeedItem = (item: FeedItem) => {
 };
 
 const shouldRenderInHomeFeed = (item: FeedItem) => {
-  if (!isAdLikeFeedItem(item)) return true;
-  // Only active ads should appear in Home feed.
-  return Boolean(item.sponsored);
+  // Ads pipeline is separate — filter out any sponsored post that slips through
+  // (e.g. stale cache from before the pipeline split). Check only the flag, not
+  // content markers, to avoid false-positives on legitimate user posts.
+  if (item.sponsored) return false;
+  return true;
 };
 
 const campaignIdByPromotedPostId = new Map<string, string>();
@@ -561,6 +564,9 @@ export default function HomePage({
   const autoLoadLockRef = useRef(false);
   const autoLoadPausedRef = useRef(false);
 
+  // ── Ads pipeline state (separate from organic) ──────────────────────────
+  const [adPool, setAdPool] = useState<PostViewState[]>([]);
+  const [adPoolLoaded, setAdPoolLoaded] = useState(false);
 
   const feedCacheKey = useMemo(() => {
     const searchKey = (searchQueryOverride ?? "").trim();
@@ -581,26 +587,44 @@ export default function HomePage({
     [items, maxItems],
   );
 
-  // When showReels is true, merge injected reel items with post items and sort by time.
+  // Merge reels (when showReels=true) then interleave ads at 5-post intervals.
+  // Ads are injected from the separate adPool — 1 ad after every 5 organic posts.
   const visibleItems = useMemo(() => {
-    if (!showReels || !extraReelItems?.length) return baseItems;
-    const existingIds = new Set(baseItems.map((i) => i.item.id));
-    const reelViews = extraReelItems
-      .filter((r) => !existingIds.has(r.id))
-      .map((item) => ({
-        item,
-        flags: {
-          liked: item.liked ?? false,
-          saved: item.saved ?? false,
-          following: (item as any).following ?? false,
-        },
-      }));
-    return [...baseItems, ...reelViews].sort(
-      (a, b) =>
-        new Date(b.item.createdAt).getTime() -
-        new Date(a.item.createdAt).getTime(),
-    );
-  }, [baseItems, extraReelItems, showReels]);
+    // Step 1: build organic list (with optional reel merge)
+    let organic = baseItems;
+    if (showReels && extraReelItems?.length) {
+      const existingIds = new Set(baseItems.map((i) => i.item.id));
+      const reelViews = extraReelItems
+        .filter((r) => !existingIds.has(r.id))
+        .map((item) => ({
+          item,
+          flags: {
+            liked: item.liked ?? false,
+            saved: item.saved ?? false,
+            following: (item as any).following ?? false,
+          },
+        }));
+      organic = [...baseItems, ...reelViews].sort(
+        (a, b) =>
+          new Date(b.item.createdAt).getTime() -
+          new Date(a.item.createdAt).getTime(),
+      );
+    }
+
+    // Step 2: interleave ads — 1 ad after every 5 organic posts.
+    // Cycle through adPool if needed (same pool, different positions).
+    if (!adPool.length || embedded) return organic;
+    const result: PostViewState[] = [];
+    let adIndex = 0;
+    for (let i = 0; i < organic.length; i++) {
+      result.push(organic[i]);
+      if ((i + 1) % 5 === 0) {
+        result.push(adPool[adIndex % adPool.length]);
+        adIndex++;
+      }
+    }
+    return result;
+  }, [baseItems, extraReelItems, showReels, adPool, embedded]);
 
   const livestreamInsertIndex = useMemo(() => {
     if (!visibleItems.length) return 0;
@@ -954,9 +978,9 @@ export default function HomePage({
         return false;
       }
       if (!Array.isArray(cached.items) || !cached.items.length) return false;
-      const filteredItems = onlyPostViews(cached.items || []).filter(
-        (p) => viewerId ? true : !(p.item as any).pollId,
-      );
+      const filteredItems = onlyPostViews(cached.items || [])
+        .filter((p) => shouldRenderInHomeFeed(p.item))
+        .filter((p) => viewerId ? true : !(p.item as any).pollId);
       if (!filteredItems.length) return false;
       setItems(filteredItems);
       setPage(cached.page ?? 1);
@@ -1107,22 +1131,9 @@ export default function HomePage({
         }));
         if (nextPage === 1) {
           // Fresh load — replace entire list.
-          // If the user just created an ad, pinnedAdPostIdRef holds the promoted
-          // post ID (set by the ?newAd useEffect above). Re-check on every page-1
-          // load so background cache-hydration refreshes don't undo the pin.
-          const pinId = pinnedAdPostIdRef.current;
-          if (pinId) {
-            const adIdx = mapped.findIndex(
-              (p) => p.item.id === pinId || p.item.repostOf === pinId,
-            );
-            const pinned =
-              adIdx > 0
-                ? [mapped[adIdx], ...mapped.slice(0, adIdx), ...mapped.slice(adIdx + 1)]
-                : mapped;
-            setItems(pinned);
-          } else {
-            setItems(mapped);
-          }
+          // Ads are in the separate adPool pipeline; pinning a newly created ad
+          // into the organic feed is no longer applicable after pipeline separation.
+          setItems(mapped);
         } else {
           // Append, deduplicating by id to handle any feed overlap between pages
           setItems((prev) => {
@@ -1161,6 +1172,45 @@ export default function HomePage({
   useEffect(() => {
     loadRef.current = load;
   }, [load]);
+
+  // Loads all active ads into the pool once per session (fire-and-forget).
+  // Ads are not paginated on the client — the pool is cycled through during rendering.
+  const loadAds = useCallback(async () => {
+    if (adPoolLoaded || isSearchMode || scopeOverride === "following") return;
+    const currentToken =
+      typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    try {
+      const result = await fetchAdsFeed({ token: currentToken, limit: 10, page: 1 });
+      const mapped = (result?.items ?? [])
+        .filter((item) => filterFeedItemsByBlockedAuthors([item], blockedIds).length > 0)
+        .map((item) => ({
+          item,
+          flags: {
+            liked: item.liked ?? false,
+            saved: item.saved ?? false,
+            following: (item as any).following ?? false,
+          },
+        }));
+      setAdPool(mapped);
+    } catch {
+      // Ads failing silently is acceptable — organic feed still works.
+    } finally {
+      setAdPoolLoaded(true);
+    }
+  }, [adPoolLoaded, isSearchMode, scopeOverride, blockedIds]);
+
+  const loadAdsRef = useRef(loadAds);
+  useEffect(() => { loadAdsRef.current = loadAds; }, [loadAds]);
+
+  // Re-filter adPool whenever blocked users change so ads from newly blocked
+  // authors disappear immediately without requiring a full refetch.
+  useEffect(() => {
+    if (!adPool.length) return;
+    setAdPool((prev) =>
+      prev.filter((p) => filterFeedItemsByBlockedAuthors([p.item], blockedIds).length > 0),
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockedIds]);
 
   const handleLoadMore = useCallback(() => {
     if (loading || !hasMore) return;
@@ -1227,16 +1277,14 @@ export default function HomePage({
     }
     const shouldHydrate = sessionStorage.getItem(FEED_CACHE_INTENT_KEY);
     if (shouldHydrate && tryHydrateFromCache()) {
-      // Keep instant render from cache but sync with latest feed in the background.
       void loadRef.current(1);
-      return;
-    }
-    if (tryHydrateFromCache()) {
-      // Ensure new items (including sponsored posts) are not missed due to stale cache.
+    } else if (tryHydrateFromCache()) {
       void loadRef.current(1);
-      return;
+    } else {
+      void loadRef.current(1);
     }
-    void loadRef.current(1);
+    // Load ads pipeline in parallel — independent of organic feed.
+    void loadAdsRef.current();
   }, [canRender, isSearchMode, tryHydrateFromCache]);
 
   // When user lands from ?newAd=1, capture the pending ad ID into a ref so all
@@ -1782,7 +1830,7 @@ export default function HomePage({
         )}
 
         {visibleItems.map(({ item, flags }, index) => (
-          <Fragment key={item.id}>
+          <Fragment key={item.sponsored ? `ad-slot-${index}` : item.id}>
             {showReels && item.kind === "reel" ? (
               <ReelFeedCard item={item} />
             ) : (
@@ -2446,6 +2494,7 @@ function FeedCard({
   >(visibility ?? "public");
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilityError, setVisibilityError] = useState<string>("");
+  const [hideConfirmOpen, setHideConfirmOpen] = useState(false);
   const [muteModalOpen, setMuteModalOpen] = useState(false);
   const [muteOption, setMuteOption] = useState("5m");
   const [muteCustomDate, setMuteCustomDate] = useState("");
@@ -3262,6 +3311,8 @@ function FeedCard({
               key={`${tag}-${start}`}
               href={`/hashtag/${encodeURIComponent(tag)}`}
               className={styles.hashtagLink}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               {display}
             </a>,
@@ -4169,7 +4220,7 @@ function FeedCard({
                       className={styles.menuItem}
                       onClick={() => {
                         setMenuOpen(false);
-                        onHide(id);
+                        setHideConfirmOpen(true);
                       }}
                     >
                       {isAdLikePost ? "Hide this ads" : t("menu.hidePost")}
@@ -4200,7 +4251,7 @@ function FeedCard({
           <button
             className={`${styles.actionBtn} ${styles.actionBtnGhost}`}
             aria-label={tCommon("hidePost")}
-            onClick={() => onHide(id)}
+            onClick={() => setHideConfirmOpen(true)}
           >
             <IconClose size={22} />
           </button>
@@ -4253,6 +4304,8 @@ function FeedCard({
                   key={tag}
                   href={`/hashtag/${encodeURIComponent(tag)}`}
                   className={`${styles.tag} ${styles.tagLink}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   #{tag}
                 </a>
@@ -4664,6 +4717,17 @@ function FeedCard({
           ? createPortal(muteModal, document.body)
           : muteModal
         : null}
+
+      <ConfirmActionOverlay
+        open={hideConfirmOpen}
+        variant="warning"
+        title={t("hideConfirm.title")}
+        body={t("hideConfirm.body")}
+        labelConfirm={t("hideConfirm.confirm")}
+        labelCancel={t("hideConfirm.cancel")}
+        onClose={() => setHideConfirmOpen(false)}
+        onConfirm={() => { setHideConfirmOpen(false); onHide(id); }}
+      />
     </article>
   );
 }

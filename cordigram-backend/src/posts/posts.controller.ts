@@ -189,6 +189,22 @@ export class PostsController {
     );
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('feed/ads')
+  async adsFeed(
+    @Req() req: Request,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.postsService.getAdsFeed(
+      user?.userId ?? null,
+      parsedLimit ?? 3,
+      page ? Number(page) : undefined,
+    );
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('saved')
   async saved(@Req() req: Request, @Query('limit') limit?: string) {

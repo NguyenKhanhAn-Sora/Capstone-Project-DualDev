@@ -611,6 +611,116 @@
   .dashboardTop  { padding: 12px 14px; }
 }
 
+@media (max-width: 767px) {
+  /* Chặn tràn ngang */
+  .page {
+    padding: 12px 12px 80px;
+    gap: 12px;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  /* Dashboard top bar — stack dọc, full width */
+  .dashboardTop {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 16px;
+  }
+
+  .dashboardTop .primaryBtnCompact {
+    width: 100%;
+    padding: 12px 14px;
+    text-align: center;
+    border-radius: 12px;
+  }
+
+  .dashboardTitle { font-size: 19px; }
+  .dashboardSubtitle { font-size: 12px; }
+
+  /* Metrics: 1 cột để tránh text bị cắt */
+  .metricsGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .metricCard {
+    padding: 12px 10px 10px 12px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .metricLabel  { font-size: 10px; letter-spacing: 0.06em; }
+  .metricValue  { font-size: 18px; margin: 6px 0 4px; }
+  .metricHint   { font-size: 11px; }
+
+  /* Content grid: 1 cột, full width */
+  .contentGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .chartCard, .tableCard {
+    border-radius: 14px;
+    padding: 14px 12px;
+    /* Ngăn card tràn ra ngoài */
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .cardTitle    { font-size: 15px; }
+  .cardSubtitle { font-size: 12px; }
+
+  /* Chart */
+  .chartBars {
+    height: 140px;
+    gap: 4px;
+    padding: 8px 0 0;
+  }
+
+  .barLabel  { font-size: 9px; }
+  .chartLegend { gap: 10px; }
+
+  /* Table: horizontal scroll bên trong card */
+  .tableWrap {
+    border-radius: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    min-width: 340px;
+    font-size: 12px;
+  }
+
+  .table th { padding: 8px 10px; font-size: 10px; }
+  .table td { padding: 9px 10px; font-size: 12px; }
+
+  /* Empty state */
+  .emptyWrap {
+    min-height: auto;
+    padding: 0;
+  }
+
+  .emptyCard {
+    padding: 24px 16px;
+    border-radius: 16px;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .emptyVisual    { width: 80px; height: 80px; }
+  .emptyTitle     { font-size: 20px; }
+  .emptyText      { font-size: 13px; }
+  .emptyChecklist { width: 100%; }
+  .checkItem      { padding: 10px 12px; font-size: 13px; }
+  .emptyActions   { flex-direction: column; }
+  .emptyCtaBtn    { width: 100%; }
+}
+
 :global([data-appearance="galaxy"]) .page {
   background: transparent;
 }

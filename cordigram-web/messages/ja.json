@@ -26,10 +26,11 @@
       },
       "theme": {
         "title": "テーマ",
-        "description": "ライトモードとダークモードを切り替える。",
+        "description": "ライト、ダーク、ギャラクシーモードを切り替える。",
         "options": {
-          "light": "光",
-          "dark": "ダーク"
+          "light": "ライト",
+          "dark": "ダーク",
+          "galaxy": "ギャラクシー"
         }
       }
     },
@@ -258,6 +259,12 @@
       "blockFailed": "ブロックに失敗しました",
       "postHidden": "投稿を非表示にしました",
       "postHideFailed": "投稿の非表示に失敗しました"
+    },
+    "hideConfirm": {
+      "title": "この投稿を非表示にしますか？",
+      "body": "この投稿はフィードに表示されなくなります。",
+      "confirm": "非表示にする",
+      "cancel": "キャンセル"
     },
     "delete": {
       "title": "この投稿を削除しますか？",

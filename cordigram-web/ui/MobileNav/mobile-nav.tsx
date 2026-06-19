@@ -60,6 +60,7 @@ export default function MobileNav() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationClosing, setNotificationClosing] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileMenuClosing, setProfileMenuClosing] = useState(false);
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [dmUnreadCount, setDmUnreadCount] = useState(0);
@@ -240,16 +241,24 @@ export default function MobileNav() {
     return () => window.removeEventListener(NOTIFICATION_READ_EVENT, handleRead);
   }, []);
 
+  const closeProfileMenu = useCallback(() => {
+    setProfileMenuClosing(true);
+    setTimeout(() => {
+      setProfileMenuOpen(false);
+      setProfileMenuClosing(false);
+    }, 260);
+  }, []);
+
   useEffect(() => {
     if (!profileMenuOpen) return;
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setProfileMenuOpen(false);
+        closeProfileMenu();
       }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [profileMenuOpen]);
+  }, [profileMenuOpen, closeProfileMenu]);
 
   const avatarLetter = useMemo(() => {
     const source = profile?.displayName || profile?.username || "";
@@ -258,7 +267,7 @@ export default function MobileNav() {
   }, [profile]);
 
   const handleLogout = useCallback(async () => {
-    setProfileMenuOpen(false);
+    closeProfileMenu();
     try {
       await apiFetch<{ success: boolean }>({ path: "/auth/logout", method: "POST", credentials: "include" });
     } catch {}
@@ -363,7 +372,7 @@ export default function MobileNav() {
               <button
                 type="button"
                 className={styles.avatarBtn}
-                onClick={() => setProfileMenuOpen((v) => !v)}
+                onClick={() => { if (profileMenuOpen) closeProfileMenu(); else setProfileMenuOpen(true); }}
                 aria-label="Profile"
               >
                 {profile?.avatarUrl ? (
@@ -380,7 +389,15 @@ export default function MobileNav() {
               </button>
 
               {profileMenuOpen && (
-                <div className={styles.profileSheet}>
+              <>
+                {/* Backdrop — click ngoài để đóng */}
+                <div
+                  className={`${styles.profileSheetOverlay}${profileMenuClosing ? ` ${styles.profileSheetOverlayClosing}` : ""}`}
+                  onClick={closeProfileMenu}
+                />
+                <div className={`${styles.profileSheet}${profileMenuClosing ? ` ${styles.profileSheetClosing}` : ""}`}>
+                  {/* Drag handle — hiện trên mobile */}
+                  <div className={styles.profileSheetHandle} />
                   <div className={styles.profileSheetHeader}>
                     <div className={styles.profileSheetAvatar}>
                       {profile?.avatarUrl ? (
@@ -406,7 +423,7 @@ export default function MobileNav() {
                       type="button"
                       className={styles.sheetItem}
                       onClick={() => {
-                        setProfileMenuOpen(false);
+                        closeProfileMenu();
                         const id = profile?.id || profile?.userId;
                         if (id) router.push(`/profile/${id}`);
                       }}
@@ -416,7 +433,7 @@ export default function MobileNav() {
                     <button
                       type="button"
                       className={styles.sheetItem}
-                      onClick={() => { setProfileMenuOpen(false); router.push("/settings"); }}
+                      onClick={() => { closeProfileMenu(); router.push("/settings"); }}
                     >
                       <IconSettings /> {t("menu.settings")}
                     </button>
@@ -424,7 +441,7 @@ export default function MobileNav() {
                       type="button"
                       className={styles.sheetItem}
                       onClick={() => {
-                        setProfileMenuOpen(false);
+                        closeProfileMenu();
                         const id = profile?.id || profile?.userId;
                         if (id) router.push(`/profile/${id}/saved`);
                       }}
@@ -434,7 +451,7 @@ export default function MobileNav() {
                     <button
                       type="button"
                       className={styles.sheetItem}
-                      onClick={() => { setProfileMenuOpen(false); router.push("/ads"); }}
+                      onClick={() => { closeProfileMenu(); router.push("/ads"); }}
                     >
                       <IconAds /> {t("nav.ads")}
                     </button>
@@ -443,7 +460,7 @@ export default function MobileNav() {
                       className={styles.sheetItem}
                       onClick={() => {
                         toggleTheme();
-                        setProfileMenuOpen(false);
+                        closeProfileMenu();
                       }}
                     >
                       <IconTheme />
@@ -460,7 +477,7 @@ export default function MobileNav() {
                             key={code}
                             type="button"
                             className={`${styles.langChip} ${language === code ? styles.langChipActive : ""}`}
-                            onClick={() => { setLanguage(code); setProfileMenuOpen(false); }}
+                            onClick={() => { setLanguage(code); closeProfileMenu(); }}
                           >
                             {code.toUpperCase()}
                           </button>
@@ -470,7 +487,7 @@ export default function MobileNav() {
                     <button
                       type="button"
                       className={styles.sheetItem}
-                      onClick={() => { setProfileMenuOpen(false); router.push("/report-problem"); }}
+                      onClick={() => { closeProfileMenu(); router.push("/report-problem"); }}
                     >
                       <IconReport /> {t("menu.reportProblem")}
                     </button>
@@ -483,6 +500,7 @@ export default function MobileNav() {
                     </button>
                   </div>
                 </div>
+              </>
               )}
             </div>
           )}

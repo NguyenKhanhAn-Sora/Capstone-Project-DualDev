@@ -93,9 +93,10 @@ class _StoryBarState extends State<StoryBar> {
   Widget build(BuildContext context) {
     final t = LanguageController.instance.t;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dividerColor = isDark
-        ? const Color(0xFF1E2D48)
-        : const Color(0xFFDDE4F0);
+    final isGalaxy = Theme.of(context).scaffoldBackgroundColor == Colors.transparent;
+    final dividerColor = isGalaxy
+        ? const Color(0xFF1A2A6B)
+        : (isDark ? const Color(0xFF1E2D48) : const Color(0xFFDDE4F0));
 
     return Container(
       height: _kBarH + 20, // extra vertical padding
@@ -117,6 +118,7 @@ class _StoryBarState extends State<StoryBar> {
                     onTap: _openCreator,
                     label: t('story.addStory'),
                     isDark: isDark,
+                    isGalaxy: isGalaxy,
                   );
                 }
                 final group = _groups[index - 1];
@@ -124,6 +126,7 @@ class _StoryBarState extends State<StoryBar> {
                   group: group,
                   onTap: () => _openViewer(index - 1),
                   isDark: isDark,
+                  isGalaxy: isGalaxy,
                 );
               },
             ),
@@ -139,16 +142,18 @@ class _CardShell extends StatelessWidget {
     required this.child,
     required this.unviewed,
     required this.isDark,
+    this.isGalaxy = false,
   });
 
   final Widget child;
   final bool unviewed;
   final bool isDark;
+  final bool isGalaxy;
 
   @override
   Widget build(BuildContext context) {
     // For unviewed stories: 2-px gradient border.
-    // Implemented by wrapping in a gradient container and inset by 2 px.
+    // Galaxy mode: enhanced cyan→purple glow + box shadow.
     if (unviewed) {
       return Container(
         width: _kCardW,
@@ -158,8 +163,17 @@ class _CardShell extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF4AA3E4), Color(0xFF7C3AED)],
+            colors: [Color(0xFF22D3EE), Color(0xFF818CF8), Color(0xFF7C3AED)],
           ),
+          boxShadow: isGalaxy
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF22D3EE).withValues(alpha: 0.40),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
         ),
         padding: const EdgeInsets.all(2),
         child: ClipRRect(
@@ -174,7 +188,9 @@ class _CardShell extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(_kRadius),
         border: Border.all(
-          color: isDark ? const Color(0xFF253347) : const Color(0xFFD4DCEC),
+          color: isGalaxy
+              ? const Color(0xFF1A2A6B)
+              : (isDark ? const Color(0xFF253347) : const Color(0xFFD4DCEC)),
           width: 1,
         ),
       ),
@@ -194,16 +210,20 @@ class _AddStoryCard extends StatelessWidget {
     required this.onTap,
     required this.label,
     required this.isDark,
+    this.isGalaxy = false,
   });
 
   final String? avatarUrl;
   final VoidCallback onTap;
   final String label;
   final bool isDark;
+  final bool isGalaxy;
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDark ? const Color(0xFF131E2E) : const Color(0xFFF0F4FB);
+    final bgColor = isGalaxy
+        ? const Color(0xFF070C20)
+        : (isDark ? const Color(0xFF131E2E) : const Color(0xFFF0F4FB));
     final textColor =
         isDark ? const Color(0xFFE8ECF8) : const Color(0xFF0F1629);
 
@@ -221,9 +241,9 @@ class _AddStoryCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(_kRadius),
                 border: Border.all(
-                  color: isDark
-                      ? const Color(0xFF253347)
-                      : const Color(0xFFD4DCEC),
+                  color: isGalaxy
+                      ? const Color(0xFF1A2A6B)
+                      : (isDark ? const Color(0xFF253347) : const Color(0xFFD4DCEC)),
                   width: 1,
                 ),
                 color: bgColor,
@@ -325,11 +345,13 @@ class _StoryCard extends StatelessWidget {
     required this.group,
     required this.onTap,
     required this.isDark,
+    this.isGalaxy = false,
   });
 
   final StoryFeedGroup group;
   final VoidCallback onTap;
   final bool isDark;
+  final bool isGalaxy;
 
   @override
   Widget build(BuildContext context) {
@@ -355,6 +377,7 @@ class _StoryCard extends StatelessWidget {
             _CardShell(
               unviewed: unviewed,
               isDark: isDark,
+              isGalaxy: isGalaxy,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
