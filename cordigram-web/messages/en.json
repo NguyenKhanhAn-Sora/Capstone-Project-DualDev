@@ -26,10 +26,11 @@
       },
       "theme": {
         "title": "Theme",
-        "description": "Switch between light and dark mode.",
+        "description": "Switch between light, dark and galaxy mode.",
         "options": {
           "light": "Light",
-          "dark": "Dark"
+          "dark": "Dark",
+          "galaxy": "Galaxy"
         }
       }
     }
@@ -180,6 +181,12 @@
       "blockFailed": "Block failed",
       "postHidden": "Post hidden",
       "postHideFailed": "Failed to hide post"
+    },
+    "hideConfirm": {
+      "title": "Hide this post?",
+      "body": "This post will no longer appear in your feed.",
+      "confirm": "Hide post",
+      "cancel": "Cancel"
     },
     "delete": {
       "title": "Delete this post?",

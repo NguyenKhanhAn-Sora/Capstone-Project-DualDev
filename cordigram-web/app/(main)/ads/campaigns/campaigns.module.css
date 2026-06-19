@@ -792,3 +792,106 @@
 
   .pageInfo { width: 100%; text-align: center; margin-left: 0; margin-top: 6px; }
 }
+
+@media (max-width: 767px) {
+  .page {
+    padding: 0 0 80px;
+    gap: 0;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .container {
+    gap: 0;
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  /* Header: full-width, no side radius */
+  .headerRow {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    margin-bottom: 0;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .title    { font-size: 20px; }
+  .subtitle { font-size: 12px; }
+
+  .createBtn {
+    width: 100%;
+    text-align: center;
+    padding: 12px 20px;
+    box-sizing: border-box;
+  }
+
+  /* Filter bar */
+  .filterBar {
+    margin: 12px 12px 0;
+    border-radius: 14px;
+    gap: 8px;
+    padding: 12px;
+    box-sizing: border-box;
+    width: calc(100% - 24px);
+  }
+
+  .searchRow       { flex-direction: column; align-items: stretch; }
+  .searchInput     { width: 100%; flex: none; box-sizing: border-box; }
+  .filtersRow      { flex-direction: column; align-items: stretch; gap: 8px; }
+  .filterInlineField { width: 100%; justify-content: space-between; }
+  .filterDropdown,
+  .dateSelectWrap  { width: 100%; }
+  .filterCount     { margin-left: 0; }
+  .clearFilterBtn  { width: 100%; box-sizing: border-box; }
+
+  /* Card: overflow hidden to contain the scrollable table */
+  .card {
+    margin: 12px;
+    border-radius: 16px;
+    padding: 0;
+    overflow: hidden;
+    max-width: calc(100% - 24px);
+    box-sizing: border-box;
+  }
+
+  /* Table wrapper scrolls horizontally inside the card */
+  .tableWrap {
+    border-radius: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+  .table { min-width: 600px; font-size: 12px; }
+
+  .table th  { padding: 8px 10px; font-size: 9px; }
+  .table td  { padding: 10px; font-size: 12px; }
+
+  /* Simplify some cells */
+  .campaignNameCell { max-width: 120px; }
+  .campaignName     { font-size: 12px; }
+  .dateCell         { font-size: 11px; }
+  .numCell          { font-size: 12px; }
+  .spentCell        { min-width: 90px; }
+  .spentValue       { font-size: 12px; }
+
+  /* Details button smaller */
+  .detailsBtn { padding: 4px 8px; font-size: 11px; }
+
+  /* Pagination */
+  .pagination       { justify-content: center; padding: 10px 12px 4px; }
+  .pageInfo         { width: 100%; text-align: center; margin-left: 0; margin-top: 4px; }
+  .pageBtn          { padding: 4px 8px; font-size: 11px; min-width: 28px; }
+
+  /* Error card */
+  .errorCard { flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; }
+
+  /* Empty state inside table */
+  .emptyCell  { padding: 32px 16px !important; }
+}

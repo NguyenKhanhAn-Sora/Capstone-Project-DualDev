@@ -730,6 +730,11 @@
       "hideAds": "隐藏此广告",
       "seeLikes": "查看点赞用户"
     },
+    "hideConfirm": {
+      "title": "隐藏此帖子？",
+      "message": "此帖子将不再出现在您的动态中。",
+      "button": "隐藏帖子"
+    },
     "actions": {
       "like": "点赞",
       "repost": "转发",
@@ -983,6 +988,11 @@
       "unfollow": "取消关注",
       "saveReel": "保存此短视频",
       "unsaveReel": "取消保存此短视频"
+    },
+    "hideConfirm": {
+      "title": "隐藏此短视频？",
+      "message": "此短视频将不再出现在您的动态中。",
+      "button": "隐藏短视频"
     },
     "snack": {
       "saved": "已保存",

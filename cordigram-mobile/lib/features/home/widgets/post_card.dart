@@ -11,6 +11,7 @@ import '../../post/models/poll_data.dart';
 import '../../post/widgets/poll_widget.dart';
 import 'media_carousel.dart';
 import '../../../core/services/language_controller.dart';
+import '../../../core/widgets/action_sheet.dart';
 
 // ── Sponsored ad creative ────────────────────────────────────────────────────
 
@@ -302,8 +303,19 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
     await handler(action, widget.state);
   }
 
+  /// Called by the X button — shows confirmation before invoking [widget.onHide].
+  void _onHideWithConfirm() {
+    showHideConfirmSheet(
+      context,
+      titleKey: 'post.hideConfirm.title',
+      messageKey: 'post.hideConfirm.message',
+      buttonKey: 'post.hideConfirm.button',
+    ).then((confirmed) {
+      if (confirmed == true && mounted) widget.onHide();
+    });
+  }
+
   Future<void> _openMoreMenu(BuildContext triggerContext) async {
-    final scheme = Theme.of(context).colorScheme;
     final lc = LanguageController.instance;
     final isOwner =
         widget.viewerId != null &&
@@ -317,111 +329,63 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
     final bool isAdPost =
         (post.sponsored == true) || hasStructuredContent || hasStructuredSource;
 
-    final entries = <({String id, String label, bool danger})>[];
+    final entries = <ActionSheetItem>[];
     if (isOwner && isAdPost && widget.useAdsMenuMode) {
-      entries.add((id: 'goToAdsPost', label: lc.t('post.menu.goToAds'), danger: false));
-      entries.add((id: 'detailAds', label: lc.t('post.menu.detailAds'), danger: false));
-      entries.add((
+      entries.add(ActionSheetItem(id: 'goToAdsPost', label: lc.t('post.menu.goToAds'), icon: Icons.open_in_new_rounded));
+      entries.add(ActionSheetItem(id: 'detailAds', label: lc.t('post.menu.detailAds'), icon: Icons.info_outline_rounded));
+      entries.add(ActionSheetItem(
         id: 'toggleHideLike',
         label: post.hideLikeCount == true ? lc.t('post.menu.showLike') : lc.t('post.menu.hideLike'),
-        danger: false,
+        icon: post.hideLikeCount == true ? Icons.favorite_rounded : Icons.favorite_border_rounded,
       ));
-      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
-      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
+      entries.add(ActionSheetItem(id: 'copyLink', label: lc.t('post.menu.copyLink'), icon: Icons.link_rounded));
+      entries.add(ActionSheetItem(id: 'seeLikes', label: lc.t('post.menu.seeLikes'), icon: Icons.favorite_border_rounded));
     } else if (isOwner) {
-      entries.add((id: 'editPost', label: lc.t('post.menu.editPost'), danger: false));
-      entries.add((
-        id: 'editVisibility',
-        label: lc.t('post.menu.editVisibility'),
-        danger: false,
-      ));
-      entries.add((
+      entries.add(ActionSheetItem(id: 'editPost', label: lc.t('post.menu.editPost'), icon: Icons.edit_outlined));
+      entries.add(ActionSheetItem(id: 'editVisibility', label: lc.t('post.menu.editVisibility'), icon: Icons.lock_outline_rounded));
+      entries.add(ActionSheetItem(
         id: 'toggleComments',
-        label: post.allowComments == false
-            ? lc.t('post.menu.commentsOn')
-            : lc.t('post.menu.commentsOff'),
-        danger: false,
+        label: post.allowComments == false ? lc.t('post.menu.commentsOn') : lc.t('post.menu.commentsOff'),
+        icon: post.allowComments == false ? Icons.chat_bubble_outline_rounded : Icons.comments_disabled_outlined,
       ));
-      entries.add((
+      entries.add(ActionSheetItem(
         id: 'toggleHideLike',
         label: post.hideLikeCount == true ? lc.t('post.menu.showLike') : lc.t('post.menu.hideLike'),
-        danger: false,
+        icon: post.hideLikeCount == true ? Icons.favorite_rounded : Icons.favorite_border_rounded,
       ));
-      entries.add((
+      entries.add(ActionSheetItem(
         id: 'muteNotifications',
-        label: post.kind.toLowerCase() == 'reel'
-            ? lc.t('post.menu.muteReel')
-            : lc.t('post.menu.mutePost'),
-        danger: false,
+        label: post.kind.toLowerCase() == 'reel' ? lc.t('post.menu.muteReel') : lc.t('post.menu.mutePost'),
+        icon: Icons.notifications_off_outlined,
       ));
-      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
-      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
-      entries.add((id: 'deletePost', label: lc.t('post.menu.deletePost'), danger: true));
+      entries.add(ActionSheetItem(id: 'copyLink', label: lc.t('post.menu.copyLink'), icon: Icons.link_rounded));
+      entries.add(ActionSheetItem(id: 'seeLikes', label: lc.t('post.menu.seeLikes'), icon: Icons.favorite_border_rounded));
+      entries.add(ActionSheetItem(id: 'deletePost', label: lc.t('post.menu.deletePost'), icon: Icons.delete_outline_rounded, danger: true));
     } else {
-      entries.add((id: 'copyLink', label: lc.t('post.menu.copyLink'), danger: false));
-      entries.add((id: 'seeLikes', label: lc.t('post.menu.seeLikes'), danger: false));
-      entries.add((
+      entries.add(ActionSheetItem(id: 'copyLink', label: lc.t('post.menu.copyLink'), icon: Icons.link_rounded));
+      entries.add(ActionSheetItem(id: 'seeLikes', label: lc.t('post.menu.seeLikes'), icon: Icons.favorite_border_rounded));
+      entries.add(ActionSheetItem(
         id: 'followToggle',
         label: widget.state.following ? lc.t('post.menu.unfollow') : lc.t('post.menu.follow'),
-        danger: false,
+        icon: widget.state.following ? Icons.person_remove_outlined : Icons.person_add_outlined,
       ));
-      entries.add((
+      entries.add(ActionSheetItem(
         id: 'saveToggle',
         label: (isAdPost && widget.useAdsMenuMode)
             ? (widget.state.saved ? lc.t('post.menu.unsaveAds') : lc.t('post.menu.saveAds'))
             : (widget.state.saved ? lc.t('post.menu.unsavePost') : lc.t('post.menu.savePost')),
-        danger: false,
+        icon: widget.state.saved ? Icons.bookmark_remove_outlined : Icons.bookmark_border_rounded,
       ));
-      entries.add((
+      entries.add(ActionSheetItem(
         id: 'hidePost',
-        label: (isAdPost && widget.useAdsMenuMode)
-            ? lc.t('post.menu.hideAds')
-            : lc.t('post.menu.hidePost'),
-        danger: false,
+        label: (isAdPost && widget.useAdsMenuMode) ? lc.t('post.menu.hideAds') : lc.t('post.menu.hidePost'),
+        icon: Icons.visibility_off_outlined,
       ));
-      entries.add((id: 'reportPost', label: lc.t('post.menu.report'), danger: false));
-      entries.add((
-        id: 'blockAccount',
-        label: lc.t('post.menu.blockAccount'),
-        danger: true,
-      ));
+      entries.add(ActionSheetItem(id: 'reportPost', label: lc.t('post.menu.report'), icon: Icons.flag_outlined));
+      entries.add(ActionSheetItem(id: 'blockAccount', label: lc.t('post.menu.blockAccount'), icon: Icons.block_rounded, danger: true));
     }
 
-    final overlay =
-        Overlay.of(triggerContext).context.findRenderObject() as RenderBox;
-    final box = triggerContext.findRenderObject() as RenderBox;
-    final rect = Rect.fromPoints(
-      box.localToGlobal(Offset.zero, ancestor: overlay),
-      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
-    );
-
-    final selected = await showMenu<String>(
-      context: context,
-      color: scheme.surface,
-      surfaceTintColor: Colors.transparent,
-      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: scheme.outline.withValues(alpha: 0.4)),
-      ),
-      items: entries
-          .map(
-            (item) => PopupMenuItem<String>(
-              value: item.id,
-              child: Text(
-                item.label,
-                style: TextStyle(
-                  color: item.danger
-                      ? const Color(0xFFF87171)
-                      : scheme.onSurface,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          )
-          .toList(),
-    );
+    final selected = await showActionSheet(context, items: entries);
 
     if (!mounted || selected == null) return;
 
@@ -450,6 +414,13 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
       case 'saveToggle':
         return _onMenuAction(PostMenuAction.saveToggle);
       case 'hidePost':
+        final confirmed = await showHideConfirmSheet(
+          context,
+          titleKey: 'post.hideConfirm.title',
+          messageKey: 'post.hideConfirm.message',
+          buttonKey: 'post.hideConfirm.button',
+        );
+        if (!mounted || confirmed != true) return;
         return _onMenuAction(PostMenuAction.hidePost);
       case 'reportPost':
         return _onMenuAction(PostMenuAction.reportPost);
@@ -464,6 +435,7 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isGalaxy = theme.scaffoldBackgroundColor == Colors.transparent;
     final state = widget.state;
     final post = state.post;
 
@@ -500,19 +472,35 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
             ? EdgeInsets.zero
             : const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: scheme.surface,
+          color: isGalaxy
+              ? const Color(0xFF080E24).withValues(alpha: 0.60)
+              : scheme.surface,
           borderRadius: widget.fullWidth
               ? BorderRadius.zero
               : BorderRadius.circular(16),
           border: widget.fullWidth
               ? null
               : Border.all(
-                  color: isAdPost
-                      ? const Color(0xFF0EA5E9).withValues(alpha: 0.35)
-                      : scheme.outline.withValues(alpha: 0.35),
+                  color: isGalaxy
+                      ? (isAdPost
+                          ? const Color(0xFF22D3EE).withValues(alpha: 0.30)
+                          : const Color(0xFF1A2A6B).withValues(alpha: 0.80))
+                      : (isAdPost
+                          ? const Color(0xFF0EA5E9).withValues(alpha: 0.35)
+                          : scheme.outline.withValues(alpha: 0.35)),
                 ),
           boxShadow: widget.fullWidth
               ? null
+              : isGalaxy
+              ? [
+                  BoxShadow(
+                    color: isAdPost
+                        ? const Color(0xFF22D3EE).withValues(alpha: 0.12)
+                        : const Color(0xFF000000).withValues(alpha: 0.45),
+                    blurRadius: isAdPost ? 20 : 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
               : isAdPost
               ? const [
                   BoxShadow(
@@ -529,7 +517,35 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
                   ),
                 ],
         ),
-        child: Padding(
+        child: Stack(
+          children: [
+            // Galaxy: subtle top gradient accent line
+            if (isGalaxy && !widget.fullWidth)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 1.5,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                    gradient: LinearGradient(
+                      colors: isAdPost
+                          ? [const Color(0xFF22D3EE), const Color(0xFF22D3EE)]
+                          : [
+                              const Color(0xFF22D3EE).withValues(alpha: 0.60),
+                              const Color(0xFF7C3AED).withValues(alpha: 0.30),
+                              Colors.transparent,
+                            ],
+                      stops: isAdPost ? null : const [0.0, 0.5, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,7 +556,7 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
               ],
               _PostHeader(
                 post: post,
-                onHide: widget.onHide,
+                onHide: _onHideWithConfirm,
                 onOpenMenu: _openMoreMenu,
                 showMenuButton: widget.onMenuAction != null,
                 hideCloseButton: widget.detailMode,
@@ -625,6 +641,8 @@ class _PostCardState extends State<PostCard> with WidgetsBindingObserver {
               ],
             ],
           ),
+        ),
+          ],
         ),
       ),
     );

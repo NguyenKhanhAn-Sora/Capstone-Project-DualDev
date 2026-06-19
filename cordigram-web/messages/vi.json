@@ -26,10 +26,11 @@
       },
       "theme": {
         "title": "Giao diện",
-        "description": "Chuyển giữa chế độ sáng và tối.",
+        "description": "Chuyển giữa chế độ sáng, tối và galaxy.",
         "options": {
           "light": "Sáng",
-          "dark": "Tối"
+          "dark": "Tối",
+          "galaxy": "Galaxy"
         }
       }
     }
@@ -180,6 +181,12 @@
       "blockFailed": "Chặn thất bại",
       "postHidden": "Đã ẩn bài viết",
       "postHideFailed": "Không thể ẩn bài viết"
+    },
+    "hideConfirm": {
+      "title": "Ẩn bài viết này?",
+      "body": "Bài viết này sẽ không còn xuất hiện trong feed của bạn.",
+      "confirm": "Ẩn bài viết",
+      "cancel": "Hủy"
     },
     "delete": {
       "title": "Xóa bài viết này?",

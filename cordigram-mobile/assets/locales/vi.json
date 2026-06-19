@@ -738,6 +738,11 @@
       "hideAds": "Ẩn quảng cáo này",
       "seeLikes": "Xem ai đã thích"
     },
+    "hideConfirm": {
+      "title": "Ẩn bài viết này?",
+      "message": "Bài viết này sẽ không còn xuất hiện trong feed của bạn.",
+      "button": "Ẩn bài viết"
+    },
     "actions": {
       "like": "Thích",
       "repost": "Đăng lại",
@@ -991,6 +996,11 @@
       "unfollow": "Bỏ theo dõi",
       "saveReel": "Lưu reel này",
       "unsaveReel": "Bỏ lưu reel này"
+    },
+    "hideConfirm": {
+      "title": "Ẩn reel này?",
+      "message": "Reel này sẽ không còn xuất hiện trong feed của bạn.",
+      "button": "Ẩn reel"
     },
     "snack": {
       "saved": "Đã lưu",

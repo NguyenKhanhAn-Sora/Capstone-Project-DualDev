@@ -1318,6 +1318,96 @@
   }
 }
 
+@media (max-width: 767px) {
+  .page {
+    padding: 0 0 80px;
+    gap: 0;
+  }
+
+  /* Top bar: stacks, no rounded corners */
+  .topBar {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+    margin-bottom: 0;
+  }
+
+  .topBarActions { margin-left: 0; width: 100%; }
+  .topBarActions button { width: 100%; }
+
+  .title    { font-size: 22px; margin: 6px 0 4px; }
+  .subtitle { font-size: 13px; }
+
+  /* Step indicator compacter */
+  .stepIndicator {
+    gap: 4px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  /* Main layout card */
+  .card {
+    margin: 10px 12px 0;
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  /* Form grids → single col */
+  .objectiveGrid,
+  .twoCols,
+  .forecastGoalTabs,
+  .quickBudgetGrid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Bottom action bar: full-width, fixed at bottom */
+  .bottomActionBar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    padding: 10px 16px env(safe-area-inset-bottom, 10px);
+    justify-content: stretch;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
+  }
+
+  .bottomActionBar button { flex: 1; padding: 12px; }
+
+  /* Preview section */
+  .previewColumn { padding: 0 12px 12px; }
+
+  .previewCard {
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .previewCarousel { gap: 8px; }
+
+  /* Payment dialog */
+  .paymentDialog {
+    border-radius: 16px;
+    margin: 12px;
+    padding: 16px;
+  }
+
+  .paymentActions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .paymentActions button { width: 100%; }
+}
+
 :global([data-theme="dark"]) .topBar,
 :global([data-theme="dark"]) .card,
 :global([data-theme="dark"]) .paymentDialog {

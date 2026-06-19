@@ -36,6 +36,7 @@ import { useGuestAuth } from "@/context/guest-auth-context";
 import styles from "./hashtag.module.css";
 import feedStyles from "../../home-feed.module.css";
 import PostEditOverlay from "@/ui/post-edit-overlay";
+import ConfirmActionOverlay from "@/ui/confirm-action-overlay/confirm-action-overlay";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
@@ -1439,6 +1440,7 @@ function HashtagPostCard({
   const t = useTranslations("home");
   const { language } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hideConfirmOpen, setHideConfirmOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
@@ -1503,6 +1505,8 @@ function HashtagPostCard({
             key={`${tag}-${start}`}
             href={`/hashtag/${encodeURIComponent(tag)}`}
             className={feedStyles.hashtagLink}
+            target="_blank"
+            rel="noopener noreferrer"
           >
             {token}
           </a>,
@@ -1886,7 +1890,7 @@ function HashtagPostCard({
                       className={feedStyles.menuItem}
                       onClick={() => {
                         setMenuOpen(false);
-                        onHide(item.id);
+                        setHideConfirmOpen(true);
                       }}
                     >
                       {t("menu.hidePost")}
@@ -1919,7 +1923,7 @@ function HashtagPostCard({
           <button
             className={`${feedStyles.actionBtn} ${feedStyles.actionBtnGhost}`}
             aria-label="Hide post"
-            onClick={() => onHide(item.id)}
+            onClick={() => setHideConfirmOpen(true)}
           >
             <IconClose size={22} />
           </button>
@@ -1955,6 +1959,8 @@ function HashtagPostCard({
                   key={tag}
                   href={`/hashtag/${encodeURIComponent(tag)}`}
                   className={`${feedStyles.tag} ${feedStyles.tagLink}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   #{tag}
                 </a>
@@ -2197,6 +2203,16 @@ function HashtagPostCard({
           </div>
         </div>
       ) : null}
+      <ConfirmActionOverlay
+        open={hideConfirmOpen}
+        variant="warning"
+        title={t("hideConfirm.title")}
+        body={t("hideConfirm.body")}
+        labelConfirm={t("hideConfirm.confirm")}
+        labelCancel={t("hideConfirm.cancel")}
+        onClose={() => setHideConfirmOpen(false)}
+        onConfirm={() => { setHideConfirmOpen(false); onHide(item.id); }}
+      />
     </article>
   );
 }

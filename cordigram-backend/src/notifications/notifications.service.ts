@@ -793,7 +793,6 @@ export class NotificationsService {
             postId: new Types.ObjectId(postId),
             commentId: mentionCommentId,
             type: 'post_mention',
-            mentionSource: source,
             postKind,
             mentionCount: 1,
           },

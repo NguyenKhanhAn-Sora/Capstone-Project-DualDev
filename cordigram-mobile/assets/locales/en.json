@@ -717,6 +717,11 @@
       "hideAds": "Hide this ads",
       "seeLikes": "See who liked this"
     },
+    "hideConfirm": {
+      "title": "Hide this post?",
+      "message": "This post will no longer appear in your feed.",
+      "button": "Hide post"
+    },
     "actions": {
       "like": "Like",
       "repost": "Repost",
@@ -970,6 +975,11 @@
       "unfollow": "Unfollow",
       "saveReel": "Save this reel",
       "unsaveReel": "Unsave this reel"
+    },
+    "hideConfirm": {
+      "title": "Hide this reel?",
+      "message": "This reel will no longer appear in your feed.",
+      "button": "Hide reel"
     },
     "snack": {
       "saved": "Saved",

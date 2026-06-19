@@ -759,6 +759,23 @@ export async function fetchFeed(opts: {
   });
 }
 
+export async function fetchAdsFeed(opts: {
+  token?: string | null;
+  limit?: number;
+  page?: number;
+}): Promise<{ items: FeedItem[]; hasMore: boolean }> {
+  const { token, limit = 3, page } = opts;
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (page && page > 1) params.set("page", String(page));
+
+  return apiFetch<{ items: FeedItem[]; hasMore: boolean }>({
+    path: `/posts/feed/ads?${params.toString()}`,
+    method: "GET",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+}
+
 export async function fetchUserPosts(opts: {
   token?: string | null;
   userId: string;

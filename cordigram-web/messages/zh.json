@@ -26,10 +26,11 @@
       },
       "theme": {
         "title": "主题",
-        "description": "在浅色模式和深色模式之间切换。",
+        "description": "在浅色、深色和星系模式之间切换。",
         "options": {
-          "light": "光",
-          "dark": "黑暗"
+          "light": "浅色",
+          "dark": "深色",
+          "galaxy": "星系"
         }
       }
     },
@@ -258,6 +259,12 @@
       "blockFailed": "屏蔽失败",
       "postHidden": "帖子已隐藏",
       "postHideFailed": "隐藏帖子失败"
+    },
+    "hideConfirm": {
+      "title": "隐藏这篇帖子？",
+      "body": "此帖子将不再出现在您的动态中。",
+      "confirm": "隐藏帖子",
+      "cancel": "取消"
     },
     "delete": {
       "title": "删除这篇帖子？",

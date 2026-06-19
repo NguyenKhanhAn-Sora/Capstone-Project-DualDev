@@ -730,6 +730,11 @@
       "hideAds": "この広告を非表示",
       "seeLikes": "いいねした人を見る"
     },
+    "hideConfirm": {
+      "title": "この投稿を非表示にしますか？",
+      "message": "この投稿はフィードに表示されなくなります。",
+      "button": "非表示にする"
+    },
     "actions": {
       "like": "いいね",
       "repost": "リポスト",
@@ -983,6 +988,11 @@
       "unfollow": "フォロー解除",
       "saveReel": "このリールを保存",
       "unsaveReel": "このリールの保存を解除"
+    },
+    "hideConfirm": {
+      "title": "このリールを非表示にしますか？",
+      "message": "このリールはフィードに表示されなくなります。",
+      "button": "非表示にする"
     },
     "snack": {
       "saved": "保存しました",

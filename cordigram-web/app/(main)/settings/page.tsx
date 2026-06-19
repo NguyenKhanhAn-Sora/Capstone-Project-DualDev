@@ -519,7 +519,7 @@ export default function SettingsPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, appearancePreset, setAppearancePreset } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const tSystem = useTranslations("settings.system");
   const tDevices = useTranslations("settings.devices");
@@ -4729,20 +4729,46 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           className={`${styles.themeOption} ${
-                            theme === "light" ? styles.themeOptionActive : ""
+                            appearancePreset !== "galaxy" && theme === "light"
+                              ? styles.themeOptionActive
+                              : ""
                           }`}
-                          onClick={() => setTheme("light")}
+                          onClick={() => {
+                            if (appearancePreset === "galaxy") setAppearancePreset("default");
+                            setTheme("light");
+                          }}
                         >
                           {tSystem("theme.options.light")}
                         </button>
                         <button
                           type="button"
                           className={`${styles.themeOption} ${
-                            theme === "dark" ? styles.themeOptionActive : ""
+                            appearancePreset !== "galaxy" && theme === "dark"
+                              ? styles.themeOptionActive
+                              : ""
                           }`}
-                          onClick={() => setTheme("dark")}
+                          onClick={() => {
+                            if (appearancePreset === "galaxy") setAppearancePreset("default");
+                            setTheme("dark");
+                          }}
                         >
                           {tSystem("theme.options.dark")}
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.themeOption} ${styles.themeOptionGalaxy} ${
+                            appearancePreset === "galaxy" ? styles.themeOptionGalaxyActive : ""
+                          }`}
+                          onClick={() => {
+                            if (appearancePreset === "galaxy") {
+                              setAppearancePreset("default");
+                            } else {
+                              setAppearancePreset("galaxy");
+                              setTheme("dark");
+                            }
+                          }}
+                        >
+                          {tSystem("theme.options.galaxy")}
                         </button>
                       </div>
                     </div>

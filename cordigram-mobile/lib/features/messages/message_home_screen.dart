@@ -877,6 +877,448 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
     );
   }
 
+  // ── Galaxy helpers ─────────────────────────────────────────────────────────
+
+  static const _kCyan   = Color(0xFF22D3EE);
+  static const _kPurple = Color(0xFF7C3AED);
+
+  PreferredSizeWidget _buildGalaxyAppBar() {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(53),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF03060F), Color(0xFF060C22)],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 52,
+                child: Row(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(left: 12),
+                      child: SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: Image(
+                          image: AssetImage('assets/images/cordigram-logo.png'),
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildGalaxyTitleDropdown()),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: _buildGalaxyInboxBtn(),
+                    ),
+                  ],
+                ),
+              ),
+              // Cyan→purple accent line
+              Container(
+                height: 1,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      _kPurple,
+                      _kCyan,
+                      Colors.transparent,
+                    ],
+                    stops: [0.0, 0.3, 0.7, 1.0],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGalaxyTitleDropdown() {
+    return GestureDetector(
+      onTap: _toggleFolder,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              _headerTitle,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFD8EAFF),
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          AnimatedRotation(
+            turns: _isFolderExpanded ? 0.25 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                color: const Color(0xFF0C1A2E),
+                border: Border.all(
+                  color: const Color(0xFF1E3A6E).withValues(alpha: 0.70),
+                ),
+              ),
+              child: const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 10,
+                color: _kCyan,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGalaxyInboxBtn() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: _openInboxSheet,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFF0C1A2E).withValues(alpha: 0.65),
+                border: Border.all(
+                  color: const Color(0xFF1E3A6E).withValues(alpha: 0.65),
+                ),
+              ),
+              child: const Icon(
+                Icons.mail_outline_rounded,
+                size: 18,
+                color: Color(0xFF8BB8E8),
+              ),
+            ),
+          ),
+        ),
+        if (_messagesController.inboxUnreadCount > 0)
+          Positioned(
+            right: -3,
+            top: -3,
+            child: Container(
+              width: 11,
+              height: 11,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFEF4444), Color(0xFFFF6B6B)],
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF060C22), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.50),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildGalaxySearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFF060E1E).withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF1E3A6E).withValues(alpha: 0.65),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _kCyan.withValues(alpha: 0.04),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          splashColor: _kCyan.withValues(alpha: 0.05),
+          onTap: _openGlobalMessageSearch,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded, color: Color(0xFF3A6A9E), size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  _t('chat.messagesPage.searchPlaceholder'),
+                  style: const TextStyle(
+                    color: Color(0xFF364E6E),
+                    fontSize: 13.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGalaxyServerSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF060E1E).withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF1E3A6E).withValues(alpha: 0.65),
+        ),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (_) => setState(() {}),
+        style: const TextStyle(color: Color(0xFFD8EAFF), fontSize: 13.5),
+        decoration: InputDecoration(
+          hintText: _t('chat.popups.messageSearch.quickSwitchServers'),
+          hintStyle: const TextStyle(color: Color(0xFF364E6E), fontSize: 13.5),
+          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF3A6A9E), size: 20),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGalaxyDivider() {
+    return Container(
+      height: 1,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.transparent,
+            const Color(0xFF1E3A6E).withValues(alpha: 0.65),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGalaxyEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF060E1E),
+              border: Border.all(
+                color: const Color(0xFF1E3A6E).withValues(alpha: 0.65),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _kCyan.withValues(alpha: 0.10),
+                  blurRadius: 22,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: Color(0xFF3A6A9E),
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'No conversations yet',
+            style: TextStyle(
+              color: Color(0xFF4A6A9E),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Start a new conversation',
+            style: TextStyle(color: Color(0xFF2A4060), fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGalaxyBottomBar() {
+    final dn = (_messagesController.myDisplayName ?? '').trim();
+    final un = (_messagesController.myUsername ?? '').trim();
+    final displayText = dn.isNotEmpty
+        ? dn
+        : (un.isNotEmpty ? un : _t('chat.messagesPage.userFallback'));
+    final letter = displayText.trim().isNotEmpty
+        ? displayText.trim().substring(0, 1).toUpperCase()
+        : 'U';
+    final avatarUrl = _messagesController.myAvatarUrl;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Gradient accent line
+        Container(
+          height: 1,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.transparent,
+                _kPurple,
+                _kCyan,
+                Colors.transparent,
+              ],
+              stops: [0.0, 0.3, 0.7, 1.0],
+            ),
+          ),
+        ),
+        Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          color: const Color(0xFF040810),
+          child: Row(
+            children: [
+              // My avatar
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF1E3A6E).withValues(alpha: 0.70),
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: (avatarUrl ?? '').isNotEmpty
+                          ? Image.network(
+                              avatarUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _GalaxyBottomAvatar(letter: letter),
+                            )
+                          : _GalaxyBottomAvatar(letter: letter),
+                    ),
+                  ),
+                  if (_messagesController.myOnline)
+                    Positioned(
+                      right: -1,
+                      bottom: -1,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: _kCyan,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFF040810),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _kCyan.withValues(alpha: 0.55),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              // Name + username
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DisplayNameStyledText(
+                      text: displayText,
+                      style: _messagesController.myDisplayNameStyle,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      fallbackColor: const Color(0xFFD8EAFF),
+                    ),
+                    if (un.isNotEmpty)
+                      Text(
+                        un,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF3A5A80),
+                          fontSize: 10,
+                          height: 1.2,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Mic
+              _GalaxyIconBtn(
+                icon: _globalMicMuted
+                    ? Icons.mic_off_rounded
+                    : Icons.mic_none_rounded,
+                muted: _globalMicMuted,
+                onTap: () => unawaited(_toggleGlobalMic()),
+              ),
+              const SizedBox(width: 6),
+              // Sound
+              _GalaxyIconBtn(
+                icon: _globalSoundMuted
+                    ? Icons.headset_off_rounded
+                    : Icons.headset_rounded,
+                muted: _globalSoundMuted,
+                onTap: () => unawaited(_toggleGlobalSound()),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final threads = _messagesController.filteredThreads;
@@ -884,6 +1326,7 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
 
     return MessagesChromeBuilder(
       builder: (context, chrome) {
+        final isGalaxy = chrome.bg == Colors.transparent;
         final muted = chrome.textMuted;
         final onSurface = chrome.text;
         return AnimatedBuilder(
@@ -900,72 +1343,74 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
         },
         child: Scaffold(
           backgroundColor: chrome.bg,
-          appBar: AppBar(
-            backgroundColor: chrome.bg,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            surfaceTintColor: Colors.transparent,
-            toolbarHeight: 52,
-            leadingWidth: 38,
-            leading: const Padding(
-              padding: EdgeInsets.only(left: 10),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: Image(
-                    image: AssetImage('assets/images/cordigram-logo.png'),
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            ),
-            titleSpacing: 2,
-            title: MessageFolderDropdown(
-              title: _headerTitle,
-              isExpanded: _isFolderExpanded,
-              onToggle: _toggleFolder,
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      tooltip: _t('chat.messagesPage.inboxTitle'),
-                      onPressed: _openInboxSheet,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 30,
-                        height: 30,
-                      ),
-                      padding: EdgeInsets.zero,
-                      splashRadius: 18,
-                      icon: Icon(
-                        Icons.mail_outline_rounded,
-                        size: 21,
-                        color: onSurface,
-                      ),
-                    ),
-                    if (_messagesController.inboxUnreadCount > 0)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFF2A45),
-                            shape: BoxShape.circle,
-                          ),
+          appBar: isGalaxy
+              ? _buildGalaxyAppBar()
+              : AppBar(
+                  backgroundColor: chrome.bg,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  surfaceTintColor: Colors.transparent,
+                  toolbarHeight: 52,
+                  leadingWidth: 38,
+                  leading: const Padding(
+                    padding: EdgeInsets.only(left: 10),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: Image(
+                          image: AssetImage('assets/images/cordigram-logo.png'),
+                          fit: BoxFit.contain,
                         ),
                       ),
+                    ),
+                  ),
+                  titleSpacing: 2,
+                  title: MessageFolderDropdown(
+                    title: _headerTitle,
+                    isExpanded: _isFolderExpanded,
+                    onToggle: _toggleFolder,
+                  ),
+                  actions: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          IconButton(
+                            tooltip: _t('chat.messagesPage.inboxTitle'),
+                            onPressed: _openInboxSheet,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 30,
+                              height: 30,
+                            ),
+                            padding: EdgeInsets.zero,
+                            splashRadius: 18,
+                            icon: Icon(
+                              Icons.mail_outline_rounded,
+                              size: 21,
+                              color: onSurface,
+                            ),
+                          ),
+                          if (_messagesController.inboxUnreadCount > 0)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFF2A45),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          ),
           body: Column(
             children: [
               if (_isFolderExpanded)
@@ -976,90 +1421,63 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                     onSelected: _onQuickMenuTap,
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                child: _isServerMode
-                    ? TextField(
-                        controller: _searchController,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: _t('chat.popups.messageSearch.quickSwitchServers'),
-                          hintStyle: TextStyle(
-                            color: muted,
-                            fontSize: 13,
-                          ),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: chrome.border,
-                              width: 1,
+              if (isGalaxy)
+                _isServerMode
+                    ? _buildGalaxyServerSearchBar()
+                    : _buildGalaxySearchBar()
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                  child: _isServerMode
+                      ? TextField(
+                          controller: _searchController,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: _t('chat.popups.messageSearch.quickSwitchServers'),
+                            hintStyle: TextStyle(color: muted, fontSize: 13),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide(color: chrome.border, width: 1),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide(color: chrome.border, width: 1),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide(color: chrome.accent, width: 1.2),
                             ),
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: chrome.border,
-                              width: 1,
+                        )
+                      : TextField(
+                          readOnly: true,
+                          onTap: _openGlobalMessageSearch,
+                          decoration: InputDecoration(
+                            hintText: _t('chat.messagesPage.searchPlaceholder'),
+                            hintStyle: TextStyle(color: muted, fontSize: 13),
+                            prefixIcon: Icon(Icons.search_rounded, color: muted, size: 22),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide(color: chrome.border, width: 1),
                             ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: chrome.accent,
-                              width: 1.2,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide(color: chrome.border, width: 1),
                             ),
-                          ),
-                        ),
-                      )
-                    : TextField(
-                        readOnly: true,
-                        onTap: _openGlobalMessageSearch,
-                        decoration: InputDecoration(
-                          hintText: _t('chat.messagesPage.searchPlaceholder'),
-                          hintStyle: TextStyle(
-                            color: muted,
-                            fontSize: 13,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: muted,
-                            size: 22,
-                          ),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 10,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: chrome.border,
-                              width: 1,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: chrome.border,
-                              width: 1,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: chrome.border,
-                              width: 1,
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              borderSide: BorderSide(color: chrome.border, width: 1),
                             ),
                           ),
                         ),
-                      ),
-              ),
-              Divider(height: 1, thickness: 1, color: chrome.border),
+                ),
+              isGalaxy
+                  ? _buildGalaxyDivider()
+                  : Divider(height: 1, thickness: 1, color: chrome.border),
               Expanded(
                 child: _isServerMode
                     ? _buildServerModeBody(servers)
@@ -1077,19 +1495,17 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
                         ),
                       )
                     : threads.isEmpty
-                    ? Center(
+                    ? (isGalaxy ? _buildGalaxyEmptyState() : Center(
                         child: Text(
                           'No conversations found',
-                          style: TextStyle(
-                            color: muted,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: TextStyle(color: muted, fontWeight: FontWeight.w500),
                         ),
-                      )
+                      ))
                     : ListView.separated(
                         itemCount: threads.length,
-                        separatorBuilder: (_, __) =>
-                            Divider(height: 1, color: chrome.border),
+                        separatorBuilder: (_, __) => isGalaxy
+                            ? _buildGalaxyDivider()
+                            : Divider(height: 1, color: chrome.border),
                         itemBuilder: (context, index) {
                           final thread = threads[index];
                           return MessageThreadTile(
@@ -1109,138 +1525,106 @@ class _MessageHomeScreenState extends State<MessageHomeScreen> {
               ),
             ],
           ),
-          bottomNavigationBar: Container(
-            height: 42,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: chrome.panelSidebar,
-              border: Border(top: BorderSide(color: chrome.border)),
-            ),
-            child: Row(
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    CircleAvatar(
-                      radius: 10,
-                      backgroundColor: chrome.surfaceMuted,
-                      backgroundImage:
-                          (_messagesController.myAvatarUrl ?? '').isNotEmpty
-                          ? NetworkImage(_messagesController.myAvatarUrl!)
-                          : null,
-                      child: (_messagesController.myAvatarUrl ?? '').isNotEmpty
-                          ? null
-                          : Text(
-                              ((_messagesController.myDisplayName ??
-                                          _messagesController.myUsername ??
-                                          'U')
-                                      .trim()
-                                      .isNotEmpty
-                                  ? (_messagesController.myDisplayName ??
-                                            _messagesController.myUsername ??
-                                            'U')
-                                        .trim()
-                                        .substring(0, 1)
-                                        .toUpperCase()
-                                  : 'U'),
-                              style: TextStyle(
-                                color: onSurface,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+          bottomNavigationBar: isGalaxy
+              ? _buildGalaxyBottomBar()
+              : Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: chrome.panelSidebar,
+                    border: Border(top: BorderSide(color: chrome.border)),
+                  ),
+                  child: Row(
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          CircleAvatar(
+                            radius: 10,
+                            backgroundColor: chrome.surfaceMuted,
+                            backgroundImage: (_messagesController.myAvatarUrl ?? '').isNotEmpty
+                                ? NetworkImage(_messagesController.myAvatarUrl!)
+                                : null,
+                            child: (_messagesController.myAvatarUrl ?? '').isNotEmpty
+                                ? null
+                                : Text(
+                                    ((_messagesController.myDisplayName ?? _messagesController.myUsername ?? 'U').trim().isNotEmpty
+                                        ? (_messagesController.myDisplayName ?? _messagesController.myUsername ?? 'U').trim().substring(0, 1).toUpperCase()
+                                        : 'U'),
+                                    style: TextStyle(color: onSurface, fontSize: 11, fontWeight: FontWeight.w700),
+                                  ),
+                          ),
+                          if (_messagesController.myOnline)
+                            Positioned(
+                              right: -1,
+                              bottom: -1,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF31C56F),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: chrome.panelSidebar, width: 1.5),
+                                ),
                               ),
                             ),
-                    ),
-                    if (_messagesController.myOnline)
-                      Positioned(
-                        right: -1,
-                        bottom: -1,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF31C56F),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: chrome.panelSidebar, width: 1.5),
-                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            DisplayNameStyledText(
+                              text: () {
+                                final dn = (_messagesController.myDisplayName ?? '').trim();
+                                final un = (_messagesController.myUsername ?? '').trim();
+                                if (dn.isNotEmpty) return dn;
+                                if (un.isNotEmpty) return un;
+                                return _t('chat.messagesPage.userFallback');
+                              }(),
+                              style: _messagesController.myDisplayNameStyle,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              fallbackColor: onSurface,
+                            ),
+                            if ((_messagesController.myUsername ?? '').trim().isNotEmpty)
+                              Text(
+                                _messagesController.myUsername!.trim(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: muted, fontSize: 9, height: 1.2),
+                              ),
+                          ],
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      DisplayNameStyledText(
-                        text: () {
-                          final dn =
-                              (_messagesController.myDisplayName ?? '').trim();
-                          final un =
-                              (_messagesController.myUsername ?? '').trim();
-                          if (dn.isNotEmpty) return dn;
-                          if (un.isNotEmpty) return un;
-                          return _t('chat.messagesPage.userFallback');
-                        }(),
-                        style: _messagesController.myDisplayNameStyle,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        fallbackColor: onSurface,
-                      ),
-                      if ((_messagesController.myUsername ?? '').trim().isNotEmpty)
-                        Text(
-                          _messagesController.myUsername!.trim(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: muted,
-                            fontSize: 9,
-                            height: 1.2,
-                          ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => unawaited(_toggleGlobalMic()),
+                        iconSize: 16,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+                        icon: Icon(
+                          _globalMicMuted ? Icons.mic_off_rounded : Icons.mic_none_rounded,
+                          color: _globalMicMuted ? Theme.of(context).colorScheme.error : muted,
                         ),
+                      ),
+                      IconButton(
+                        onPressed: () => unawaited(_toggleGlobalSound()),
+                        iconSize: 16,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+                        icon: Icon(
+                          _globalSoundMuted ? Icons.headset_off_rounded : Icons.headset_rounded,
+                          color: _globalSoundMuted ? Theme.of(context).colorScheme.error : muted,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => unawaited(_toggleGlobalMic()),
-                  iconSize: 16,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 26,
-                    height: 26,
-                  ),
-                  icon: Icon(
-                    _globalMicMuted
-                        ? Icons.mic_off_rounded
-                        : Icons.mic_none_rounded,
-                    color: _globalMicMuted
-                        ? Theme.of(context).colorScheme.error
-                        : muted,
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => unawaited(_toggleGlobalSound()),
-                  iconSize: 16,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 26,
-                    height: 26,
-                  ),
-                  icon: Icon(
-                    _globalSoundMuted
-                        ? Icons.headset_off_rounded
-                        : Icons.headset_rounded,
-                    color: _globalSoundMuted
-                        ? Theme.of(context).colorScheme.error
-                        : muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
@@ -1272,9 +1656,7 @@ class _ServerCircleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final hasImage = (imageUrl ?? '').isNotEmpty;
-    final letter = (label ?? '').trim().isNotEmpty
-        ? (label!.trim().substring(0, 1).toUpperCase())
-        : '?';
+    final letter = (label ?? '').trim().isNotEmpty ? (label!.trim().substring(0, 1).toUpperCase()) : '?';
     final onCircle = selected ? scheme.onPrimary : scheme.onSurface;
     return Tooltip(
       message: tooltip ?? label ?? '',
@@ -1348,6 +1730,71 @@ class _ServerCircleButton extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Galaxy bottom bar helpers ─────────────────────────────────────────────────
+
+class _GalaxyBottomAvatar extends StatelessWidget {
+  const _GalaxyBottomAvatar({required this.letter});
+  final String letter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF162A50), Color(0xFF0A1628)],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          letter,
+          style: const TextStyle(
+            color: Color(0xFF6A9ACA),
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GalaxyIconBtn extends StatelessWidget {
+  const _GalaxyIconBtn({
+    required this.icon,
+    required this.muted,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool muted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFF060E1E).withValues(alpha: 0.65),
+          border: Border.all(
+            color: const Color(0xFF1E3A6E).withValues(alpha: 0.55),
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 15,
+          color: muted ? const Color(0xFFEF4444) : const Color(0xFF7A99C8),
+        ),
       ),
     );
   }
