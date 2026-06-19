@@ -747,6 +747,10 @@
       "inVoiceChannel": "在语音频道中",
       "goBackAdmin": "返回管理员"
     },
+    "adminView": {
+      "readOnlyFooter": "管理员查看模式 — 只读。无法聊天、添加反应或操作服务器。",
+      "readOnlyBadge": "仅查看"
+    },
     "boostStore": {
       "tabs": {
         "store": "商店",

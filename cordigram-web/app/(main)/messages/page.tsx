@@ -46,7 +46,8 @@ import {
 } from "@/lib/dm-call-active-peers";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
-import { translateCategoryName, translateChannelName } from "@/lib/system-names";
+import { translateCategoryName, translateChannelName, resolveServerDisplayLanguage } from "@/lib/system-names";
+import { clampFloatingPosition } from "@/lib/floating-ui";
 import { DEFAULT_FREE_MAX_UPLOAD_BYTES, formatUploadLimitExceededMessage, isAllowedMessagingMediaFile, mapMessagingUploadErrorMessage } from "@/lib/upload-limits";
 import { shouldPlayChannelMessageNotificationSound } from "@/lib/channel-notification-sound";
 import { playMessageNotificationSound } from "@/lib/message-notification-sound";
@@ -878,18 +879,16 @@ const MessageItem = memo(
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const fromRight = message.isFromCurrentUser && message.replyToMessage?.messageType !== "welcome";
-      const PADDING = 8;
-      const QUICK_BAR_W = 380; // estimate to keep inside viewport
-      const baseLeft = fromRight ? rect.right - QUICK_BAR_W - 10 : rect.left + 50;
-      const clampedLeft = Math.min(
-        Math.max(baseLeft, PADDING),
-        Math.max(PADDING, window.innerWidth - PADDING - QUICK_BAR_W),
-      );
-
-      setFixedReactionPosition({
-        top: rect.top - 50,
-        left: clampedLeft,
+      const QUICK_BAR_W = 360;
+      const QUICK_BAR_H = 44;
+      const pos = clampFloatingPosition({
+        anchorRect: rect,
+        width: QUICK_BAR_W,
+        height: QUICK_BAR_H,
+        alignRight: fromRight,
+        gap: 6,
       });
+      setFixedReactionPosition(pos);
     }, [message.isFromCurrentUser, message.replyToMessage?.messageType]);
 
     useLayoutEffect(() => {
@@ -1207,12 +1206,17 @@ const MessageItem = memo(
               style={{
                 position: "fixed",
                 zIndex: 10006,
-                top: fixedReactionPosition.top + 50,
-                // Emoji picker width is fixed (340px), clamp by shifting left if needed
-                left: Math.min(
-                  fixedReactionPosition.left,
-                  Math.max(8, window.innerWidth - 8 - 340),
-                ),
+                ...(() => {
+                  const PICKER_W = 340;
+                  const PICKER_H = 420;
+                  const below = clampFloatingPosition({
+                    anchorRect: messageRef.current!.getBoundingClientRect(),
+                    width: PICKER_W,
+                    height: PICKER_H,
+                    gap: 52,
+                  });
+                  return { top: below.top, left: below.left };
+                })(),
               }}
             >
               <EmojiReactionPicker
@@ -1249,11 +1253,17 @@ const MessageItem = memo(
                 style={{
                   position: "fixed",
                   zIndex: 10007,
-                  top: fixedReactionPosition.top + 50,
-                  left: Math.min(
-                    fixedReactionPosition.left,
-                    Math.max(8, window.innerWidth - 8 - 220),
-                  ),
+                  ...(() => {
+                    const MENU_W = 220;
+                    const MENU_H = 280;
+                    const pos = clampFloatingPosition({
+                      anchorRect: messageRef.current!.getBoundingClientRect(),
+                      width: MENU_W,
+                      height: MENU_H,
+                      gap: 52,
+                    });
+                    return { top: pos.top, left: pos.left };
+                  })(),
                 }}
               >
                 <MessageActionsMenu
@@ -1549,12 +1559,11 @@ export default function MessagesPage() {
 
   const serverScopedLanguage = useMemo((): LanguageCode | null => {
     if (!selectedServer) return null;
-    const row = servers.find((s) => s._id === selectedServer) as
-      | { primaryLanguage?: string }
-      | undefined;
-    const pl = row?.primaryLanguage;
-    return isLanguageCode(pl) ? pl : null;
-  }, [selectedServer, servers]);
+    const row = servers.find((s) => s._id === selectedServer);
+    const resolved = resolveServerDisplayLanguage(row, userLanguage);
+    if (resolved === userLanguage) return null;
+    return resolved;
+  }, [selectedServer, servers, userLanguage]);
 
   const language = (serverScopedLanguage ?? userLanguage) as LanguageCode;
   const t = useMemo(() => makeTranslator(language), [language]);
@@ -5171,6 +5180,8 @@ export default function MessagesPage() {
         isPublic: srv.isPublic,
         createdAt: srv.createdAt,
         updatedAt: srv.updatedAt,
+        primaryLanguage: srv.primaryLanguage,
+        communitySettings: srv.communitySettings,
         infoChannels: chs.filter((c) => c.type === "text" && c.category === "info" && !c.categoryId),
         textChannels: chs.filter((c) => c.type === "text" && c.category !== "info"),
         voiceChannels: chs.filter((c) => c.type === "voice"),
@@ -10414,7 +10425,7 @@ export default function MessagesPage() {
                           onBlur={() => { if (renameCancelledRef.current) { renameCancelledRef.current = false; return; } handleRenameCategory(infoCat._id, renamingCategoryName); }}
                         />
                       ) : (
-                        <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{infoCat?.name ?? t("chat.sidebar.infoFallback")}</h3>
+                        <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{infoCat?.name ? translateCategoryName(infoCat.name, language) : t("chat.sidebar.infoFallback")}</h3>
                       )}
                     </div>
                     {!hideInfoChannels && infoChannelsVisible.map((channel) => (
@@ -12676,7 +12687,7 @@ export default function MessagesPage() {
                 {/* Input Area */}
                 {isAdminView && selectedServer === adminViewServerId ? (
                   <div className={styles.inputArea} style={{ justifyContent: "center", opacity: 0.7 }}>
-                    <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Chế độ xem Admin — chỉ đọc</span>
+                    <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{t("chat.adminView.readOnlyFooter")}</span>
                   </div>
                 ) : (
                 <div
@@ -15271,9 +15282,15 @@ function ExploreServersView({
         <div className={styles.exploreGrid}>
           {servers.map((s) => {
             const b = normalizeServerBanner(s);
-            const cardLang = isLanguageCode(s.primaryLanguage)
-              ? s.primaryLanguage
-              : userLanguage;
+            const cardLang = resolveServerDisplayLanguage(
+              {
+                primaryLanguage: s.primaryLanguage,
+                communitySettings: {
+                  primaryLanguageConfigured: s.primaryLanguageConfigured,
+                },
+              },
+              userLanguage,
+            );
             const tCard = makeTranslator(cardLang);
             const localeTag = localeTagForLanguage(cardLang);
             return (
@@ -15365,6 +15382,12 @@ function CommunityOverviewSection({
         if (cancelled) return;
         setChannels(chs);
         setRulesChannelId(community.rulesChannelId ?? null);
+        if (isLanguageCode(community.primaryLanguage)) {
+          setPrimaryLanguage(community.primaryLanguage);
+        }
+        if (typeof community.description === "string") {
+          setDescription(community.description);
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Không tải được");
@@ -15496,6 +15519,10 @@ function CommunityOverviewSection({
                     onUpdated?.({
                       description: res.description ?? undefined,
                       primaryLanguage: res.primaryLanguage,
+                      communitySettings: {
+                        ...((initialServer as any)?.communitySettings || {}),
+                        primaryLanguageConfigured: true,
+                      },
                     } as any);
                   } catch (e) {
                     setError(e instanceof Error ? e.message : t("chat.communityOverview.errorSave"));

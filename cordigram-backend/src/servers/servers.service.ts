@@ -4054,10 +4054,9 @@ export class ServersService {
         'communitySettings.enabled': true,
         communityDiscoveryStatus: 'approved',
         isActive: true,
-        memberCount: { $gte: 3 },
       })
       .select(
-        'name description avatarUrl bannerUrl bannerImageUrl bannerColor memberCount accessMode isPublic primaryLanguage',
+        'name description avatarUrl bannerUrl bannerImageUrl bannerColor memberCount accessMode isPublic primaryLanguage communitySettings',
       )
       .lean()
       .exec();
@@ -4074,13 +4073,16 @@ export class ServersService {
       accessMode: s.accessMode ?? 'discoverable',
       isPublic: Boolean(s.isPublic),
       primaryLanguage: (s as any).primaryLanguage ?? 'vi',
+      primaryLanguageConfigured: Boolean(
+        (s as any).communitySettings?.primaryLanguageConfigured,
+      ),
     }));
   }
 
   async getCommunitySettings(serverId: string, userId: string) {
     const server = await this.serverModel
       .findById(serverId)
-      .select('ownerId communitySettings')
+      .select('ownerId communitySettings primaryLanguage description')
       .lean()
       .exec();
     if (!server)
@@ -4091,14 +4093,18 @@ export class ServersService {
       (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
     if (!canManage)
       throw new ForbiddenException('Bạn không có quyền xem cài đặt cộng đồng');
-    return (
-      (server as any).communitySettings || {
-        enabled: false,
-        rulesChannelId: null,
-        updatesChannelId: null,
-        activatedAt: null,
-      }
-    );
+    const cs = (server as any).communitySettings || {
+      enabled: false,
+      rulesChannelId: null,
+      updatesChannelId: null,
+      activatedAt: null,
+      primaryLanguageConfigured: false,
+    };
+    return {
+      ...cs,
+      primaryLanguage: (server as any).primaryLanguage ?? 'vi',
+      description: (server as any).description ?? null,
+    };
   }
 
   async activateCommunity(
@@ -4272,6 +4278,14 @@ export class ServersService {
         throw new BadRequestException('Invalid primaryLanguage');
       }
       (server as any).primaryLanguage = lang;
+      (server as any).communitySettings = (server as any).communitySettings || {
+        enabled: false,
+        rulesChannelId: null,
+        updatesChannelId: null,
+        activatedAt: null,
+        primaryLanguageConfigured: false,
+      };
+      (server as any).communitySettings.primaryLanguageConfigured = true;
     }
 
     if (typeof body.rulesChannelId !== 'undefined') {
@@ -4301,6 +4315,9 @@ export class ServersService {
       ok: true,
       description: (server as any).description ?? null,
       primaryLanguage: (server as any).primaryLanguage ?? 'vi',
+      primaryLanguageConfigured: Boolean(
+        (server as any).communitySettings?.primaryLanguageConfigured,
+      ),
       rulesChannelId: (server as any).communitySettings?.rulesChannelId ?? null,
     };
   }

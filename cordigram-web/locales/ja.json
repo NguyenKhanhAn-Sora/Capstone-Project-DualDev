@@ -747,6 +747,10 @@
       "inVoiceChannel": "ボイスチャンネルに参加中",
       "goBackAdmin": "管理画面に戻る"
     },
+    "adminView": {
+      "readOnlyFooter": "管理者閲覧モード — 読み取り専用。チャット、リアクション、サーバー操作はできません。",
+      "readOnlyBadge": "閲覧のみ"
+    },
     "boostStore": {
       "tabs": {
         "store": "ストア",

@@ -12,6 +12,10 @@ export type AdminServerViewResponse = {
     _id: string;
     name?: string;
     avatarUrl?: string | null;
+    primaryLanguage?: "vi" | "en" | "ja" | "zh";
+    communitySettings?: {
+      primaryLanguageConfigured?: boolean;
+    };
   };
   channels: Array<{
     _id: string;

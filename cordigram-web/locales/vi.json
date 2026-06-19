@@ -748,6 +748,10 @@
       "inVoiceChannel": "Đang trong kênh",
       "goBackAdmin": "Quay lại Admin"
     },
+    "adminView": {
+      "readOnlyFooter": "Chế độ xem Admin — chỉ đọc. Không chat, không thêm reaction, không thao tác máy chủ.",
+      "readOnlyBadge": "Chỉ xem"
+    },
     "boostStore": {
       "tabs": {
         "store": "Cửa hàng",

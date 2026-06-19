@@ -58,10 +58,11 @@ class _ChannelChatScreenState extends State<ChannelChatScreen> {
   MessagesChromePalette get _chrome => AccentColorController.instance.palette;
 
   String _t(String key, [Map<String, dynamic>? vars]) =>
-      LanguageController.instance.tForServer(
-        widget.server.primaryLanguage,
-        key,
-        vars,
+      LanguageController.instance.tForServerIfConfigured(
+        configured: widget.server.primaryLanguageConfigured,
+        serverLang: widget.server.primaryLanguage,
+        key: key,
+        vars: vars,
       );
 
   static final RegExp _pollRegExp = RegExp(r'📊 \[Poll\]:\s*([a-fA-F0-9]{24})');

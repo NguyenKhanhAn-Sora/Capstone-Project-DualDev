@@ -9,6 +9,7 @@ class ServerSummary {
     this.ownerId,
     this.communityEnabled = false,
     this.primaryLanguage = 'vi',
+    this.primaryLanguageConfigured = false,
   });
 
   final String id;
@@ -22,6 +23,8 @@ class ServerSummary {
   final bool communityEnabled;
   /// Ngôn ngữ chính của máy chủ (`vi` | `en` | `ja` | `zh`).
   final String primaryLanguage;
+  /// Chỉ áp dụng ngôn ngữ server khi đã lưu trong Tổng quan cộng đồng.
+  final bool primaryLanguageConfigured;
 
   factory ServerSummary.fromJson(Map<String, dynamic> json) {
     final rawOwner = json['ownerId'];
@@ -38,6 +41,9 @@ class ServerSummary {
     final primaryLanguage = const {'vi', 'en', 'ja', 'zh'}.contains(rawLang)
         ? rawLang
         : 'vi';
+    final primaryLanguageConfigured = cs is Map
+        ? cs['primaryLanguageConfigured'] == true
+        : json['primaryLanguageConfigured'] == true;
     return ServerSummary(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
@@ -52,6 +58,7 @@ class ServerSummary {
       ownerId: oid,
       communityEnabled: communityOn,
       primaryLanguage: primaryLanguage,
+      primaryLanguageConfigured: primaryLanguageConfigured,
     );
   }
 }

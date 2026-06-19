@@ -747,6 +747,10 @@
       "inVoiceChannel": "In voice channel",
       "goBackAdmin": "Back to Admin"
     },
+    "adminView": {
+      "readOnlyFooter": "Admin view mode — read only. No chat, reactions, or server actions.",
+      "readOnlyBadge": "View only"
+    },
     "boostStore": {
       "tabs": {
         "store": "Store",

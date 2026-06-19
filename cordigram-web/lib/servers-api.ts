@@ -66,6 +66,7 @@ export interface Server {
   isActive: boolean;
   isPublic?: boolean;
   isAgeRestricted?: boolean;
+  communitySettings?: CommunitySettings;
   createdAt: string;
   updatedAt: string;
 }
@@ -1473,6 +1474,9 @@ export interface CommunitySettings {
   rulesChannelId: string | null;
   updatesChannelId: string | null;
   activatedAt: string | null;
+  primaryLanguageConfigured?: boolean;
+  primaryLanguage?: "vi" | "en" | "ja" | "zh";
+  description?: string | null;
 }
 
 export interface DiscoveryCheck {
@@ -3015,6 +3019,7 @@ export type ExploreServer = {
   accessMode: "invite_only" | "apply" | "discoverable";
   isPublic: boolean;
   primaryLanguage?: "vi" | "en" | "ja" | "zh";
+  primaryLanguageConfigured?: boolean;
 };
 
 export async function listExploreServers(): Promise<ExploreServer[]> {

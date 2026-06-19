@@ -129,6 +129,16 @@ class LanguageController extends ChangeNotifier {
     return t(key, vars);
   }
 
+  String tForServerIfConfigured({
+    required bool configured,
+    required String serverLang,
+    required String key,
+    Map<String, dynamic>? vars,
+  }) {
+    if (!configured) return t(key, vars);
+    return tForServer(serverLang, key, vars);
+  }
+
   String t(String key, [Map<String, dynamic>? vars]) {
     dynamic val = _getByPath(_dict, key);
     if (val == null && _fallbackDict.isNotEmpty) {

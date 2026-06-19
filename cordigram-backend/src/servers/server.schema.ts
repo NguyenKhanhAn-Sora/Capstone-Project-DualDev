@@ -127,7 +127,7 @@ export class Server extends Document {
 
   @Prop({
     type: String,
-    enum: ['vi', 'en'],
+    enum: ['vi', 'en', 'ja', 'zh'],
     default: 'vi',
   })
   primaryLanguage!: ServerPrimaryLanguage;
@@ -417,12 +417,14 @@ export class Server extends Document {
       rulesChannelId: { type: String, default: null },
       updatesChannelId: { type: String, default: null },
       activatedAt: { type: Date, default: null },
+      primaryLanguageConfigured: { type: Boolean, default: false },
     },
     default: () => ({
       enabled: false,
       rulesChannelId: null,
       updatesChannelId: null,
       activatedAt: null,
+      primaryLanguageConfigured: false,
     }),
   })
   communitySettings!: CommunitySettings;
@@ -497,6 +499,8 @@ export interface CommunitySettings {
   rulesChannelId: string | null;
   updatesChannelId: string | null;
   activatedAt: Date | null;
+  /** Set when owner saves primary language in Community Overview. */
+  primaryLanguageConfigured?: boolean;
 }
 
 export const ServerSchema = SchemaFactory.createForClass(Server);

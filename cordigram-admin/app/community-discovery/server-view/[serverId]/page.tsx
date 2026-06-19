@@ -11,6 +11,11 @@ import {
   fetchAdminServerView,
   type AdminServerViewResponse,
 } from "@/lib/server-preview-api";
+import {
+  adminViewUi,
+  resolveAdminViewLanguage,
+  translateChannelName,
+} from "@/lib/server-view-i18n";
 
 type AdminPayload = {
   roles?: string[];
@@ -294,6 +299,7 @@ export default function AdminServerReadOnlyPage() {
   const [bootChecked, setBootChecked] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [serverName, setServerName] = useState("");
+  const [viewLang, setViewLang] = useState<"vi" | "en" | "ja" | "zh">("vi");
   const [channels, setChannels] = useState<AdminServerViewResponse["channels"]>(
     [],
   );
@@ -344,6 +350,7 @@ export default function AdminServerReadOnlyPage() {
         ]);
         if (cancelled) return;
         setServerName(view.server?.name || "Máy chủ");
+        setViewLang(resolveAdminViewLanguage(view.server || {}));
         const ch = [...(view.channels || [])].sort(
           (a, b) => (a.position ?? 0) - (b.position ?? 0),
         );
@@ -418,6 +425,8 @@ export default function AdminServerReadOnlyPage() {
     [channels],
   );
 
+  const ui = useMemo(() => adminViewUi(viewLang), [viewLang]);
+
   if (!bootChecked) {
     return (
       <div className={styles.page}>
@@ -430,12 +439,12 @@ export default function AdminServerReadOnlyPage() {
     <div className={styles.page}>
       <header className={styles.topBar}>
         <Link href="/community-discovery" className={styles.backLink}>
-          ← Quay lại Khám phá cộng đồng
+          {ui.back}
         </Link>
         <div className={styles.titleBlock}>
           <div className={styles.serverName}>{serverName || "—"}</div>
         </div>
-        <span className={styles.badge}>Chỉ xem</span>
+        <span className={styles.badge}>{ui.viewOnly}</span>
       </header>
 
       {loadError ? (
@@ -443,11 +452,12 @@ export default function AdminServerReadOnlyPage() {
       ) : (
         <div className={styles.body}>
           <aside className={styles.channelRail}>
-            <div className={styles.railHeader}>Kênh chat</div>
+            <div className={styles.railHeader}>{ui.textChannels}</div>
             <div className={styles.channelList}>
               {textChannels.map((c) => {
                 const id = String(c._id);
                 const active = id === selectedChannelId;
+                const label = translateChannelName(c.name, viewLang);
                 return (
                   <button
                     key={id}
@@ -456,23 +466,23 @@ export default function AdminServerReadOnlyPage() {
                     onClick={() => setSelectedChannelId(id)}
                   >
                     <span>#</span>
-                    <span>{c.name}</span>
+                    <span>{label}</span>
                   </button>
                 );
               })}
             </div>
             {voiceChannels.length > 0 ? (
               <>
-                <div className={styles.railHeader}>Kênh thoại</div>
+                <div className={styles.railHeader}>{ui.voiceChannels}</div>
                 <div className={styles.channelList}>
                   {voiceChannels.map((c) => (
                     <div
                       key={String(c._id)}
                       className={`${styles.channelBtn} ${styles.channelVoice}`}
-                      title="Chỉ xem danh sách kênh — không có lịch sử chat"
+                      title={ui.voiceListOnly}
                     >
                       <span aria-hidden>🔊</span>
-                      <span>{c.name}</span>
+                      <span>{translateChannelName(c.name, viewLang)}</span>
                     </div>
                   ))}
                 </div>
@@ -484,22 +494,22 @@ export default function AdminServerReadOnlyPage() {
             <div className={styles.channelTitle}>
               {selectedChannel
                 ? selectedChannel.type === "text"
-                  ? `# ${selectedChannel.name}`
-                  : "Chọn kênh chat"
-                : "Không có kênh chat"}
+                  ? `# ${translateChannelName(selectedChannel.name, viewLang)}`
+                  : ui.selectChannel
+                : ui.noTextChannel}
             </div>
             <div className={styles.messagesScroll}>
               {msgError ? (
                 <div className={styles.error}>{msgError}</div>
               ) : msgLoading ? (
-                <div className={styles.empty}>Đang tải tin nhắn…</div>
+                <div className={styles.empty}>{ui.loadingMessages}</div>
               ) : !selectedChannelId ||
                 selectedChannel?.type !== "text" ? (
                 <div className={styles.empty}>
-                  Chọn một kênh chat để xem nội dung.
+                  {ui.selectChannel}
                 </div>
               ) : messages.length === 0 ? (
-                <div className={styles.empty}>Chưa có tin nhắn.</div>
+                <div className={styles.empty}>{ui.noMessages}</div>
               ) : (
                 messages.map((msg) => {
                   const rx = msg.reactions || [];

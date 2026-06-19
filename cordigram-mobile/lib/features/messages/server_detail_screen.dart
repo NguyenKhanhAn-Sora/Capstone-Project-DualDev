@@ -16,6 +16,7 @@ import 'voice_channel_room_screen.dart';
 import 'server_join_applications_screen.dart';
 import 'widgets/channel_context_sheet.dart';
 import 'widgets/invite_to_server_sheet.dart';
+import 'search/system_channel_names.dart';
 import 'utils/messages_navigator.dart';
 import 'widgets/messages_chrome_builder.dart';
 import 'widgets/server_context_sheet.dart';
@@ -64,12 +65,25 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
   ServerSummary get _effectiveServer =>
       _serverOverride ?? widget.server;
 
-  String _t(String key, [Map<String, dynamic>? vars]) =>
-      LanguageController.instance.tForServer(
-        _effectiveServer.primaryLanguage,
-        key,
-        vars,
+  String get _displayLang => resolveServerDisplayLanguage(
+        primaryLanguageConfigured: _effectiveServer.primaryLanguageConfigured,
+        primaryLanguage: _effectiveServer.primaryLanguage,
+        userLanguage: LanguageController.instance.language,
       );
+
+  String _t(String key, [Map<String, dynamic>? vars]) =>
+      LanguageController.instance.tForServerIfConfigured(
+        configured: _effectiveServer.primaryLanguageConfigured,
+        serverLang: _effectiveServer.primaryLanguage,
+        key: key,
+        vars: vars,
+      );
+
+  String _channelLabel(String name) =>
+      translateChannelName(name, _displayLang);
+
+  String _categoryLabel(String name) =>
+      translateCategoryName(name, _displayLang);
 
   @override
   void initState() {
@@ -131,6 +145,11 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                   ? (mapped['primaryLanguage'] ?? _effectiveServer.primaryLanguage)
                       .toString()
                   : _effectiveServer.primaryLanguage,
+              primaryLanguageConfigured:
+                  (mapped['communitySettings'] is Map &&
+                      mapped['communitySettings']['primaryLanguageConfigured'] ==
+                          true) ||
+                  _effectiveServer.primaryLanguageConfigured,
             );
           });
         }
@@ -657,12 +676,12 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                           children: [
                             _SectionHeader(
                               icon: Icons.folder_open_rounded,
-                              title: cat.name,
+                              title: _categoryLabel(cat.name),
                             ),
                             ...catText.map(
                               (channel) => _ChannelTile(
                                 icon: Icons.tag_rounded,
-                                title: channel.name,
+                                title: _channelLabel(channel.name),
                                 subtitle: channel.description,
                                 unreadCount: channel.unreadCount,
                                 isPrivate: channel.isPrivate,
@@ -674,7 +693,7 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                             ...catVoice.map(
                               (channel) => _ChannelTile(
                                 icon: Icons.volume_up_rounded,
-                                title: channel.name,
+                                title: _channelLabel(channel.name),
                                 subtitle: channel.description,
                                 unreadCount: channel.unreadCount,
                                 isPrivate: channel.isPrivate,
@@ -692,14 +711,14 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                         .isNotEmpty) ...[
                       _SectionHeader(
                         icon: Icons.tag_rounded,
-                        title: LanguageController.instance.t('messages.chatChannel'),
+                        title: _t('messages.chatChannel'),
                       ),
                       ..._displayTextChannels
                           .where((c) => c.categoryId == null)
                           .map(
                             (channel) => _ChannelTile(
                               icon: Icons.tag_rounded,
-                              title: channel.name,
+                              title: _channelLabel(channel.name),
                               subtitle: channel.description,
                               unreadCount: channel.unreadCount,
                               isPrivate: channel.isPrivate,
@@ -715,14 +734,14 @@ class _ServerDetailScreenState extends State<ServerDetailScreen> {
                       Divider(height: 22, color: chrome.border),
                       _SectionHeader(
                         icon: Icons.volume_up_rounded,
-                        title: LanguageController.instance.t('messages.voiceChannel'),
+                        title: _t('messages.voiceChannel'),
                       ),
                       ..._displayVoiceChannels
                           .where((c) => c.categoryId == null)
                           .map(
                             (channel) => _ChannelTile(
                               icon: Icons.volume_up_rounded,
-                              title: channel.name,
+                              title: _channelLabel(channel.name),
                               subtitle: channel.description,
                               unreadCount: channel.unreadCount,
                               isPrivate: channel.isPrivate,
