@@ -3196,6 +3196,11 @@
   flex-shrink: 0;
 }
 
+/* Mobile-only plus menu items: ẩn trên desktop */
+.plusMenuItemMobile {
+  display: none;
+}
+
 /* Media Buttons */
 .mediaButtons {
   display: flex;
@@ -4128,7 +4133,7 @@
   }
 
   .messagesContainer {
-    padding: 10px 8px 52px;
+    padding: 10px 8px 72px;
     gap: 6px;
   }
 
@@ -4157,16 +4162,38 @@
   }
 
   .inputArea {
-    padding: 10px 12px;
-    gap: 6px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    padding: 8px 8px env(safe-area-inset-bottom, 8px) 10px;
+    gap: 3px;
+    background: var(--color-panel-bg);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
   }
 
   .messageInput {
-    padding: 9px 12px;
+    padding: 8px 10px;
+    font-size: 14px;
   }
 
   .mediaButtons {
-    gap: 2px;
+    gap: 0;
+  }
+
+  /* GIF và sticker: ẩn khỏi media bar trên mobile, đã được thêm vào plus menu */
+  .mediaButtonGif,
+  .mediaButtonSticker {
+    display: none !important;
+  }
+
+  /* Plus menu item chỉ hiện trên mobile */
+  .plusMenuItemMobile {
+    display: flex !important;
   }
 
   .mediaButton,
@@ -4174,13 +4201,28 @@
   .attachButton,
   .sendButton,
   .voiceButton {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+
+  /* Plus menu popup trên mobile: full width, z-index cao */
+  .plusMenuPopup {
+    min-width: 200px;
+    z-index: 9000;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  }
+
+  .plusMenuItem {
+    padding: 14px 16px;
+    font-size: 15px;
   }
 
   .emojiPickerContent,
   .gifPicker {
-    width: 290px;
+    width: min(320px, calc(100vw - 16px));
+    right: -8px;
   }
 }
 
@@ -5508,5 +5550,155 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 2px 10px rgba(88, 101, 242, 0.18);
+}
+
+/* ── Mobile back button — ẩn trên desktop ── */
+.mobileChatBackBtn {
+  display: none;
+}
+
+/* ── Helper: icon switch desktop/mobile ── */
+.mobileOnly { display: none; }
+.desktopOnly { display: flex; }
+
+/* ── Mobile (≤767px) — full mobile nav pattern, giống mobile app ── */
+@media (max-width: 767px) {
+  /* Container không scroll ngang */
+  .container {
+    overflow: hidden;
+  }
+
+  /* Ẩn left icon sidebar — MobileNav đã handle navigation */
+  .leftSidebar {
+    display: none;
+  }
+
+  /* mainContent: host 2 panel tuyệt đối */
+  .mainContent {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Panel 1 — conversationsList: chiếm toàn màn hình, là view mặc định */
+  .conversationsList {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    z-index: 2;
+    transform: translateX(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Panel 2 — rightContent: bắt đầu ngoài màn hình bên phải */
+  .rightContent {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Khi chat đang mở: slide list ra trái, chat vào từ phải */
+  :global([data-mobile-chat-open="true"]) .conversationsList {
+    transform: translateX(-100%);
+    z-index: 1;
+  }
+
+  :global([data-mobile-chat-open="true"]) .rightContent {
+    transform: translateX(0);
+    z-index: 2;
+  }
+
+  /* Mobile back button — hiển thị trên mobile */
+  .mobileChatBackBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--color-text);
+    cursor: pointer;
+    border-radius: 8px;
+    flex-shrink: 0;
+    margin-right: 2px;
+    padding: 0;
+    transition: background 0.15s ease;
+  }
+
+  .mobileChatBackBtn:hover,
+  .mobileChatBackBtn:active {
+    background: var(--color-surface-muted);
+  }
+
+  /* Context bar trên mobile: tên lớn hơn, rõ ràng hơn */
+  .contextBar {
+    padding: 14px 16px;
+    min-height: 52px;
+  }
+
+  .contextBarLabel {
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  /* Search bar full width */
+  .searchInputWrapper {
+    padding: 10px 12px;
+  }
+
+  /* Friend items: touch target lớn hơn */
+  .friendItem {
+    padding: 12px 16px;
+  }
+
+  /* Chat header: gọn hơn trên mobile */
+  .chatHeader {
+    padding: 10px 14px;
+    min-height: 52px;
+  }
+
+  .chatHeaderTitle {
+    font-size: 15px;
+  }
+
+  /* Ẩn các nút header (phone/video/search/profile) trên mobile — đã được gộp vào menu 3 chấm */
+  .chatActionMobileHidden {
+    display: none !important;
+  }
+
+  /* activeNowSidebar — full-screen overlay khi mở trên mobile */
+  .activeNowSidebar {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    z-index: 10;
+    border-left: none;
+    animation: mobileSlideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  /* activeNowHeader trên mobile: back button bên trái + title ở giữa */
+  .activeNowHeader {
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    min-height: 52px;
+  }
+
+  .activeNowTitle {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  /* icon switch */
+  .mobileOnly { display: flex; }
+  .desktopOnly { display: none; }
+}
+
+@keyframes mobileSlideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
 }
 

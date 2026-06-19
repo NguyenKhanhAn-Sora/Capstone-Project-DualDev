@@ -428,3 +428,61 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── Mobile icon switching ── */
+.panelCloseBtnX    { display: block; }
+.panelCloseBtnBack { display: none; }
+
+/* ── Mobile (≤767px) — full-screen overlay ── */
+@media (max-width: 767px) {
+  /* Override width-based collapse with transform-based slide */
+  .panel {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    z-index: 10;
+    border-left: none;
+    /* Replace width/opacity transition with transform */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .panel:not(.collapsed) {
+    transform: translateX(0);
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .panel.collapsed {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateX(100%);
+  }
+
+  /* Back arrow trên mobile — hiển thị ở góc trái header */
+  .panelCloseBtn {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: auto;
+    padding: 6px;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .panelCloseBtnX    { display: none; }
+  .panelCloseBtnBack { display: block; }
+
+  /* Header padding để không bị che bởi back button */
+  .panelHeader {
+    padding: 20px 16px 16px;
+  }
+}
