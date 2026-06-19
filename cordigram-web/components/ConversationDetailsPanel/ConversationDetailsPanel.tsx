@@ -316,9 +316,14 @@ export function ConversationDetailsPanel({
       {/* Header */}
       <div className={styles.panelHeader} style={{ position: "relative" }}>
         <button type="button" className={styles.panelCloseBtn} onClick={onClose} title={cd("close")}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          {/* X icon — desktop */}
+          <svg className={styles.panelCloseBtnX} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          {/* Back arrow — mobile */}
+          <svg className={styles.panelCloseBtnBack} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
 
