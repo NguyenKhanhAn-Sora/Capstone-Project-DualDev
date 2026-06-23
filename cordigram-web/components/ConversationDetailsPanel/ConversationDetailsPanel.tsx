@@ -16,12 +16,6 @@ export interface DetailsPanelMessage {
   attachments?: string[];
 }
 
-export interface DetailsPanelFile {
-  url: string;
-  name: string;
-  timestamp: Date | string;
-}
-
 export interface DetailsPanelPinnedItem {
   id: string;
   text: string;
@@ -53,7 +47,6 @@ const IMAGE_RE = /📷 \[Image\]: (https?:\/\/[^\s]+)/g;
 const VIDEO_RE = /🎬 \[Video\]: (https?:\/\/[^\s]+)/g;
 const PLAIN_IMG_RE = /^https?:\/\/[^\s]+\.(jpe?g|png|webp|gif)(\?[^\s]*)?$/i;
 const PLAIN_VID_RE = /^https?:\/\/[^\s]+\.(mp4|webm|mov)(\?[^\s]*)?$/i;
-const FILE_LINK_RE = /https?:\/\/[^\s]+\/[^\s/]+\.(pdf|doc[x]?|xls[x]?|ppt[x]?|zip|rar|7z|txt|csv)/gi;
 
 function toHttps(url: string): string {
   return url.startsWith("http://") ? "https://" + url.slice(7) : url;
@@ -62,12 +55,6 @@ function toHttps(url: string): string {
 interface MediaItem {
   url: string;
   type: "image" | "video";
-  timestamp: Date;
-}
-
-interface FileItem {
-  url: string;
-  name: string;
   timestamp: Date;
 }
 
@@ -99,36 +86,6 @@ function extractMedia(messages: DetailsPanelMessage[]): MediaItem[] {
         if (!a) continue;
         if (PLAIN_VID_RE.test(a)) push(a, "video");
         else if (a.startsWith("http")) push(a, "image");
-      }
-    }
-  }
-
-  return items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-}
-
-function extractFiles(messages: DetailsPanelMessage[]): FileItem[] {
-  const seen = new Set<string>();
-  const items: FileItem[] = [];
-
-  for (const msg of messages) {
-    const ts = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp);
-    const text = msg.text || "";
-    for (const m of text.matchAll(FILE_LINK_RE)) {
-      const url = toHttps(m[0]);
-      if (seen.has(url)) continue;
-      seen.add(url);
-      const name = decodeURIComponent(url.split("/").pop() || url);
-      items.push({ url, name, timestamp: ts });
-    }
-    if (msg.attachments) {
-      for (const att of msg.attachments) {
-        const a = att.trim();
-        if (!a || seen.has(a)) continue;
-        if (FILE_LINK_RE.test(a)) {
-          seen.add(a);
-          const name = decodeURIComponent(a.split("/").pop() || a);
-          items.push({ url: toHttps(a), name, timestamp: ts });
-        }
       }
     }
   }
@@ -197,7 +154,6 @@ function SectionToggle({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const MEDIA_PAGE_SIZE = 18;
-const FILE_PAGE_SIZE = 10;
 
 export function ConversationDetailsPanel({
   open,
@@ -220,7 +176,6 @@ export function ConversationDetailsPanel({
   const [searchOpen, setSearchOpen] = useState(true);
   const [pinnedOpen, setPinnedOpen] = useState(true);
   const [mediaOpen, setMediaOpen] = useState(true);
-  const [filesOpen, setFilesOpen] = useState(false);
 
   // ── Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -292,20 +247,9 @@ export function ConversationDetailsPanel({
     [visibleMedia, todayLabel, yesterdayLabel, language],
   );
 
-  // ── Shared files
-  const [fileSearch, setFileSearch] = useState("");
-  const allFiles = useMemo(() => extractFiles(messages), [messages]);
-  const [filePage, setFilePage] = useState(1);
-  const filteredFiles = useMemo(() => {
-    const q = fileSearch.trim().toLowerCase();
-    return q ? allFiles.filter((f) => f.name.toLowerCase().includes(q)) : allFiles;
-  }, [allFiles, fileSearch]);
-  const visibleFiles = filteredFiles.slice(0, filePage * FILE_PAGE_SIZE);
-
   // Reset pagination when conversation changes
   useEffect(() => {
     setMediaPage(1);
-    setFilePage(1);
   }, [messages]);
 
   // ── Avatar
@@ -496,79 +440,6 @@ export function ConversationDetailsPanel({
                     </button>
                   )}
                 </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Shared Files ── */}
-        <div className={styles.section}>
-          <SectionToggle
-            label={`${cd("sharedFiles")}${allFiles.length > 0 ? ` (${allFiles.length})` : ""}`}
-            open={filesOpen}
-            onToggle={() => setFilesOpen((v) => !v)}
-          />
-          {filesOpen && (
-            <div className={styles.sectionContent}>
-              {allFiles.length > 0 && (
-                <div className={`${styles.fileSearchWrap} ${styles.searchInputWrap}`}>
-                  <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                  <input
-                    type="text"
-                    className={styles.searchInput}
-                    placeholder={cd("searchFiles")}
-                    value={fileSearch}
-                    onChange={(e) => setFileSearch(e.target.value)}
-                  />
-                </div>
-              )}
-
-              {filteredFiles.length === 0 ? (
-                <p className={styles.emptyNote}>
-                  {fileSearch.trim() ? cd("noFilesFound") : cd("noFiles")}
-                </p>
-              ) : (
-                <div className={styles.fileList}>
-                  {visibleFiles.map((file, i) => (
-                    <div key={`${file.url}-${i}`} className={styles.fileItem}>
-                      <svg className={styles.fileIcon} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                      <div className={styles.fileInfo}>
-                        <p className={styles.fileName}>{file.name}</p>
-                        <p className={styles.fileDate}>{formatDateTime(file.timestamp, language)}</p>
-                      </div>
-                      <a
-                        href={file.url}
-                        download={file.name}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.fileDownloadBtn}
-                        title={cd("download")}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="7 10 12 15 17 10" />
-                          <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
-                      </a>
-                    </div>
-                  ))}
-
-                  {visibleFiles.length < filteredFiles.length && (
-                    <button
-                      type="button"
-                      className={styles.loadMoreBtn}
-                      onClick={() => setFilePage((p) => p + 1)}
-                    >
-                      Xem thêm ({filteredFiles.length - visibleFiles.length} file còn lại)
-                    </button>
-                  )}
-                </div>
               )}
             </div>
           )}

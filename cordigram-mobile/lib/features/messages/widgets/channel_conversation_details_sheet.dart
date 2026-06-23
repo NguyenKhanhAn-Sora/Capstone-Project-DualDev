@@ -126,7 +126,7 @@ class _ChannelSheetBodyState extends State<_ChannelSheetBody>
 
   // ── tabs ─────────────────────────────────────────────────────────────
   late final TabController _tabController;
-  static const _tabs = ['search', 'pinned', 'media', 'files'];
+  static const _tabs = ['search', 'pinned', 'media'];
 
   // ── search ───────────────────────────────────────────────────────────
   final _searchCtrl = TextEditingController();
@@ -143,19 +143,12 @@ class _ChannelSheetBodyState extends State<_ChannelSheetBody>
   final _mediaPageSize = 20;
   int _mediaPage = 1;
 
-  // ── files search ─────────────────────────────────────────────────────
-  final _fileSearchCtrl = TextEditingController();
-  String _fileQuery = '';
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(_onTabChange);
     _searchCtrl.addListener(_onSearchChanged);
-    _fileSearchCtrl.addListener(
-      () => setState(() => _fileQuery = _fileSearchCtrl.text),
-    );
   }
 
   @override
@@ -165,7 +158,6 @@ class _ChannelSheetBodyState extends State<_ChannelSheetBody>
       ..dispose();
     _debounce?.cancel();
     _searchCtrl.dispose();
-    _fileSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -294,30 +286,6 @@ class _ChannelSheetBodyState extends State<_ChannelSheetBody>
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 
-  List<({String url, String name, DateTime ts})> get _allFiles {
-    final items = <({String url, String name, DateTime ts})>[];
-    final seen = <String>{};
-    for (final m in widget.messages) {
-      for (final att in m.attachments) {
-        final url = _normalizeUrl(att.trim());
-        if (url.isEmpty) continue;
-        final isMedia = url.endsWith('.jpg') ||
-            url.endsWith('.jpeg') ||
-            url.endsWith('.png') ||
-            url.endsWith('.gif') ||
-            url.endsWith('.webp') ||
-            url.endsWith('.mp4') ||
-            url.endsWith('.webm') ||
-            url.endsWith('.mov');
-        if (!isMedia && seen.add(url)) {
-          final name = Uri.tryParse(url)?.pathSegments.lastOrNull ?? url;
-          items.add((url: url, name: name, ts: m.createdAt));
-        }
-      }
-    }
-    return items;
-  }
-
   // ── build ─────────────────────────────────────────────────────────────
 
   @override
@@ -355,7 +323,6 @@ class _ChannelSheetBodyState extends State<_ChannelSheetBody>
                 _buildSearchTab(),
                 _buildPinnedTab(),
                 _buildMediaTab(),
-                _buildFilesTab(),
               ],
             ),
           ),
@@ -468,7 +435,6 @@ class _ChannelSheetBodyState extends State<_ChannelSheetBody>
       _cd('search'),
       _cd('pinnedMessages'),
       _cd('sharedMedia'),
-      _cd('sharedFiles'),
     ];
     return TabBar(
       controller: _tabController,
@@ -658,74 +624,6 @@ class _ChannelSheetBodyState extends State<_ChannelSheetBody>
               ),
             ),
           ),
-      ],
-    );
-  }
-
-  // ── Files tab ─────────────────────────────────────────────────────────
-
-  Widget _buildFilesTab() {
-    final allFiles = _allFiles;
-    final filtered = _fileQuery.trim().isEmpty
-        ? allFiles
-        : allFiles
-            .where((f) =>
-                f.name.toLowerCase().contains(_fileQuery.toLowerCase()))
-            .toList();
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-          child: _SearchField(
-            controller: _fileSearchCtrl,
-            hintText: _cd('searchFiles'),
-            textColor: _c.text,
-            hintColor: _c.text.withValues(alpha: 0.4),
-            borderColor: const Color(0xFF233358),
-          ),
-        ),
-        Expanded(
-          child: allFiles.isEmpty
-              ? Center(
-                  child: Text(
-                    _cd('noFiles'),
-                    style: TextStyle(
-                      color: _c.text.withValues(alpha: 0.5),
-                      fontSize: 13,
-                    ),
-                  ),
-                )
-              : filtered.isEmpty
-                  ? Center(
-                      child: Text(
-                        _cd('noFilesFound'),
-                        style: TextStyle(
-                          color: _c.text.withValues(alpha: 0.5),
-                          fontSize: 13,
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 4,
-                      ),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const Divider(
-                        height: 1,
-                        color: Color(0xFF1E2D4B),
-                      ),
-                      itemBuilder: (ctx, i) {
-                        final f = filtered[i];
-                        return _FileTile(
-                          file: f,
-                          accentColor: _c.accent,
-                          textColor: _c.text,
-                        );
-                      },
-                    ),
-        ),
       ],
     );
   }
@@ -994,84 +892,6 @@ class _MediaThumb extends StatelessWidget {
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FileTile extends StatelessWidget {
-  const _FileTile({
-    required this.file,
-    required this.accentColor,
-    required this.textColor,
-  });
-
-  final ({String url, String name, DateTime ts}) file;
-  final Color accentColor;
-  final Color textColor;
-
-  IconData _iconFor(String name) {
-    final ext = name.split('.').lastOrNull?.toLowerCase() ?? '';
-    if (['pdf'].contains(ext)) return Icons.picture_as_pdf_rounded;
-    if (['doc', 'docx'].contains(ext)) return Icons.description_rounded;
-    if (['xls', 'xlsx'].contains(ext)) return Icons.table_chart_rounded;
-    if (['zip', 'rar', '7z'].contains(ext)) return Icons.folder_zip_rounded;
-    return Icons.insert_drive_file_rounded;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final h = file.ts;
-    final dateStr = '${h.day}/${h.month}/${h.year}';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(_iconFor(file.name), size: 20, color: accentColor),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  dateStr,
-                  style: TextStyle(
-                    color: textColor.withValues(alpha: 0.4),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.download_rounded, size: 18, color: accentColor),
-            onPressed: () {
-              // Open URL for download
-              // launchUrl is called via url_launcher if needed; for now we just hint the browser
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          ),
-        ],
       ),
     );
   }

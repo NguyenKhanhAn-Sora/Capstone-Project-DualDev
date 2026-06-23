@@ -1477,7 +1477,27 @@ export async function declineServerInvite(inviteId: string): Promise<void> {
   }
 }
 
+export async function getTimedOutMembers(
+  serverId: string,
+): Promise<TimedOutMember[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/timed-out-members`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) return [];
+  return response.json();
+}
+
 // Mention Spam Restricted Members
+export interface TimedOutMember {
+  userId: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string;
+  timeoutUntil: string;
+  remainingSeconds: number;
+}
+
 export interface MentionRestrictedMember {
   userId: string;
   displayName: string;

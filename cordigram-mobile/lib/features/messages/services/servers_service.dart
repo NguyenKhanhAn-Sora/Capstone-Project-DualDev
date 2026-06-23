@@ -1062,6 +1062,34 @@ class ServersService {
     );
   }
 
+  static Future<List<Map<String, dynamic>>> getTimedOutMembers(
+    String serverId,
+  ) async {
+    try {
+      final list = await _getListResponse(
+        '/servers/$serverId/timed-out-members',
+        preferredKeys: const ['items', 'data', 'members'],
+      );
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {
+      try {
+        final list = await ApiService.getList(
+          '/servers/$serverId/timed-out-members',
+          extraHeaders: _authHeaders,
+        );
+        return list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      } catch (_) {
+        return [];
+      }
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getMentionRestrictedMembers(
     String serverId,
   ) async {

@@ -1034,6 +1034,17 @@ export class ServersController {
     return this.serversService.getCategories(serverId);
   }
 
+  @Get(':id/timed-out-members')
+  async getTimedOutMembers(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getTimedOutMembers(
+      serverId,
+      req.user.userId,
+    );
+  }
+
   @Get(':id/mention-restricted')
   async getMentionRestrictedMembers(
     @Param('id') serverId: string,

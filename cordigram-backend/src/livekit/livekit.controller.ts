@@ -49,6 +49,20 @@ export class LivekitController {
       if (!this.serversService.isMember(server, userId)) {
         throw new ForbiddenException('Bạn không thuộc máy chủ này');
       }
+      const ownerId = (server as any).ownerId?.toString?.() ?? '';
+      if (ownerId !== userId) {
+        const member = ((server as any).members || []).find(
+          (m: any) => m?.userId?.toString?.() === userId,
+        );
+        if (member?.timeoutUntil) {
+          const until = new Date(member.timeoutUntil);
+          if (!Number.isNaN(until.getTime()) && until.getTime() > Date.now()) {
+            throw new ForbiddenException(
+              'Bạn đang bị hạn chế và không thể tham gia kênh thoại.',
+            );
+          }
+        }
+      }
       await this.channelsService.assertCanAccessChannel(channelId, userId);
       return;
     }

@@ -682,6 +682,18 @@ export class MessagesService {
       throw new ForbiddenException('Bạn không thuộc server này');
     }
 
+    const memberRow = (server as any).members?.find(
+      (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
+    );
+    if (!isOwner && memberRow?.timeoutUntil) {
+      const until = new Date(memberRow.timeoutUntil);
+      if (!Number.isNaN(until.getTime()) && until.getTime() > Date.now()) {
+        throw new ForbiddenException(
+          'Bạn đang bị hạn chế và không thể gửi tin nhắn hoặc tham gia kênh thoại.',
+        );
+      }
+    }
+
     if (channel.isPrivate) {
       const canAccessPrivate = await this.canAccessPrivateChannel(
         channel.serverId.toString(),
