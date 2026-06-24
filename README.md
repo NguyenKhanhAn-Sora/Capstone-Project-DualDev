@@ -19,6 +19,62 @@
 
 ---
 
+## 🎬 Demo Videos
+
+<div align="center">
+
+*Nền tảng mạng xã hội Cordigram — VTC Academy — Nhóm DualDev*
+
+<br/>
+
+<table>
+  <tr>
+    <td align="center" width="360">
+      <a href="https://www.youtube.com/watch?v=tf9XSTiwRig">
+        <img src="https://img.youtube.com/vi/tf9XSTiwRig/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Phần 1 — Social Web & Mobile"/>
+      </a>
+      <br/><br/>
+      <b>Phần 1 — Social Web & Mobile</b>
+      <br/>
+      <sub>Tổng quan tính năng mạng xã hội trên Web & Mobile</sub>
+      <br/><br/>
+      <a href="https://www.youtube.com/watch?v=tf9XSTiwRig">
+        <img src="https://img.shields.io/badge/▶%20Xem%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Xem trên YouTube"/>
+      </a>
+    </td>
+    <td align="center" width="360">
+      <a href="https://www.youtube.com/watch?v=KiyZAB27B1s">
+        <img src="https://img.youtube.com/vi/KiyZAB27B1s/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Phần 2 — Tin nhắn UI Web"/>
+      </a>
+      <br/><br/>
+      <b>Phần 2 — Tin nhắn UI Web</b>
+      <br/>
+      <sub>Demo tính năng Direct Messages & Server Channel trên Web</sub>
+      <br/><br/>
+      <a href="https://www.youtube.com/watch?v=KiyZAB27B1s">
+        <img src="https://img.shields.io/badge/▶%20Xem%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Xem trên YouTube"/>
+      </a>
+    </td>
+    <td align="center" width="360">
+      <a href="https://www.youtube.com/watch?v=JPfYmIrZI-o">
+        <img src="https://img.youtube.com/vi/JPfYmIrZI-o/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Phần 3 — Tin nhắn UI Mobile"/>
+      </a>
+      <br/><br/>
+      <b>Phần 3 — Tin nhắn UI Mobile</b>
+      <br/>
+      <sub>Demo tính năng tin nhắn & cuộc gọi trên ứng dụng Mobile</sub>
+      <br/><br/>
+      <a href="https://www.youtube.com/watch?v=JPfYmIrZI-o">
+        <img src="https://img.shields.io/badge/▶%20Xem%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Xem trên YouTube"/>
+      </a>
+    </td>
+  </tr>
+</table>
+
+</div>
+
+---
+
 ## 📖 Overview
 
 **Cordigram** is a modern social media platform that combines the visual content-sharing experience of **Instagram** with the community-based server/channel system of **Discord** — all in one unified application.
@@ -331,45 +387,104 @@ npm run dev
 
 ### 🌐 Web
 
-| Home | Post | Profile |
-|------|------|---------|
-| ![Home](./cordigram-web/screenshot/home.jpg) | ![Post](./cordigram-web/screenshot/post.jpg) | ![Profile](./cordigram-web/screenshot/profile.jpg) |
+<div align="center">
 
-| Messages | Notifications | Settings |
-|----------|---------------|----------|
-| ![Messages](./cordigram-web/screenshot/message.jpg) | ![Notifications](./cordigram-web/screenshot/notification.jpg) | ![Settings](./cordigram-web/screenshot/settings.jpg) |
+<table>
+  <tr>
+    <td align="center"><b>Home Feed</b></td>
+    <td align="center"><b>Post</b></td>
+    <td align="center"><b>Profile</b></td>
+  </tr>
+  <tr>
+    <td><img src="./cordigram-web/screenshot/home.jpg" width="280" alt="Home"/></td>
+    <td><img src="./cordigram-web/screenshot/post.jpg" width="280" alt="Post"/></td>
+    <td><img src="./cordigram-web/screenshot/profile.jpg" width="280" alt="Profile"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Direct Messages</b></td>
+    <td align="center"><b>Notifications</b></td>
+    <td align="center"><b>Settings</b></td>
+  </tr>
+  <tr>
+    <td><img src="./cordigram-web/screenshot/message.jpg" width="280" alt="Messages"/></td>
+    <td><img src="./cordigram-web/screenshot/notification.jpg" width="280" alt="Notifications"/></td>
+    <td><img src="./cordigram-web/screenshot/settings.jpg" width="280" alt="Settings"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Ads Management</b></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><img src="./cordigram-web/screenshot/ads.jpg" width="280" alt="Ads"/></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
 
-| Ads |
-|-----|
-| ![Ads](./cordigram-web/screenshot/ads.jpg) |
+</div>
 
 ---
 
 ### 📱 Mobile
 
-| Login | Home | Reels |
-|-------|------|-------|
-| ![Login](./cordigram-mobile/screenshot/login.jpg) | ![Home](./cordigram-mobile/screenshot/home.jpg) | ![Reels](./cordigram-mobile/screenshot/reels.jpg) |
+<div align="center">
 
-| Profile | Notifications | Settings |
-|---------|---------------|----------|
-| ![Profile](./cordigram-mobile/screenshot/profile.jpg) | ![Notifications](./cordigram-mobile/screenshot/notification.jpg) | ![Settings](./cordigram-mobile/screenshot/seettings.jpg) |
+<table>
+  <tr>
+    <td align="center"><b>Login</b></td>
+    <td align="center"><b>Home</b></td>
+    <td align="center"><b>Reels</b></td>
+    <td align="center"><b>Profile</b></td>
+  </tr>
+  <tr>
+    <td><img src="./cordigram-mobile/screenshot/login.jpg" width="180" alt="Login"/></td>
+    <td><img src="./cordigram-mobile/screenshot/home.jpg" width="180" alt="Home"/></td>
+    <td><img src="./cordigram-mobile/screenshot/reels.jpg" width="180" alt="Reels"/></td>
+    <td><img src="./cordigram-mobile/screenshot/profile.jpg" width="180" alt="Profile"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Notifications</b></td>
+    <td align="center"><b>Settings</b></td>
+    <td align="center"><b>Comment</b></td>
+    <td align="center"><b>Ads Dashboard</b></td>
+  </tr>
+  <tr>
+    <td><img src="./cordigram-mobile/screenshot/notification.jpg" width="180" alt="Notifications"/></td>
+    <td><img src="./cordigram-mobile/screenshot/seettings.jpg" width="180" alt="Settings"/></td>
+    <td><img src="./cordigram-mobile/screenshot/commentpost.jpg" width="180" alt="Comment"/></td>
+    <td><img src="./cordigram-mobile/screenshot/dashboardads.jpg" width="180" alt="Ads Dashboard"/></td>
+  </tr>
+</table>
 
-| Comment Post | Menu User | Dashboard Ads |
-|--------------|-----------|---------------|
-| ![Comment Post](./cordigram-mobile/screenshot/commentpost.jpg) | ![Menu User](./cordigram-mobile/screenshot/menuuser.jpg) | ![Dashboard Ads](./cordigram-mobile/screenshot/dashboardads.jpg) |
+</div>
 
 ---
 
 ### 🛡️ Admin Dashboard
 
-| Dashboard | Content Moderation |
-|-----------|--------------------|
-| ![Dashboard](./cordigram-admin/screenshot/dashboard.png) | ![Content Moderation](./cordigram-admin/screenshot/contentmoderation.jpg) |
+<div align="center">
 
-| Resolve Report | Audit Log |
-|----------------|-----------|
-| ![Resolve Report](./cordigram-admin/screenshot/resolvereport.jpg) | ![Audit Log](./cordigram-admin/screenshot/auditlog.jpg) |
+<table>
+  <tr>
+    <td align="center"><b>Dashboard</b></td>
+    <td align="center"><b>Content Moderation</b></td>
+  </tr>
+  <tr>
+    <td><img src="./cordigram-admin/screenshot/dashboard.png" width="420" alt="Dashboard"/></td>
+    <td><img src="./cordigram-admin/screenshot/contentmoderation.jpg" width="420" alt="Content Moderation"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Resolve Report</b></td>
+    <td align="center"><b>Audit Log</b></td>
+  </tr>
+  <tr>
+    <td><img src="./cordigram-admin/screenshot/resolvereport.jpg" width="420" alt="Resolve Report"/></td>
+    <td><img src="./cordigram-admin/screenshot/auditlog.jpg" width="420" alt="Audit Log"/></td>
+  </tr>
+</table>
+
+</div>
 
 ---
 
