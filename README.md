@@ -23,7 +23,7 @@
 
 <div align="center">
 
-*Nền tảng mạng xã hội Cordigram — VTC Academy — Nhóm DualDev*
+*Cordigram Social Media Platform — VTC Academy — DualDev Team*
 
 <br/>
 
@@ -31,41 +31,41 @@
   <tr>
     <td align="center" width="360">
       <a href="https://www.youtube.com/watch?v=tf9XSTiwRig">
-        <img src="https://img.youtube.com/vi/tf9XSTiwRig/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Phần 1 — Social Web & Mobile"/>
+        <img src="https://img.youtube.com/vi/tf9XSTiwRig/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Part 1 — Social Web & Mobile"/>
       </a>
       <br/><br/>
-      <b>Phần 1 — Social Web & Mobile</b>
+      <b>Part 1 — Social Web & Mobile</b>
       <br/>
-      <sub>Tổng quan tính năng mạng xã hội trên Web & Mobile</sub>
+      <sub>Overview of social features on Web & Mobile</sub>
       <br/><br/>
       <a href="https://www.youtube.com/watch?v=tf9XSTiwRig">
-        <img src="https://img.shields.io/badge/▶%20Xem%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Xem trên YouTube"/>
+        <img src="https://img.shields.io/badge/▶%20Watch%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube"/>
       </a>
     </td>
     <td align="center" width="360">
       <a href="https://www.youtube.com/watch?v=KiyZAB27B1s">
-        <img src="https://img.youtube.com/vi/KiyZAB27B1s/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Phần 2 — Tin nhắn UI Web"/>
+        <img src="https://img.youtube.com/vi/KiyZAB27B1s/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Part 2 — Messaging UI Web"/>
       </a>
       <br/><br/>
-      <b>Phần 2 — Tin nhắn UI Web</b>
+      <b>Part 2 — Messaging UI Web</b>
       <br/>
-      <sub>Demo tính năng Direct Messages & Server Channel trên Web</sub>
+      <sub>Demo of Direct Messages & Server Channels on Web</sub>
       <br/><br/>
       <a href="https://www.youtube.com/watch?v=KiyZAB27B1s">
-        <img src="https://img.shields.io/badge/▶%20Xem%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Xem trên YouTube"/>
+        <img src="https://img.shields.io/badge/▶%20Watch%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube"/>
       </a>
     </td>
     <td align="center" width="360">
       <a href="https://www.youtube.com/watch?v=JPfYmIrZI-o">
-        <img src="https://img.youtube.com/vi/JPfYmIrZI-o/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Phần 3 — Tin nhắn UI Mobile"/>
+        <img src="https://img.youtube.com/vi/JPfYmIrZI-o/maxresdefault.jpg" width="340" style="border-radius:8px" alt="Demo Part 3 — Messaging UI Mobile"/>
       </a>
       <br/><br/>
-      <b>Phần 3 — Tin nhắn UI Mobile</b>
+      <b>Part 3 — Messaging UI Mobile</b>
       <br/>
-      <sub>Demo tính năng tin nhắn & cuộc gọi trên ứng dụng Mobile</sub>
+      <sub>Demo of messaging & call features on the Mobile app</sub>
       <br/><br/>
       <a href="https://www.youtube.com/watch?v=JPfYmIrZI-o">
-        <img src="https://img.shields.io/badge/▶%20Xem%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Xem trên YouTube"/>
+        <img src="https://img.shields.io/badge/▶%20Watch%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube"/>
       </a>
     </td>
   </tr>
